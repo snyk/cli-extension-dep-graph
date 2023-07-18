@@ -13,7 +13,6 @@ jobs:
       - run:
           name: run lint check
           command: make lint
-      - notify_slack_on_failure
   unit_test:
     docker:
       - image: cimg/go:1.20
@@ -22,7 +21,6 @@ jobs:
       - run:
           name: run unit tests
           command: make test
-      - notify_slack_on_failure
 
 workflows:
   version: 2
