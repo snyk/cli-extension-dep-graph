@@ -24,7 +24,7 @@ jobs:
 
 workflows:
   version: 2
-  test_and_release:
+  CI:
     jobs:
       - lint:
           name: Lint
@@ -38,4 +38,3 @@ workflows:
             branches:
               ignore:
                 - main
-
