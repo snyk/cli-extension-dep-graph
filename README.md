@@ -1,28 +1,9 @@
-# go-template
+<p align="center">
+  <img src="https://snyk.io/style/asset/logo/snyk-print.svg" />
+</p>
 
-The go-template is a template repo for golang project. it provides basic golang project structure and files
-for quick kickstart of golang project.
+# Snyk DepGraph CLI Extension
 
-## usage
+## Overview
 
-<br><img src="usage.png" width="800" alt="template usage plot"><br>
-
-## Dependency management
-```
-go mod init github.com/snyk/<project name>
-go mod tidy
-```
-
-## Content
-- folders layout 
-- basic make file
-- linter with configuration
-- docker file 
-- circle-ci config file
-- test helper
-- release config file
-
-
-
-
-Note : Not all folders must use , one can be deleted if not needed 
+This module implements the Snyk CLI Extension to generate DepGraphs for a local software project.
