@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  prodsec: snyk/prodsec-orb@1.0
+
 metadata:
   resource_class: small
   working_directory: ~/<project name>
@@ -26,6 +29,12 @@ workflows:
   version: 2
   CI:
     jobs:
+      - prodsec/secrets-scan:
+          name: Scan repository for secrets
+          context:
+            - snyk-bot-slack
+          channel: team-link-pipeline-info
+
       - lint:
           name: Lint
           filters:
