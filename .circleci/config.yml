@@ -34,7 +34,10 @@ workflows:
           context:
             - snyk-bot-slack
           channel: team-link-pipeline-info
-
+          filters:
+            branches:
+              ignore:
+                - main
       - lint:
           name: Lint
           filters:
