@@ -115,5 +115,20 @@ func prepareLegacyFlags(cfg configuration.Configuration, logger *log.Logger) { /
 		logger.Println("Prune repeated sub-dependencies: true")
 	}
 
+	if cfg.GetBool("maven-aggregate-project") {
+		cmdArgs = append(cmdArgs, "--maven-aggregate-project")
+		logger.Println("Ensure all modules are resolvable by the Maven reactor: true")
+	}
+
+	if cfg.GetBool("scan-unmanaged") {
+		cmdArgs = append(cmdArgs, "--scan-unmanaged")
+		logger.Println("Specify an individual JAR, WAR, or AAR file: true")
+	}
+
+	if cfg.GetBool("scan-all-unmanaged") {
+		cmdArgs = append(cmdArgs, "--scan-all-unmanaged")
+		logger.Println("Auto-detect Maven, JAR, WAR, and AAR files recursively from the current folder: true")
+	}
+
 	cfg.Set(configuration.RAW_CMD_ARGS, cmdArgs)
 }
