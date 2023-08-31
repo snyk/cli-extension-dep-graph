@@ -71,7 +71,7 @@ func prepareLegacyFlags(cfg configuration.Configuration, logger *log.Logger) { /
 		cmdArgs = append(cmdArgs, "--all-projects")
 	}
 
-	if cfg.GetBool("fail-fast") {
+	if cfg.GetBool(FlagFailFast) {
 		cmdArgs = append(cmdArgs, "--fail-fast")
 	}
 
@@ -80,7 +80,7 @@ func prepareLegacyFlags(cfg configuration.Configuration, logger *log.Logger) { /
 		logger.Println("Exclude:", exclude)
 	}
 
-	if detectionDepth := cfg.GetString("detection-depth"); detectionDepth != "" {
+	if detectionDepth := cfg.GetString(FlagDetectionDepth); detectionDepth != "" {
 		cmdArgs = append(cmdArgs, "--detection-depth="+detectionDepth)
 		logger.Println("Detection depth:", detectionDepth)
 	}
@@ -90,7 +90,7 @@ func prepareLegacyFlags(cfg configuration.Configuration, logger *log.Logger) { /
 		logger.Println("Target directory:", targetDir)
 	}
 
-	if file := cfg.GetString("file"); file != "" {
+	if file := cfg.GetString(FlagFile); file != "" {
 		cmdArgs = append(cmdArgs, "--file="+file)
 		logger.Println("File:", file)
 	}
@@ -105,29 +105,59 @@ func prepareLegacyFlags(cfg configuration.Configuration, logger *log.Logger) { /
 		logger.Println("Debug: true")
 	}
 
-	if cfg.GetBool("dev") {
+	if cfg.GetBool(FlagDev) {
 		cmdArgs = append(cmdArgs, "--dev")
 		logger.Println("Dev dependencies: true")
 	}
 
-	if cfg.GetBool("prune-repeated-subdependencies") {
+	if cfg.GetBool(FlagPruneRepeatedSubdependencies) {
 		cmdArgs = append(cmdArgs, "--prune-repeated-subdependencies")
 		logger.Println("Prune repeated sub-dependencies: true")
 	}
 
-	if cfg.GetBool("maven-aggregate-project") {
+	if cfg.GetBool(FlagMavenAggregateProject) {
 		cmdArgs = append(cmdArgs, "--maven-aggregate-project")
 		logger.Println("Ensure all modules are resolvable by the Maven reactor: true")
 	}
 
-	if cfg.GetBool("scan-unmanaged") {
+	if cfg.GetBool(FlagScanUnmanaged) {
 		cmdArgs = append(cmdArgs, "--scan-unmanaged")
 		logger.Println("Specify an individual JAR, WAR, or AAR file: true")
 	}
 
-	if cfg.GetBool("scan-all-unmanaged") {
+	if cfg.GetBool(FlagScanAllUnmanaged) {
 		cmdArgs = append(cmdArgs, "--scan-all-unmanaged")
 		logger.Println("Auto-detect Maven, JAR, WAR, and AAR files recursively from the current folder: true")
+	}
+
+	if subProject := cfg.GetString(FlagSubProject); subProject != "" {
+		cmdArgs = append(cmdArgs, "--sub-project="+subProject)
+		logger.Println("Sub-project:", subProject)
+	}
+
+	if gradleSubProject := cfg.GetString(FlagGradleSubProject); gradleSubProject != "" {
+		cmdArgs = append(cmdArgs, "--gradle-sub-project="+gradleSubProject)
+		logger.Println("Gradle sub-project:", gradleSubProject)
+	}
+
+	if cfg.GetBool(FlagAllSubProjects) {
+		cmdArgs = append(cmdArgs, "--all-sub-projects")
+		logger.Println("Test all sub-projects: true")
+	}
+
+	if configurationMatching := cfg.GetString(FlagConfigurationMatching); configurationMatching != "" {
+		cmdArgs = append(cmdArgs, "--configuration-matching="+configurationMatching)
+		logger.Println("Configuration matching:", configurationMatching)
+	}
+
+	if configurationAttributes := cfg.GetString(FlagConfigurationAttributes); configurationAttributes != "" {
+		cmdArgs = append(cmdArgs, "--configuration-attributes="+configurationAttributes)
+		logger.Println("Configuration attributes:", configurationAttributes)
+	}
+
+	if initScript := cfg.GetString(FlagInitScript); initScript != "" {
+		cmdArgs = append(cmdArgs, "--init-script="+initScript)
+		logger.Println("Init script:", initScript)
 	}
 
 	cfg.Set(configuration.RAW_CMD_ARGS, cmdArgs)

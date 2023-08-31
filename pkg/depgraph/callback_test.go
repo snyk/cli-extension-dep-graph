@@ -326,6 +326,42 @@ func Test_callback(t *testing.T) {
 		assert.Contains(t, commandArgs, "--scan-all-unmanaged")
 	})
 
+	t.Run("should support 'sub-project' flag", func(t *testing.T) {
+		config.Set("sub-project", "app")
+		testCmdArgs := invokeWithConfigAndGetTestCmdArgs(t, engineMock, config, invocationContextMock)
+		assert.Contains(t, testCmdArgs, "--sub-project=app")
+	})
+
+	t.Run("should support 'gradle-sub-project' flag", func(t *testing.T) {
+		config.Set("gradle-sub-project", "app")
+		testCmdArgs := invokeWithConfigAndGetTestCmdArgs(t, engineMock, config, invocationContextMock)
+		assert.Contains(t, testCmdArgs, "--gradle-sub-project=app")
+	})
+
+	t.Run("should support 'all-sub-projects' flag", func(t *testing.T) {
+		config.Set("all-sub-projects", true)
+		testCmdArgs := invokeWithConfigAndGetTestCmdArgs(t, engineMock, config, invocationContextMock)
+		assert.Contains(t, testCmdArgs, "--all-sub-projects")
+	})
+
+	t.Run("should support 'configuration-matching' flag", func(t *testing.T) {
+		config.Set("configuration-matching", "^releaseRuntimeClasspath$")
+		testCmdArgs := invokeWithConfigAndGetTestCmdArgs(t, engineMock, config, invocationContextMock)
+		assert.Contains(t, testCmdArgs, "--configuration-matching=^releaseRuntimeClasspath$")
+	})
+
+	t.Run("should support 'configuration-attributes' flag", func(t *testing.T) {
+		config.Set("configuration-attributes", "buildtype:release,usage:java-runtime")
+		testCmdArgs := invokeWithConfigAndGetTestCmdArgs(t, engineMock, config, invocationContextMock)
+		assert.Contains(t, testCmdArgs, "--configuration-attributes=buildtype:release,usage:java-runtime")
+	})
+
+	t.Run("should support 'init-script' flag", func(t *testing.T) {
+		config.Set("init-script", "/somewhere/init.gradle")
+		testCmdArgs := invokeWithConfigAndGetTestCmdArgs(t, engineMock, config, invocationContextMock)
+		assert.Contains(t, testCmdArgs, "--init-script=/somewhere/init.gradle")
+	})
+
 	t.Run("should error if no dependency graphs found", func(t *testing.T) {
 		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
 		data := workflow.NewData(dataIdentifier, "application/json", []byte{})
@@ -340,4 +376,20 @@ func Test_callback(t *testing.T) {
 		// assert
 		assert.ErrorIs(t, err, errNoDepGraphsFound)
 	})
+}
+
+func invokeWithConfigAndGetTestCmdArgs(t *testing.T, engineMock *mocks.MockEngine, config configuration.Configuration, invocationContextMock *mocks.MockInvocationContext) interface{} {
+	dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
+	data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
+
+	// engine mocks
+	id := workflow.NewWorkflowIdentifier("legacycli")
+	engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
+
+	// execute
+	_, err := callback(invocationContextMock, []workflow.Data{})
+
+	// assert
+	assert.Nil(t, err)
+	return config.Get(configuration.RAW_CMD_ARGS)
 }
