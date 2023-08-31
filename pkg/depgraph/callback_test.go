@@ -2,6 +2,7 @@ package depgraph
 
 import (
 	_ "embed"
+	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -33,6 +34,113 @@ func Test_callback(t *testing.T) {
 	invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
 	invocationContextMock.EXPECT().GetLogger().Return(logger).AnyTimes()
 
+	type option struct {
+		key      string
+		value    interface{}
+		expected string
+	}
+
+	options := []option{
+		{
+			key:      configuration.DEBUG,
+			value:    true,
+			expected: "--debug",
+		},
+		{
+			key:      FlagDev,
+			value:    true,
+			expected: "--dev",
+		},
+		{
+			key:      FlagFailFast,
+			value:    true,
+			expected: "--fail-fast",
+		},
+		{
+			key:      FlagAllProjects,
+			value:    true,
+			expected: "--all-projects",
+		},
+		{
+			key:      "targetDirectory",
+			value:    "path/to/target",
+			expected: "path/to/target",
+		},
+		{
+			key:      FlagFile,
+			value:    "path/to/target/file.js",
+			expected: "--file=path/to/target/file.js",
+		},
+		{
+			key:      "exclude",
+			value:    "path/to/target/file.js",
+			expected: "--exclude=path/to/target/file.js",
+		},
+		{
+			key:      FlagDetectionDepth,
+			value:    "42",
+			expected: "--detection-depth=42",
+		},
+		{
+			key:      FlagPruneRepeatedSubdependencies,
+			value:    true,
+			expected: "--prune-repeated-subdependencies",
+		},
+		{
+			key:      "unmanaged",
+			value:    true,
+			expected: "--unmanaged",
+		},
+		{
+			key:      FlagScanUnmanaged,
+			value:    true,
+			expected: "--scan-unmanaged",
+		},
+		{
+			key:      FlagScanAllUnmanaged,
+			value:    true,
+			expected: "--scan-all-unmanaged",
+		},
+		{
+			key:      FlagSubProject,
+			value:    "app",
+			expected: "--sub-project=app",
+		},
+		{
+			key:      FlagGradleSubProject,
+			value:    "app",
+			expected: "--gradle-sub-project=app",
+		},
+		{
+			key:      FlagAllSubProjects,
+			value:    true,
+			expected: "--all-sub-projects",
+		},
+		{
+			key:      FlagConfigurationMatching,
+			value:    "^releaseRuntimeClasspath$",
+			expected: "--configuration-matching=^releaseRuntimeClasspath$",
+		},
+		{
+			key:      FlagConfigurationAttributes,
+			value:    "buildtype:release,usage:java-runtime",
+			expected: "--configuration-attributes=buildtype:release,usage:java-runtime",
+		},
+		{
+			key:      FlagInitScript,
+			value:    "/somewhere/init.gradle",
+			expected: "--init-script=/somewhere/init.gradle",
+		},
+	}
+
+	for _, tc := range options {
+		t.Run(fmt.Sprintf("flag: %s", tc.key), func(t *testing.T) {
+			config.Set(tc.key, tc.value)
+			testCmdArgs := invokeWithConfigAndGetTestCmdArgs(t, engineMock, config, invocationContextMock)
+			assert.Contains(t, testCmdArgs, tc.expected)
+		})
+	}
+
 	t.Run("should return a depGraphList", func(t *testing.T) {
 		// setup
 		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
@@ -51,315 +159,6 @@ func Test_callback(t *testing.T) {
 		actualDepGraph := depGraphs[0].GetPayload().([]byte)
 
 		assert.JSONEq(t, expectedDepGraph, string(actualDepGraph))
-	})
-
-	t.Run("should support 'debug' flag", func(t *testing.T) {
-		// setup
-		config.Set(configuration.DEBUG, true)
-
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
-
-		// engine mocks
-		id := workflow.NewWorkflowIdentifier("legacycli")
-		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
-
-		// execute
-		_, err := callback(invocationContextMock, []workflow.Data{})
-
-		// assert
-		assert.Nil(t, err)
-
-		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
-		assert.Contains(t, commandArgs, "--debug")
-	})
-
-	t.Run("should support 'dev' flag", func(t *testing.T) {
-		// setup
-		config.Set("dev", true)
-
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
-
-		// engine mocks
-		id := workflow.NewWorkflowIdentifier("legacycli")
-		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
-
-		// execute
-		_, err := callback(invocationContextMock, []workflow.Data{})
-
-		// assert
-		assert.Nil(t, err)
-
-		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
-		assert.Contains(t, commandArgs, "--dev")
-	})
-
-	t.Run("should support 'fail-fast' flag", func(t *testing.T) {
-		// setup
-		config.Set("fail-fast", true)
-
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
-
-		// engine mocks
-		id := workflow.NewWorkflowIdentifier("legacycli")
-		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
-
-		// execute
-		_, err := callback(invocationContextMock, []workflow.Data{})
-
-		// assert
-		assert.Nil(t, err)
-
-		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
-		assert.Contains(t, commandArgs, "--fail-fast")
-	})
-
-	t.Run("should support 'all-projects' flag", func(t *testing.T) {
-		// setup
-		config.Set("all-projects", true)
-
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
-
-		// engine mocks
-		id := workflow.NewWorkflowIdentifier("legacycli")
-		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
-
-		// execute
-		_, err := callback(invocationContextMock, []workflow.Data{})
-
-		// assert
-		assert.Nil(t, err)
-
-		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
-		assert.Contains(t, commandArgs, "--all-projects")
-	})
-
-	t.Run("should support custom 'targetDirectory'", func(t *testing.T) {
-		// setup
-		config.Set("targetDirectory", "path/to/target")
-
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
-
-		// engine mocks
-		id := workflow.NewWorkflowIdentifier("legacycli")
-		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
-
-		// execute
-		_, err := callback(invocationContextMock, []workflow.Data{})
-
-		// assert
-		assert.Nil(t, err)
-
-		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
-		assert.Contains(t, commandArgs, "path/to/target")
-	})
-
-	t.Run("should support 'file' flag", func(t *testing.T) {
-		// setup
-		config.Set("file", "path/to/target/file.js")
-
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
-
-		// engine mocks
-		id := workflow.NewWorkflowIdentifier("legacycli")
-		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
-
-		// execute
-		_, err := callback(invocationContextMock, []workflow.Data{})
-
-		// assert
-		assert.Nil(t, err)
-
-		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
-		assert.Contains(t, commandArgs, "--file=path/to/target/file.js")
-	})
-
-	t.Run("should support 'exclude' flag", func(t *testing.T) {
-		// setup
-		config.Set("exclude", "path/to/target/file.js")
-
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
-
-		// engine mocks
-		id := workflow.NewWorkflowIdentifier("legacycli")
-		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
-
-		// execute
-		_, err := callback(invocationContextMock, []workflow.Data{})
-
-		// assert
-		assert.Nil(t, err)
-
-		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
-		assert.Contains(t, commandArgs, "--exclude=path/to/target/file.js")
-	})
-
-	t.Run("should support 'detection-depth' flag", func(t *testing.T) {
-		// setup
-		config.Set("detection-depth", "42")
-
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
-
-		// engine mocks
-		id := workflow.NewWorkflowIdentifier("legacycli")
-		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
-
-		// execute
-		_, err := callback(invocationContextMock, []workflow.Data{})
-
-		// assert
-		assert.Nil(t, err)
-
-		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
-		assert.Contains(t, commandArgs, "--detection-depth=42")
-	})
-
-	t.Run("should support 'prune-repeated-subdependencies' flag", func(t *testing.T) {
-		// setup
-		config.Set("prune-repeated-subdependencies", true)
-
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
-
-		// engine mocks
-		id := workflow.NewWorkflowIdentifier("legacycli")
-		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
-
-		// execute
-		_, err := callback(invocationContextMock, []workflow.Data{})
-
-		// assert
-		assert.Nil(t, err)
-
-		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
-		assert.Contains(t, commandArgs, "--prune-repeated-subdependencies")
-	})
-
-	t.Run("should support 'unmanaged' flag", func(t *testing.T) {
-		// setup
-		config.Set("unmanaged", true)
-
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
-
-		// engine mocks
-		id := workflow.NewWorkflowIdentifier("legacycli")
-		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
-
-		// execute
-		_, err := callback(invocationContextMock, []workflow.Data{})
-
-		// assert
-		assert.Nil(t, err)
-
-		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
-		assert.Contains(t, commandArgs, "--unmanaged")
-	})
-
-	t.Run("should support 'prune-repeated-subdependencies' flag", func(t *testing.T) {
-		// setup
-		config.Set("prune-repeated-subdependencies", true)
-
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
-
-		// engine mocks
-		id := workflow.NewWorkflowIdentifier("legacycli")
-		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
-
-		// execute
-		_, err := callback(invocationContextMock, []workflow.Data{})
-
-		// assert
-		assert.Nil(t, err)
-
-		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
-		assert.Contains(t, commandArgs, "--prune-repeated-subdependencies")
-	})
-
-	t.Run("should support 'scan-unmanaged' flag", func(t *testing.T) {
-		// setup
-		config.Set("scan-unmanaged", true)
-
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
-
-		// engine mocks
-		id := workflow.NewWorkflowIdentifier("legacycli")
-		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
-
-		// execute
-		_, err := callback(invocationContextMock, []workflow.Data{})
-
-		// assert
-		assert.Nil(t, err)
-
-		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
-		assert.Contains(t, commandArgs, "--scan-unmanaged")
-	})
-
-	t.Run("should support 'scan-all-unmanaged' flag", func(t *testing.T) {
-		// setup
-		config.Set("scan-all-unmanaged", true)
-
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
-
-		// engine mocks
-		id := workflow.NewWorkflowIdentifier("legacycli")
-		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
-
-		// execute
-		_, err := callback(invocationContextMock, []workflow.Data{})
-
-		// assert
-		assert.Nil(t, err)
-
-		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
-		assert.Contains(t, commandArgs, "--scan-all-unmanaged")
-	})
-
-	t.Run("should support 'sub-project' flag", func(t *testing.T) {
-		config.Set("sub-project", "app")
-		testCmdArgs := invokeWithConfigAndGetTestCmdArgs(t, engineMock, config, invocationContextMock)
-		assert.Contains(t, testCmdArgs, "--sub-project=app")
-	})
-
-	t.Run("should support 'gradle-sub-project' flag", func(t *testing.T) {
-		config.Set("gradle-sub-project", "app")
-		testCmdArgs := invokeWithConfigAndGetTestCmdArgs(t, engineMock, config, invocationContextMock)
-		assert.Contains(t, testCmdArgs, "--gradle-sub-project=app")
-	})
-
-	t.Run("should support 'all-sub-projects' flag", func(t *testing.T) {
-		config.Set("all-sub-projects", true)
-		testCmdArgs := invokeWithConfigAndGetTestCmdArgs(t, engineMock, config, invocationContextMock)
-		assert.Contains(t, testCmdArgs, "--all-sub-projects")
-	})
-
-	t.Run("should support 'configuration-matching' flag", func(t *testing.T) {
-		config.Set("configuration-matching", "^releaseRuntimeClasspath$")
-		testCmdArgs := invokeWithConfigAndGetTestCmdArgs(t, engineMock, config, invocationContextMock)
-		assert.Contains(t, testCmdArgs, "--configuration-matching=^releaseRuntimeClasspath$")
-	})
-
-	t.Run("should support 'configuration-attributes' flag", func(t *testing.T) {
-		config.Set("configuration-attributes", "buildtype:release,usage:java-runtime")
-		testCmdArgs := invokeWithConfigAndGetTestCmdArgs(t, engineMock, config, invocationContextMock)
-		assert.Contains(t, testCmdArgs, "--configuration-attributes=buildtype:release,usage:java-runtime")
-	})
-
-	t.Run("should support 'init-script' flag", func(t *testing.T) {
-		config.Set("init-script", "/somewhere/init.gradle")
-		testCmdArgs := invokeWithConfigAndGetTestCmdArgs(t, engineMock, config, invocationContextMock)
-		assert.Contains(t, testCmdArgs, "--init-script=/somewhere/init.gradle")
 	})
 
 	t.Run("should error if no dependency graphs found", func(t *testing.T) {
