@@ -263,6 +263,69 @@ func Test_callback(t *testing.T) {
 		assert.Contains(t, commandArgs, "--unmanaged")
 	})
 
+	t.Run("should support 'prune-repeated-subdependencies' flag", func(t *testing.T) {
+		// setup
+		config.Set("prune-repeated-subdependencies", true)
+
+		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
+		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
+
+		// engine mocks
+		id := workflow.NewWorkflowIdentifier("legacycli")
+		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
+
+		// execute
+		_, err := callback(invocationContextMock, []workflow.Data{})
+
+		// assert
+		assert.Nil(t, err)
+
+		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
+		assert.Contains(t, commandArgs, "--prune-repeated-subdependencies")
+	})
+
+	t.Run("should support 'scan-unmanaged' flag", func(t *testing.T) {
+		// setup
+		config.Set("scan-unmanaged", true)
+
+		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
+		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
+
+		// engine mocks
+		id := workflow.NewWorkflowIdentifier("legacycli")
+		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
+
+		// execute
+		_, err := callback(invocationContextMock, []workflow.Data{})
+
+		// assert
+		assert.Nil(t, err)
+
+		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
+		assert.Contains(t, commandArgs, "--scan-unmanaged")
+	})
+
+	t.Run("should support 'scan-all-unmanaged' flag", func(t *testing.T) {
+		// setup
+		config.Set("scan-all-unmanaged", true)
+
+		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
+		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
+
+		// engine mocks
+		id := workflow.NewWorkflowIdentifier("legacycli")
+		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
+
+		// execute
+		_, err := callback(invocationContextMock, []workflow.Data{})
+
+		// assert
+		assert.Nil(t, err)
+
+		commandArgs := config.Get(configuration.RAW_CMD_ARGS)
+		assert.Contains(t, commandArgs, "--scan-all-unmanaged")
+	})
+
 	t.Run("should error if no dependency graphs found", func(t *testing.T) {
 		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
 		data := workflow.NewData(dataIdentifier, "application/json", []byte{})
