@@ -131,6 +131,26 @@ func Test_callback(t *testing.T) {
 			value:    "/somewhere/init.gradle",
 			expected: "--init-script=/somewhere/init.gradle",
 		},
+		{
+			key:      FlagYarnWorkspaces,
+			value:    true,
+			expected: "--yarn-workspaces",
+		},
+		{
+			key:      FlagPythonCommand,
+			value:    "python3",
+			expected: "--command=python3",
+		},
+		{
+			key:      FlagPythonSkipUnresolved,
+			value:    true,
+			expected: "--skip-unresolved",
+		},
+		{
+			key:      FlagPythonPackageManager,
+			value:    "pip",
+			expected: "--package-manager=pip",
+		},
 	}
 
 	for _, tc := range options {
