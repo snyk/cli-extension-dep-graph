@@ -3,6 +3,7 @@ package depgraph
 import (
 	"bytes"
 	"log"
+	"strconv"
 	"strings"
 
 	"github.com/snyk/go-application-framework/pkg/configuration"
@@ -193,6 +194,10 @@ func prepareLegacyFlags(cfg configuration.Configuration, logger *log.Logger) { /
 	if pyPkgManager := cfg.GetString(FlagPythonPackageManager); pyPkgManager != "" {
 		cmdArgs = append(cmdArgs, "--package-manager="+pyPkgManager)
 		logger.Println("Python package manager:", pyPkgManager)
+	}
+
+	if maxDepth := cfg.GetInt(FlagUnmanagedMaxDepth); maxDepth != 0 {
+		cmdArgs = append(cmdArgs, "--max-depth="+strconv.Itoa(maxDepth))
 	}
 
 	cfg.Set(configuration.RAW_CMD_ARGS, cmdArgs)
