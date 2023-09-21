@@ -160,6 +160,21 @@ func prepareLegacyFlags(cfg configuration.Configuration, logger *log.Logger) { /
 		logger.Println("Init script:", initScript)
 	}
 
+	if cfg.GetBool(FlagNPMStrictOutOfSync) {
+		cmdArgs = append(cmdArgs, "--strict-out-of-sync")
+		logger.Println("NPM strict-out-of-sync: true")
+	}
+
+	if cfg.GetBool(FlagNugetAssetsProjectName) {
+		cmdArgs = append(cmdArgs, "--assets-project-name")
+		logger.Println("NuGet assets-project-name: true")
+	}
+
+	if file := cfg.GetString(FlagNugetPkgsFolder); file != "" {
+		cmdArgs = append(cmdArgs, "--packages-folder="+file)
+		logger.Println("NuGet packages-folder: ", file)
+	}
+
 	if cfg.GetBool(FlagYarnWorkspaces) {
 		cmdArgs = append(cmdArgs, "--yarn-workspaces")
 		logger.Println("Yarn Workspaces: true")
