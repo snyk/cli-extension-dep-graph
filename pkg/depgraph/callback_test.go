@@ -166,6 +166,11 @@ func Test_callback(t *testing.T) {
 			value:    "../packages",
 			expected: "--packages-folder=../packages",
 		},
+		{
+			key:      FlagUnmanagedMaxDepth,
+			value:    "42",
+			expected: "--max-depth=42",
+		},
 	}
 
 	for _, tc := range options {

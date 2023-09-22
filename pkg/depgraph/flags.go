@@ -25,6 +25,7 @@ const (
 	FlagNPMStrictOutOfSync           = "strict-out-of-sync"
 	FlagNugetAssetsProjectName       = "assets-project-name"
 	FlagNugetPkgsFolder              = "packages-folder"
+	FlagUnmanagedMaxDepth            = "max-depth"
 )
 
 func getFlagSet() *pflag.FlagSet {
@@ -52,6 +53,7 @@ func getFlagSet() *pflag.FlagSet {
 	flagSet.Bool(FlagNPMStrictOutOfSync, true, "Prevent testing out-of-sync NPM lockfiles.")
 	flagSet.String(FlagNugetAssetsProjectName, "", "When you are monitoring a .NET project using NuGet PackageReference uses the project name in project.assets.json if found.")
 	flagSet.String(FlagNugetPkgsFolder, "", "Specify a custom path to the packages folder when using NuGet.")
+	flagSet.Int(FlagUnmanagedMaxDepth, 0, "Specify the maximum level of archive extraction for unmanaged scanning.")
 
 	return flagSet
 }
