@@ -160,5 +160,25 @@ func prepareLegacyFlags(cfg configuration.Configuration, logger *log.Logger) { /
 		logger.Println("Init script:", initScript)
 	}
 
+	if cfg.GetBool(FlagYarnWorkspaces) {
+		cmdArgs = append(cmdArgs, "--yarn-workspaces")
+		logger.Println("Yarn Workspaces: true")
+	}
+
+	if pyCmd := cfg.GetString(FlagPythonCommand); pyCmd != "" {
+		cmdArgs = append(cmdArgs, "--command="+pyCmd)
+		logger.Println("Python command:", pyCmd)
+	}
+
+	if cfg.GetBool(FlagPythonSkipUnresolved) {
+		cmdArgs = append(cmdArgs, "--skip-unresolved")
+		logger.Println("Python skip unresolved: true")
+	}
+
+	if pyPkgManager := cfg.GetString(FlagPythonPackageManager); pyPkgManager != "" {
+		cmdArgs = append(cmdArgs, "--package-manager="+pyPkgManager)
+		logger.Println("Python package manager:", pyPkgManager)
+	}
+
 	cfg.Set(configuration.RAW_CMD_ARGS, cmdArgs)
 }

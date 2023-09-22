@@ -18,6 +18,10 @@ const (
 	FlagConfigurationMatching        = "configuration-matching"
 	FlagConfigurationAttributes      = "configuration-attributes"
 	FlagInitScript                   = "init-script"
+	FlagYarnWorkspaces               = "yarn-workspaces"
+	FlagPythonCommand                = "command"
+	FlagPythonSkipUnresolved         = "skip-unresolved"
+	FlagPythonPackageManager         = "package-manager"
 )
 
 func getFlagSet() *pflag.FlagSet {
@@ -38,6 +42,10 @@ func getFlagSet() *pflag.FlagSet {
 	flagSet.String(FlagConfigurationMatching, "", "Resolve dependencies using only configuration(s) that match the specified Java regular expression.")
 	flagSet.String(FlagConfigurationAttributes, "", "Select certain values of configuration attributes to install and resolve dependencies.")
 	flagSet.String(FlagInitScript, "", "Use for projects that contain a Gradle initialization script.")
+	flagSet.Bool(FlagYarnWorkspaces, false, "Detect and scan Yarn Workspaces only when a lockfile is in the root.")
+	flagSet.String(FlagPythonCommand, "", "Indicate which specific Python commands to use based on the Python version.")
+	flagSet.Bool(FlagPythonSkipUnresolved, false, "Skip Python packages that cannot be found in the environment.")
+	flagSet.String(FlagPythonPackageManager, "", `Add --package-manager=pip to your command if the file name is not "requirements.txt".`)
 
 	return flagSet
 }
