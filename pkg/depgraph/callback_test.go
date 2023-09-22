@@ -151,6 +151,21 @@ func Test_callback(t *testing.T) {
 			value:    "pip",
 			expected: "--package-manager=pip",
 		},
+		{
+			key:      FlagNPMStrictOutOfSync,
+			value:    true,
+			expected: "--strict-out-of-sync",
+		},
+		{
+			key:      FlagNugetAssetsProjectName,
+			value:    true,
+			expected: "--assets-project-name",
+		},
+		{
+			key:      FlagNugetPkgsFolder,
+			value:    "../packages",
+			expected: "--packages-folder=../packages",
+		},
 	}
 
 	for _, tc := range options {
