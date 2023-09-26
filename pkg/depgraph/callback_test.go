@@ -143,8 +143,8 @@ func Test_callback(t *testing.T) {
 		},
 		{
 			key:      FlagPythonSkipUnresolved,
-			value:    true,
-			expected: "--skip-unresolved",
+			value:    "true",
+			expected: "--skip-unresolved=true",
 		},
 		{
 			key:      FlagPythonPackageManager,

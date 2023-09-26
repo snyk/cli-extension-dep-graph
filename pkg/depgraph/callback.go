@@ -186,8 +186,8 @@ func prepareLegacyFlags(cfg configuration.Configuration, logger *log.Logger) { /
 		logger.Println("Python command:", pyCmd)
 	}
 
-	if cfg.GetBool(FlagPythonSkipUnresolved) {
-		cmdArgs = append(cmdArgs, "--skip-unresolved")
+	if skipUnresolved := cfg.GetString(FlagPythonSkipUnresolved); skipUnresolved != "" {
+		cmdArgs = append(cmdArgs, "--skip-unresolved="+skipUnresolved)
 		logger.Println("Python skip unresolved: true")
 	}
 
