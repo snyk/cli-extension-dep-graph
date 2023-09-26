@@ -161,9 +161,9 @@ func prepareLegacyFlags(cfg configuration.Configuration, logger *log.Logger) { /
 		logger.Println("Init script:", initScript)
 	}
 
-	if cfg.GetBool(FlagNPMStrictOutOfSync) {
-		cmdArgs = append(cmdArgs, "--strict-out-of-sync")
-		logger.Println("NPM strict-out-of-sync: true")
+	if cfg.GetString(FlagNPMStrictOutOfSync) == "false" {
+		cmdArgs = append(cmdArgs, "--strict-out-of-sync=false")
+		logger.Println("NPM strict-out-of-sync: false")
 	}
 
 	if cfg.GetBool(FlagNugetAssetsProjectName) {

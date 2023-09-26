@@ -153,8 +153,8 @@ func Test_callback(t *testing.T) {
 		},
 		{
 			key:      FlagNPMStrictOutOfSync,
-			value:    true,
-			expected: "--strict-out-of-sync",
+			value:    "false",
+			expected: "--strict-out-of-sync=false",
 		},
 		{
 			key:      FlagNugetAssetsProjectName,
