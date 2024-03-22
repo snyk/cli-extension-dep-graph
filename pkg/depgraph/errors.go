@@ -15,6 +15,7 @@ type LegacyCLIJSONError struct {
 	Ok       bool   `json:"ok"`
 	ErrorMsg string `json:"error"`
 	Path     string `json:"path"`
+	exitErr  error
 }
 
 // Error returns the LegacyCliJsonError error message
@@ -22,7 +23,14 @@ func (e *LegacyCLIJSONError) Error() string {
 	return e.ErrorMsg
 }
 
-var _ error = (*LegacyCLIJSONError)(nil)
+func (e *LegacyCLIJSONError) Unwrap() error {
+	return e.exitErr
+}
+
+var _ interface {
+	error
+	Unwrap() error
+} = new(LegacyCLIJSONError)
 
 // extractLegacyCLIError extracts the error message from the legacy cli if possible
 func extractLegacyCLIError(input error, data []workflow.Data) error {
@@ -33,6 +41,7 @@ func extractLegacyCLIError(input error, data []workflow.Data) error {
 		bytes, _ := data[0].GetPayload().([]byte)
 
 		var decodedError LegacyCLIJSONError
+		decodedError.exitErr = input
 		err := json.Unmarshal(bytes, &decodedError)
 		if err == nil {
 			output = &decodedError
