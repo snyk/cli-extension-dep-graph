@@ -1,8 +1,7 @@
 version: 2.1
 
 orbs:
-  prodsec: snyk/prodsec-orb@1.0
-  snyk: snyk/snyk@1.7.1
+  prodsec: snyk/prodsec-orb@1
 
 metadata:
   resource_class: small
@@ -31,25 +30,14 @@ jobs:
           name: run unit tests
           command: make test
 
-  scan-code:
+  security-scans:
     <<: *go_image
+    resource_class: small
     steps:
       - checkout
-      - snyk/scan:
-          command: code test
-          fail-on-issues: true
-          severity-threshold: high
-          monitor-on-build: false
-
-  scan-deps:
-    <<: *go_image
-    steps:
-      - checkout
-      - snyk/scan:
-          additional-arguments: --all-projects --exclude=scripts
-          fail-on-issues: true
-          severity-threshold: high
-          monitor-on-build: false
+      - prodsec/security_scans:
+          mode: auto
+          iac-scan: disabled
 
 workflows:
   version: 2
@@ -59,8 +47,15 @@ workflows:
           name: Scan repository for secrets
           context:
             - snyk-bot-slack
-          channel: team-link-pipeline-info
-
+          channel: team-unify-alerts
+          filters:
+            branches:
+              ignore:
+                - main
+      - security-scans:
+          name: Security Scans
+          context:
+            - analysis_unify
       - lint:
           name: Lint
           filters:
@@ -69,26 +64,6 @@ workflows:
                 - main
       - unit_test:
           name: Unit tests
-          filters:
-            branches:
-              ignore:
-                - main
-
-      - scan-code:
-          name: Scan Code
-          context:
-            - snyk-token-team-link
-            - snyk-bot-slack
-          filters:
-            branches:
-              ignore:
-                - main
-
-      - scan-deps:
-          name: Scan Dependencies
-          context:
-            - snyk-token-team-link
-            - snyk-bot-slack
           filters:
             branches:
               ignore:
