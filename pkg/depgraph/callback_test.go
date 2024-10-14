@@ -112,6 +112,11 @@ func Test_callback(t *testing.T) {
 			expected: "--gradle-sub-project=app",
 		},
 		{
+			key:      FlagGradleNormalizeDeps,
+			value:    true,
+			expected: "--gradle-normalize-deps",
+		},
+		{
 			key:      FlagAllSubProjects,
 			value:    true,
 			expected: "--all-sub-projects",
