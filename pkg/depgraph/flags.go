@@ -14,6 +14,7 @@ const (
 	FlagScanAllUnmanaged             = "scan-all-unmanaged"
 	FlagSubProject                   = "sub-project"
 	FlagGradleSubProject             = "gradle-sub-project"
+	FlagGradleNormalizeDeps          = "gradle-normalize-deps"
 	FlagAllSubProjects               = "all-sub-projects"
 	FlagConfigurationMatching        = "configuration-matching"
 	FlagConfigurationAttributes      = "configuration-attributes"
@@ -42,6 +43,7 @@ func getFlagSet() *pflag.FlagSet {
 	flagSet.Bool(FlagScanAllUnmanaged, false, "Auto-detect Maven, JAR, WAR, and AAR files recursively from the current folder.")
 	flagSet.String(FlagSubProject, "", "Name of Gradle sub-project to test.")
 	flagSet.String(FlagGradleSubProject, "", "Name of Gradle sub-project to test.")
+	flagSet.Bool(FlagGradleNormalizeDeps, false, "Normalize Gradle dependencies.")
 	flagSet.Bool(FlagAllSubProjects, false, "Test all sub-projects in a multi-project build.")
 	flagSet.String(FlagConfigurationMatching, "", "Resolve dependencies using only configuration(s) that match the specified Java regular expression.")
 	flagSet.String(FlagConfigurationAttributes, "", "Select certain values of configuration attributes to install and resolve dependencies.")

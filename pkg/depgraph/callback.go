@@ -141,6 +141,11 @@ func prepareLegacyFlags(cfg configuration.Configuration, logger *log.Logger) { /
 		logger.Println("Gradle sub-project:", gradleSubProject)
 	}
 
+	if cfg.GetBool(FlagGradleNormalizeDeps) {
+		cmdArgs = append(cmdArgs, "--gradle-normalize-deps")
+		logger.Println("Normalize Gradle dependencies: true")
+	}
+
 	if cfg.GetBool(FlagAllSubProjects) {
 		cmdArgs = append(cmdArgs, "--all-sub-projects")
 		logger.Println("Test all sub-projects: true")
