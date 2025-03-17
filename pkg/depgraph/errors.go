@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os/exec"
 
+	clierrors "github.com/snyk/error-catalog-golang-public/cli"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 )
 
@@ -37,7 +38,8 @@ func extractLegacyCLIError(input error, data []workflow.Data) error {
 	output := input
 
 	// extract error from legacy cli if possible and wrap it in an error instance
-	if _, ok := input.(*exec.ExitError); ok && data != nil && len(data) > 0 {
+	var xerr *exec.ExitError
+	if errors.As(input, &xerr) && len(data) > 0 {
 		bytes, _ := data[0].GetPayload().([]byte)
 
 		var decodedError LegacyCLIJSONError
@@ -48,5 +50,5 @@ func extractLegacyCLIError(input error, data []workflow.Data) error {
 		}
 	}
 
-	return output
+	return clierrors.NewGeneralSCAFailureError(output.Error())
 }
