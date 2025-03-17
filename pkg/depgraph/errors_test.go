@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,15 +17,14 @@ func Test_extractLegacyCLIError_ErrorFromLegacyCLI(t *testing.T) {
 		"path": "/"
 	  }`
 
-	inputError := &exec.ExitError{}
+	wrappedErr := fmt.Errorf("something bad happened: %w", &exec.ExitError{})
 	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, "something"), "application/json", []byte(expectedMsgJSON))
 
-	outputError := extractLegacyCLIError(inputError, []workflow.Data{data})
+	outputError := extractLegacyCLIError(wrappedErr, []workflow.Data{data})
 
-	assert.NotNil(t, outputError)
-	assert.Equal(t, "Hello Error", outputError.Error())
-
-	assert.IsType(t, &LegacyCLIJSONError{}, outputError)
+	var snykErr snyk_errors.Error
+	assert.ErrorAs(t, outputError, &snykErr)
+	assert.Equal(t, "Hello Error", snykErr.Detail)
 }
 
 func Test_extractLegacyCLIError_InputSameAsOutput(t *testing.T) {
@@ -33,15 +33,7 @@ func Test_extractLegacyCLIError_InputSameAsOutput(t *testing.T) {
 
 	outputError := extractLegacyCLIError(inputError, []workflow.Data{data})
 
-	assert.NotNil(t, outputError)
-	assert.Equal(t, inputError.Error(), outputError.Error())
-}
-
-func Test_extractLegacyCLIError_RetainExitError(t *testing.T) {
-	inputError := &exec.ExitError{}
-	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, "something"), "application/json", []byte{})
-
-	outputError := extractLegacyCLIError(inputError, []workflow.Data{data})
-
-	assert.ErrorIs(t, outputError, inputError)
+	var snykErr snyk_errors.Error
+	assert.ErrorAs(t, outputError, &snykErr)
+	assert.Equal(t, inputError.Error(), snykErr.Detail)
 }

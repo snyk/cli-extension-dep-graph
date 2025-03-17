@@ -60,7 +60,7 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 		}
 	}
 
-	logger.Printf("depgraph workflow done (%d)", len(depGraphList))
+	logger.Printf("DepGraph workflow done (extracted %d dependency graphs)", len(depGraphList))
 
 	return depGraphList, nil
 }
