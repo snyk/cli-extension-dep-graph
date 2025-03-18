@@ -6,6 +6,7 @@ import (
 	"os/exec"
 
 	clierrors "github.com/snyk/error-catalog-golang-public/cli"
+	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 )
 
@@ -50,5 +51,5 @@ func extractLegacyCLIError(input error, data []workflow.Data) error {
 		}
 	}
 
-	return clierrors.NewGeneralSCAFailureError(output.Error())
+	return clierrors.NewGeneralSCAFailureError(output.Error(), snyk_errors.WithCause(output))
 }

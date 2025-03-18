@@ -37,3 +37,12 @@ func Test_extractLegacyCLIError_InputSameAsOutput(t *testing.T) {
 	assert.ErrorAs(t, outputError, &snykErr)
 	assert.Equal(t, inputError.Error(), snykErr.Detail)
 }
+
+func Test_extractLegacyCLIError_RetainExitError(t *testing.T) {
+	inputError := &exec.ExitError{}
+	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, "something"), "application/json", []byte{})
+
+	outputError := extractLegacyCLIError(inputError, []workflow.Data{data})
+
+	assert.ErrorIs(t, outputError, inputError)
+}
