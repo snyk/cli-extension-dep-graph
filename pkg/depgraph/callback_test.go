@@ -186,6 +186,16 @@ func Test_callback(t *testing.T) {
 		})
 	}
 
+	t.Run("should not include target directory if file flag provided", func(t *testing.T) {
+		config.Set(FlagFile, "path/to/target/file.js")
+		config.Set("targetDirectory", "path/to/target")
+
+		testCmdArgs := invokeWithConfigAndGetTestCmdArgs(t, engineMock, config, invocationContextMock)
+
+		assert.Contains(t, testCmdArgs, "--file=path/to/target/file.js")
+		assert.NotContains(t, testCmdArgs, "path/to/target")
+	})
+
 	t.Run("should return a depGraphList", func(t *testing.T) {
 		// setup
 		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")

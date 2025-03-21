@@ -86,14 +86,14 @@ func prepareLegacyFlags(cfg configuration.Configuration, logger *log.Logger) { /
 		logger.Println("Detection depth:", detectionDepth)
 	}
 
-	if targetDir := cfg.GetString(configuration.INPUT_DIRECTORY); targetDir != "" {
-		cmdArgs = append(cmdArgs, targetDir)
-		logger.Println("Target directory:", targetDir)
-	}
-
 	if file := cfg.GetString(FlagFile); file != "" {
 		cmdArgs = append(cmdArgs, "--file="+file)
 		logger.Println("File:", file)
+	} else {
+		if targetDir := cfg.GetString(configuration.INPUT_DIRECTORY); targetDir != "" {
+			cmdArgs = append(cmdArgs, targetDir)
+			logger.Println("Target directory:", targetDir)
+		}
 	}
 
 	if cfg.GetBool("unmanaged") {
