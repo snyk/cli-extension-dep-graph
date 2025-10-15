@@ -205,5 +205,10 @@ func prepareLegacyFlags(cfg configuration.Configuration, logger *log.Logger) { /
 		cmdArgs = append(cmdArgs, "--max-depth="+strconv.Itoa(maxDepth))
 	}
 
+	if cfg.GetBool(FlagIncludeProvenance) {
+		cmdArgs = append(cmdArgs, "--include-provenance")
+		logger.Println("Include provenance: true")
+	}
+
 	cfg.Set(configuration.RAW_CMD_ARGS, cmdArgs)
 }

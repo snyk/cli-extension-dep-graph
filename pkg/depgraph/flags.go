@@ -27,6 +27,7 @@ const (
 	FlagNugetAssetsProjectName       = "assets-project-name"
 	FlagNugetPkgsFolder              = "packages-folder"
 	FlagUnmanagedMaxDepth            = "max-depth"
+	FlagIncludeProvenance            = "include-provenance"
 )
 
 func getFlagSet() *pflag.FlagSet {
@@ -56,6 +57,7 @@ func getFlagSet() *pflag.FlagSet {
 	flagSet.Bool(FlagNugetAssetsProjectName, false, "When you are monitoring a .NET project using NuGet PackageReference uses the project name in project.assets.json if found.")
 	flagSet.String(FlagNugetPkgsFolder, "", "Specify a custom path to the packages folder when using NuGet.")
 	flagSet.Int(FlagUnmanagedMaxDepth, 0, "Specify the maximum level of archive extraction for unmanaged scanning.")
+	flagSet.Bool(FlagIncludeProvenance, false, "Include checksums in purl to support package provenance.")
 
 	return flagSet
 }
