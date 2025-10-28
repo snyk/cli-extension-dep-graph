@@ -2,6 +2,7 @@ package depgraph
 
 import (
 	"bytes"
+	_ "embed"
 	"log"
 	"strconv"
 	"strings"
@@ -18,6 +19,9 @@ var (
 	legacyWorkflowID = workflow.NewWorkflowIdentifier("legacycli")
 )
 
+//go:embed testdata/mock_depgraph.json
+var mockDepGraph []byte
+
 func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Data, error) {
 	depGraphList := []workflow.Data{}
 
@@ -26,6 +30,15 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 	logger := ctx.GetLogger()
 
 	logger.Println("DepGraph workflow start")
+
+	// Check if SBOM resolution mode is enabled
+	if config.GetBool(FlagUseSBOMResolve) {
+		logger.Println("SBOM resolve mode enabled, returning mock dependency graph")
+		data := workflow.NewData(DataTypeID, "application/json", mockDepGraph)
+		data.SetMetaData("Content-Location", "uv.lock")
+		logger.Println("SBOM resolve mode done, returning mock dependency graph")
+		return []workflow.Data{data}, nil
+	}
 
 	// prepare invocation of the legacy cli
 	prepareLegacyFlags(config, logger)
