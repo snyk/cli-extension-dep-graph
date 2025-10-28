@@ -28,7 +28,7 @@ const (
 	FlagNugetPkgsFolder              = "packages-folder"
 	FlagUnmanagedMaxDepth            = "max-depth"
 	FlagIncludeProvenance            = "include-provenance"
-	FlagUseSBOMResolve               = "use-sbom-resolve"
+	FlagUseSBOMResolution            = "use-sbom-resolution"
 )
 
 func getFlagSet() *pflag.FlagSet {
@@ -59,7 +59,7 @@ func getFlagSet() *pflag.FlagSet {
 	flagSet.String(FlagNugetPkgsFolder, "", "Specify a custom path to the packages folder when using NuGet.")
 	flagSet.Int(FlagUnmanagedMaxDepth, 0, "Specify the maximum level of archive extraction for unmanaged scanning.")
 	flagSet.Bool(FlagIncludeProvenance, false, "Include checksums in purl to support package provenance.")
-	flagSet.Bool(FlagUseSBOMResolve, false, "Use SBOM resolution instead of legacy CLI.")
+	flagSet.Bool(FlagUseSBOMResolution, false, "Use SBOM resolution instead of legacy CLI.")
 
 	return flagSet
 }

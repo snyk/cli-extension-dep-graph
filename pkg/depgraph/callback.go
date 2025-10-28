@@ -32,7 +32,7 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 	logger.Println("DepGraph workflow start")
 
 	// Check if SBOM resolution mode is enabled
-	if config.GetBool(FlagUseSBOMResolve) {
+	if config.GetBool(FlagUseSBOMResolution) {
 		logger.Println("SBOM resolve mode enabled, returning mock dependency graph")
 		data := workflow.NewData(DataTypeID, "application/json", mockDepGraph)
 		data.SetMetaData("Content-Location", "uv.lock")

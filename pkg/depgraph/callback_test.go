@@ -24,10 +24,10 @@ var expectedDepGraph string
 //go:embed testdata/mock_depgraph.json
 var expectedMockDepGraph string
 
-func Test_callback_SBOMResolve(t *testing.T) {
+func Test_callback_SBOMResolution(t *testing.T) {
 	logger := log.New(os.Stderr, "test", 0)
 	config := configuration.New()
-	config.Set(FlagUseSBOMResolve, true)
+	config.Set(FlagUseSBOMResolution, true)
 
 	ctrl := gomock.NewController(t)
 	engineMock := mocks.NewMockEngine(ctrl)
@@ -37,7 +37,7 @@ func Test_callback_SBOMResolve(t *testing.T) {
 	invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
 	invocationContextMock.EXPECT().GetLogger().Return(logger).AnyTimes()
 
-	t.Run("should return mock depgraph when use-sbom-resolve flag is enabled", func(t *testing.T) {
+	t.Run("should return mock depgraph when use-sbom-resolution flag is enabled", func(t *testing.T) {
 		depGraphs, err := callback(invocationContextMock, []workflow.Data{})
 		require.Nil(t, err)
 
