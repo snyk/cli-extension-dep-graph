@@ -1,21 +1,16 @@
 package depgraph
 
 import (
-	"bytes"
 	_ "embed"
-	"log"
-	"strconv"
-	"strings"
-
+	"fmt"
+	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
+	"log"
+	"strconv"
 )
 
 var (
-	jsonSeparatorEnd    = []byte("DepGraph end")
-	jsonSeparatorData   = []byte("DepGraph data:")
-	jsonSeparatorTarget = []byte("DepGraph target:")
-
 	legacyWorkflowID = workflow.NewWorkflowIdentifier("legacycli")
 )
 
@@ -23,8 +18,6 @@ var (
 var mockDepGraph []byte
 
 func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Data, error) {
-	depGraphList := []workflow.Data{}
-
 	engine := ctx.GetEngine()
 	config := ctx.GetConfiguration()
 	logger := ctx.GetLogger()
@@ -45,37 +38,32 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 
 	legacyData, legacyCLIError := engine.InvokeWithConfig(legacyWorkflowID, config)
 	if legacyCLIError != nil {
-		return depGraphList, extractLegacyCLIError(legacyCLIError, legacyData)
+		return nil, extractLegacyCLIError(legacyCLIError, legacyData)
 	}
 
 	snykOutput, _ := legacyData[0].GetPayload().([]byte)
 
-	if len(snykOutput) <= 0 {
-		return depGraphList, errNoDepGraphsFound
+	depGraphs, err := parsers.NewPlainText().ParseOutput(snykOutput)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing dep graphs: %v", err)
+	}
+	if len(depGraphs) == 0 {
+		return nil, errNoDepGraphsFound
 	}
 
-	// split up dependency data from legacy cli
-	separatedJSONRawData := bytes.Split(snykOutput, jsonSeparatorEnd)
-	for i := range separatedJSONRawData {
-		rawData := separatedJSONRawData[i]
-		if bytes.Contains(rawData, jsonSeparatorData) {
-			graphStartIndex := bytes.Index(rawData, jsonSeparatorData) + len(jsonSeparatorData)
-			graphEndIndex := bytes.Index(rawData, jsonSeparatorTarget)
-			targetNameStartIndex := graphEndIndex + len(jsonSeparatorTarget)
-			targetNameEndIndex := len(rawData) - 1
+	workflowOutputData := mapToWorkflowData(depGraphs)
+	logger.Printf("DepGraph workflow done (extracted %d dependency graphs)", len(workflowOutputData))
+	return workflowOutputData, nil
+}
 
-			targetName := rawData[targetNameStartIndex:targetNameEndIndex]
-			depGraphJSON := rawData[graphStartIndex:graphEndIndex]
-
-			data := workflow.NewData(DataTypeID, "application/json", depGraphJSON)
-			data.SetMetaData("Content-Location", strings.TrimSpace(string(targetName)))
-			depGraphList = append(depGraphList, data)
-		}
+func mapToWorkflowData(depGraphs []parsers.DepGraphOutput) []workflow.Data {
+	depGraphList := []workflow.Data{}
+	for _, depGraph := range depGraphs {
+		data := workflow.NewData(DataTypeID, "application/json", depGraph.DepGraph)
+		data.SetMetaData("Content-Location", depGraph.DisplayTargetName)
+		depGraphList = append(depGraphList, data)
 	}
-
-	logger.Printf("DepGraph workflow done (extracted %d dependency graphs)", len(depGraphList))
-
-	return depGraphList, nil
+	return depGraphList
 }
 
 func prepareLegacyFlags(cfg configuration.Configuration, logger *log.Logger) { //nolint:gocyclo
