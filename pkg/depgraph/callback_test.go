@@ -21,6 +21,37 @@ var payload string
 //go:embed testdata/expected_dep_graph.json
 var expectedDepGraph string
 
+//go:embed testdata/mock_depgraph.json
+var expectedMockDepGraph string
+
+func Test_callback_SBOMResolution(t *testing.T) {
+	logger := log.New(os.Stderr, "test", 0)
+	config := configuration.New()
+	config.Set(FlagUseSBOMResolution, true)
+
+	ctrl := gomock.NewController(t)
+	engineMock := mocks.NewMockEngine(ctrl)
+	invocationContextMock := mocks.NewMockInvocationContext(ctrl)
+
+	invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
+	invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
+	invocationContextMock.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+	t.Run("should return mock depgraph when use-sbom-resolution flag is enabled", func(t *testing.T) {
+		depGraphs, err := callback(invocationContextMock, []workflow.Data{})
+		require.Nil(t, err)
+
+		assert.Len(t, depGraphs, 1)
+
+		actualDepGraph := depGraphs[0].GetPayload().([]byte)
+		assert.JSONEq(t, expectedMockDepGraph, string(actualDepGraph))
+
+		contentLocation, err := depGraphs[0].GetMetaData("Content-Location")
+		require.Nil(t, err)
+		assert.Equal(t, "uv.lock", contentLocation)
+	})
+}
+
 func Test_callback(t *testing.T) {
 	logger := log.New(os.Stderr, "test", 0)
 	config := configuration.New()

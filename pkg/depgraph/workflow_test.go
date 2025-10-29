@@ -20,4 +20,7 @@ func Test_Depgraph_Init(t *testing.T) {
 
 	inputFile := config.Get("file")
 	assert.Equal(t, "", inputFile)
+
+	useSBOMResolution := config.Get("use-sbom-resolution")
+	assert.Equal(t, false, useSBOMResolution)
 }
