@@ -37,8 +37,8 @@ func (p PlainTextOutputParser) ParseOutput(output []byte) ([]DepGraphOutput, err
 			depGraphJSON := rawData[graphStartIndex:graphEndIndex]
 
 			o := DepGraphOutput{
-				DepGraph:          depGraphJSON,
-				DisplayTargetName: strings.TrimSpace(string(targetName)),
+				DepGraph:             depGraphJSON,
+				NormalisedTargetFile: strings.TrimSpace(string(targetName)),
 			}
 
 			depGraphList = append(depGraphList, o)

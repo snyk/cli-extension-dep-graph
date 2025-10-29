@@ -33,8 +33,10 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 		return []workflow.Data{data}, nil
 	}
 
+	subcommand, outputParser := chooseGraphSubcommand(config)
+
 	// prepare invocation of the legacy cli
-	prepareLegacyFlags(config, logger)
+	prepareLegacyFlags(subcommand, config, logger)
 
 	legacyData, legacyCLIError := engine.InvokeWithConfig(legacyWorkflowID, config)
 	if legacyCLIError != nil {
@@ -43,7 +45,7 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 
 	snykOutput, _ := legacyData[0].GetPayload().([]byte)
 
-	depGraphs, err := parsers.NewPlainText().ParseOutput(snykOutput)
+	depGraphs, err := outputParser.ParseOutput(snykOutput)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing dep graphs: %v", err)
 	}
@@ -56,18 +58,30 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 	return workflowOutputData, nil
 }
 
+func chooseGraphSubcommand(config configuration.Configuration) (string, parsers.OutputParser) {
+	if config.GetBool(FlagPruneGraph) {
+		return "--print-pruned-graph", parsers.NewJSONL()
+	}
+
+	return "--print-graph", parsers.NewPlainText()
+}
+
 func mapToWorkflowData(depGraphs []parsers.DepGraphOutput) []workflow.Data {
 	depGraphList := []workflow.Data{}
 	for _, depGraph := range depGraphs {
 		data := workflow.NewData(DataTypeID, "application/json", depGraph.DepGraph)
-		data.SetMetaData("Content-Location", depGraph.DisplayTargetName)
+		data.SetMetaData("Content-Location", depGraph.NormalisedTargetFile)
+		data.SetMetaData("normalisedTargetFile", depGraph.NormalisedTargetFile)
+		if depGraph.TargetFileFromPlugin != nil {
+			data.SetMetaData("normalisedTargetFile", *depGraph.TargetFileFromPlugin)
+		}
 		depGraphList = append(depGraphList, data)
 	}
 	return depGraphList
 }
 
-func prepareLegacyFlags(cfg configuration.Configuration, logger *log.Logger) { //nolint:gocyclo
-	cmdArgs := []string{"test", "--print-graph", "--json"}
+func prepareLegacyFlags(graphSubcommand string, cfg configuration.Configuration, logger *log.Logger) { //nolint:gocyclo
+	cmdArgs := []string{"test", graphSubcommand, "--json"}
 
 	if allProjects := cfg.GetBool("all-projects"); allProjects {
 		cmdArgs = append(cmdArgs, "--all-projects")

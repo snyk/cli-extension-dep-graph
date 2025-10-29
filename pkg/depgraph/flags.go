@@ -29,6 +29,7 @@ const (
 	FlagUnmanagedMaxDepth            = "max-depth"
 	FlagIncludeProvenance            = "include-provenance"
 	FlagUseSBOMResolution            = "use-sbom-resolution"
+	FlagPruneGraph                   = "prune-graph"
 )
 
 func getFlagSet() *pflag.FlagSet {

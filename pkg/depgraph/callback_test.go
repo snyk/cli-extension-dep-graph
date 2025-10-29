@@ -18,6 +18,9 @@ import (
 //go:embed testdata/legacy_cli_output
 var payload string
 
+//go:embed testdata/jsonl_output
+var jsonlPayload string
+
 //go:embed testdata/expected_dep_graph.json
 var expectedDepGraph string
 
@@ -245,6 +248,26 @@ func Test_callback(t *testing.T) {
 		actualDepGraph := depGraphs[0].GetPayload().([]byte)
 
 		assert.JSONEq(t, expectedDepGraph, string(actualDepGraph))
+	})
+
+	t.Run("should return pruned dep graphs when requested", func(t *testing.T) {
+		config.Set(FlagPruneGraph, true)
+		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
+		data := workflow.NewData(dataIdentifier, "application/json", []byte(jsonlPayload))
+		engineMock.
+			EXPECT().
+			InvokeWithConfig(legacyWorkflowID, config).
+			Return([]workflow.Data{data}, nil).
+			Times(1)
+
+		depGraphs, err := callback(invocationContextMock, []workflow.Data{})
+		require.Nil(t, err)
+
+		assert.Len(t, depGraphs, 1)
+
+		actualDepGraph := depGraphs[0].GetPayload().([]byte)
+
+		assert.Contains(t, string(actualDepGraph), "npm")
 	})
 
 	t.Run("should error if no dependency graphs found", func(t *testing.T) {
