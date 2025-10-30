@@ -75,12 +75,12 @@ DepGraph end`)
 	require.Len(t, results, 2)
 
 	// First depgraph
-	assert.Equal(t, "package-lock.json", results[0].DisplayTargetName)
+	assert.Equal(t, "package-lock.json", results[0].NormalisedTargetFile)
 	assert.Contains(t, string(results[0].DepGraph), `"name": "npm"`)
 	assert.Contains(t, string(results[0].DepGraph), `"app1@1.0.0"`)
 
 	// Second depgraph
-	assert.Equal(t, "pom.xml", results[1].DisplayTargetName)
+	assert.Equal(t, "pom.xml", results[1].NormalisedTargetFile)
 	assert.Contains(t, string(results[1].DepGraph), `"name": "maven"`)
 	assert.Contains(t, string(results[1].DepGraph), `"com.example:app2@2.0.0"`)
 }

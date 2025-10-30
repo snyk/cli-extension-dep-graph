@@ -1,6 +1,8 @@
 package parsers
 
 type DepGraphOutput struct {
-	DisplayTargetName string
-	DepGraph          []byte
+	NormalisedTargetFile string
+	TargetFileFromPlugin *string
+	Target               []byte
+	DepGraph             []byte
 }
