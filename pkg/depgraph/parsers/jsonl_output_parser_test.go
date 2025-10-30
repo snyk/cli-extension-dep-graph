@@ -1,6 +1,7 @@
 package parsers
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,4 +52,16 @@ func TestJSONLOutputParser_ParseOutput_InvalidJSON(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Nil(t, results)
+}
+
+func TestJSONLOutputParser_BigInput(t *testing.T) {
+	parser := NewJSONL()
+
+	input, err := os.ReadFile("testdata/big_input.json")
+	require.NoError(t, err)
+
+	results, err := parser.ParseOutput(input)
+
+	require.NoError(t, err)
+	assert.NotNil(t, results)
 }
