@@ -33,10 +33,10 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 		return []workflow.Data{data}, nil
 	}
 
-	subcommand, outputParser := chooseGraphSubcommand(config)
+	arguments, outputParser := chooseGraphArguments(config)
 
 	// prepare invocation of the legacy cli
-	prepareLegacyFlags(subcommand, config, logger)
+	prepareLegacyFlags(arguments, config, logger)
 
 	legacyData, legacyCLIError := engine.InvokeWithConfig(legacyWorkflowID, config)
 	if legacyCLIError != nil {
@@ -58,12 +58,12 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 	return workflowOutputData, nil
 }
 
-func chooseGraphSubcommand(config configuration.Configuration) (string, parsers.OutputParser) {
+func chooseGraphArguments(config configuration.Configuration) (string, parsers.OutputParser) {
 	if config.GetBool(FlagPruneGraph) {
 		return "--print-pruned-graph", parsers.NewJSONL()
 	}
 
-	return "--print-graph", parsers.NewPlainText()
+	return "--print-graph --json", parsers.NewPlainText()
 }
 
 func mapToWorkflowData(depGraphs []parsers.DepGraphOutput) []workflow.Data {
@@ -83,8 +83,8 @@ func mapToWorkflowData(depGraphs []parsers.DepGraphOutput) []workflow.Data {
 	return depGraphList
 }
 
-func prepareLegacyFlags(graphSubcommand string, cfg configuration.Configuration, logger *log.Logger) { //nolint:gocyclo
-	cmdArgs := []string{"test", graphSubcommand, "--json"}
+func prepareLegacyFlags(arguments string, cfg configuration.Configuration, logger *log.Logger) { //nolint:gocyclo
+	cmdArgs := []string{"test", arguments}
 
 	if allProjects := cfg.GetBool("all-projects"); allProjects {
 		cmdArgs = append(cmdArgs, "--all-projects")
