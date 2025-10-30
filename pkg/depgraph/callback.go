@@ -71,9 +71,12 @@ func mapToWorkflowData(depGraphs []parsers.DepGraphOutput) []workflow.Data {
 	for _, depGraph := range depGraphs {
 		data := workflow.NewData(DataTypeID, "application/json", depGraph.DepGraph)
 		data.SetMetaData("Content-Location", depGraph.NormalisedTargetFile)
-		data.SetMetaData("normalisedTargetFile", depGraph.NormalisedTargetFile)
+		data.SetMetaData(MetaKeyNormalisedTargetFile, depGraph.NormalisedTargetFile)
 		if depGraph.TargetFileFromPlugin != nil {
-			data.SetMetaData("normalisedTargetFile", *depGraph.TargetFileFromPlugin)
+			data.SetMetaData(MetaKeyTargetFileFromPlugin, *depGraph.TargetFileFromPlugin)
+		}
+		if depGraph.Target != nil {
+			data.SetMetaData(MetaKeyTarget, string(depGraph.Target))
 		}
 		depGraphList = append(depGraphList, data)
 	}

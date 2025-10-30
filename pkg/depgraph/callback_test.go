@@ -268,6 +268,10 @@ func Test_callback(t *testing.T) {
 		actualDepGraph := depGraphs[0].GetPayload().([]byte)
 
 		assert.Contains(t, string(actualDepGraph), "npm")
+
+		verifyMeta(t, depGraphs[0], MetaKeyNormalisedTargetFile, "some normalised target file")
+		verifyMeta(t, depGraphs[0], MetaKeyTargetFileFromPlugin, "some target file from plugin")
+		verifyMeta(t, depGraphs[0], MetaKeyTarget, `{"key":"some target value"}`)
 	})
 
 	t.Run("should error if no dependency graphs found", func(t *testing.T) {
@@ -300,4 +304,12 @@ func invokeWithConfigAndGetTestCmdArgs(t *testing.T, engineMock *mocks.MockEngin
 	// assert
 	assert.Nil(t, err)
 	return config.Get(configuration.RAW_CMD_ARGS)
+}
+
+func verifyMeta(t *testing.T, data workflow.Data, key string, expectedValue string) {
+	t.Helper()
+
+	value, err := data.GetMetaData(key)
+	require.NoError(t, err)
+	assert.Equal(t, expectedValue, value)
 }
