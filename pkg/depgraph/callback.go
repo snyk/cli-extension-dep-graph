@@ -34,7 +34,6 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 	}
 
 	arguments, outputParser := chooseGraphArguments(config)
-	logger.Println("Extracting dep graphs using " + arguments)
 
 	// prepare invocation of the legacy cli
 	prepareLegacyFlags(arguments, config, logger)
