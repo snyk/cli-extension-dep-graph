@@ -59,12 +59,12 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 	return workflowOutputData, nil
 }
 
-func chooseGraphArguments(config configuration.Configuration) (string, parsers.OutputParser) {
+func chooseGraphArguments(config configuration.Configuration) ([]string, parsers.OutputParser) {
 	if config.GetBool(FlagEffectiveGraph) {
-		return "--print-effective-graph", parsers.NewJSONL()
+		return []string{"--print-effective-graph"}, parsers.NewJSONL()
 	}
 
-	return "--print-graph --json", parsers.NewPlainText()
+	return []string{"--print-graph", "--json"}, parsers.NewPlainText()
 }
 
 func mapToWorkflowData(depGraphs []parsers.DepGraphOutput) []workflow.Data {
@@ -84,8 +84,9 @@ func mapToWorkflowData(depGraphs []parsers.DepGraphOutput) []workflow.Data {
 	return depGraphList
 }
 
-func prepareLegacyFlags(arguments string, cfg configuration.Configuration, logger *log.Logger) { //nolint:gocyclo
-	cmdArgs := []string{"test", arguments}
+func prepareLegacyFlags(arguments []string, cfg configuration.Configuration, logger *log.Logger) { //nolint:gocyclo
+	cmdArgs := []string{"test"}
+	cmdArgs = append(cmdArgs, arguments...)
 
 	if allProjects := cfg.GetBool("all-projects"); allProjects {
 		cmdArgs = append(cmdArgs, "--all-projects")
