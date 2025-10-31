@@ -250,8 +250,8 @@ func Test_callback(t *testing.T) {
 		assert.JSONEq(t, expectedDepGraph, string(actualDepGraph))
 	})
 
-	t.Run("should return pruned dep graphs when requested", func(t *testing.T) {
-		config.Set(FlagPruneGraph, true)
+	t.Run("should return effective dep graphs when requested", func(t *testing.T) {
+		config.Set(FlagEffectiveGraph, true)
 		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
 		data := workflow.NewData(dataIdentifier, "application/json", []byte(jsonlPayload))
 		engineMock.

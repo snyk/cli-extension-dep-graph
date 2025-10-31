@@ -3,11 +3,12 @@ package depgraph
 import (
 	_ "embed"
 	"fmt"
+	"log"
+	"strconv"
+
 	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
-	"log"
-	"strconv"
 )
 
 var (
@@ -59,8 +60,8 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 }
 
 func chooseGraphArguments(config configuration.Configuration) (string, parsers.OutputParser) {
-	if config.GetBool(FlagPruneGraph) {
-		return "--print-pruned-graph", parsers.NewJSONL()
+	if config.GetBool(FlagEffectiveGraph) {
+		return "--print-effective-graph", parsers.NewJSONL()
 	}
 
 	return "--print-graph --json", parsers.NewPlainText()
