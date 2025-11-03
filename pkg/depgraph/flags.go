@@ -29,7 +29,7 @@ const (
 	FlagUnmanagedMaxDepth            = "max-depth"
 	FlagIncludeProvenance            = "include-provenance"
 	FlagUseSBOMResolution            = "use-sbom-resolution"
-	FlagEffectiveGraph               = "effective-graph"
+	FlagPrintEffectiveGraph          = "effective-graph"
 )
 
 func getFlagSet() *pflag.FlagSet {
@@ -61,6 +61,7 @@ func getFlagSet() *pflag.FlagSet {
 	flagSet.Int(FlagUnmanagedMaxDepth, 0, "Specify the maximum level of archive extraction for unmanaged scanning.")
 	flagSet.Bool(FlagIncludeProvenance, false, "Include checksums in purl to support package provenance.")
 	flagSet.Bool(FlagUseSBOMResolution, false, "Use SBOM resolution instead of legacy CLI.")
+	flagSet.Bool(FlagPrintEffectiveGraph, false, "Return the pruned dependency graph.")
 
 	return flagSet
 }

@@ -36,7 +36,7 @@ func (j *JSONLOutputParser) ParseOutput(data []byte) ([]DepGraphOutput, error) {
 
 		var parsed jsonLine
 		if err := json.Unmarshal(line, &parsed); err != nil {
-			return nil, err
+			continue
 		}
 
 		depGraphList = append(depGraphList, DepGraphOutput{
