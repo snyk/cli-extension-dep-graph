@@ -210,6 +210,16 @@ func Test_callback(t *testing.T) {
 			value:    "42",
 			expected: "--max-depth=42",
 		},
+		{
+			key:      FlagDotnetRuntimeResolution,
+			value:    true,
+			expected: "--dotnet-runtime-resolution",
+		},
+		{
+			key:      FlagDotnetTargetFramework,
+			value:    "net9.3",
+			expected: "--dotnet-target-framework=net9.3",
+		},
 	}
 
 	for _, tc := range options {
@@ -251,7 +261,7 @@ func Test_callback(t *testing.T) {
 	})
 
 	t.Run("should return effective dep graphs when requested", func(t *testing.T) {
-		config.Set(FlagEffectiveGraph, true)
+		config.Set(FlagPrintEffectiveGraph, true)
 		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
 		data := workflow.NewData(dataIdentifier, "application/json", []byte(jsonlPayload))
 		engineMock.
