@@ -60,7 +60,7 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 }
 
 func chooseGraphArguments(config configuration.Configuration) ([]string, parsers.OutputParser) {
-	if config.GetBool(FlagEffectiveGraph) {
+	if config.GetBool(FlagPrintEffectiveGraph) {
 		return []string{"--print-effective-graph"}, parsers.NewJSONL()
 	}
 

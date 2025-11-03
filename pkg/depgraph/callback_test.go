@@ -251,7 +251,7 @@ func Test_callback(t *testing.T) {
 	})
 
 	t.Run("should return effective dep graphs when requested", func(t *testing.T) {
-		config.Set(FlagEffectiveGraph, true)
+		config.Set(FlagPrintEffectiveGraph, true)
 		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
 		data := workflow.NewData(dataIdentifier, "application/json", []byte(jsonlPayload))
 		engineMock.
