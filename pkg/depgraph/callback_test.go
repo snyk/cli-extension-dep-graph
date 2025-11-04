@@ -210,6 +210,16 @@ func Test_callback(t *testing.T) {
 			value:    "42",
 			expected: "--max-depth=42",
 		},
+		{
+			key:      FlagDotnetRuntimeResolution,
+			value:    true,
+			expected: "--dotnet-runtime-resolution",
+		},
+		{
+			key:      FlagDotnetTargetFramework,
+			value:    "net9.3",
+			expected: "--dotnet-target-framework=net9.3",
+		},
 	}
 
 	for _, tc := range options {

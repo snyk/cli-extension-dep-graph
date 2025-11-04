@@ -30,6 +30,8 @@ const (
 	FlagIncludeProvenance            = "include-provenance"
 	FlagUseSBOMResolution            = "use-sbom-resolution"
 	FlagPrintEffectiveGraph          = "effective-graph"
+	FlagDotnetRuntimeResolution      = "dotnet-runtime-resolution"
+	FlagDotnetTargetFramework        = "dotnet-target-framework"
 )
 
 func getFlagSet() *pflag.FlagSet {
@@ -62,6 +64,8 @@ func getFlagSet() *pflag.FlagSet {
 	flagSet.Bool(FlagIncludeProvenance, false, "Include checksums in purl to support package provenance.")
 	flagSet.Bool(FlagUseSBOMResolution, false, "Use SBOM resolution instead of legacy CLI.")
 	flagSet.Bool(FlagPrintEffectiveGraph, false, "Return the pruned dependency graph.")
+	flagSet.Bool(FlagDotnetRuntimeResolution, false, "Required. You must use this option when you test .NET projects using Runtime Resolution Scanning.")
+	flagSet.String(FlagDotnetTargetFramework, "", "Optional. You may use this option if your solution contains multiple <TargetFramework> directives. If you do not specify the option --dotnet-target-framework, all supported Target Frameworks will be scanned.")
 
 	return flagSet
 }
