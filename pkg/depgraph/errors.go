@@ -38,11 +38,15 @@ var _ interface {
 func extractLegacyCLIError(input error, data []workflow.Data) error {
 	output := input
 
+	var errCatalogErr snyk_errors.Error
+	if errors.As(input, &errCatalogErr) {
+		return errCatalogErr
+	}
+
 	// extract error from legacy cli if possible and wrap it in an error instance
 	var xerr *exec.ExitError
 	if errors.As(input, &xerr) && len(data) > 0 {
 		bytes, _ := data[0].GetPayload().([]byte)
-
 		var decodedError LegacyCLIJSONError
 		decodedError.exitErr = input
 		err := json.Unmarshal(bytes, &decodedError)
