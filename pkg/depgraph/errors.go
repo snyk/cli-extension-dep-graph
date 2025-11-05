@@ -40,7 +40,7 @@ func extractLegacyCLIError(input error, data []workflow.Data) error {
 
 	var errCatalogErr snyk_errors.Error
 	if errors.As(input, &errCatalogErr) {
-		return errCatalogErr
+		return input
 	}
 
 	// extract error from legacy cli if possible and wrap it in an error instance
