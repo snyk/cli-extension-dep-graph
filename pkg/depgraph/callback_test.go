@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"testing"
 
@@ -28,18 +29,38 @@ var jsonlPayload string
 //go:embed testdata/expected_dep_graph.json
 var expectedDepGraph string
 
-const (
-	errMsgPayloadShouldBeByte = "payload should be []byte"
-)
+//go:embed testdata/uv-sbom-convert-expected-dep-graph.json
+var uvSBOMConvertExpectedDepGraph string
+
+//go:embed testdata/uv-sbom-convert-response.json
+var uvSBOMConvertResponse string
+
+const errMsgPayloadShouldBeByte = "payload should be []byte"
 
 func Test_callback_SBOMResolution(t *testing.T) {
 	t.Run("should return depgraphs from SBOM conversion when use-sbom-resolution flag is enabled", func(t *testing.T) {
 		logger := log.New(os.Stderr, "test", 0)
 		enhancedLogger := zerolog.New(io.Discard)
+
+		// Create mock SBOM service response with a depGraph fact
+		mockResponse := mocks.NewMockResponse(
+			"application/json",
+			[]byte(uvSBOMConvertResponse),
+			http.StatusOK,
+		)
+
+		mockSBOMService := mocks.NewMockSBOMService(mockResponse, func(r *http.Request) {
+			assert.Equal(t, http.MethodPost, r.Method)
+			assert.Contains(t, r.RequestURI, "/hidden/orgs/test-org-id/sboms/convert")
+			assert.Equal(t, "application/octet-stream", r.Header.Get("Content-Type"))
+			assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
+		})
+		defer mockSBOMService.Close()
+
 		config := configuration.New()
 		config.Set(FlagUseSBOMResolution, true)
 		config.Set(configuration.ORGANIZATION, "test-org-id")
-		config.Set(configuration.API_URL, "https://api.snyk.io")
+		config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -61,14 +82,15 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			},
 		}
 
-		// Note: This test will fail at the SBOMConvert call because we haven't fully mocked the Snyk client
-		// For now, we're testing that the UV client is properly called
-		_, err := callbackWithDI(invocationContextMock, []workflow.Data{}, mockUVClient)
+		workflowData, err := callbackWithDI(invocationContextMock, []workflow.Data{}, mockUVClient)
 
-		// The test should fail with API error, not with UV execution error
-		// This proves UV client is mocked
-		assert.Error(t, err)
-		assert.NotContains(t, err.Error(), "failed to export SBOM using uv")
+		require.NoError(t, err)
+		assert.NotNil(t, workflowData)
+		assert.Len(t, workflowData, 1)
+
+		// Compare the workflow data payload with the expected depGraph
+		depGraph := workflowData[0].GetPayload().([]byte)
+		assert.JSONEq(t, uvSBOMConvertExpectedDepGraph, string(depGraph))
 	})
 
 	t.Run("should handle UV client errors gracefully", func(t *testing.T) {
