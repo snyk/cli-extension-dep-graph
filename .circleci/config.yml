@@ -10,12 +10,12 @@ metadata:
 go_image: &go_image
   resource_class: medium
   docker:
-    - image: cimg/go:1.19
+    - image: cimg/go:1.24
 
 jobs:
   lint:
     docker:
-      - image: cimg/go:1.20
+      - image: cimg/go:1.24
     steps:
       - checkout
       - run:
@@ -23,7 +23,7 @@ jobs:
           command: make lint
   unit_test:
     docker:
-      - image: cimg/go:1.20
+      - image: cimg/go:1.24
     steps:
       - checkout
       - run:
