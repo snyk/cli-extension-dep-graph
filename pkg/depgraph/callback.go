@@ -49,10 +49,10 @@ func callbackWithDI(ctx workflow.InvocationContext, _ []workflow.Data, uvClient 
 			return nil, fmt.Errorf("failed to export SBOM using uv: %w", err)
 		}
 
-		errFactory := snykclient.NewErrorFactory(logger)
 		orgID := config.GetString(configuration.ORGANIZATION)
 		if orgID == "" {
-			return nil, errFactory.NewEmptyOrgError()
+			logger.Printf("ERROR: failed to determine org id\n")
+			return nil, snykclient.NewEmptyOrgError()
 		}
 		remoteRepoURL := config.GetString("remote-repo-url")
 
@@ -63,7 +63,7 @@ func callbackWithDI(ctx workflow.InvocationContext, _ []workflow.Data, uvClient 
 
 		sbomReader := bytes.NewReader(sbomOutput)
 
-		scans, warnings, err := c.SBOMConvert(context.Background(), errFactory, sbomReader, remoteRepoURL)
+		scans, warnings, err := c.SBOMConvert(context.Background(), logger, sbomReader, remoteRepoURL)
 		if err != nil {
 			return nil, err
 		}

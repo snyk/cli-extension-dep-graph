@@ -1,7 +1,6 @@
 package snykclient_test
 
 import (
-	"bytes"
 	"net/http"
 	"testing"
 
@@ -12,8 +11,7 @@ import (
 )
 
 var (
-	logger     = zerolog.New(&bytes.Buffer{})
-	errFactory = snykclient.NewErrorFactory(&logger)
+	logger = zerolog.Nop()
 )
 
 func TestNewSnykClient(t *testing.T) {
