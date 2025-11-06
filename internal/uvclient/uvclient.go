@@ -14,7 +14,7 @@ type uvClient struct {
 }
 
 func NewUVClient() UVClient {
-	return NewUVClientWithPath("/Users/will/Projects/tom-uv/target/release/uv")
+	return NewUVClientWithPath("uv")
 }
 
 func NewUVClientWithPath(uvBinary string) UVClient {
