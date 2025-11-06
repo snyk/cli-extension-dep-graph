@@ -1,11 +1,16 @@
 package depgraph
 
 import (
+	"bytes"
+	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strconv"
 
+	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/internal/uvclient"
 	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
@@ -23,7 +28,11 @@ var legacyWorkflowID = workflow.NewWorkflowIdentifier(legacyCLIWorkflowIDStr)
 //go:embed testdata/mock_depgraph.json
 var mockDepGraph []byte
 
-func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Data, error) {
+func callback(ctx workflow.InvocationContext, data []workflow.Data) ([]workflow.Data, error) {
+	return callbackWithDI(ctx, data, uvclient.NewUVClient())
+}
+
+func callbackWithDI(ctx workflow.InvocationContext, _ []workflow.Data, uvClient uvclient.UVClient) ([]workflow.Data, error) {
 	engine := ctx.GetEngine()
 	config := ctx.GetConfiguration()
 	logger := ctx.GetLogger()
@@ -32,11 +41,49 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 
 	// Check if SBOM resolution mode is enabled
 	if config.GetBool(FlagUseSBOMResolution) {
-		logger.Println("SBOM resolve mode enabled, returning mock dependency graph")
-		data := workflow.NewData(DataTypeID, contentTypeJSON, mockDepGraph)
-		data.SetMetaData(contentLocationKey, "uv.lock")
-		logger.Println("SBOM resolve mode done, returning mock dependency graph")
-		return []workflow.Data{data}, nil
+		inputDir := config.GetString(configuration.INPUT_DIRECTORY)
+		if inputDir == "" {
+			inputDir = "."
+		}
+
+		sbomOutput, err := uvClient.ExportSBOM(inputDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to export SBOM using uv: %w", err)
+		}
+
+		enhancedLogger := ctx.GetEnhancedLogger()
+		errFactory := snykclient.NewErrorFactory(enhancedLogger)
+		orgID := config.GetString(configuration.ORGANIZATION)
+		if orgID == "" {
+			return nil, errFactory.NewEmptyOrgError()
+		}
+		remoteRepoURL := config.GetString("remote-repo-url")
+
+		c := snykclient.NewSnykClient(
+			ctx.GetNetworkAccess().GetHttpClient(),
+			config.GetString(configuration.API_URL),
+			orgID)
+
+		sbomReader := bytes.NewReader(sbomOutput)
+
+		scans, warnings, err := c.SBOMConvert(context.Background(), errFactory, sbomReader, remoteRepoURL)
+		if err != nil {
+			return nil, err
+		}
+
+		logger.Printf("Successfully converted SBOM, warning(s): %d\n", len(warnings))
+
+		depGraphsData, err := extractDepGraphsFromScans(scans)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract depgraphs from scan results: %w", err)
+		}
+
+		if len(depGraphsData) == 0 {
+			return nil, fmt.Errorf("no dependency graphs found in SBOM conversion response")
+		}
+
+		logger.Printf("DepGraph workflow done (extracted %d dependency graphs from SBOM)", len(depGraphsData))
+		return depGraphsData, nil
 	}
 
 	arguments, outputParser := chooseGraphArguments(config)
@@ -90,6 +137,37 @@ func mapToWorkflowData(depGraphs []parsers.DepGraphOutput) []workflow.Data {
 		depGraphList = append(depGraphList, data)
 	}
 	return depGraphList
+}
+
+func extractDepGraphsFromScans(scans []*snykclient.ScanResult) ([]workflow.Data, error) {
+	var depGraphList []workflow.Data
+
+	for _, scan := range scans {
+		// Look for depgraph facts in this scan result
+		for _, fact := range scan.Facts {
+			if fact.Type == "depGraph" {
+				// Marshal the depgraph data to JSON bytes
+				depGraphBytes, err := json.Marshal(fact.Data)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal depgraph data: %w", err)
+				}
+
+				// Create workflow data with the depgraph
+				data := workflow.NewData(DataTypeID, "application/json", depGraphBytes)
+
+				data.SetMetaData("Content-Location", "uv.lock")
+				data.SetMetaData(MetaKeyNormalisedTargetFile, "uv.lock")
+
+				if scan.Identity.Type != "" {
+					data.SetMetaData(MetaKeyTargetFileFromPlugin, scan.Identity.Type)
+				}
+
+				depGraphList = append(depGraphList, data)
+			}
+		}
+	}
+
+	return depGraphList, nil
 }
 
 //nolint:gocyclo // Function contains many conditional flag checks
