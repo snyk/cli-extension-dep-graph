@@ -6,9 +6,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 
+	"github.com/rs/zerolog"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/internal/uvclient"
 	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
@@ -33,9 +33,9 @@ func callback(ctx workflow.InvocationContext, data []workflow.Data) ([]workflow.
 func callbackWithDI(ctx workflow.InvocationContext, _ []workflow.Data, uvClient uvclient.UVClient) ([]workflow.Data, error) {
 	engine := ctx.GetEngine()
 	config := ctx.GetConfiguration()
-	logger := ctx.GetLogger()
+	logger := ctx.GetEnhancedLogger()
 
-	logger.Println("DepGraph workflow start")
+	logger.Print("DepGraph workflow start")
 
 	// Check if SBOM resolution mode is enabled
 	if config.GetBool(FlagUseSBOMResolution) {
@@ -49,8 +49,7 @@ func callbackWithDI(ctx workflow.InvocationContext, _ []workflow.Data, uvClient 
 			return nil, fmt.Errorf("failed to export SBOM using uv: %w", err)
 		}
 
-		enhancedLogger := ctx.GetEnhancedLogger()
-		errFactory := snykclient.NewErrorFactory(enhancedLogger)
+		errFactory := snykclient.NewErrorFactory(logger)
 		orgID := config.GetString(configuration.ORGANIZATION)
 		if orgID == "" {
 			return nil, errFactory.NewEmptyOrgError()
@@ -169,7 +168,7 @@ func extractDepGraphsFromScans(scans []*snykclient.ScanResult) ([]workflow.Data,
 }
 
 //nolint:gocyclo // Function contains many conditional flag checks
-func prepareLegacyFlags(arguments []string, cfg configuration.Configuration, logger *log.Logger) {
+func prepareLegacyFlags(arguments []string, cfg configuration.Configuration, logger *zerolog.Logger) {
 	cmdArgs := []string{"test"}
 	cmdArgs = append(cmdArgs, arguments...)
 
@@ -183,127 +182,127 @@ func prepareLegacyFlags(arguments []string, cfg configuration.Configuration, log
 
 	if exclude := cfg.GetString("exclude"); exclude != "" {
 		cmdArgs = append(cmdArgs, "--exclude="+exclude)
-		logger.Println("Exclude:", exclude)
+		logger.Print("Exclude:", exclude)
 	}
 
 	if detectionDepth := cfg.GetString(FlagDetectionDepth); detectionDepth != "" {
 		cmdArgs = append(cmdArgs, "--detection-depth="+detectionDepth)
-		logger.Println("Detection depth:", detectionDepth)
+		logger.Print("Detection depth:", detectionDepth)
 	}
 
 	if file := cfg.GetString(FlagFile); file != "" {
 		cmdArgs = append(cmdArgs, "--file="+file)
-		logger.Println("File:", file)
+		logger.Print("File:", file)
 	} else {
 		if targetDir := cfg.GetString(configuration.INPUT_DIRECTORY); targetDir != "" {
 			cmdArgs = append(cmdArgs, targetDir)
-			logger.Println("Target directory:", targetDir)
+			logger.Print("Target directory:", targetDir)
 		}
 	}
 
 	if cfg.GetBool("unmanaged") {
 		cmdArgs = append(cmdArgs, "--unmanaged")
-		logger.Println("Is unmanaged: true")
+		logger.Print("Is unmanaged: true")
 	}
 
 	if cfg.GetBool(configuration.DEBUG) {
 		cmdArgs = append(cmdArgs, "--debug")
-		logger.Println("Debug: true")
+		logger.Print("Debug: true")
 	}
 
 	if cfg.GetBool(FlagDev) {
 		cmdArgs = append(cmdArgs, "--dev")
-		logger.Println("Dev dependencies: true")
+		logger.Print("Dev dependencies: true")
 	}
 
 	if cfg.GetBool(FlagPruneRepeatedSubdependencies) {
 		cmdArgs = append(cmdArgs, "--prune-repeated-subdependencies")
-		logger.Println("Prune repeated sub-dependencies: true")
+		logger.Print("Prune repeated sub-dependencies: true")
 	}
 
 	if cfg.GetBool(FlagMavenAggregateProject) {
 		cmdArgs = append(cmdArgs, "--maven-aggregate-project")
-		logger.Println("Ensure all modules are resolvable by the Maven reactor: true")
+		logger.Print("Ensure all modules are resolvable by the Maven reactor: true")
 	}
 
 	if cfg.GetBool(FlagScanUnmanaged) {
 		cmdArgs = append(cmdArgs, "--scan-unmanaged")
-		logger.Println("Specify an individual JAR, WAR, or AAR file: true")
+		logger.Print("Specify an individual JAR, WAR, or AAR file: true")
 	}
 
 	if cfg.GetBool(FlagScanAllUnmanaged) {
 		cmdArgs = append(cmdArgs, "--scan-all-unmanaged")
-		logger.Println("Auto-detect Maven, JAR, WAR, and AAR files recursively from the current folder: true")
+		logger.Print("Auto-detect Maven, JAR, WAR, and AAR files recursively from the current folder: true")
 	}
 
 	if subProject := cfg.GetString(FlagSubProject); subProject != "" {
 		cmdArgs = append(cmdArgs, "--sub-project="+subProject)
-		logger.Println("Sub-project:", subProject)
+		logger.Print("Sub-project:", subProject)
 	}
 
 	if gradleSubProject := cfg.GetString(FlagGradleSubProject); gradleSubProject != "" {
 		cmdArgs = append(cmdArgs, "--gradle-sub-project="+gradleSubProject)
-		logger.Println("Gradle sub-project:", gradleSubProject)
+		logger.Print("Gradle sub-project:", gradleSubProject)
 	}
 
 	if cfg.GetBool(FlagGradleNormalizeDeps) {
 		cmdArgs = append(cmdArgs, "--gradle-normalize-deps")
-		logger.Println("Normalize Gradle dependencies: true")
+		logger.Print("Normalize Gradle dependencies: true")
 	}
 
 	if cfg.GetBool(FlagAllSubProjects) {
 		cmdArgs = append(cmdArgs, "--all-sub-projects")
-		logger.Println("Test all sub-projects: true")
+		logger.Print("Test all sub-projects: true")
 	}
 
 	if configurationMatching := cfg.GetString(FlagConfigurationMatching); configurationMatching != "" {
 		cmdArgs = append(cmdArgs, "--configuration-matching="+configurationMatching)
-		logger.Println("Configuration matching:", configurationMatching)
+		logger.Print("Configuration matching:", configurationMatching)
 	}
 
 	if configurationAttributes := cfg.GetString(FlagConfigurationAttributes); configurationAttributes != "" {
 		cmdArgs = append(cmdArgs, "--configuration-attributes="+configurationAttributes)
-		logger.Println("Configuration attributes:", configurationAttributes)
+		logger.Print("Configuration attributes:", configurationAttributes)
 	}
 
 	if initScript := cfg.GetString(FlagInitScript); initScript != "" {
 		cmdArgs = append(cmdArgs, "--init-script="+initScript)
-		logger.Println("Init script:", initScript)
+		logger.Print("Init script:", initScript)
 	}
 
 	if cfg.GetString(FlagNPMStrictOutOfSync) == "false" {
 		cmdArgs = append(cmdArgs, "--strict-out-of-sync=false")
-		logger.Println("NPM strict-out-of-sync: false")
+		logger.Print("NPM strict-out-of-sync: false")
 	}
 
 	if cfg.GetBool(FlagNugetAssetsProjectName) {
 		cmdArgs = append(cmdArgs, "--assets-project-name")
-		logger.Println("NuGet assets-project-name: true")
+		logger.Print("NuGet assets-project-name: true")
 	}
 
 	if file := cfg.GetString(FlagNugetPkgsFolder); file != "" {
 		cmdArgs = append(cmdArgs, "--packages-folder="+file)
-		logger.Println("NuGet packages-folder: ", file)
+		logger.Print("NuGet packages-folder: ", file)
 	}
 
 	if cfg.GetBool(FlagYarnWorkspaces) {
 		cmdArgs = append(cmdArgs, "--yarn-workspaces")
-		logger.Println("Yarn Workspaces: true")
+		logger.Print("Yarn Workspaces: true")
 	}
 
 	if pyCmd := cfg.GetString(FlagPythonCommand); pyCmd != "" {
 		cmdArgs = append(cmdArgs, "--command="+pyCmd)
-		logger.Println("Python command:", pyCmd)
+		logger.Print("Python command:", pyCmd)
 	}
 
 	if skipUnresolved := cfg.GetString(FlagPythonSkipUnresolved); skipUnresolved != "" {
 		cmdArgs = append(cmdArgs, "--skip-unresolved="+skipUnresolved)
-		logger.Println("Python skip unresolved: true")
+		logger.Print("Python skip unresolved: true")
 	}
 
 	if pyPkgManager := cfg.GetString(FlagPythonPackageManager); pyPkgManager != "" {
 		cmdArgs = append(cmdArgs, "--package-manager="+pyPkgManager)
-		logger.Println("Python package manager:", pyPkgManager)
+		logger.Print("Python package manager:", pyPkgManager)
 	}
 
 	if maxDepth := cfg.GetInt(FlagUnmanagedMaxDepth); maxDepth != 0 {
@@ -312,17 +311,17 @@ func prepareLegacyFlags(arguments []string, cfg configuration.Configuration, log
 
 	if cfg.GetBool(FlagIncludeProvenance) {
 		cmdArgs = append(cmdArgs, "--include-provenance")
-		logger.Println("Include provenance: true")
+		logger.Print("Include provenance: true")
 	}
 
 	if cfg.GetBool(FlagDotnetRuntimeResolution) {
 		cmdArgs = append(cmdArgs, "--dotnet-runtime-resolution")
-		logger.Println("Dotnet runtime resolution: true")
+		logger.Print("Dotnet runtime resolution: true")
 	}
 
 	if tf := cfg.GetString(FlagDotnetTargetFramework); tf != "" {
 		cmdArgs = append(cmdArgs, "--dotnet-target-framework="+tf)
-		logger.Println("Dotnet target framework:", tf)
+		logger.Print("Dotnet target framework:", tf)
 	}
 
 	cfg.Set(configuration.RAW_CMD_ARGS, cmdArgs)

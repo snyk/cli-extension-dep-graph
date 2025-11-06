@@ -3,10 +3,7 @@ package depgraph
 import (
 	_ "embed"
 	"fmt"
-	"io"
-	"log"
 	"net/http"
-	"os"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -38,10 +35,9 @@ var uvSBOMConvertResponse string
 const errMsgPayloadShouldBeByte = "payload should be []byte"
 
 func Test_callback_SBOMResolution(t *testing.T) {
-	t.Run("should return depgraphs from SBOM conversion when use-sbom-resolution flag is enabled", func(t *testing.T) {
-		logger := log.New(os.Stderr, "test", 0)
-		enhancedLogger := zerolog.New(io.Discard)
+	nopLogger := zerolog.Nop()
 
+	t.Run("should return depgraphs from SBOM conversion when use-sbom-resolution flag is enabled", func(t *testing.T) {
 		// Create mock SBOM service response with a depGraph fact
 		mockResponse := mocks.NewMockResponse(
 			"application/json",
@@ -70,8 +66,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
 		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
-		invocationContextMock.EXPECT().GetLogger().Return(logger).AnyTimes()
-		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&enhancedLogger).AnyTimes()
+		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
 		invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
 
 		// Create mock UV client that returns valid SBOM data
@@ -94,7 +89,6 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("should handle UV client errors gracefully", func(t *testing.T) {
-		logger := log.New(os.Stderr, "test", 0)
 		config := configuration.New()
 		config.Set(FlagUseSBOMResolution, true)
 
@@ -106,7 +100,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
 		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
-		invocationContextMock.EXPECT().GetLogger().Return(logger).AnyTimes()
+		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
 
 		// Create mock UV client that returns an error
 		mockUVClient := &mocks.MockUVClient{
@@ -124,7 +118,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 }
 
 func Test_callback(t *testing.T) {
-	logger := log.New(os.Stderr, "test", 0)
+	nopLogger := zerolog.Nop()
 	config := configuration.New()
 	// setup mocks
 	ctrl := gomock.NewController(t)
@@ -134,7 +128,7 @@ func Test_callback(t *testing.T) {
 	// invocation context mocks
 	invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
 	invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
-	invocationContextMock.EXPECT().GetLogger().Return(logger).AnyTimes()
+	invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
 
 	type option struct {
 		key      string
