@@ -11,9 +11,14 @@ import (
 	"github.com/snyk/go-application-framework/pkg/workflow"
 )
 
-var (
-	legacyWorkflowID = workflow.NewWorkflowIdentifier("legacycli")
+const (
+	contentTypeJSON        = "application/json"
+	legacyCLIWorkflowIDStr = "legacycli"
+	contentLocationKey     = "Content-Location"
 )
+
+//nolint:gochecknoglobals // Workflow identifier needs to be a package-level variable
+var legacyWorkflowID = workflow.NewWorkflowIdentifier(legacyCLIWorkflowIDStr)
 
 //go:embed testdata/mock_depgraph.json
 var mockDepGraph []byte
@@ -28,8 +33,8 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 	// Check if SBOM resolution mode is enabled
 	if config.GetBool(FlagUseSBOMResolution) {
 		logger.Println("SBOM resolve mode enabled, returning mock dependency graph")
-		data := workflow.NewData(DataTypeID, "application/json", mockDepGraph)
-		data.SetMetaData("Content-Location", "uv.lock")
+		data := workflow.NewData(DataTypeID, contentTypeJSON, mockDepGraph)
+		data.SetMetaData(contentLocationKey, "uv.lock")
 		logger.Println("SBOM resolve mode done, returning mock dependency graph")
 		return []workflow.Data{data}, nil
 	}
@@ -44,11 +49,14 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 		return nil, extractLegacyCLIError(legacyCLIError, legacyData)
 	}
 
-	snykOutput, _ := legacyData[0].GetPayload().([]byte)
+	snykOutput, ok := legacyData[0].GetPayload().([]byte)
+	if !ok {
+		return nil, fmt.Errorf("failed to get payload from legacy data")
+	}
 
 	depGraphs, err := outputParser.ParseOutput(snykOutput)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing dep graphs: %v", err)
+		return nil, fmt.Errorf("error parsing dep graphs: %w", err)
 	}
 	if len(depGraphs) == 0 {
 		return nil, errNoDepGraphsFound
@@ -70,8 +78,8 @@ func chooseGraphArguments(config configuration.Configuration) ([]string, parsers
 func mapToWorkflowData(depGraphs []parsers.DepGraphOutput) []workflow.Data {
 	depGraphList := []workflow.Data{}
 	for _, depGraph := range depGraphs {
-		data := workflow.NewData(DataTypeID, "application/json", depGraph.DepGraph)
-		data.SetMetaData("Content-Location", depGraph.NormalisedTargetFile)
+		data := workflow.NewData(DataTypeID, contentTypeJSON, depGraph.DepGraph)
+		data.SetMetaData(contentLocationKey, depGraph.NormalisedTargetFile)
 		data.SetMetaData(MetaKeyNormalisedTargetFile, depGraph.NormalisedTargetFile)
 		if depGraph.TargetFileFromPlugin != nil {
 			data.SetMetaData(MetaKeyTargetFileFromPlugin, *depGraph.TargetFileFromPlugin)
@@ -84,7 +92,8 @@ func mapToWorkflowData(depGraphs []parsers.DepGraphOutput) []workflow.Data {
 	return depGraphList
 }
 
-func prepareLegacyFlags(arguments []string, cfg configuration.Configuration, logger *log.Logger) { //nolint:gocyclo
+//nolint:gocyclo // Function contains many conditional flag checks
+func prepareLegacyFlags(arguments []string, cfg configuration.Configuration, logger *log.Logger) {
 	cmdArgs := []string{"test"}
 	cmdArgs = append(cmdArgs, arguments...)
 

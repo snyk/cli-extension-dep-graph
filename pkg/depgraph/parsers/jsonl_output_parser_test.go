@@ -8,10 +8,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	testPackageLockJSON = "package-lock.json"
+)
+
 func TestJSONLOutputParser_ParseOutput(t *testing.T) {
 	parser := NewJSONL()
 
-	input := []byte(`{"depGraph":{"arbitraryJsonKey":"first value"},"normalisedTargetFile":"package-lock.json","targetFileFromPlugin":"target-from-plugin","target":{"key":"value"}}
+	input := []byte(`{"depGraph":{"arbitraryJsonKey":"first value"},"normalisedTargetFile":"` + testPackageLockJSON + `",` +
+		`"targetFileFromPlugin":"target-from-plugin","target":{"key":"value"}}
 {"depGraph":{"arbitraryJsonKey":"second value"},"normalisedTargetFile":"pom.xml"}`)
 
 	results, err := parser.ParseOutput(input)
@@ -19,7 +24,7 @@ func TestJSONLOutputParser_ParseOutput(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 
-	assert.Equal(t, "package-lock.json", results[0].NormalisedTargetFile)
+	assert.Equal(t, testPackageLockJSON, results[0].NormalisedTargetFile)
 	require.NotNil(t, results[0].TargetFileFromPlugin)
 	assert.Equal(t, "target-from-plugin", *results[0].TargetFileFromPlugin)
 	require.NotNil(t, results[0].Target)
@@ -46,14 +51,15 @@ func TestJSONLOutputParser_ParseOutput_BlankOutput(t *testing.T) {
 func TestJSONLOutputParser_ParseOutput_InvalidJSON(t *testing.T) {
 	parser := NewJSONL()
 
-	input := []byte(`{"depGraph":{"arbitraryJsonKey":"first value"},"normalisedTargetFile":"package-lock.json","targetFileFromPlugin":"target-from-plugin","target":{"key":"value"}}
+	input := []byte(`{"depGraph":{"arbitraryJsonKey":"first value"},"normalisedTargetFile":"` + testPackageLockJSON + `",` +
+		`"targetFileFromPlugin":"target-from-plugin","target":{"key":"value"}}
 	This is a warning!`)
 
 	results, err := parser.ParseOutput(input)
 	require.NoError(t, err)
 
 	assert.Len(t, results, 1)
-	assert.Equal(t, "package-lock.json", results[0].NormalisedTargetFile)
+	assert.Equal(t, testPackageLockJSON, results[0].NormalisedTargetFile)
 	require.NotNil(t, results[0].TargetFileFromPlugin)
 	assert.Equal(t, "target-from-plugin", *results[0].TargetFileFromPlugin)
 	require.NotNil(t, results[0].Target)

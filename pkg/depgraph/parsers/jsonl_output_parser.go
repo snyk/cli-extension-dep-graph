@@ -4,13 +4,15 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 )
 
-type JSONLOutputParser struct {
-}
+// JSONLOutputParser parses JSONL formatted dependency graph output.
+type JSONLOutputParser struct{}
 
 var _ OutputParser = (*JSONLOutputParser)(nil)
 
+// NewJSONL creates a new JSONL output parser.
 func NewJSONL() OutputParser {
 	return &JSONLOutputParser{}
 }
@@ -22,8 +24,9 @@ type jsonLine struct {
 	Target               json.RawMessage `json:"target"`
 }
 
+// ParseOutput parses JSONL formatted dependency graph output.
 func (j *JSONLOutputParser) ParseOutput(data []byte) ([]DepGraphOutput, error) {
-	var depGraphList []DepGraphOutput
+	depGraphList := make([]DepGraphOutput, 0)
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	buf := make([]byte, 0, 64*1024)
@@ -48,7 +51,7 @@ func (j *JSONLOutputParser) ParseOutput(data []byte) ([]DepGraphOutput, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("scanner error: %w", err)
 	}
 
 	return depGraphList, nil
