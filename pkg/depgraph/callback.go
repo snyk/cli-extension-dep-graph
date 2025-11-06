@@ -25,13 +25,11 @@ const (
 //nolint:gochecknoglobals // Workflow identifier needs to be a package-level variable
 var legacyWorkflowID = workflow.NewWorkflowIdentifier(legacyCLIWorkflowIDStr)
 
-//go:embed testdata/mock_depgraph.json
-var mockDepGraph []byte
-
 func callback(ctx workflow.InvocationContext, data []workflow.Data) ([]workflow.Data, error) {
 	return callbackWithDI(ctx, data, uvclient.NewUVClient())
 }
 
+//nolint:gocyclo // Complexity is acceptable for workflow coordination
 func callbackWithDI(ctx workflow.InvocationContext, _ []workflow.Data, uvClient uvclient.UVClient) ([]workflow.Data, error) {
 	engine := ctx.GetEngine()
 	config := ctx.GetConfiguration()

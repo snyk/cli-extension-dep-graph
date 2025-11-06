@@ -34,7 +34,10 @@ func (t *SnykClient) SBOMConvert(
 	if err != nil {
 		return nil, nil, errFactory.NewSCAError(err)
 	}
-	writer.Close()
+	err = writer.Close()
+	if err != nil {
+		return nil, nil, errFactory.NewSCAError(err)
+	}
 
 	req, err := http.NewRequestWithContext(
 		ctx,
@@ -53,7 +56,7 @@ func (t *SnykClient) SBOMConvert(
 	if err != nil {
 		return nil, nil, errFactory.NewSCAError(err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // errors in deferred close are not critical
 
 	if resp.StatusCode > 399 && resp.StatusCode < 500 {
 		return nil, nil, errFactory.NewSCAError(errorWithRequestID("request to analyze SBOM document was rejected", resp))
@@ -81,8 +84,8 @@ func buildSBOMConvertAPIURL(apiBaseURL, apiVersion, orgID, remoteRepoURL string)
 	u = u.JoinPath("hidden", "orgs", orgID, "sboms", "convert")
 
 	query := url.Values{
-		"version":         {apiVersion},
-		"remote_repo_url": {remoteRepoURL},
+		"version":         []string{apiVersion},
+		"remote_repo_url": []string{remoteRepoURL},
 	}
 	u.RawQuery = query.Encode()
 

@@ -2,7 +2,6 @@ package snykclient_test
 
 import (
 	"bytes"
-	_ "embed"
 	"net/http"
 	"testing"
 
@@ -11,9 +10,6 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 )
-
-//go:embed testdata/sbom-test-result.response.json
-var testResultMockResponse []byte
 
 var (
 	logger     = zerolog.New(&bytes.Buffer{})

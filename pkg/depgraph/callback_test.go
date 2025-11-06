@@ -28,9 +28,6 @@ var jsonlPayload string
 //go:embed testdata/expected_dep_graph.json
 var expectedDepGraph string
 
-//go:embed testdata/mock_depgraph.json
-var expectedMockDepGraph string
-
 const (
 	errMsgPayloadShouldBeByte = "payload should be []byte"
 )
