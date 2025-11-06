@@ -115,6 +115,54 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to export SBOM using uv")
 		assert.Nil(t, depGraphs)
 	})
+
+	t.Run("should handle SBOM convert network request errors", func(t *testing.T) {
+		// Create mock SBOM service response with an error status
+		mockResponse := mocks.NewMockResponse(
+			"application/json",
+			[]byte(`{"message":"Internal server error."}`),
+			http.StatusInternalServerError,
+		)
+
+		mockSBOMService := mocks.NewMockSBOMService(mockResponse, func(r *http.Request) {
+			assert.Equal(t, http.MethodPost, r.Method)
+			assert.Contains(t, r.RequestURI, "/hidden/orgs/test-org-id/sboms/convert")
+			assert.Equal(t, "application/octet-stream", r.Header.Get("Content-Type"))
+			assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
+		})
+		defer mockSBOMService.Close()
+
+		config := configuration.New()
+		config.Set(FlagUseSBOMResolution, true)
+		config.Set(configuration.ORGANIZATION, "test-org-id")
+		config.Set(configuration.API_URL, mockSBOMService.URL)
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		engineMock := frameworkmocks.NewMockEngine(ctrl)
+		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
+
+		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
+		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
+		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
+		invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
+
+		// Create mock UV client that returns valid SBOM data
+		mockUVClient := &mocks.MockUVClient{
+			ExportSBOMFunc: func(inputDir string) ([]byte, error) {
+				// Return a minimal valid CycloneDX SBOM
+				return []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), nil
+			},
+		}
+
+		depGraphs, err := callbackWithDI(invocationContextMock, []workflow.Data{}, mockUVClient)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "analysis of SBOM document failed due to error")
+		assert.Contains(t, err.Error(), "500")
+		assert.Nil(t, depGraphs)
+	})
 }
 
 func Test_callback(t *testing.T) {
