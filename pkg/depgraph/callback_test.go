@@ -27,6 +27,10 @@ var expectedDepGraph string
 //go:embed testdata/mock_depgraph.json
 var expectedMockDepGraph string
 
+const (
+	errMsgPayloadShouldBeByte = "payload should be []byte"
+)
+
 func Test_callback_SBOMResolution(t *testing.T) {
 	logger := log.New(os.Stderr, "test", 0)
 	config := configuration.New()
@@ -46,7 +50,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		assert.Len(t, depGraphs, 1)
 
-		actualDepGraph := depGraphs[0].GetPayload().([]byte)
+		actualDepGraph, ok := depGraphs[0].GetPayload().([]byte)
+		require.True(t, ok, errMsgPayloadShouldBeByte)
 		assert.JSONEq(t, expectedMockDepGraph, string(actualDepGraph))
 
 		contentLocation, err := depGraphs[0].GetMetaData("Content-Location")
@@ -242,8 +247,8 @@ func Test_callback(t *testing.T) {
 
 	t.Run("should return a depGraphList", func(t *testing.T) {
 		// setup
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
+		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+		data := workflow.NewData(dataIdentifier, contentTypeJSON, []byte(payload))
 		engineMock.
 			EXPECT().
 			InvokeWithConfig(legacyWorkflowID, config).
@@ -255,15 +260,15 @@ func Test_callback(t *testing.T) {
 
 		assert.Len(t, depGraphs, 1)
 
-		actualDepGraph := depGraphs[0].GetPayload().([]byte)
-
+		actualDepGraph, ok := depGraphs[0].GetPayload().([]byte)
+		require.True(t, ok, errMsgPayloadShouldBeByte)
 		assert.JSONEq(t, expectedDepGraph, string(actualDepGraph))
 	})
 
 	t.Run("should return effective dep graphs when requested", func(t *testing.T) {
 		config.Set(FlagPrintEffectiveGraph, true)
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte(jsonlPayload))
+		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+		data := workflow.NewData(dataIdentifier, contentTypeJSON, []byte(jsonlPayload))
 		engineMock.
 			EXPECT().
 			InvokeWithConfig(legacyWorkflowID, config).
@@ -275,8 +280,8 @@ func Test_callback(t *testing.T) {
 
 		assert.Len(t, depGraphs, 1)
 
-		actualDepGraph := depGraphs[0].GetPayload().([]byte)
-
+		actualDepGraph, ok := depGraphs[0].GetPayload().([]byte)
+		require.True(t, ok, errMsgPayloadShouldBeByte)
 		assert.Contains(t, string(actualDepGraph), "npm")
 
 		verifyMeta(t, depGraphs[0], MetaKeyNormalisedTargetFile, "some normalised target file")
@@ -285,8 +290,8 @@ func Test_callback(t *testing.T) {
 	})
 
 	t.Run("should error if no dependency graphs found", func(t *testing.T) {
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-		data := workflow.NewData(dataIdentifier, "application/json", []byte{})
+		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+		data := workflow.NewData(dataIdentifier, contentTypeJSON, []byte{})
 
 		// engine mocks
 		id := workflow.NewWorkflowIdentifier("legacycli")
@@ -300,9 +305,15 @@ func Test_callback(t *testing.T) {
 	})
 }
 
-func invokeWithConfigAndGetTestCmdArgs(t *testing.T, engineMock *mocks.MockEngine, config configuration.Configuration, invocationContextMock *mocks.MockInvocationContext) interface{} {
-	dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, "depgraph")
-	data := workflow.NewData(dataIdentifier, "application/json", []byte(payload))
+func invokeWithConfigAndGetTestCmdArgs(
+	t *testing.T,
+	engineMock *mocks.MockEngine,
+	config configuration.Configuration,
+	invocationContextMock *mocks.MockInvocationContext,
+) interface{} {
+	t.Helper()
+	dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+	data := workflow.NewData(dataIdentifier, contentTypeJSON, []byte(payload))
 
 	// engine mocks
 	id := workflow.NewWorkflowIdentifier("legacycli")
@@ -316,7 +327,7 @@ func invokeWithConfigAndGetTestCmdArgs(t *testing.T, engineMock *mocks.MockEngin
 	return config.Get(configuration.RAW_CMD_ARGS)
 }
 
-func verifyMeta(t *testing.T, data workflow.Data, key string, expectedValue string) {
+func verifyMeta(t *testing.T, data workflow.Data, key, expectedValue string) {
 	t.Helper()
 
 	value, err := data.GetMetaData(key)

@@ -3,6 +3,10 @@ package depgraph
 import "github.com/spf13/pflag"
 
 const (
+	flagSetName = "depgraph"
+)
+
+const (
 	FlagFailFast                     = "fail-fast"
 	FlagAllProjects                  = "all-projects"
 	FlagDev                          = "dev"
@@ -35,7 +39,7 @@ const (
 )
 
 func getFlagSet() *pflag.FlagSet {
-	flagSet := pflag.NewFlagSet("depgraph", pflag.ExitOnError)
+	flagSet := pflag.NewFlagSet(flagSetName, pflag.ExitOnError)
 
 	flagSet.Bool(FlagFailFast, false, "Fail fast when scanning all projects")
 	flagSet.Bool(FlagAllProjects, false, "Enable all projects")
@@ -58,14 +62,17 @@ func getFlagSet() *pflag.FlagSet {
 	flagSet.String(FlagPythonSkipUnresolved, "", "Skip Python packages that cannot be found in the environment.")
 	flagSet.String(FlagPythonPackageManager, "", `Add --package-manager=pip to your command if the file name is not "requirements.txt".`)
 	flagSet.String(FlagNPMStrictOutOfSync, "true", "Prevent testing out-of-sync NPM lockfiles.")
-	flagSet.Bool(FlagNugetAssetsProjectName, false, "When you are monitoring a .NET project using NuGet PackageReference uses the project name in project.assets.json if found.")
+	flagSet.Bool(FlagNugetAssetsProjectName, false,
+		"When you are monitoring a .NET project using NuGet PackageReference uses the project name in project.assets.json if found.")
 	flagSet.String(FlagNugetPkgsFolder, "", "Specify a custom path to the packages folder when using NuGet.")
 	flagSet.Int(FlagUnmanagedMaxDepth, 0, "Specify the maximum level of archive extraction for unmanaged scanning.")
 	flagSet.Bool(FlagIncludeProvenance, false, "Include checksums in purl to support package provenance.")
 	flagSet.Bool(FlagUseSBOMResolution, false, "Use SBOM resolution instead of legacy CLI.")
 	flagSet.Bool(FlagPrintEffectiveGraph, false, "Return the pruned dependency graph.")
 	flagSet.Bool(FlagDotnetRuntimeResolution, false, "Required. You must use this option when you test .NET projects using Runtime Resolution Scanning.")
-	flagSet.String(FlagDotnetTargetFramework, "", "Optional. You may use this option if your solution contains multiple <TargetFramework> directives. If you do not specify the option --dotnet-target-framework, all supported Target Frameworks will be scanned.")
+	flagSet.String(FlagDotnetTargetFramework, "",
+		"Optional. You may use this option if your solution contains multiple <TargetFramework> directives. "+
+			"If you do not specify the option --dotnet-target-framework, all supported Target Frameworks will be scanned.")
 
 	return flagSet
 }

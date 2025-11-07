@@ -5,11 +5,12 @@ import (
 	"strings"
 )
 
-type PlainTextOutputParser struct {
-}
+// PlainTextOutputParser parses plain text formatted dependency graph output.
+type PlainTextOutputParser struct{}
 
 var _ OutputParser = (*PlainTextOutputParser)(nil)
 
+// NewPlainText creates a new plain text output parser.
 func NewPlainText() OutputParser {
 	return &PlainTextOutputParser{}
 }
@@ -20,8 +21,8 @@ var (
 	jsonSeparatorTarget = []byte("DepGraph target:")
 )
 
+// ParseOutput parses plain text formatted dependency graph output.
 func (p PlainTextOutputParser) ParseOutput(output []byte) ([]DepGraphOutput, error) {
-
 	depGraphList := []DepGraphOutput{}
 
 	separatedJSONRawData := bytes.Split(output, jsonSeparatorEnd)
@@ -46,5 +47,4 @@ func (p PlainTextOutputParser) ParseOutput(output []byte) ([]DepGraphOutput, err
 	}
 
 	return depGraphList, nil
-
 }

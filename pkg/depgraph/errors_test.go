@@ -10,6 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	testDataTypeID = "something"
+)
+
 func Test_extractLegacyCLIError_ErrorFromLegacyCLI(t *testing.T) {
 	expectedMsgJSON := `{
 		"ok": false,
@@ -18,7 +22,7 @@ func Test_extractLegacyCLIError_ErrorFromLegacyCLI(t *testing.T) {
 	  }`
 
 	wrappedErr := fmt.Errorf("something bad happened: %w", &exec.ExitError{})
-	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, "something"), "application/json", []byte(expectedMsgJSON))
+	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, testDataTypeID), contentTypeJSON, []byte(expectedMsgJSON))
 
 	outputError := extractLegacyCLIError(wrappedErr, []workflow.Data{data})
 
@@ -34,7 +38,7 @@ func Test_extractLegacyCLIError_ErrorCatalogFromLegacyCLI(t *testing.T) {
 		Detail: "Something bad happened",
 	}
 
-	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, "something"), "application/json", nil)
+	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, testDataTypeID), contentTypeJSON, nil)
 
 	outputError := extractLegacyCLIError(err, []workflow.Data{data})
 
