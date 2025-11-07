@@ -3,13 +3,15 @@ package depgraph
 import (
 	_ "embed"
 	"fmt"
-	"log"
-	"os"
+	"net/http"
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/rs/zerolog"
+	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
 	"github.com/snyk/go-application-framework/pkg/configuration"
-	"github.com/snyk/go-application-framework/pkg/mocks"
+	frameworkmocks "github.com/snyk/go-application-framework/pkg/mocks"
+	"github.com/snyk/go-application-framework/pkg/networking"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,54 +26,158 @@ var jsonlPayload string
 //go:embed testdata/expected_dep_graph.json
 var expectedDepGraph string
 
-//go:embed testdata/mock_depgraph.json
-var expectedMockDepGraph string
+//go:embed testdata/uv-sbom-convert-expected-dep-graph.json
+var uvSBOMConvertExpectedDepGraph string
 
-const (
-	errMsgPayloadShouldBeByte = "payload should be []byte"
-)
+//go:embed testdata/uv-sbom-convert-response.json
+var uvSBOMConvertResponse string
+
+const errMsgPayloadShouldBeByte = "payload should be []byte"
 
 func Test_callback_SBOMResolution(t *testing.T) {
-	logger := log.New(os.Stderr, "test", 0)
-	config := configuration.New()
-	config.Set(FlagUseSBOMResolution, true)
+	nopLogger := zerolog.Nop()
 
-	ctrl := gomock.NewController(t)
-	engineMock := mocks.NewMockEngine(ctrl)
-	invocationContextMock := mocks.NewMockInvocationContext(ctrl)
+	t.Run("should return depgraphs from SBOM conversion when use-sbom-resolution flag is enabled", func(t *testing.T) {
+		// Create mock SBOM service response with a depGraph fact
+		mockResponse := mocks.NewMockResponse(
+			"application/json",
+			[]byte(uvSBOMConvertResponse),
+			http.StatusOK,
+		)
 
-	invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
-	invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
-	invocationContextMock.EXPECT().GetLogger().Return(logger).AnyTimes()
+		mockSBOMService := mocks.NewMockSBOMService(mockResponse, func(r *http.Request) {
+			assert.Equal(t, http.MethodPost, r.Method)
+			assert.Contains(t, r.RequestURI, "/hidden/orgs/test-org-id/sboms/convert")
+			assert.Equal(t, "application/octet-stream", r.Header.Get("Content-Type"))
+			assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
+		})
+		defer mockSBOMService.Close()
 
-	t.Run("should return mock depgraph when use-sbom-resolution flag is enabled", func(t *testing.T) {
-		depGraphs, err := callback(invocationContextMock, []workflow.Data{})
-		require.Nil(t, err)
+		config := configuration.New()
+		config.Set(FlagUseSBOMResolution, true)
+		config.Set(configuration.ORGANIZATION, "test-org-id")
+		config.Set(configuration.API_URL, mockSBOMService.URL)
 
-		assert.Len(t, depGraphs, 1)
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-		actualDepGraph, ok := depGraphs[0].GetPayload().([]byte)
-		require.True(t, ok, errMsgPayloadShouldBeByte)
-		assert.JSONEq(t, expectedMockDepGraph, string(actualDepGraph))
+		engineMock := frameworkmocks.NewMockEngine(ctrl)
+		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
 
-		contentLocation, err := depGraphs[0].GetMetaData("Content-Location")
-		require.Nil(t, err)
-		assert.Equal(t, "uv.lock", contentLocation)
+		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
+		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
+		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
+		invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
+
+		// Create mock UV client that returns valid SBOM data
+		mockUVClient := &mocks.MockUVClient{
+			ExportSBOMFunc: func(_ string) ([]byte, error) {
+				// Return a minimal valid CycloneDX SBOM
+				return []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), nil
+			},
+		}
+
+		workflowData, err := callbackWithDI(invocationContextMock, []workflow.Data{}, mockUVClient)
+
+		require.NoError(t, err)
+		assert.NotNil(t, workflowData)
+		assert.Len(t, workflowData, 1)
+
+		// Compare the workflow data payload with the expected depGraph
+		depGraph, ok := workflowData[0].GetPayload().([]byte)
+		require.True(t, ok, "payload should be []byte")
+		assert.JSONEq(t, uvSBOMConvertExpectedDepGraph, string(depGraph))
+	})
+
+	t.Run("should handle UV client errors gracefully", func(t *testing.T) {
+		config := configuration.New()
+		config.Set(FlagUseSBOMResolution, true)
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		engineMock := frameworkmocks.NewMockEngine(ctrl)
+		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
+
+		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
+		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
+		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
+
+		// Create mock UV client that returns an error
+		mockUVClient := &mocks.MockUVClient{
+			ExportSBOMFunc: func(_ string) ([]byte, error) {
+				return nil, fmt.Errorf("uv command failed")
+			},
+		}
+
+		depGraphs, err := callbackWithDI(invocationContextMock, []workflow.Data{}, mockUVClient)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to export SBOM using uv")
+		assert.Nil(t, depGraphs)
+	})
+
+	t.Run("should handle SBOM convert network request errors", func(t *testing.T) {
+		// Create mock SBOM service response with an error status
+		mockResponse := mocks.NewMockResponse(
+			"application/json",
+			[]byte(`{"message":"Internal server error."}`),
+			http.StatusInternalServerError,
+		)
+
+		mockSBOMService := mocks.NewMockSBOMService(mockResponse, func(r *http.Request) {
+			assert.Equal(t, http.MethodPost, r.Method)
+			assert.Contains(t, r.RequestURI, "/hidden/orgs/test-org-id/sboms/convert")
+			assert.Equal(t, "application/octet-stream", r.Header.Get("Content-Type"))
+			assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
+		})
+		defer mockSBOMService.Close()
+
+		config := configuration.New()
+		config.Set(FlagUseSBOMResolution, true)
+		config.Set(configuration.ORGANIZATION, "test-org-id")
+		config.Set(configuration.API_URL, mockSBOMService.URL)
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		engineMock := frameworkmocks.NewMockEngine(ctrl)
+		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
+
+		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
+		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
+		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
+		invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
+
+		// Create mock UV client that returns valid SBOM data
+		mockUVClient := &mocks.MockUVClient{
+			ExportSBOMFunc: func(_ string) ([]byte, error) {
+				// Return a minimal valid CycloneDX SBOM
+				return []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), nil
+			},
+		}
+
+		depGraphs, err := callbackWithDI(invocationContextMock, []workflow.Data{}, mockUVClient)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "analysis of SBOM document failed due to error")
+		assert.Contains(t, err.Error(), "500")
+		assert.Nil(t, depGraphs)
 	})
 }
 
 func Test_callback(t *testing.T) {
-	logger := log.New(os.Stderr, "test", 0)
+	nopLogger := zerolog.Nop()
 	config := configuration.New()
 	// setup mocks
 	ctrl := gomock.NewController(t)
-	engineMock := mocks.NewMockEngine(ctrl)
-	invocationContextMock := mocks.NewMockInvocationContext(ctrl)
+	engineMock := frameworkmocks.NewMockEngine(ctrl)
+	invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
 
 	// invocation context mocks
 	invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
 	invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
-	invocationContextMock.EXPECT().GetLogger().Return(logger).AnyTimes()
+	invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
 
 	type option struct {
 		key      string
@@ -307,9 +413,9 @@ func Test_callback(t *testing.T) {
 
 func invokeWithConfigAndGetTestCmdArgs(
 	t *testing.T,
-	engineMock *mocks.MockEngine,
+	engineMock *frameworkmocks.MockEngine,
 	config configuration.Configuration,
-	invocationContextMock *mocks.MockInvocationContext,
+	invocationContextMock *frameworkmocks.MockInvocationContext,
 ) interface{} {
 	t.Helper()
 	dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)

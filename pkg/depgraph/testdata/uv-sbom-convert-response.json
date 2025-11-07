@@ -1,0 +1,45 @@
+{
+  "scanResults": [
+    {
+      "name": "test-scan",
+      "identity": {
+        "type": "pip"
+      },
+      "target": {
+        "remoteUrl": ""
+      },
+      "facts": [
+        {
+          "type": "depGraph",
+          "data": {
+            "schemaVersion": "1.2.0",
+            "pkgManager": {
+              "name": "pip"
+            },
+            "pkgs": [
+              {
+                "id": "test-pkg@1.0.0",
+                "info": {
+                  "name": "test-pkg",
+                  "version": "1.0.0"
+                }
+              }
+            ],
+            "graph": {
+              "rootNodeId": "root-node",
+              "nodes": [
+                {
+                  "nodeId": "root-node",
+                  "pkgId": "test-pkg@1.0.0",
+                  "deps": []
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}
+

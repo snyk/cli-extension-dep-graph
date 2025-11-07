@@ -146,3 +146,10 @@ linters:
     - wastedassign
     - whitespace
     - wrapcheck
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - goconst
+        - wrapcheck
