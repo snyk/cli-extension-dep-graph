@@ -1,6 +1,7 @@
 package uvclient
 
 import (
+	"fmt"
 	"os/exec"
 )
 
@@ -24,7 +25,7 @@ func NewUVClientWithPath(uvBinary string) UVClient {
 	}
 }
 
-// creates a new UV client with a custom executor for testing
+// NewUVClientWithExecutor creates a new UV client with a custom executor for testing.
 func NewUVClientWithExecutor(uvBinary string, executor cmdExecutor) UVClient {
 	return &uvClient{
 		uvBinary: uvBinary,
@@ -32,21 +33,29 @@ func NewUVClientWithExecutor(uvBinary string, executor cmdExecutor) UVClient {
 	}
 }
 
-// ExportSBOM exports an SBOM in CycloneDX format using UV
+// ExportSBOM exports an SBOM in CycloneDX format using UV.
 func (c *uvClient) ExportSBOM(inputDir string) ([]byte, error) {
-	return c.executor.Execute(c.uvBinary, inputDir, "export", "--format", "cyclonedx1.5", "--frozen")
+	output, err := c.executor.Execute(c.uvBinary, inputDir, "export", "--format", "cyclonedx1.5", "--frozen")
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute uv export: %w", err)
+	}
+	return output, nil
 }
 
-// cmdExecutor interface for executing commands mockable
+// cmdExecutor interface for executing commands mockable.
 type cmdExecutor interface {
 	Execute(binary, dir string, args ...string) ([]byte, error)
 }
 
-// defaultCmdExecutor is the real implementation of cmdExecutor
+// defaultCmdExecutor is the real implementation of cmdExecutor.
 type defaultCmdExecutor struct{}
 
 func (e *defaultCmdExecutor) Execute(binary, dir string, args ...string) ([]byte, error) {
 	cmd := exec.Command(binary, args...)
 	cmd.Dir = dir
-	return cmd.Output()
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute command: %w", err)
+	}
+	return output, nil
 }

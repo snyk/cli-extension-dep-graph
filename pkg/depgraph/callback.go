@@ -29,7 +29,6 @@ func callback(ctx workflow.InvocationContext, data []workflow.Data) ([]workflow.
 	return callbackWithDI(ctx, data, uvclient.NewUVClient())
 }
 
-//nolint:gocyclo // Complexity is acceptable for workflow coordination
 func callbackWithDI(ctx workflow.InvocationContext, _ []workflow.Data, uvClient uvclient.UVClient) ([]workflow.Data, error) {
 	engine := ctx.GetEngine()
 	config := ctx.GetConfiguration()
@@ -39,50 +38,63 @@ func callbackWithDI(ctx workflow.InvocationContext, _ []workflow.Data, uvClient 
 
 	// Check if SBOM resolution mode is enabled
 	if config.GetBool(FlagUseSBOMResolution) {
-		inputDir := config.GetString(configuration.INPUT_DIRECTORY)
-		if inputDir == "" {
-			inputDir = "."
-		}
-
-		sbomOutput, err := uvClient.ExportSBOM(inputDir)
-		if err != nil {
-			return nil, fmt.Errorf("failed to export SBOM using uv: %w", err)
-		}
-
-		orgID := config.GetString(configuration.ORGANIZATION)
-		if orgID == "" {
-			logger.Printf("ERROR: failed to determine org id\n")
-			return nil, snykclient.NewEmptyOrgError()
-		}
-		remoteRepoURL := config.GetString("remote-repo-url")
-
-		c := snykclient.NewSnykClient(
-			ctx.GetNetworkAccess().GetHttpClient(),
-			config.GetString(configuration.API_URL),
-			orgID)
-
-		sbomReader := bytes.NewReader(sbomOutput)
-
-		scans, warnings, err := c.SBOMConvert(context.Background(), logger, sbomReader, remoteRepoURL)
-		if err != nil {
-			return nil, err
-		}
-
-		logger.Printf("Successfully converted SBOM, warning(s): %d\n", len(warnings))
-
-		depGraphsData, err := extractDepGraphsFromScans(scans)
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract depgraphs from scan results: %w", err)
-		}
-
-		if len(depGraphsData) == 0 {
-			return nil, fmt.Errorf("no dependency graphs found in SBOM conversion response")
-		}
-
-		logger.Printf("DepGraph workflow done (extracted %d dependency graphs from SBOM)", len(depGraphsData))
-		return depGraphsData, nil
+		return handleSBOMResolution(ctx, config, logger, uvClient)
 	}
 
+	return handleLegacyWorkflow(engine, config, logger)
+}
+
+func handleSBOMResolution(
+	ctx workflow.InvocationContext,
+	config configuration.Configuration,
+	logger *zerolog.Logger,
+	uvClient uvclient.UVClient,
+) ([]workflow.Data, error) {
+	inputDir := config.GetString(configuration.INPUT_DIRECTORY)
+	if inputDir == "" {
+		inputDir = "."
+	}
+
+	sbomOutput, err := uvClient.ExportSBOM(inputDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to export SBOM using uv: %w", err)
+	}
+
+	orgID := config.GetString(configuration.ORGANIZATION)
+	if orgID == "" {
+		logger.Printf("ERROR: failed to determine org id\n")
+		return nil, snykclient.NewEmptyOrgError()
+	}
+	remoteRepoURL := config.GetString("remote-repo-url")
+
+	c := snykclient.NewSnykClient(
+		ctx.GetNetworkAccess().GetHttpClient(),
+		config.GetString(configuration.API_URL),
+		orgID)
+
+	sbomReader := bytes.NewReader(sbomOutput)
+
+	scans, warnings, err := c.SBOMConvert(context.Background(), logger, sbomReader, remoteRepoURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert SBOM: %w", err)
+	}
+
+	logger.Printf("Successfully converted SBOM, warning(s): %d\n", len(warnings))
+
+	depGraphsData, err := extractDepGraphsFromScans(scans)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract depgraphs from scan results: %w", err)
+	}
+
+	if len(depGraphsData) == 0 {
+		return nil, fmt.Errorf("no dependency graphs found in SBOM conversion response")
+	}
+
+	logger.Printf("DepGraph workflow done (extracted %d dependency graphs from SBOM)", len(depGraphsData))
+	return depGraphsData, nil
+}
+
+func handleLegacyWorkflow(engine workflow.Engine, config configuration.Configuration, logger *zerolog.Logger) ([]workflow.Data, error) {
 	arguments, outputParser := chooseGraphArguments(config)
 
 	// prepare invocation of the legacy cli
@@ -142,25 +154,26 @@ func extractDepGraphsFromScans(scans []*snykclient.ScanResult) ([]workflow.Data,
 	for _, scan := range scans {
 		// Look for depgraph facts in this scan result
 		for _, fact := range scan.Facts {
-			if fact.Type == "depGraph" {
-				// Marshal the depgraph data to JSON bytes
-				depGraphBytes, err := json.Marshal(fact.Data)
-				if err != nil {
-					return nil, fmt.Errorf("failed to marshal depgraph data: %w", err)
-				}
-
-				// Create workflow data with the depgraph
-				data := workflow.NewData(DataTypeID, "application/json", depGraphBytes)
-
-				data.SetMetaData("Content-Location", "uv.lock")
-				data.SetMetaData(MetaKeyNormalisedTargetFile, "uv.lock")
-
-				if scan.Identity.Type != "" {
-					data.SetMetaData(MetaKeyTargetFileFromPlugin, scan.Identity.Type)
-				}
-
-				depGraphList = append(depGraphList, data)
+			if fact.Type != "depGraph" {
+				continue
 			}
+			// Marshal the depgraph data to JSON bytes
+			depGraphBytes, err := json.Marshal(fact.Data)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal depgraph data: %w", err)
+			}
+
+			// Create workflow data with the depgraph
+			data := workflow.NewData(DataTypeID, contentTypeJSON, depGraphBytes)
+
+			data.SetMetaData("Content-Location", "uv.lock")
+			data.SetMetaData(MetaKeyNormalisedTargetFile, "uv.lock")
+
+			if scan.Identity.Type != "" {
+				data.SetMetaData(MetaKeyTargetFileFromPlugin, scan.Identity.Type)
+			}
+
+			depGraphList = append(depGraphList, data)
 		}
 	}
 

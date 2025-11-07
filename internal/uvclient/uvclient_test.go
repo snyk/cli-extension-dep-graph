@@ -39,7 +39,7 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 func TestUVClient_ExportSBOM_Error(t *testing.T) {
 	expectedErr := errors.New("command failed")
 	mockExecutor := &mockCmdExecutor{
-		executeFunc: func(binary, dir string, args ...string) ([]byte, error) {
+		executeFunc: func(_, _ string, _ ...string) ([]byte, error) {
 			return nil, expectedErr
 		},
 	}
@@ -48,6 +48,6 @@ func TestUVClient_ExportSBOM_Error(t *testing.T) {
 	result, err := client.ExportSBOM("/test/dir")
 
 	assert.Error(t, err)
-	assert.Equal(t, expectedErr, err)
+	assert.ErrorIs(t, err, expectedErr)
 	assert.Nil(t, result)
 }

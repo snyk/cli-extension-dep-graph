@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -63,7 +64,9 @@ func (t *SnykClient) SBOMConvert(
 		logger.Printf("ERROR: failed to execute HTTP request for SBOM conversion: %s\n", err)
 		return nil, nil, NewSCAError(err)
 	}
-	defer resp.Body.Close() //nolint:errcheck // errors in deferred close are not critical
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode > 399 && resp.StatusCode < 500 {
 		reqErr := errorWithRequestID("request to analyze SBOM document was rejected", resp)
@@ -90,7 +93,7 @@ func (t *SnykClient) SBOMConvert(
 func buildSBOMConvertAPIURL(apiBaseURL, apiVersion, orgID, remoteRepoURL string) (*url.URL, error) {
 	u, err := url.Parse(apiBaseURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse API base URL: %w", err)
 	}
 
 	u = u.JoinPath("hidden", "orgs", orgID, "sboms", "convert")

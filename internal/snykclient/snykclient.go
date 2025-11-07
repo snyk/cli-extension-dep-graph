@@ -23,7 +23,7 @@ func NewSnykClient(c *http.Client, apiBaseURL, orgID string) *SnykClient {
 func createNonRedirectingHTTPClient(c *http.Client) *http.Client {
 	newClient := http.Client{
 		Transport: c.Transport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}

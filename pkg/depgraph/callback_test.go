@@ -71,7 +71,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		// Create mock UV client that returns valid SBOM data
 		mockUVClient := &mocks.MockUVClient{
-			ExportSBOMFunc: func(inputDir string) ([]byte, error) {
+			ExportSBOMFunc: func(_ string) ([]byte, error) {
 				// Return a minimal valid CycloneDX SBOM
 				return []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), nil
 			},
@@ -84,7 +84,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Len(t, workflowData, 1)
 
 		// Compare the workflow data payload with the expected depGraph
-		depGraph := workflowData[0].GetPayload().([]byte)
+		depGraph, ok := workflowData[0].GetPayload().([]byte)
+		require.True(t, ok, "payload should be []byte")
 		assert.JSONEq(t, uvSBOMConvertExpectedDepGraph, string(depGraph))
 	})
 
@@ -104,7 +105,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		// Create mock UV client that returns an error
 		mockUVClient := &mocks.MockUVClient{
-			ExportSBOMFunc: func(inputDir string) ([]byte, error) {
+			ExportSBOMFunc: func(_ string) ([]byte, error) {
 				return nil, fmt.Errorf("uv command failed")
 			},
 		}
@@ -150,7 +151,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		// Create mock UV client that returns valid SBOM data
 		mockUVClient := &mocks.MockUVClient{
-			ExportSBOMFunc: func(inputDir string) ([]byte, error) {
+			ExportSBOMFunc: func(_ string) ([]byte, error) {
 				// Return a minimal valid CycloneDX SBOM
 				return []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), nil
 			},
