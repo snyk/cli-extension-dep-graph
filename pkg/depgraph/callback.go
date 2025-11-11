@@ -95,10 +95,10 @@ func handleSBOMResolution(
 }
 
 func handleLegacyWorkflow(engine workflow.Engine, config configuration.Configuration, logger *zerolog.Logger) ([]workflow.Data, error) {
-	arguments, outputParser := chooseGraphArguments(config)
+	argument, outputParser := chooseGraphArgument(config)
 
 	// prepare invocation of the legacy cli
-	prepareLegacyFlags(arguments, config, logger)
+	prepareLegacyFlags(argument, config, logger)
 
 	legacyData, legacyCLIError := engine.InvokeWithConfig(legacyWorkflowID, config)
 	if legacyCLIError != nil {
@@ -123,12 +123,12 @@ func handleLegacyWorkflow(engine workflow.Engine, config configuration.Configura
 	return workflowOutputData, nil
 }
 
-func chooseGraphArguments(config configuration.Configuration) ([]string, parsers.OutputParser) {
+func chooseGraphArgument(config configuration.Configuration) (string, parsers.OutputParser) {
 	if config.GetBool(FlagPrintEffectiveGraph) {
-		return []string{"--print-effective-graph"}, parsers.NewJSONL()
+		return "--print-effective-graph", parsers.NewJSONL()
 	}
 
-	return []string{"--print-graph", "--json"}, parsers.NewPlainText()
+	return "--print-graph", parsers.NewPlainText()
 }
 
 func mapToWorkflowData(depGraphs []parsers.DepGraphOutput) []workflow.Data {
@@ -181,9 +181,9 @@ func extractDepGraphsFromScans(scans []*snykclient.ScanResult) ([]workflow.Data,
 }
 
 //nolint:gocyclo // Function contains many conditional flag checks
-func prepareLegacyFlags(arguments []string, cfg configuration.Configuration, logger *zerolog.Logger) {
-	cmdArgs := []string{"test"}
-	cmdArgs = append(cmdArgs, arguments...)
+func prepareLegacyFlags(argument string, cfg configuration.Configuration, logger *zerolog.Logger) {
+	cmdArgs := []string{"test", "--json"}
+	cmdArgs = append(cmdArgs, argument)
 
 	if allProjects := cfg.GetBool("all-projects"); allProjects {
 		cmdArgs = append(cmdArgs, "--all-projects")
