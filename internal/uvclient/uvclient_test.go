@@ -51,3 +51,18 @@ func TestUVClient_ExportSBOM_Error(t *testing.T) {
 	assert.ErrorIs(t, err, expectedErr)
 	assert.Nil(t, result)
 }
+
+func TestUVClient_ExportSBOM_BinaryNotFound(t *testing.T) {
+	mockExecutor := &mockCmdExecutor{
+		executeFunc: func(binary, _ string, _ ...string) ([]byte, error) {
+			return nil, errors.New(binary + " binary not found in PATH")
+		},
+	}
+
+	client := uvclient.NewUVClientWithExecutor("uv", mockExecutor)
+	result, err := client.ExportSBOM("/test/dir")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "binary not found in PATH")
+	assert.Nil(t, result)
+}

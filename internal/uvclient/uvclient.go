@@ -19,10 +19,7 @@ func NewUVClient() UVClient {
 }
 
 func NewUVClientWithPath(uvBinary string) UVClient {
-	return &uvClient{
-		uvBinary: uvBinary,
-		executor: &defaultCmdExecutor{},
-	}
+	return NewUVClientWithExecutor(uvBinary, &defaultCmdExecutor{})
 }
 
 // NewUVClientWithExecutor creates a new UV client with a custom executor for testing.
@@ -51,6 +48,12 @@ type cmdExecutor interface {
 type defaultCmdExecutor struct{}
 
 func (e *defaultCmdExecutor) Execute(binary, dir string, args ...string) ([]byte, error) {
+	// Check if uv binary exists in PATH
+	_, err := exec.LookPath(binary)
+	if err != nil {
+		return nil, fmt.Errorf("%s binary not found in PATH", binary)
+	}
+
 	cmd := exec.Command(binary, args...)
 	cmd.Dir = dir
 	output, err := cmd.Output()
