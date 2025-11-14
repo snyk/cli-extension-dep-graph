@@ -2,14 +2,6 @@ package ecosystems
 
 import "context"
 
-// GraphNode represents a node in the dependency graph tree structure.
-// It contains a reference to its parent package and a map of child nodes.
-type GraphNode struct {
-	ParentPackageID *string              `json:"parentPackageId,omitempty"`
-	PackageID       string               `json:"packageId"`
-	Nodes           map[string]GraphNode `json:"nodes"`
-}
-
 // Package represents a dependency package with its identifying information.
 type Package struct {
 	PackageID   string `json:"packageId"`
@@ -18,10 +10,12 @@ type Package struct {
 }
 
 // Depgraph represents the complete dependency graph containing all packages
-// and their relationships in a tree structure.
+// and their relationships in an adjacency list structure, with a root package
+// identifier that marks the entry point of the dependency graph.
 type Depgraph struct {
-	Packages map[string]Package `json:"packages"`
-	Graph    GraphNode          `json:"graph"`
+	Packages      map[string]Package  `json:"packages"`
+	Graph         map[string][]string `json:"graph"`
+	RootPackageID string              `json:"rootPackageId"`
 }
 
 // Metadata contains contextual information about the dependency graph,
