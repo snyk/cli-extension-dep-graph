@@ -2,20 +2,23 @@ package ecosystems
 
 import "context"
 
+// PackageID uniquely identifies a package, typically in the format "name@version".
+type PackageID string
+
 // Package represents a dependency package with its identifying information.
 type Package struct {
-	PackageID   string `json:"packageId"`
-	PackageName string `json:"packageName"`
-	Version     string `json:"version"`
+	PackageID   PackageID `json:"packageId"`
+	PackageName string    `json:"packageName"`
+	Version     string    `json:"version"`
 }
 
 // Depgraph represents the complete dependency graph containing all packages
 // and their relationships in an adjacency list structure, with a root package
 // identifier that marks the entry point of the dependency graph.
 type Depgraph struct {
-	Packages      map[string]Package  `json:"packages"`
-	Graph         map[string][]string `json:"graph"`
-	RootPackageID string              `json:"rootPackageId"`
+	Packages      map[PackageID]Package     `json:"packages"`
+	Graph         map[PackageID][]PackageID `json:"graph"`
+	RootPackageID PackageID                 `json:"rootPackageId"`
 }
 
 // Metadata contains contextual information about the dependency graph,
