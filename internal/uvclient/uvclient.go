@@ -63,10 +63,9 @@ func (e *defaultCmdExecutor) Execute(binary, dir string, args ...string) ([]byte
 
 	cmd := exec.Command(binary, args...)
 	cmd.Dir = dir
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// TODO(uv): print stdout/stderr
-		return nil, fmt.Errorf("failed to execute command: %w", err)
+		return nil, fmt.Errorf("failed to execute command: %w\noutput: %s", err, output)
 	}
 	return output, nil
 }
