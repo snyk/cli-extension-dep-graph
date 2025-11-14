@@ -1,12 +1,15 @@
-package uvclient
+package uv
 
 import (
 	"fmt"
 	"os/exec"
+
+	"github.com/rs/zerolog"
 )
 
-type UVClient interface {
+type Client interface {
 	ExportSBOM(inputDir string) ([]byte, error)
+	ShouldExportSBOM(inputDir string, logger *zerolog.Logger) bool
 }
 
 type uvClient struct {
@@ -14,32 +17,36 @@ type uvClient struct {
 	executor cmdExecutor
 }
 
-func NewUVClient() UVClient {
-	return NewUVClientWithPath("uv")
+func NewUvClient() Client {
+	return NewUvClientWithPath("uv")
 }
 
-func NewUVClientWithPath(uvBinary string) UVClient {
+func NewUvClientWithPath(uvBinary string) Client {
 	return &uvClient{
 		uvBinary: uvBinary,
 		executor: &defaultCmdExecutor{},
 	}
 }
 
-// NewUVClientWithExecutor creates a new UV client with a custom executor for testing.
-func NewUVClientWithExecutor(uvBinary string, executor cmdExecutor) UVClient {
+// NewUvClientWithExecutor creates a new uv client with a custom executor for testing.
+func NewUvClientWithExecutor(uvBinary string, executor cmdExecutor) Client {
 	return &uvClient{
 		uvBinary: uvBinary,
 		executor: executor,
 	}
 }
 
-// ExportSBOM exports an SBOM in CycloneDX format using UV.
+// exportSBOM exports an SBOM in CycloneDX format using uv.
 func (c *uvClient) ExportSBOM(inputDir string) ([]byte, error) {
 	output, err := c.executor.Execute(c.uvBinary, inputDir, "export", "--format", "cyclonedx1.5", "--frozen")
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute uv export: %w", err)
 	}
 	return output, nil
+}
+
+func (c *uvClient) ShouldExportSBOM(inputDir string, logger *zerolog.Logger) bool {
+	return HasUvLockFile(inputDir, logger)
 }
 
 // cmdExecutor interface for executing commands mockable.

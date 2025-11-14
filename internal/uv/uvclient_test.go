@@ -1,10 +1,10 @@
-package uvclient_test
+package uv_test
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/uvclient"
+	"github.com/snyk/cli-extension-dep-graph/internal/uv"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,7 +29,7 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 		},
 	}
 
-	client := uvclient.NewUVClientWithExecutor("/path/to/uv", mockExecutor)
+	client := uv.NewUvClientWithExecutor("/path/to/uv", mockExecutor)
 	result, err := client.ExportSBOM("/test/dir")
 
 	assert.NoError(t, err)
@@ -44,7 +44,7 @@ func TestUVClient_ExportSBOM_Error(t *testing.T) {
 		},
 	}
 
-	client := uvclient.NewUVClientWithExecutor("/path/to/uv", mockExecutor)
+	client := uv.NewUvClientWithExecutor("/path/to/uv", mockExecutor)
 	result, err := client.ExportSBOM("/test/dir")
 
 	assert.Error(t, err)

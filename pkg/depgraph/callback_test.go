@@ -92,6 +92,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	t.Run("should handle UV client errors gracefully", func(t *testing.T) {
 		config := configuration.New()
 		config.Set(FlagUseSBOMResolution, true)
+		config.Set(configuration.ORGANIZATION, "test-org-id")
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
