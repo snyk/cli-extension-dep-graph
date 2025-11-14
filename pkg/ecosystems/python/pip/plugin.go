@@ -1,6 +1,7 @@
 package pip
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
@@ -8,6 +9,9 @@ import (
 
 type Plugin struct{}
 
-func (p Plugin) BuildDepGraphsFromDir(_ string, _ ecosystems.ScaPluginOptions) (*ecosystems.Depgraph, error) {
+// Compile-time check to ensure Plugin implements ScaPlugin interface.
+var _ ecosystems.ScaPlugin = (*Plugin)(nil)
+
+func (p Plugin) BuildDepGraphsFromDir(_ context.Context, _ string, _ ecosystems.ScaPluginOptions) ([]ecosystems.ScaResult, error) {
 	return nil, fmt.Errorf("not yet implemented")
 }
