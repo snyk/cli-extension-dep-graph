@@ -1,0 +1,35 @@
+package uv
+
+import (
+	"fmt"
+
+	"github.com/rs/zerolog"
+	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
+)
+
+type Plugin struct {
+	client Client
+}
+
+func NewUvPlugin(client Client) Plugin {
+	return Plugin{
+		client: client,
+	}
+}
+
+func (p Plugin) BuildSbomsFromDir(inputDir string, _ scaplugin.Options, logger *zerolog.Logger) ([]scaplugin.Sbom, error) {
+	// TODO(uv): handle options, including (but not limited to):
+	// - all-projects flag
+	// - file flag
+	// - exclude flag
+
+	if !p.client.ShouldExportSBOM(inputDir, logger) {
+		return []scaplugin.Sbom{}, nil
+	}
+
+	sbomOutput, err := p.client.ExportSBOM(inputDir)
+	if err != nil {
+		return []scaplugin.Sbom{}, fmt.Errorf("failed to export SBOM using uv: %w", err)
+	}
+	return []scaplugin.Sbom{sbomOutput}, nil
+}
