@@ -3,6 +3,8 @@ package uvclient
 import (
 	"fmt"
 	"os/exec"
+	"regexp"
+	"strconv"
 )
 
 type UVClient interface {
@@ -19,10 +21,7 @@ func NewUVClient() UVClient {
 }
 
 func NewUVClientWithPath(uvBinary string) UVClient {
-	return &uvClient{
-		uvBinary: uvBinary,
-		executor: &defaultCmdExecutor{},
-	}
+	return NewUVClientWithExecutor(uvBinary, &defaultCmdExecutor{})
 }
 
 // NewUVClientWithExecutor creates a new UV client with a custom executor for testing.
@@ -51,11 +50,76 @@ type cmdExecutor interface {
 type defaultCmdExecutor struct{}
 
 func (e *defaultCmdExecutor) Execute(binary, dir string, args ...string) ([]byte, error) {
+	// Check if uv binary exists in PATH
+	_, err := exec.LookPath(binary)
+	if err != nil {
+		return nil, fmt.Errorf("%s binary not found in PATH", binary)
+	}
+
+	//nolint:govet // Reassigning to err is fine
+	if err := checkVersion(binary); err != nil {
+		return nil, err
+	}
+
 	cmd := exec.Command(binary, args...)
 	cmd.Dir = dir
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute command: %w", err)
+		return nil, fmt.Errorf("failed to execute command: %w\noutput: %s", err, output)
 	}
 	return output, nil
+}
+
+func checkVersion(binary string) error {
+	cmd := exec.Command(binary, "--version")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to get %s version: %w\noutput: %s", binary, err, output)
+	}
+	return parseAndValidateVersion(binary, string(output))
+}
+
+func parseAndValidateVersion(binary, versionOutput string) error {
+	versionRe := regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
+	matches := versionRe.FindStringSubmatch(versionOutput)
+	// First element in matches is the full match, remainder are capture groups
+	if len(matches) < 4 {
+		return fmt.Errorf("unable to parse %s version from output: %s", binary, versionOutput)
+	}
+
+	curVersion := Version{
+		mustAtoi(matches[1]),
+		mustAtoi(matches[2]),
+		mustAtoi(matches[3]),
+	}
+	minVersion := Version{0, 9, 10} // Min version containing SBOM export functionality
+	if compareVersions(curVersion, minVersion) >= 0 {
+		return nil
+	}
+
+	return fmt.Errorf("%s version %d.%d.%d is not supported. Minimum required version is 0.9.10", binary, curVersion[0], curVersion[1], curVersion[2])
+}
+
+type Version = [3]int
+
+// Compares two semantic versions.
+// Returns -1 if v1 < v2, 0 if v1 == v2, and 1 if v1 > v2.
+func compareVersions(v1, v2 Version) int {
+	for i := range len(v1) {
+		if v1[i] < v2[i] {
+			return -1
+		}
+		if v1[i] > v2[i] {
+			return 1
+		}
+	}
+	return 0
+}
+
+func mustAtoi(s string) int {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		panic(fmt.Sprintf("failed to convert %q to int: %v", s, err))
+	}
+	return i
 }
