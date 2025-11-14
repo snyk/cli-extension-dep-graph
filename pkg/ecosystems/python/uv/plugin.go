@@ -1,13 +1,13 @@
 package uv
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 )
 
-type UvPlugin struct{}
+type Plugin struct{}
 
-func (plug UvPlugin) BuildDepGraphsFromDir(dir string, option ecosystems.ScaPluginOptions) (*ecosystems.Depgraph, error) {
-	return nil, errors.New("not yet implemented")
+func (p Plugin) BuildDepGraphsFromDir(_ string, _ ecosystems.ScaPluginOptions) (*ecosystems.Depgraph, error) {
+	return nil, fmt.Errorf("not yet implemented")
 }
