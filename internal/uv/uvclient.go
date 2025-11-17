@@ -39,7 +39,7 @@ func NewUvClientWithExecutor(uvBinary string, executor cmdExecutor) Client {
 
 // exportSBOM exports an SBOM in CycloneDX format using uv.
 func (c client) ExportSBOM(inputDir string) ([]byte, error) {
-	output, err := c.executor.Execute(c.uvBinary, inputDir, "export", "--format", "cyclonedx1.5", "--frozen")
+	output, err := c.executor.Execute(c.uvBinary, inputDir, "export", "--format", "cyclonedx1.5", "--frozen", "--preview")
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute uv export: %w", err)
 	}
