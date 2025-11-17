@@ -1,8 +1,8 @@
 package ecosystems
 
-// ScaPluginOptions contains configuration options for SCA plugins,
+// SCAPluginOptions contains configuration options for SCA plugins,
 // including global settings and language-specific options.
-type ScaPluginOptions struct {
+type SCAPluginOptions struct {
 	Global GlobalOptions
 	Python *PythonOptions
 }
@@ -16,19 +16,19 @@ type GlobalOptions struct {
 // PythonOptions contains Python-specific options for dependency graph generation.
 type PythonOptions struct{}
 
-func NewPluginOptions() *ScaPluginOptions {
-	return &ScaPluginOptions{
+func NewPluginOptions() *SCAPluginOptions {
+	return &SCAPluginOptions{
 		Global: GlobalOptions{},
 		Python: &PythonOptions{},
 	}
 }
 
-func (o *ScaPluginOptions) WithTargetFile(targetFile string) *ScaPluginOptions {
+func (o *SCAPluginOptions) WithTargetFile(targetFile string) *SCAPluginOptions {
 	o.Global.TargetFile = &targetFile
 	return o
 }
 
-func (o *ScaPluginOptions) WithAllSubProjects(allSubProjects bool) *ScaPluginOptions {
+func (o *SCAPluginOptions) WithAllSubProjects(allSubProjects bool) *SCAPluginOptions {
 	o.Global.AllSubProjects = allSubProjects
 	return o
 }

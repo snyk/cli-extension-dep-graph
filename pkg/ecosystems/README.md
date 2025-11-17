@@ -19,8 +19,8 @@ Modern software projects use diverse package managers (pip, npm, maven, gradle, 
 ### Core Interface
 
 ```go
-type ScaPlugin interface {
-    BuildDepGraphsFromDir(ctx context.Context, dir string, options *ScaPluginOptions) ([]ScaResult, error)
+type SCAPlugin interface {
+    BuildDepGraphsFromDir(ctx context.Context, dir string, options *SCAPluginOptions) ([]SCAResult, error)
 }
 ```
 
@@ -36,8 +36,8 @@ Go's interface design provides several benefits for plugin architecture:
 
 #### 1. **Compile-Time Verification**
 ```go
-// This line ensures Plugin implements ScaPlugin at compile time
-var _ ecosystems.ScaPlugin = (*Plugin)(nil)
+// This line ensures Plugin implements SCAPlugin at compile time
+var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 ```
 If the interface isn't properly implemented, the code won't compile—catching errors early.
 
@@ -46,12 +46,12 @@ Unlike explicit interface implementation in other languages, Go interfaces are s
 
 #### 3. **Dependency Injection**
 ```go
-func AnalyzeDependencies(plugin ScaPlugin, dir string) error {
+func AnalyzeDependencies(plugin SCAPlugin, dir string) error {
     results, err := plugin.BuildDepGraphsFromDir(context.Background(), dir, options)
     // ...
 }
 ```
-Functions can accept any type that implements `ScaPlugin`, enabling easy testing with mock implementations and swapping between different ecosystem plugins.
+Functions can accept any type that implements `SCAPlugin`, enabling easy testing with mock implementations and swapping between different ecosystem plugins.
 
 #### 4. **Composition Over Inheritance**
 Go's interfaces encourage composition. You can embed interfaces or compose structs to build complex behavior from simple primitives, avoiding deep inheritance hierarchies.
@@ -101,10 +101,10 @@ depgraph := Depgraph{
 }
 ```
 
-### ScaResult: Analysis Output
+### SCAResult: Analysis Output
 
 ```go
-type ScaResult struct {
+type SCAResult struct {
     DepGraph Depgraph `json:"depGraph"`
     Metadata Metadata `json:"metadata"`
 }
@@ -114,7 +114,7 @@ Each result contains:
 - **DepGraph**: The complete dependency graph
 - **Metadata**: Context about the analysis (target file, runtime environment)
 
-Plugins return `[]ScaResult` to support:
+Plugins return `[]SCAResult` to support:
 - Monorepos with multiple projects
 - Projects with multiple dependency graphs (e.g., runtime + dev dependencies)
 - Workspaces (npm, yarn, cargo)
@@ -151,10 +151,10 @@ The architecture supports adding plugins for:
 
 ## Configuration
 
-### ScaPluginOptions
+### SCAPluginOptions
 
 ```go
-type ScaPluginOptions struct {
+type SCAPluginOptions struct {
     Global GlobalOptions    // Options for all plugins
     Python *PythonOptions   // Python-specific options
 }
@@ -229,13 +229,13 @@ To add support for a new ecosystem:
        // Plugin-specific fields
    }
    
-   var _ ecosystems.ScaPlugin = (*Plugin)(nil)
+   var _ ecosystems.SCAPlugin = (*Plugin)(nil)
    
-   func (p *Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *ecosystems.ScaPluginOptions) ([]ecosystems.ScaResult, error) {
+   func (p *Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *ecosystems.SCAPluginOptions) ([]ecosystems.SCAResult, error) {
        // 1. Discover manifest files in dir
        // 2. Resolve dependencies using ecosystem tooling
        // 3. Build Depgraph from resolved dependencies
-       // 4. Return ScaResult with metadata
+       // 4. Return SCAResult with metadata
    }
    ```
 
@@ -246,7 +246,7 @@ To add support for a new ecosystem:
        SpecificOption string
    }
    
-   type ScaPluginOptions struct {
+   type SCAPluginOptions struct {
        Global      GlobalOptions
        Python      *PythonOptions
        MyEcosystem *MyEcosystemOptions  // Add here

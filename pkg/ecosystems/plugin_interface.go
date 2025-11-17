@@ -28,15 +28,15 @@ type Metadata struct {
 	Runtime    string `json:"runtime"`
 }
 
-// ScaResult represents the result of a Software Composition Analysis (SCA),
+// SCAResult represents the result of a Software Composition Analysis (SCA),
 // containing the dependency graph and associated metadata.
-type ScaResult struct {
+type SCAResult struct {
 	DepGraph Depgraph `json:"depGraph"`
 	Metadata Metadata `json:"metadata"`
 }
 
-// ScaPlugin defines the interface for SCA plugins that build dependency graphs
+// SCAPlugin defines the interface for SCA plugins that build dependency graphs
 // from a directory containing project files.
-type ScaPlugin interface {
-	BuildDepGraphsFromDir(ctx context.Context, dir string, options *ScaPluginOptions) ([]ScaResult, error)
+type SCAPlugin interface {
+	BuildDepGraphsFromDir(ctx context.Context, dir string, options *SCAPluginOptions) ([]SCAResult, error)
 }
