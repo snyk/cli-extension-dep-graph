@@ -1,4 +1,4 @@
-package uvclient
+package uv
 
 import (
 	"errors"
@@ -24,12 +24,12 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 		executeFunc: func(binary, dir string, args ...string) ([]byte, error) {
 			assert.Equal(t, "/path/to/uv", binary)
 			assert.Equal(t, "/test/dir", dir)
-			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--frozen"}, args)
+			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--frozen", "--preview"}, args)
 			return []byte(`{"sbom":"data"}`), nil
 		},
 	}
 
-	client := NewUVClientWithExecutor("/path/to/uv", mockExecutor)
+	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
 	result, err := client.ExportSBOM("/test/dir")
 
 	assert.NoError(t, err)
@@ -44,7 +44,7 @@ func TestUVClient_ExportSBOM_Error(t *testing.T) {
 		},
 	}
 
-	client := NewUVClientWithExecutor("/path/to/uv", mockExecutor)
+	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
 	result, err := client.ExportSBOM("/test/dir")
 
 	require.Error(t, err)

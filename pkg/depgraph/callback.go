@@ -10,8 +10,9 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
-	"github.com/snyk/cli-extension-dep-graph/internal/uvclient"
+	"github.com/snyk/cli-extension-dep-graph/internal/uv"
 	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
+	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 )
@@ -26,10 +27,10 @@ const (
 var legacyWorkflowID = workflow.NewWorkflowIdentifier(legacyCLIWorkflowIDStr)
 
 func callback(ctx workflow.InvocationContext, data []workflow.Data) ([]workflow.Data, error) {
-	return callbackWithDI(ctx, data, uvclient.NewUVClient())
+	return callbackWithDI(ctx, data, uv.NewUvClient())
 }
 
-func callbackWithDI(ctx workflow.InvocationContext, _ []workflow.Data, uvClient uvclient.UVClient) ([]workflow.Data, error) {
+func callbackWithDI(ctx workflow.InvocationContext, _ []workflow.Data, uvClient uv.Client) ([]workflow.Data, error) {
 	engine := ctx.GetEngine()
 	config := ctx.GetConfiguration()
 	logger := ctx.GetEnhancedLogger()
@@ -48,16 +49,11 @@ func handleSBOMResolution(
 	ctx workflow.InvocationContext,
 	config configuration.Configuration,
 	logger *zerolog.Logger,
-	uvClient uvclient.UVClient,
+	uvClient uv.Client,
 ) ([]workflow.Data, error) {
 	inputDir := config.GetString(configuration.INPUT_DIRECTORY)
 	if inputDir == "" {
 		inputDir = "."
-	}
-
-	sbomOutput, err := uvClient.ExportSBOM(inputDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to export SBOM using uv: %w", err)
 	}
 
 	orgID := config.GetString(configuration.ORGANIZATION)
@@ -65,33 +61,44 @@ func handleSBOMResolution(
 		logger.Printf("ERROR: failed to determine org id\n")
 		return nil, snykclient.NewEmptyOrgError()
 	}
-	remoteRepoURL := config.GetString("remote-repo-url")
 
-	c := snykclient.NewSnykClient(
+	// TODO(uv):
+	// - validate options - we can't have both all-projects and file args
+	// - handle various options, including --all-projects, --file and --exclude
+	// - check which other flags we need to handle e.g. fail-fast
+
+	pluginOptions := scaplugin.Options{}
+	scaPlugins := []scaplugin.ScaPlugin{
+		uv.NewUvPlugin(uvClient),
+	}
+
+	// Generate SBOMs
+	findings := []scaplugin.Finding{}
+	for _, sp := range scaPlugins {
+		f, err := sp.BuildFindingsFromDir(inputDir, pluginOptions, logger)
+		if err != nil {
+			return nil, fmt.Errorf("error building SBOM: %w", err)
+		}
+		findings = append(findings, f...)
+	}
+
+	remoteRepoURL := config.GetString("remote-repo-url")
+	snykClient := snykclient.NewSnykClient(
 		ctx.GetNetworkAccess().GetHttpClient(),
 		config.GetString(configuration.API_URL),
 		orgID)
 
-	sbomReader := bytes.NewReader(sbomOutput)
-
-	scans, warnings, err := c.SBOMConvert(context.Background(), logger, sbomReader, remoteRepoURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert SBOM: %w", err)
+	// Convert SBOMs to workflow.Data
+	workflowData := []workflow.Data{}
+	for _, f := range findings { // Could be parallelised in future
+		data, err := sbomToWorkflowData(f.Sbom, snykClient, logger, remoteRepoURL)
+		if err != nil {
+			return nil, fmt.Errorf("error converting SBOM: %w", err)
+		}
+		workflowData = append(workflowData, data...)
 	}
 
-	logger.Printf("Successfully converted SBOM, warning(s): %d\n", len(warnings))
-
-	depGraphsData, err := extractDepGraphsFromScans(scans)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract depgraphs from scan results: %w", err)
-	}
-
-	if len(depGraphsData) == 0 {
-		return nil, fmt.Errorf("no dependency graphs found in SBOM conversion response")
-	}
-
-	logger.Printf("DepGraph workflow done (extracted %d dependency graphs from SBOM)", len(depGraphsData))
-	return depGraphsData, nil
+	return workflowData, nil
 }
 
 func handleLegacyWorkflow(engine workflow.Engine, config configuration.Configuration, logger *zerolog.Logger) ([]workflow.Data, error) {
@@ -146,6 +153,27 @@ func mapToWorkflowData(depGraphs []parsers.DepGraphOutput) []workflow.Data {
 		depGraphList = append(depGraphList, data)
 	}
 	return depGraphList
+}
+
+func sbomToWorkflowData(sbomOutput []byte, snykClient *snykclient.SnykClient, logger *zerolog.Logger, remoteRepoURL string) ([]workflow.Data, error) {
+	sbomReader := bytes.NewReader(sbomOutput)
+
+	scans, warnings, err := snykClient.SBOMConvert(context.Background(), logger, sbomReader, remoteRepoURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert SBOM: %w", err)
+	}
+
+	logger.Printf("Successfully converted SBOM, warning(s): %d\n", len(warnings))
+
+	depGraphsData, err := extractDepGraphsFromScans(scans)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract depgraphs from scan results: %w", err)
+	}
+
+	if len(depGraphsData) == 0 {
+		return nil, fmt.Errorf("no dependency graphs found in SBOM conversion response")
+	}
+	return depGraphsData, nil
 }
 
 func extractDepGraphsFromScans(scans []*snykclient.ScanResult) ([]workflow.Data, error) {
