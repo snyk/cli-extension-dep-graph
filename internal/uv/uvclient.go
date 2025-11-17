@@ -1,6 +1,7 @@
 package uv
 
 import (
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -43,7 +44,31 @@ func (c client) ExportSBOM(inputDir string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute uv export: %w", err)
 	}
+
+	if err := validateSBOM(output); err != nil {
+		return nil, err
+	}
+
 	return output, nil
+}
+
+// Verifies that the SBOM is valid JSON and has a root component.
+func validateSBOM(sbomData []byte) error {
+	var sbom struct {
+		Metadata struct {
+			Component json.RawMessage `json:"component"`
+		} `json:"metadata"`
+	}
+
+	if err := json.Unmarshal(sbomData, &sbom); err != nil {
+		return fmt.Errorf("failed to parse SBOM: %w", err)
+	}
+
+	if len(sbom.Metadata.Component) == 0 {
+		return fmt.Errorf("SBOM missing root component at metadata.component - uv project may be missing a root package")
+	}
+
+	return nil
 }
 
 func (c *client) ShouldExportSBOM(inputDir string, logger *zerolog.Logger) bool {
