@@ -1,4 +1,4 @@
-package uvclient
+package uv
 
 import (
 	"errors"
@@ -29,7 +29,7 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 		},
 	}
 
-	client := NewUVClientWithExecutor("/path/to/uv", mockExecutor)
+	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
 	result, err := client.ExportSBOM("/test/dir")
 
 	assert.NoError(t, err)
@@ -44,7 +44,7 @@ func TestUVClient_ExportSBOM_Error(t *testing.T) {
 		},
 	}
 
-	client := NewUVClientWithExecutor("/path/to/uv", mockExecutor)
+	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
 	result, err := client.ExportSBOM("/test/dir")
 
 	require.Error(t, err)
