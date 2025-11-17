@@ -38,5 +38,5 @@ type ScaResult struct {
 // ScaPlugin defines the interface for SCA plugins that build dependency graphs
 // from a directory containing project files.
 type ScaPlugin interface {
-	BuildDepGraphsFromDir(ctx context.Context, dir string, options ScaPluginOptions) ([]ScaResult, error)
+	BuildDepGraphsFromDir(ctx context.Context, dir string, options *ScaPluginOptions) ([]ScaResult, error)
 }
