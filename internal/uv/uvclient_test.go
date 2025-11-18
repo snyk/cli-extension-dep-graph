@@ -20,12 +20,24 @@ func (m *mockCmdExecutor) Execute(binary, dir string, args ...string) ([]byte, e
 }
 
 func TestUVClient_ExportSBOM_Success(t *testing.T) {
+	validSBOM := `{
+		"bomFormat": "CycloneDX",
+		"specVersion": "1.5",
+		"metadata": {
+			"component": {
+				"type": "library",
+				"bom-ref": "test-project-1",
+				"name": "test-project"
+			}
+		}
+	}`
+
 	mockExecutor := &mockCmdExecutor{
 		executeFunc: func(binary, dir string, args ...string) ([]byte, error) {
 			assert.Equal(t, "/path/to/uv", binary)
 			assert.Equal(t, "/test/dir", dir)
 			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--frozen", "--preview"}, args)
-			return []byte(`{"sbom":"data"}`), nil
+			return []byte(validSBOM), nil
 		},
 	}
 
@@ -33,7 +45,7 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 	result, err := client.ExportSBOM("/test/dir")
 
 	assert.NoError(t, err)
-	assert.Equal(t, []byte(`{"sbom":"data"}`), result)
+	assert.JSONEq(t, validSBOM, string(result))
 }
 
 func TestUVClient_ExportSBOM_Error(t *testing.T) {
@@ -49,6 +61,26 @@ func TestUVClient_ExportSBOM_Error(t *testing.T) {
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, expectedErr)
+	assert.Nil(t, result)
+}
+
+func TestUVClient_ExportSBOM_InvalidSBOM(t *testing.T) {
+	invalidSBOM := `{
+		"bomFormat": "CycloneDX",
+		"metadata": {}
+	}`
+
+	mockExecutor := &mockCmdExecutor{
+		executeFunc: func(_, _ string, _ ...string) ([]byte, error) {
+			return []byte(invalidSBOM), nil
+		},
+	}
+
+	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
+	result, err := client.ExportSBOM("/test/dir")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "SBOM missing root component")
 	assert.Nil(t, result)
 }
 
@@ -114,6 +146,84 @@ func TestParseAndValidateVersion_UnparseableOutput(t *testing.T) {
 			assert.Contains(t, err.Error(), "unable to parse")
 		})
 	}
+}
+
+func TestValidateSBOM_Success(t *testing.T) {
+	tests := []struct {
+		name string
+		sbom string
+	}{
+		{
+			name: "valid SBOM with component",
+			sbom: `{
+				"bomFormat": "CycloneDX",
+				"specVersion": "1.5",
+				"metadata": {
+					"component": {
+						"type": "library",
+						"name": "test-project",
+						"bom-ref": "test-project-1"
+					}
+				}
+			}`,
+		},
+		{
+			name: "valid SBOM with minimal component",
+			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "my-project"
+					}
+				}
+			}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateSBOM([]byte(tt.sbom))
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestValidateSBOM_MissingComponent(t *testing.T) {
+	tests := []struct {
+		name string
+		sbom string
+	}{
+		{
+			name: "missing component field",
+			sbom: `{
+				"bomFormat": "CycloneDX",
+				"specVersion": "1.5",
+				"metadata": {
+					"timestamp": "2025-11-17T16:20:47.525804000Z"
+				}
+			}`,
+		},
+		{
+			name: "missing metadata",
+			sbom: `{
+				"bomFormat": "CycloneDX",
+				"specVersion": "1.5"
+			}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateSBOM([]byte(tt.sbom))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "SBOM missing root component at metadata.component")
+		})
+	}
+}
+
+func TestValidateSBOM_InvalidJSON(t *testing.T) {
+	err := validateSBOM([]byte("invalid json"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to parse SBOM")
 }
 
 func TestCompareVersions(t *testing.T) {
