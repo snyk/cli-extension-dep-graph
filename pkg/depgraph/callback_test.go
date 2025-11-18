@@ -179,6 +179,62 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Nil(t, depGraphs)
 	})
 
+	t.Run("should return error when SBOM conversion fails for any finding when multiple findings are present", func(t *testing.T) {
+		// Create mock SBOM service with two responses: first success, second error
+		mockResponses := []mocks.MockResponse{
+			mocks.NewMockResponse(
+				"application/json",
+				[]byte(uvSBOMConvertResponse),
+				http.StatusOK,
+			),
+			mocks.NewMockResponse(
+				"application/json",
+				[]byte(`{"message":"Internal server error."}`),
+				http.StatusInternalServerError,
+			),
+		}
+
+		mockSBOMService := mocks.NewMockSBOMServiceMultiResponse(mockResponses, func(r *http.Request) {
+			assert.Equal(t, http.MethodPost, r.Method)
+			assert.Contains(t, r.RequestURI, "/hidden/orgs/test-org-id/sboms/convert")
+			assert.Equal(t, "application/octet-stream", r.Header.Get("Content-Type"))
+			assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
+		})
+		defer mockSBOMService.Close()
+
+		config := configuration.New()
+		config.Set(FlagUseSBOMResolution, true)
+		config.Set(FlagAllProjects, true)
+		config.Set(configuration.ORGANIZATION, "test-org-id")
+		config.Set(configuration.API_URL, mockSBOMService.URL)
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		engineMock := frameworkmocks.NewMockEngine(ctrl)
+		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
+
+		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
+		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
+		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
+		invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
+
+		// Create mock plugin that returns two findings
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), FilesProcessed: []string{}},
+				{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"test"}]}`), FilesProcessed: []string{}},
+			},
+		}
+
+		depGraphs, err := handleSBOMResolution(invocationContextMock, config, &nopLogger, []scaplugin.ScaPlugin{mockPlugin})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "analysis of SBOM document failed due to error")
+		assert.Contains(t, err.Error(), "500")
+		assert.Nil(t, depGraphs)
+	})
+
 	t.Run("should return only first finding when FlagAllProjects is false", func(t *testing.T) {
 		// Create mock SBOM service response
 		mockResponse := mocks.NewMockResponse(
@@ -228,14 +284,17 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	t.Run("handleSBOMResolution with FlagAllProjects", func(t *testing.T) {
 		finding1 := scaplugin.Finding{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), FilesProcessed: []string{}}
 		finding2 := scaplugin.Finding{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"test"}]}`), FilesProcessed: []string{}}
+		finding3 := scaplugin.Finding{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"someFinding"}]}`), FilesProcessed: []string{}}
+		finding4 := scaplugin.Finding{
+			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"anotherFinding"}]}`),
+			FilesProcessed: []string{},
+		}
 
 		tc := []struct {
 			name                    string
 			allProjects             bool
 			plugins                 []scaplugin.ScaPlugin
 			expectedWorkflowDataLen int
-			mockResponses           []mocks.MockResponse
-			useMultiResponse        bool
 		}{
 			{
 				name:        "should return only first finding when FlagAllProjects is false and BuildFindingsFromDir returns 2 findings",
@@ -249,9 +308,6 @@ func Test_callback_SBOMResolution(t *testing.T) {
 					},
 				},
 				expectedWorkflowDataLen: 1,
-				mockResponses: []mocks.MockResponse{
-					mocks.NewMockResponse("application/json", []byte(uvSBOMConvertResponse), http.StatusOK),
-				},
 			},
 			{
 				name:        "should return all findings when FlagAllProjects is true",
@@ -265,10 +321,6 @@ func Test_callback_SBOMResolution(t *testing.T) {
 					},
 				},
 				expectedWorkflowDataLen: 2,
-				mockResponses: []mocks.MockResponse{
-					mocks.NewMockResponse("application/json", []byte(uvSBOMConvertResponse), http.StatusOK),
-					mocks.NewMockResponse("application/json", []byte(uvSBOMConvertResponse), http.StatusOK),
-				},
 			},
 			{
 				name:        "should continue to next plugin when first plugin returns zero findings and FlagAllProjects is false",
@@ -284,16 +336,55 @@ func Test_callback_SBOMResolution(t *testing.T) {
 					},
 				},
 				expectedWorkflowDataLen: 1,
-				mockResponses: []mocks.MockResponse{
-					mocks.NewMockResponse("application/json", []byte(uvSBOMConvertResponse), http.StatusOK),
+			},
+			{
+				name:        "should return one finding when multiple plugins return multiple findings and FlagAllProjects is false",
+				allProjects: false,
+				plugins: []scaplugin.ScaPlugin{
+					&mockScaPlugin{
+						findings: []scaplugin.Finding{
+							finding1,
+							finding2,
+						},
+					},
+					&mockScaPlugin{
+						findings: []scaplugin.Finding{
+							finding3,
+							finding4,
+						},
+					},
 				},
+				expectedWorkflowDataLen: 1,
+			},
+			{
+				name:        "should return all findings when FlagAllProjects is true and multiple plugins return multiple findings",
+				allProjects: true,
+				plugins: []scaplugin.ScaPlugin{
+					&mockScaPlugin{
+						findings: []scaplugin.Finding{
+							finding1,
+							finding2,
+						},
+					},
+					&mockScaPlugin{
+						findings: []scaplugin.Finding{
+							finding3,
+							finding4,
+						},
+					},
+				},
+				expectedWorkflowDataLen: 4,
 			},
 		}
 
 		for _, tc := range tc {
 			t.Run(tc.name, func(t *testing.T) {
+				mr := make([]mocks.MockResponse, tc.expectedWorkflowDataLen)
+				for i := 0; i < tc.expectedWorkflowDataLen; i++ {
+					mr[i] = mocks.NewMockResponse("application/json", []byte(uvSBOMConvertResponse), http.StatusOK)
+				}
 				mockSBOMService := mocks.NewMockSBOMServiceMultiResponse(
-					tc.mockResponses,
+					mr,
 					func(r *http.Request) {
 						assert.Equal(t, http.MethodPost, r.Method)
 						assert.Contains(t, r.RequestURI, "/hidden/orgs/test-org-id/sboms/convert")
