@@ -104,6 +104,12 @@ func handleSBOMResolution(
 		workflowData = append(workflowData, data...)
 	}
 
+	if len(findings) == 0 || allProjects {
+		_ = getExclusionsFromFindings(findings)
+
+		// TODO(uv): Call legacy workflow with exclusions, collect resulting workflow.Data and add them to the current workflowData
+	}
+
 	return workflowData, nil
 }
 
