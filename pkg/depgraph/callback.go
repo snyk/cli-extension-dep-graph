@@ -39,7 +39,10 @@ func callbackWithDI(ctx workflow.InvocationContext, _ []workflow.Data, uvClient 
 
 	// Check if SBOM resolution mode is enabled
 	if config.GetBool(FlagUseSBOMResolution) {
-		return handleSBOMResolution(ctx, config, logger, uvClient)
+		scaPlugins := []scaplugin.ScaPlugin{
+			uv.NewUvPlugin(uvClient),
+		}
+		return handleSBOMResolution(ctx, config, logger, scaPlugins)
 	}
 
 	return handleLegacyWorkflow(engine, config, logger)
@@ -49,7 +52,7 @@ func handleSBOMResolution(
 	ctx workflow.InvocationContext,
 	config configuration.Configuration,
 	logger *zerolog.Logger,
-	uvClient uv.Client,
+	scaPlugins []scaplugin.ScaPlugin,
 ) ([]workflow.Data, error) {
 	inputDir := config.GetString(configuration.INPUT_DIRECTORY)
 	if inputDir == "" {
@@ -68,18 +71,21 @@ func handleSBOMResolution(
 	// - check which other flags we need to handle e.g. fail-fast
 
 	pluginOptions := scaplugin.Options{}
-	scaPlugins := []scaplugin.ScaPlugin{
-		uv.NewUvPlugin(uvClient),
-	}
 
 	// Generate SBOMs
 	findings := []scaplugin.Finding{}
+	allProjects := config.GetBool(FlagAllProjects)
 	for _, sp := range scaPlugins {
 		f, err := sp.BuildFindingsFromDir(inputDir, pluginOptions, logger)
 		if err != nil {
 			return nil, fmt.Errorf("error building SBOM: %w", err)
 		}
-		findings = append(findings, f...)
+		if allProjects {
+			findings = append(findings, f...)
+		} else if len(f) > 0 {
+			findings = append(findings, f[0])
+			break
+		}
 	}
 
 	remoteRepoURL := config.GetString("remote-repo-url")
@@ -98,7 +104,21 @@ func handleSBOMResolution(
 		workflowData = append(workflowData, data...)
 	}
 
+	if len(findings) == 0 || allProjects {
+		_ = getExclusionsFromFindings(findings)
+
+		// TODO(uv): Call legacy workflow with exclusions, collect resulting workflow.Data and add them to the current workflowData
+	}
+
 	return workflowData, nil
+}
+
+func getExclusionsFromFindings(findings []scaplugin.Finding) []string {
+	exclusions := []string{}
+	for _, f := range findings {
+		exclusions = append(exclusions, f.FilesProcessed...)
+	}
+	return exclusions
 }
 
 func handleLegacyWorkflow(engine workflow.Engine, config configuration.Configuration, logger *zerolog.Logger) ([]workflow.Data, error) {
