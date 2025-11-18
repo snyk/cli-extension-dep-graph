@@ -595,6 +595,83 @@ func invokeWithConfigAndGetTestCmdArgs(
 	return config.Get(configuration.RAW_CMD_ARGS)
 }
 
+func Test_getExclusionsFromFindings(t *testing.T) {
+	testCases := []struct {
+		name     string
+		findings []scaplugin.Finding
+		expected []string
+	}{
+		{
+			name:     "should return empty slice when findings is empty",
+			findings: []scaplugin.Finding{},
+			expected: []string{},
+		},
+		{
+			name: "should return empty slice when finding has no files processed",
+			findings: []scaplugin.Finding{
+				{
+					Sbom:           []byte(`{"bomFormat":"CycloneDX"}`),
+					FilesProcessed: []string{},
+				},
+			},
+			expected: []string{},
+		},
+		{
+			name: "should return files from single finding",
+			findings: []scaplugin.Finding{
+				{
+					Sbom:           []byte(`{"bomFormat":"CycloneDX"}`),
+					FilesProcessed: []string{"file1.py", "file2.py"},
+				},
+			},
+			expected: []string{"file1.py", "file2.py"},
+		},
+		{
+			name: "should return all files from multiple findings",
+			findings: []scaplugin.Finding{
+				{
+					Sbom:           []byte(`{"bomFormat":"CycloneDX"}`),
+					FilesProcessed: []string{"file1.py", "file2.py"},
+				},
+				{
+					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5"}`),
+					FilesProcessed: []string{"file3.py", "file4.py", "file5.py"},
+				},
+			},
+			expected: []string{"file1.py", "file2.py", "file3.py", "file4.py", "file5.py"},
+		},
+		{
+			name: "should handle mixed findings with and without files processed",
+			findings: []scaplugin.Finding{
+				{
+					Sbom:           []byte(`{"bomFormat":"CycloneDX"}`),
+					FilesProcessed: []string{},
+				},
+				{
+					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5"}`),
+					FilesProcessed: []string{"file1.py"},
+				},
+				{
+					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.6"}`),
+					FilesProcessed: []string{"file2.py", "file3.py"},
+				},
+			},
+			expected: []string{"file1.py", "file2.py", "file3.py"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			exclusions := getExclusionsFromFindings(tc.findings)
+			assert.Equal(t, tc.expected, exclusions)
+			// Ensure that even empty results return a non-nil slice
+			if len(tc.findings) == 0 {
+				assert.NotNil(t, exclusions)
+			}
+		})
+	}
+}
+
 func verifyMeta(t *testing.T, data workflow.Data, key, expectedValue string) {
 	t.Helper()
 

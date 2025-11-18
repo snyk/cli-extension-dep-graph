@@ -107,6 +107,14 @@ func handleSBOMResolution(
 	return workflowData, nil
 }
 
+func getExclusionsFromFindings(findings []scaplugin.Finding) []string {
+	exclusions := []string{}
+	for _, f := range findings {
+		exclusions = append(exclusions, f.FilesProcessed...)
+	}
+	return exclusions
+}
+
 func handleLegacyWorkflow(engine workflow.Engine, config configuration.Configuration, logger *zerolog.Logger) ([]workflow.Data, error) {
 	argument, outputParser := chooseGraphArgument(config)
 
