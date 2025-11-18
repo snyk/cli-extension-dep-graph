@@ -9,6 +9,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
+	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	frameworkmocks "github.com/snyk/go-application-framework/pkg/mocks"
 	"github.com/snyk/go-application-framework/pkg/networking"
@@ -33,6 +34,18 @@ var uvSBOMConvertExpectedDepGraph string
 var uvSBOMConvertResponse string
 
 const errMsgPayloadShouldBeByte = "payload should be []byte"
+
+type mockScaPlugin struct {
+	findings []scaplugin.Finding
+	err      error
+}
+
+func (m *mockScaPlugin) BuildFindingsFromDir(_ string, _ scaplugin.Options, _ *zerolog.Logger) ([]scaplugin.Finding, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.findings, nil
+}
 
 func Test_callback_SBOMResolution(t *testing.T) {
 	nopLogger := zerolog.Nop()
@@ -164,6 +177,154 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Contains(t, err.Error(), "analysis of SBOM document failed due to error")
 		assert.Contains(t, err.Error(), "500")
 		assert.Nil(t, depGraphs)
+	})
+
+	t.Run("should return only first finding when FlagAllProjects is false", func(t *testing.T) {
+		// Create mock SBOM service response
+		mockResponse := mocks.NewMockResponse(
+			"application/json",
+			[]byte(uvSBOMConvertResponse),
+			http.StatusOK,
+		)
+
+		mockSBOMService := mocks.NewMockSBOMService(mockResponse, func(r *http.Request) {
+			assert.Equal(t, http.MethodPost, r.Method)
+			assert.Contains(t, r.RequestURI, "/hidden/orgs/test-org-id/sboms/convert")
+		})
+		defer mockSBOMService.Close()
+
+		config := configuration.New()
+		config.Set(FlagUseSBOMResolution, true)
+		config.Set(FlagAllProjects, false)
+		config.Set(configuration.ORGANIZATION, "test-org-id")
+		config.Set(configuration.API_URL, mockSBOMService.URL)
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		engineMock := frameworkmocks.NewMockEngine(ctrl)
+		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
+
+		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
+		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
+		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
+		invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
+
+		// Create mock UV client that returns valid SBOM data
+		mockUVClient := &mocks.MockUVClient{
+			ExportSBOMFunc: func(_ string) ([]byte, error) {
+				return []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), nil
+			},
+		}
+
+		workflowData, err := callbackWithDI(invocationContextMock, []workflow.Data{}, mockUVClient)
+
+		require.NoError(t, err)
+		assert.NotNil(t, workflowData)
+		// Should only have one finding even if multiple plugins could return findings
+		assert.Len(t, workflowData, 1)
+	})
+
+	t.Run("handleSBOMResolution with FlagAllProjects", func(t *testing.T) {
+		finding1 := scaplugin.Finding{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), FilesProcessed: []string{}}
+		finding2 := scaplugin.Finding{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"test"}]}`), FilesProcessed: []string{}}
+
+		tc := []struct {
+			name                    string
+			allProjects             bool
+			plugins                 []scaplugin.ScaPlugin
+			expectedWorkflowDataLen int
+			mockResponses           []mocks.MockResponse
+			useMultiResponse        bool
+		}{
+			{
+				name:        "should return only first finding when FlagAllProjects is false and BuildFindingsFromDir returns 2 findings",
+				allProjects: false,
+				plugins: []scaplugin.ScaPlugin{
+					&mockScaPlugin{
+						findings: []scaplugin.Finding{
+							finding1,
+							finding2,
+						},
+					},
+				},
+				expectedWorkflowDataLen: 1,
+				mockResponses: []mocks.MockResponse{
+					mocks.NewMockResponse("application/json", []byte(uvSBOMConvertResponse), http.StatusOK),
+				},
+			},
+			{
+				name:        "should return all findings when FlagAllProjects is true",
+				allProjects: true,
+				plugins: []scaplugin.ScaPlugin{
+					&mockScaPlugin{
+						findings: []scaplugin.Finding{
+							finding1,
+							finding2,
+						},
+					},
+				},
+				expectedWorkflowDataLen: 2,
+				mockResponses: []mocks.MockResponse{
+					mocks.NewMockResponse("application/json", []byte(uvSBOMConvertResponse), http.StatusOK),
+					mocks.NewMockResponse("application/json", []byte(uvSBOMConvertResponse), http.StatusOK),
+				},
+			},
+			{
+				name:        "should continue to next plugin when first plugin returns zero findings and FlagAllProjects is false",
+				allProjects: false,
+				plugins: []scaplugin.ScaPlugin{
+					&mockScaPlugin{
+						findings: []scaplugin.Finding{},
+					},
+					&mockScaPlugin{
+						findings: []scaplugin.Finding{
+							finding1,
+						},
+					},
+				},
+				expectedWorkflowDataLen: 1,
+				mockResponses: []mocks.MockResponse{
+					mocks.NewMockResponse("application/json", []byte(uvSBOMConvertResponse), http.StatusOK),
+				},
+			},
+		}
+
+		for _, tc := range tc {
+			t.Run(tc.name, func(t *testing.T) {
+				mockSBOMService := mocks.NewMockSBOMServiceMultiResponse(
+					tc.mockResponses,
+					func(r *http.Request) {
+						assert.Equal(t, http.MethodPost, r.Method)
+						assert.Contains(t, r.RequestURI, "/hidden/orgs/test-org-id/sboms/convert")
+					},
+				)
+				defer mockSBOMService.Close()
+
+				config := configuration.New()
+				config.Set(FlagUseSBOMResolution, true)
+				config.Set(FlagAllProjects, tc.allProjects)
+				config.Set(configuration.ORGANIZATION, "test-org-id")
+				config.Set(configuration.API_URL, mockSBOMService.URL)
+
+				ctrl := gomock.NewController(t)
+				defer ctrl.Finish()
+
+				engineMock := frameworkmocks.NewMockEngine(ctrl)
+				invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
+
+				invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
+				invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
+				invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
+				invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
+
+				workflowData, err := handleSBOMResolution(invocationContextMock, config, &nopLogger, tc.plugins)
+
+				require.NoError(t, err)
+				assert.NotNil(t, workflowData)
+				assert.Len(t, workflowData, tc.expectedWorkflowDataLen)
+			})
+		}
 	})
 }
 
