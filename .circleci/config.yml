@@ -30,6 +30,29 @@ jobs:
           name: run unit tests
           command: make test
 
+  python_integration_test:
+    parameters:
+      python_version:
+        type: string
+    docker:
+      - image: cimg/go:1.24
+    steps:
+      - checkout
+      - run:
+          name: Install Python << parameters.python_version >>
+          command: |
+            pyenv install << parameters.python_version >>
+            pyenv global << parameters.python_version >>
+      - run:
+          name: Verify installations
+          command: |
+            go version
+            python --version
+            pip --version
+      - run:
+          name: Run Python integration tests
+          command: make test-python-integration
+
   security-scans:
     <<: *go_image
     resource_class: small
@@ -64,6 +87,15 @@ workflows:
                 - main
       - unit_test:
           name: Unit tests
+          filters:
+            branches:
+              ignore:
+                - main
+      - python_integration_test:
+          name: Python << matrix.python_version >> integration tests
+          matrix:
+            parameters:
+              python_version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
           filters:
             branches:
               ignore:

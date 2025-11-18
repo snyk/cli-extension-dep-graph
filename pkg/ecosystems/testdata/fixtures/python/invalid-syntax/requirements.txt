@@ -1,0 +1,3 @@
+requests==2.31.0
+invalid===syntax!!!
+click>=8.0

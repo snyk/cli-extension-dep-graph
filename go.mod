@@ -10,7 +10,7 @@ require (
 	github.com/snyk/error-catalog-golang-public v0.0.0-20250310083934-7ac627e3451f
 	github.com/snyk/go-application-framework v0.0.0-20230714085540-37d34ad405bc
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 )
 
 require (
