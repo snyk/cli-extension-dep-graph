@@ -17,6 +17,6 @@ test:
 	$(GOTEST) ./... -coverprofile cp.out
 
 test-python-integration:
-	$(GOTEST) -v -tags="integration,python" -timeout=10m ./pkg/ecosystems/python/pip/
+	$(GOTEST) -v -tags="integration,python" -timeout=10m ./pkg/ecosystems/python/pip/ -coverprofile cp.out
 
 .PHONY: install-req fmt test test-python-integration lint tidy imports
