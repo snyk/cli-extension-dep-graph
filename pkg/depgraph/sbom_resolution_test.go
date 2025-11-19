@@ -9,6 +9,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
+	"github.com/snyk/cli-extension-dep-graph/internal/uv"
 	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	frameworkmocks "github.com/snyk/go-application-framework/pkg/mocks"
@@ -34,6 +35,31 @@ func (m *mockScaPlugin) BuildFindingsFromDir(_ string, _ scaplugin.Options, _ *z
 		return nil, m.err
 	}
 	return m.findings, nil
+}
+
+// CalledResolutionHandlerFunc is a test helper structure to track calls to the mock ResolutionHandlerFunc.
+type CalledResolutionHandlerFunc struct {
+	Called      bool
+	Config      configuration.Configuration
+	ReturnData  []workflow.Data
+	ReturnError error
+}
+
+// NewCalledResolutionHandlerFunc creates a new instance for use in tests.
+func NewCalledResolutionHandlerFunc(returnData []workflow.Data, returnErr error) *CalledResolutionHandlerFunc {
+	return &CalledResolutionHandlerFunc{
+		ReturnData:  returnData,
+		ReturnError: returnErr,
+	}
+}
+
+// Func returns a ResolutionHandlerFunc that records invocation and arguments.
+func (c *CalledResolutionHandlerFunc) Func() ResolutionHandlerFunc {
+	return func(_ workflow.InvocationContext, config configuration.Configuration, _ *zerolog.Logger) ([]workflow.Data, error) {
+		c.Called = true
+		c.Config = config
+		return c.ReturnData, c.ReturnError
+	}
 }
 
 func Test_callback_SBOMResolution(t *testing.T) {
@@ -65,6 +91,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		engineMock := frameworkmocks.NewMockEngine(ctrl)
 		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
+		calledResolutionHandlerFunc := NewCalledResolutionHandlerFunc(nil, nil)
 
 		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
 		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
@@ -79,11 +106,18 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			},
 		}
 
-		workflowData, err := callbackWithDI(invocationContextMock, []workflow.Data{}, mockUVClient)
+		workflowData, err := handleSBOMResolutionDI(
+			invocationContextMock,
+			config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{uv.NewUvPlugin(mockUVClient)},
+			calledResolutionHandlerFunc.Func(),
+		)
 
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 		assert.Len(t, workflowData, 1)
+		assert.False(t, calledResolutionHandlerFunc.Called, "ResolutionHandlerFunc should not be called")
 
 		// Compare the workflow data payload with the expected depGraph
 		depGraph, ok := workflowData[0].GetPayload().([]byte)
@@ -101,6 +135,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		engineMock := frameworkmocks.NewMockEngine(ctrl)
 		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
+		calledResolutionHandlerFunc := NewCalledResolutionHandlerFunc(nil, nil)
 
 		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
 		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
@@ -113,11 +148,18 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			},
 		}
 
-		depGraphs, err := callbackWithDI(invocationContextMock, []workflow.Data{}, mockUVClient)
+		workflowData, err := handleSBOMResolutionDI(
+			invocationContextMock,
+			config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{uv.NewUvPlugin(mockUVClient)},
+			calledResolutionHandlerFunc.Func(),
+		)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to export SBOM using uv")
-		assert.Nil(t, depGraphs)
+		assert.Nil(t, workflowData)
+		assert.False(t, calledResolutionHandlerFunc.Called, "ResolutionHandlerFunc should not be called")
 	})
 
 	t.Run("should handle SBOM convert network request errors", func(t *testing.T) {
@@ -146,6 +188,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		engineMock := frameworkmocks.NewMockEngine(ctrl)
 		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
+		calledResolutionHandlerFunc := NewCalledResolutionHandlerFunc(nil, nil)
 
 		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
 		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
@@ -160,12 +203,19 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			},
 		}
 
-		depGraphs, err := callbackWithDI(invocationContextMock, []workflow.Data{}, mockUVClient)
+		workflowData, err := handleSBOMResolutionDI(
+			invocationContextMock,
+			config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{uv.NewUvPlugin(mockUVClient)},
+			calledResolutionHandlerFunc.Func(),
+		)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "analysis of SBOM document failed due to error")
 		assert.Contains(t, err.Error(), "500")
-		assert.Nil(t, depGraphs)
+		assert.Nil(t, workflowData)
+		assert.False(t, calledResolutionHandlerFunc.Called, "ResolutionHandlerFunc should not be called")
 	})
 
 	t.Run("should return error when SBOM conversion fails for any finding when multiple findings are present", func(t *testing.T) {
@@ -216,12 +266,20 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			},
 		}
 
-		depGraphs, err := handleSBOMResolution(invocationContextMock, config, &nopLogger, []scaplugin.ScaPlugin{mockPlugin})
+		calledResolutionHandlerFunc := NewCalledResolutionHandlerFunc(nil, nil)
+		depGraphs, err := handleSBOMResolutionDI(
+			invocationContextMock,
+			config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{mockPlugin},
+			calledResolutionHandlerFunc.Func(),
+		)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "analysis of SBOM document failed due to error")
 		assert.Contains(t, err.Error(), "500")
 		assert.Nil(t, depGraphs)
+		assert.False(t, calledResolutionHandlerFunc.Called, "ResolutionHandlerFunc should not be called")
 	})
 
 	t.Run("should return only first finding when FlagAllProjects is false", func(t *testing.T) {
@@ -249,6 +307,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		engineMock := frameworkmocks.NewMockEngine(ctrl)
 		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
+		calledResolutionHandlerFunc := NewCalledResolutionHandlerFunc(nil, nil)
 
 		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
 		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
@@ -262,32 +321,52 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			},
 		}
 
-		workflowData, err := callbackWithDI(invocationContextMock, []workflow.Data{}, mockUVClient)
+		workflowData, err := handleSBOMResolutionDI(
+			invocationContextMock,
+			config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{uv.NewUvPlugin(mockUVClient)},
+			calledResolutionHandlerFunc.Func(),
+		)
 
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 		// Should only have one finding even if multiple plugins could return findings
 		assert.Len(t, workflowData, 1)
+		assert.False(t, calledResolutionHandlerFunc.Called, "ResolutionHandlerFunc should not be called")
 	})
 
 	t.Run("handleSBOMResolution with FlagAllProjects", func(t *testing.T) {
-		finding1 := scaplugin.Finding{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), FilesProcessed: []string{}}
-		finding2 := scaplugin.Finding{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"test"}]}`), FilesProcessed: []string{}}
-		finding3 := scaplugin.Finding{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"someFinding"}]}`), FilesProcessed: []string{}}
+		finding1 := scaplugin.Finding{
+			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+			FilesProcessed: []string{"uv.lock", "pyproject.toml"},
+		}
+		finding2 := scaplugin.Finding{
+			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"test"}]}`),
+			FilesProcessed: []string{"requirements.txt", "setup.py"},
+		}
+		finding3 := scaplugin.Finding{
+			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"someFinding"}]}`),
+			FilesProcessed: []string{"package.json"},
+		}
 		finding4 := scaplugin.Finding{
 			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"anotherFinding"}]}`),
-			FilesProcessed: []string{},
+			FilesProcessed: []string{"go.mod"},
 		}
 
 		tc := []struct {
-			name                    string
-			allProjects             bool
-			plugins                 []scaplugin.ScaPlugin
-			expectedWorkflowDataLen int
+			name                             string
+			allProjects                      bool
+			initialExclude                   string
+			plugins                          []scaplugin.ScaPlugin
+			expectedWorkflowDataLen          int
+			expectLegacyResolutionToBeCalled bool
+			expectedExclude                  string
 		}{
 			{
-				name:        "should return only first finding when FlagAllProjects is false and BuildFindingsFromDir returns 2 findings",
-				allProjects: false,
+				name:           "should return only first finding when FlagAllProjects is false and BuildFindingsFromDir returns 2 findings",
+				allProjects:    false,
+				initialExclude: "",
 				plugins: []scaplugin.ScaPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{
@@ -296,11 +375,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 						},
 					},
 				},
-				expectedWorkflowDataLen: 1,
+				expectedWorkflowDataLen:          1,
+				expectLegacyResolutionToBeCalled: false,
+				expectedExclude:                  "",
 			},
 			{
-				name:        "should return all findings when FlagAllProjects is true",
-				allProjects: true,
+				name:           "should return all findings when FlagAllProjects is true",
+				allProjects:    true,
+				initialExclude: "",
 				plugins: []scaplugin.ScaPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{
@@ -309,11 +391,15 @@ func Test_callback_SBOMResolution(t *testing.T) {
 						},
 					},
 				},
-				expectedWorkflowDataLen: 2,
+				// Expected: 2 SBOM findings + 1 legacy workflow depgraph = 3
+				expectedWorkflowDataLen:          3,
+				expectLegacyResolutionToBeCalled: true,
+				expectedExclude:                  "uv.lock,pyproject.toml,requirements.txt,setup.py",
 			},
 			{
-				name:        "should continue to next plugin when first plugin returns zero findings and FlagAllProjects is false",
-				allProjects: false,
+				name:           "should continue to next plugin when first plugin returns zero findings and FlagAllProjects is false",
+				allProjects:    false,
+				initialExclude: "",
 				plugins: []scaplugin.ScaPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{},
@@ -324,11 +410,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 						},
 					},
 				},
-				expectedWorkflowDataLen: 1,
+				expectedWorkflowDataLen:          1,
+				expectLegacyResolutionToBeCalled: false,
+				expectedExclude:                  "",
 			},
 			{
-				name:        "should return one finding when multiple plugins return multiple findings and FlagAllProjects is false",
-				allProjects: false,
+				name:           "should return one finding when multiple plugins return multiple findings and FlagAllProjects is false",
+				allProjects:    false,
+				initialExclude: "",
 				plugins: []scaplugin.ScaPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{
@@ -343,11 +432,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 						},
 					},
 				},
-				expectedWorkflowDataLen: 1,
+				expectedWorkflowDataLen:          1,
+				expectLegacyResolutionToBeCalled: false,
+				expectedExclude:                  "",
 			},
 			{
-				name:        "should return all findings when FlagAllProjects is true and multiple plugins return multiple findings",
-				allProjects: true,
+				name:           "should return all findings when FlagAllProjects is true and multiple plugins return multiple findings",
+				allProjects:    true,
+				initialExclude: "",
 				plugins: []scaplugin.ScaPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{
@@ -362,7 +454,43 @@ func Test_callback_SBOMResolution(t *testing.T) {
 						},
 					},
 				},
-				expectedWorkflowDataLen: 4,
+				// Expected: 4 SBOM findings + 1 legacy workflow depgraph = 5
+				expectedWorkflowDataLen:          5,
+				expectLegacyResolutionToBeCalled: true,
+				expectedExclude:                  "uv.lock,pyproject.toml,requirements.txt,setup.py,package.json,go.mod",
+			},
+			{
+				name:           "should call legacy resolution workflow when no SBOM findings are found and FlagAllProjects is false",
+				allProjects:    false,
+				initialExclude: "",
+				plugins: []scaplugin.ScaPlugin{
+					&mockScaPlugin{
+						findings: []scaplugin.Finding{},
+					},
+					&mockScaPlugin{
+						findings: []scaplugin.Finding{},
+					},
+				},
+				expectedWorkflowDataLen:          1,
+				expectLegacyResolutionToBeCalled: true,
+				expectedExclude:                  "",
+			},
+			{
+				name:           "should append FilesProcessed to existing FlagExclude when FlagAllProjects is true",
+				allProjects:    true,
+				initialExclude: "existing-file.txt,another-file.py",
+				plugins: []scaplugin.ScaPlugin{
+					&mockScaPlugin{
+						findings: []scaplugin.Finding{
+							finding1,
+							finding2,
+						},
+					},
+				},
+				// Expected: 2 SBOM findings + 1 legacy workflow depgraph = 3
+				expectedWorkflowDataLen:          3,
+				expectLegacyResolutionToBeCalled: true,
+				expectedExclude:                  "existing-file.txt,another-file.py,uv.lock,pyproject.toml,requirements.txt,setup.py",
 			},
 		}
 
@@ -384,6 +512,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				config := configuration.New()
 				config.Set(FlagUseSBOMResolution, true)
 				config.Set(FlagAllProjects, tc.allProjects)
+				config.Set(FlagExclude, tc.initialExclude)
 				config.Set(configuration.ORGANIZATION, "test-org-id")
 				config.Set(configuration.API_URL, mockSBOMService.URL)
 
@@ -398,11 +527,36 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
 				invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
 
-				workflowData, err := handleSBOMResolution(invocationContextMock, config, &nopLogger, tc.plugins)
+				calledResolutionHandlerFunc := NewCalledResolutionHandlerFunc(nil, nil)
+				if tc.expectLegacyResolutionToBeCalled {
+					dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+					mockWorkflowData := []workflow.Data{
+						workflow.NewData(
+							dataIdentifier,
+							"application/json",
+							[]byte(`{"mock":"data"}`),
+						),
+					}
+					calledResolutionHandlerFunc.ReturnData = mockWorkflowData
+				}
+
+				workflowData, err := handleSBOMResolutionDI(
+					invocationContextMock,
+					config,
+					&nopLogger,
+					tc.plugins,
+					calledResolutionHandlerFunc.Func(),
+				)
 
 				require.NoError(t, err)
 				assert.NotNil(t, workflowData)
 				assert.Len(t, workflowData, tc.expectedWorkflowDataLen)
+				assert.Equal(t, tc.expectLegacyResolutionToBeCalled, calledResolutionHandlerFunc.Called)
+
+				if tc.expectLegacyResolutionToBeCalled {
+					actualExclude := calledResolutionHandlerFunc.Config.GetString(FlagExclude)
+					assert.Equal(t, tc.expectedExclude, actualExclude, "FlagExclude should contain FilesProcessed from findings")
+				}
 			})
 		}
 	})

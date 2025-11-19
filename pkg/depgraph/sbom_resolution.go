@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/rs/zerolog"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/internal/uv"
 	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
@@ -17,7 +19,24 @@ func handleSBOMResolution(
 	ctx workflow.InvocationContext,
 	config configuration.Configuration,
 	logger *zerolog.Logger,
+) ([]workflow.Data, error) {
+	return handleSBOMResolutionDI(
+		ctx,
+		config,
+		logger,
+		[]scaplugin.ScaPlugin{
+			uv.NewUvPlugin(uv.NewUvClient()),
+		},
+		handleLegacyResolution,
+	)
+}
+
+func handleSBOMResolutionDI(
+	ctx workflow.InvocationContext,
+	config configuration.Configuration,
+	logger *zerolog.Logger,
 	scaPlugins []scaplugin.ScaPlugin,
+	depGraphWorkflowFunc ResolutionHandlerFunc,
 ) ([]workflow.Data, error) {
 	inputDir := config.GetString(configuration.INPUT_DIRECTORY)
 	if inputDir == "" {
@@ -70,9 +89,22 @@ func handleSBOMResolution(
 	}
 
 	if len(findings) == 0 || allProjects {
-		_ = getExclusionsFromFindings(findings)
+		findingsExclusions := getExclusionsFromFindings(findings)
 
-		// TODO(uv): Call legacy workflow with exclusions, collect resulting workflow.Data and add them to the current workflowData
+		if len(findingsExclusions) > 0 {
+			exclude := config.GetString(FlagExclude)
+			if exclude != "" {
+				exclude = fmt.Sprintf("%s,", exclude)
+			}
+			exclude = fmt.Sprintf("%s%s", exclude, strings.Join(findingsExclusions, ","))
+			config.Set(FlagExclude, exclude)
+		}
+
+		legacyData, err := depGraphWorkflowFunc(ctx, config, logger)
+		if err != nil {
+			return nil, fmt.Errorf("error handling legacy workflow: %w", err)
+		}
+		workflowData = append(workflowData, legacyData...)
 	}
 
 	return workflowData, nil

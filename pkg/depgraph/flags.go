@@ -10,6 +10,7 @@ const (
 	FlagFailFast                     = "fail-fast"
 	FlagAllProjects                  = "all-projects"
 	FlagDev                          = "dev"
+	FlagExclude                      = "exclude"
 	FlagFile                         = "file"
 	FlagDetectionDepth               = "detection-depth"
 	FlagPruneRepeatedSubdependencies = "prune-repeated-subdependencies"

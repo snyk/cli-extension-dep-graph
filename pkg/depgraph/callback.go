@@ -3,8 +3,8 @@ package depgraph
 import (
 	_ "embed"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/uv"
-	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
+	"github.com/rs/zerolog"
+	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 )
 
@@ -14,27 +14,17 @@ const (
 	contentLocationKey     = "Content-Location"
 )
 
-//nolint:gochecknoglobals // Workflow identifier needs to be a package-level variable
-var legacyWorkflowID = workflow.NewWorkflowIdentifier(legacyCLIWorkflowIDStr)
+type ResolutionHandlerFunc func(ctx workflow.InvocationContext, config configuration.Configuration, logger *zerolog.Logger) ([]workflow.Data, error)
 
-func callback(ctx workflow.InvocationContext, data []workflow.Data) ([]workflow.Data, error) {
-	return callbackWithDI(ctx, data, uv.NewUvClient())
-}
-
-func callbackWithDI(ctx workflow.InvocationContext, _ []workflow.Data, uvClient uv.Client) ([]workflow.Data, error) {
-	engine := ctx.GetEngine()
+func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Data, error) {
 	config := ctx.GetConfiguration()
 	logger := ctx.GetEnhancedLogger()
 
 	logger.Print("DepGraph workflow start")
 
-	// Check if SBOM resolution mode is enabled
 	if config.GetBool(FlagUseSBOMResolution) {
-		scaPlugins := []scaplugin.ScaPlugin{
-			uv.NewUvPlugin(uvClient),
-		}
-		return handleSBOMResolution(ctx, config, logger, scaPlugins)
+		return handleSBOMResolution(ctx, config, logger)
 	}
 
-	return handleLegacyResolution(engine, config, logger)
+	return handleLegacyResolution(ctx, config, logger)
 }
