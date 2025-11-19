@@ -3,6 +3,11 @@ version: 2.1
 orbs:
   prodsec: snyk/prodsec-orb@1
 
+parameters:
+  go_version:
+    type: string
+    default: "1.24"
+
 metadata:
   resource_class: small
   working_directory: ~/<project name>
@@ -10,25 +15,48 @@ metadata:
 go_image: &go_image
   resource_class: medium
   docker:
-    - image: cimg/go:1.24
+    - image: cimg/go:<< pipeline.parameters.go_version >>
 
 jobs:
   lint:
-    docker:
-      - image: cimg/go:1.24
+    <<: *go_image
     steps:
       - checkout
       - run:
           name: run lint check
           command: make lint
   unit_test:
-    docker:
-      - image: cimg/go:1.24
+    <<: *go_image
     steps:
       - checkout
       - run:
           name: run unit tests
           command: make test
+
+  python_integration_test:
+    parameters:
+      python_version:
+        type: string
+    resource_class: medium
+    docker:
+      - image: cimg/python:<< parameters.python_version >>
+    steps:
+      - checkout
+      - run:
+          name: Install Go
+          command: |
+            wget -qO- https://go.dev/dl/go<< pipeline.parameters.go_version >>.0.linux-amd64.tar.gz | sudo tar -C /usr/local -xz
+            echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
+            source $BASH_ENV
+      - run:
+          name: Verify installations
+          command: |
+            go version
+            python --version
+            pip --version
+      - run:
+          name: Run Python integration tests
+          command: make test-python-integration
 
   security-scans:
     <<: *go_image
@@ -64,6 +92,17 @@ workflows:
                 - main
       - unit_test:
           name: Unit tests
+          filters:
+            branches:
+              ignore:
+                - main
+      - python_integration_test:
+          name: Python << matrix.python_version >> integration tests
+          requires:
+            - Unit tests
+          matrix:
+            parameters:
+              python_version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
           filters:
             branches:
               ignore:

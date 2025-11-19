@@ -1,0 +1,44 @@
+{
+  "install": [
+    {
+      "metadata": {
+        "name": "requests",
+        "version": "2.31.0",
+        "requires_dist": null
+      },
+      "requested": true
+    },
+    {
+      "metadata": {
+        "name": "charset-normalizer",
+        "version": "",
+        "requires_dist": null
+      },
+      "requested": false
+    },
+    {
+      "metadata": {
+        "name": "idna",
+        "version": "",
+        "requires_dist": null
+      },
+      "requested": false
+    },
+    {
+      "metadata": {
+        "name": "urllib3",
+        "version": "",
+        "requires_dist": null
+      },
+      "requested": false
+    },
+    {
+      "metadata": {
+        "name": "certifi",
+        "version": "",
+        "requires_dist": null
+      },
+      "requested": false
+    }
+  ]
+}
