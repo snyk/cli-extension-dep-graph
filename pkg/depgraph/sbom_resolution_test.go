@@ -62,6 +62,19 @@ func (c *CalledResolutionHandlerFunc) Func() ResolutionHandlerFunc {
 	}
 }
 
+// mockExitError creates an error with the specified exit code.
+type mockExitError struct {
+	code int
+}
+
+func (e mockExitError) Error() string {
+	return fmt.Sprintf("mock exit error: %d", e.code)
+}
+
+func (e mockExitError) ExitCode() int {
+	return e.code
+}
+
 func Test_callback_SBOMResolution(t *testing.T) {
 	nopLogger := zerolog.Nop()
 
@@ -559,6 +572,171 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("should handle exit code 3 (no projects found) gracefully and continue with SBOM data", func(t *testing.T) {
+		// Create mock SBOM service response
+		mockResponse := mocks.NewMockResponse(
+			"application/json",
+			[]byte(uvSBOMConvertResponse),
+			http.StatusOK,
+		)
+
+		mockSBOMService := mocks.NewMockSBOMService(mockResponse, func(r *http.Request) {
+			assert.Equal(t, http.MethodPost, r.Method)
+			assert.Contains(t, r.RequestURI, "/hidden/orgs/test-org-id/sboms/convert")
+		})
+		defer mockSBOMService.Close()
+
+		config := configuration.New()
+		config.Set(FlagUseSBOMResolution, true)
+		config.Set(FlagAllProjects, true)
+		config.Set(configuration.ORGANIZATION, "test-org-id")
+		config.Set(configuration.API_URL, mockSBOMService.URL)
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		engineMock := frameworkmocks.NewMockEngine(ctrl)
+		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
+
+		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
+		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
+		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
+		invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
+
+		// Create mock plugin that returns a finding
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					FilesProcessed: []string{"uv.lock"},
+				},
+			},
+		}
+
+		// Create an error with exit code 3 (no projects found)
+		exitError3 := mockExitError{code: 3}
+		calledResolutionHandlerFunc := NewCalledResolutionHandlerFunc(nil, exitError3)
+
+		workflowData, err := handleSBOMResolutionDI(
+			invocationContextMock,
+			config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{mockPlugin},
+			calledResolutionHandlerFunc.Func(),
+		)
+
+		// Should succeed and return SBOM data despite exit code 3 from legacy workflow
+		require.NoError(t, err)
+		assert.NotNil(t, workflowData)
+		// Should have 1 SBOM finding (legacy workflow returned exit code 3, so no legacy data)
+		assert.Len(t, workflowData, 1)
+		// Legacy resolution should have been called
+		assert.True(t, calledResolutionHandlerFunc.Called, "ResolutionHandlerFunc should be called")
+	})
+
+	t.Run("should handle exit code 3 when no SBOM findings are found", func(t *testing.T) {
+		config := configuration.New()
+		config.Set(FlagUseSBOMResolution, true)
+		config.Set(FlagAllProjects, false)
+		config.Set(configuration.ORGANIZATION, "test-org-id")
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		engineMock := frameworkmocks.NewMockEngine(ctrl)
+		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
+
+		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
+		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
+		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
+		invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
+
+		// Create mock plugin that returns no findings
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{},
+		}
+
+		// Create an error with exit code 3 (no projects found)
+		exitError3 := mockExitError{code: 3}
+		calledResolutionHandlerFunc := NewCalledResolutionHandlerFunc(nil, exitError3)
+
+		workflowData, err := handleSBOMResolutionDI(
+			invocationContextMock,
+			config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{mockPlugin},
+			calledResolutionHandlerFunc.Func(),
+		)
+
+		// Should return error when exit code 3 occurs with no SBOM findings
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no supported projects detected")
+		assert.Nil(t, workflowData)
+		// Legacy resolution should have been called
+		assert.True(t, calledResolutionHandlerFunc.Called, "ResolutionHandlerFunc should be called")
+	})
+
+	t.Run("should return error for non-exit-code-3 errors from legacy workflow", func(t *testing.T) {
+		// Create mock SBOM service response
+		mockResponse := mocks.NewMockResponse(
+			"application/json",
+			[]byte(uvSBOMConvertResponse),
+			http.StatusOK,
+		)
+
+		mockSBOMService := mocks.NewMockSBOMService(mockResponse, func(r *http.Request) {
+			assert.Equal(t, http.MethodPost, r.Method)
+			assert.Contains(t, r.RequestURI, "/hidden/orgs/test-org-id/sboms/convert")
+		})
+		defer mockSBOMService.Close()
+
+		config := configuration.New()
+		config.Set(FlagUseSBOMResolution, true)
+		config.Set(FlagAllProjects, true)
+		config.Set(configuration.ORGANIZATION, "test-org-id")
+		config.Set(configuration.API_URL, mockSBOMService.URL)
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		engineMock := frameworkmocks.NewMockEngine(ctrl)
+		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
+
+		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
+		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
+		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
+		invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
+
+		// Create mock plugin that returns a finding
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					FilesProcessed: []string{"uv.lock"},
+				},
+			},
+		}
+
+		// Create an error with exit code 1 (not exit code 3)
+		exitError1 := mockExitError{code: 1}
+		calledResolutionHandlerFunc := NewCalledResolutionHandlerFunc(nil, exitError1)
+
+		workflowData, err := handleSBOMResolutionDI(
+			invocationContextMock,
+			config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{mockPlugin},
+			calledResolutionHandlerFunc.Func(),
+		)
+
+		// Should return error for non-exit-code-3 errors
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "error handling legacy workflow")
+		assert.Nil(t, workflowData)
+		// Legacy resolution should have been called
+		assert.True(t, calledResolutionHandlerFunc.Called, "ResolutionHandlerFunc should be called")
 	})
 }
 

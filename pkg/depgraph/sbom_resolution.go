@@ -89,22 +89,15 @@ func handleSBOMResolutionDI(
 	}
 
 	if len(findings) == 0 || allProjects {
-		findingsExclusions := getExclusionsFromFindings(findings)
+		applyFindingsExclusions(config, findings)
 
-		if len(findingsExclusions) > 0 {
-			exclude := config.GetString(FlagExclude)
-			if exclude != "" {
-				exclude = fmt.Sprintf("%s,", exclude)
-			}
-			exclude = fmt.Sprintf("%s%s", exclude, strings.Join(findingsExclusions, ","))
-			config.Set(FlagExclude, exclude)
-		}
-
-		legacyData, err := depGraphWorkflowFunc(ctx, config, logger)
+		legacyData, err := executeLegacyWorkflow(ctx, config, logger, depGraphWorkflowFunc, findings)
 		if err != nil {
-			return nil, fmt.Errorf("error handling legacy workflow: %w", err)
+			return nil, err
 		}
-		workflowData = append(workflowData, legacyData...)
+		if legacyData != nil {
+			workflowData = append(workflowData, legacyData...)
+		}
 	}
 
 	return workflowData, nil
@@ -116,6 +109,45 @@ func getExclusionsFromFindings(findings []scaplugin.Finding) []string {
 		exclusions = append(exclusions, f.FilesProcessed...)
 	}
 	return exclusions
+}
+
+func applyFindingsExclusions(config configuration.Configuration, findings []scaplugin.Finding) {
+	findingsExclusions := getExclusionsFromFindings(findings)
+	if len(findingsExclusions) == 0 {
+		return
+	}
+
+	exclude := config.GetString(FlagExclude)
+	if exclude != "" {
+		exclude = fmt.Sprintf("%s,", exclude)
+	}
+	exclude = fmt.Sprintf("%s%s", exclude, strings.Join(findingsExclusions, ","))
+	config.Set(FlagExclude, exclude)
+}
+
+func executeLegacyWorkflow(
+	ctx workflow.InvocationContext,
+	config configuration.Configuration,
+	logger *zerolog.Logger,
+	depGraphWorkflowFunc ResolutionHandlerFunc,
+	findings []scaplugin.Finding,
+) ([]workflow.Data, error) {
+	legacyData, err := depGraphWorkflowFunc(ctx, config, logger)
+	if err == nil {
+		return legacyData, nil
+	}
+
+	// Handle exit code 3 (no projects found to test)
+	if isExitCode3(err) {
+		if len(findings) > 0 {
+			logger.Printf("No projects found in legacy workflow (exit code 3), continuing with SBOM data only")
+			return nil, nil
+		}
+		// No SBOM findings and no legacy projects found, return the error
+		return nil, fmt.Errorf("no supported projects detected: %w", err)
+	}
+
+	return nil, fmt.Errorf("error handling legacy workflow: %w", err)
 }
 
 func sbomToWorkflowData(sbomOutput []byte, snykClient *snykclient.SnykClient, logger *zerolog.Logger, remoteRepoURL string) ([]workflow.Data, error) {

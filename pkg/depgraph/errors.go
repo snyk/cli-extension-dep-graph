@@ -60,3 +60,18 @@ func extractLegacyCLIError(input error, data []workflow.Data) error {
 
 	return clierrors.NewGeneralSCAFailureError(output.Error(), snyk_errors.WithCause(output))
 }
+
+// exitCoder interface allows checking for exit codes without depending on concrete exec.ExitError.
+type exitCoder interface {
+	ExitCode() int
+}
+
+// isExitCode3 checks if the error chain contains an error with exit code 3.
+// Exit code 3 typically means "no projects found to test" in the legacy CLI.
+func isExitCode3(err error) bool {
+	var ec exitCoder
+	if errors.As(err, &ec) {
+		return ec.ExitCode() == 3
+	}
+	return false
+}
