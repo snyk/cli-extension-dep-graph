@@ -122,11 +122,18 @@ func TestExtractPackageName(t *testing.T) {
 		depString string
 		want      string
 	}{
-		"with_constraints": {"urllib3 (<3,>=1.21.1)", "urllib3"},
-		"with_extras":      {"requests[security] (>=2.20.0)", "requests"},
-		"special_chars":    {"some-package_name.py (>=1.0)", "some-package_name.py"},
-		"no_constraints":   {"certifi", "certifi"},
-		"empty":            {"", ""},
+		"with_constraints":        {"urllib3 (<3,>=1.21.1)", "urllib3"},
+		"with_extras":             {"requests[security] (>=2.20.0)", "requests"},
+		"special_chars":           {"some-package_name.py (>=1.0)", "some-package_name.py"},
+		"no_constraints":          {"certifi", "certifi"},
+		"empty":                   {"", ""},
+		"no_space_version":        {"idna>=3.3", "idna"},
+		"with_extra_marker":       {"mypy; extra == \"dev\"", "mypy"},
+		"hyphenated_with_extra":   {"pre-commit; extra == \"dev\"", "pre-commit"},
+		"hyphenated_with_marker":  {"pytest-cov; extra == \"dev\"", "pytest-cov"},
+		"multiple_hyphens":        {"pytest-socket; extra == \"dev\"", "pytest-socket"},
+		"simple_with_extra":       {"pytest; extra == \"dev\"", "pytest"},
+		"single_char_with_marker": {"ruff; extra == \"dev\"", "ruff"},
 	}
 
 	for name, tt := range tests {

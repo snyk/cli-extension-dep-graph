@@ -22,7 +22,7 @@ func (r *Report) ToDepgraph() (*ecosystems.Depgraph, error) {
 		return nil, fmt.Errorf("report cannot be nil")
 	}
 
-	slog.Info("Converting pip report to depgraph", slog.Int("total_packages", len(r.Install)))
+	slog.Debug("Converting pip report to depgraph", slog.Int("total_packages", len(r.Install)))
 
 	// First pass: index packages by name for dependency resolution
 	// Pip's dependency resolver ensures only one version of each package is installed
@@ -78,7 +78,7 @@ func (r *Report) ToDepgraph() (*ecosystems.Depgraph, error) {
 	// Add root pointing to direct dependencies
 	graph["root"] = directDeps
 
-	slog.Info("Successfully converted pip report to depgraph",
+	slog.Debug("Successfully converted pip report to depgraph",
 		slog.Int("total_packages", len(packages)),
 		slog.Int("direct_dependencies", len(directDeps)),
 		slog.Int("graph_nodes", len(graph)))
