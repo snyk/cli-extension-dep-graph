@@ -53,9 +53,12 @@ func (c client) ExportSBOM(inputDir string) (*scaplugin.Finding, error) {
 	}
 
 	return &scaplugin.Finding{
-		Sbom:           output,
-		FilesProcessed: []string{},
-		TargetFile:     path.Join(inputDir, UvLockFileName),
+		Sbom: output,
+		FilesProcessed: []string{
+			path.Join(inputDir, RequirementsTxtFileName),
+			path.Join(inputDir, PyprojectTomlFileName),
+		},
+		TargetFile: path.Join(inputDir, UvLockFileName),
 	}, nil
 }
 
