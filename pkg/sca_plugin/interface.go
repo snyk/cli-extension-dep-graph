@@ -7,6 +7,7 @@ type Options struct{}
 type Finding struct {
 	Sbom           Sbom
 	FilesProcessed []string
+	TargetFile     string
 }
 
 type Sbom []byte

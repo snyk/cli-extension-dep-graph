@@ -131,8 +131,10 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockUVClient := &mocks.MockUVClient{
-			ExportSBOMFunc: func(_ string) ([]byte, error) {
-				return []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), nil
+			ExportSBOMFunc: func(_ string) (*scaplugin.Finding, error) {
+				return &scaplugin.Finding{
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+				}, nil
 			},
 		}
 
@@ -159,7 +161,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 
 		mockUVClient := &mocks.MockUVClient{
-			ExportSBOMFunc: func(_ string) ([]byte, error) {
+			ExportSBOMFunc: func(_ string) (*scaplugin.Finding, error) {
 				return nil, fmt.Errorf("uv command failed")
 			},
 		}
@@ -187,8 +189,10 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockUVClient := &mocks.MockUVClient{
-			ExportSBOMFunc: func(_ string) ([]byte, error) {
-				return []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), nil
+			ExportSBOMFunc: func(_ string) (*scaplugin.Finding, error) {
+				return &scaplugin.Finding{
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+				}, nil
 			},
 		}
 
@@ -268,8 +272,10 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockUVClient := &mocks.MockUVClient{
-			ExportSBOMFunc: func(_ string) ([]byte, error) {
-				return []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), nil
+			ExportSBOMFunc: func(_ string) (*scaplugin.Finding, error) {
+				return &scaplugin.Finding{
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+				}, nil
 			},
 		}
 

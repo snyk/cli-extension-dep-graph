@@ -45,7 +45,7 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 	result, err := client.ExportSBOM("/test/dir")
 
 	assert.NoError(t, err)
-	assert.JSONEq(t, validSBOM, string(result))
+	assert.JSONEq(t, validSBOM, string(result.Sbom))
 }
 
 func TestUVClient_ExportSBOM_Error(t *testing.T) {
