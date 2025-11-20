@@ -10,7 +10,10 @@ import (
 	"github.com/snyk/go-application-framework/pkg/workflow"
 )
 
-func handleLegacyResolution(engine workflow.Engine, config configuration.Configuration, logger *zerolog.Logger) ([]workflow.Data, error) {
+var legacyWorkflowID = workflow.NewWorkflowIdentifier(legacyCLIWorkflowIDStr)
+
+func handleLegacyResolution(ctx workflow.InvocationContext, config configuration.Configuration, logger *zerolog.Logger) ([]workflow.Data, error) {
+	engine := ctx.GetEngine()
 	argument, outputParser := chooseGraphArgument(config)
 
 	// prepare invocation of the legacy cli

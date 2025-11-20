@@ -25,7 +25,7 @@ var expectedDepGraph string
 
 const errMsgPayloadShouldBeByte = "payload should be []byte"
 
-func Test_callback(t *testing.T) {
+func Test_LegacyResolution(t *testing.T) {
 	nopLogger := zerolog.Nop()
 	config := configuration.New()
 	// setup mocks
@@ -220,7 +220,7 @@ func Test_callback(t *testing.T) {
 			Return([]workflow.Data{data}, nil).
 			Times(1)
 
-		depGraphs, err := callback(invocationContextMock, []workflow.Data{})
+		depGraphs, err := handleLegacyResolution(invocationContextMock, config, &nopLogger)
 		require.Nil(t, err)
 
 		assert.Len(t, depGraphs, 1)
@@ -240,7 +240,7 @@ func Test_callback(t *testing.T) {
 			Return([]workflow.Data{data}, nil).
 			Times(1)
 
-		depGraphs, err := callback(invocationContextMock, []workflow.Data{})
+		depGraphs, err := handleLegacyResolution(invocationContextMock, config, &nopLogger)
 		require.Nil(t, err)
 
 		assert.Len(t, depGraphs, 1)
@@ -263,7 +263,7 @@ func Test_callback(t *testing.T) {
 		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
 
 		// execute
-		_, err := callback(invocationContextMock, []workflow.Data{})
+		_, err := handleLegacyResolution(invocationContextMock, config, &nopLogger)
 
 		// assert
 		assert.ErrorIs(t, err, errNoDepGraphsFound)
@@ -279,13 +279,14 @@ func invokeWithConfigAndGetTestCmdArgs(
 	t.Helper()
 	dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
 	data := workflow.NewData(dataIdentifier, contentTypeJSON, []byte(payload))
+	nopLogger := zerolog.Nop()
 
 	// engine mocks
 	id := workflow.NewWorkflowIdentifier("legacycli")
 	engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
 
 	// execute
-	_, err := callback(invocationContextMock, []workflow.Data{})
+	_, err := handleLegacyResolution(invocationContextMock, config, &nopLogger)
 
 	// assert
 	assert.Nil(t, err)

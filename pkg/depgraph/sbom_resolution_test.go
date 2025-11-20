@@ -4,11 +4,13 @@ import (
 	_ "embed"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
+	"github.com/snyk/cli-extension-dep-graph/internal/uv"
 	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	frameworkmocks "github.com/snyk/go-application-framework/pkg/mocks"
@@ -36,139 +38,180 @@ func (m *mockScaPlugin) BuildFindingsFromDir(_ string, _ scaplugin.Options, _ *z
 	return m.findings, nil
 }
 
+// CalledResolutionHandlerFunc is a test helper structure to track calls to the mock ResolutionHandlerFunc.
+type CalledResolutionHandlerFunc struct {
+	Called      bool
+	Config      configuration.Configuration
+	ReturnData  []workflow.Data
+	ReturnError error
+}
+
+// NewCalledResolutionHandlerFunc creates a new instance for use in tests.
+func NewCalledResolutionHandlerFunc(returnData []workflow.Data, returnErr error) *CalledResolutionHandlerFunc {
+	return &CalledResolutionHandlerFunc{
+		ReturnData:  returnData,
+		ReturnError: returnErr,
+	}
+}
+
+// Func returns a ResolutionHandlerFunc that records invocation and arguments.
+func (c *CalledResolutionHandlerFunc) Func() ResolutionHandlerFunc {
+	return func(_ workflow.InvocationContext, config configuration.Configuration, _ *zerolog.Logger) ([]workflow.Data, error) {
+		c.Called = true
+		c.Config = config
+		return c.ReturnData, c.ReturnError
+	}
+}
+
+// mockExitError creates an error with the specified exit code.
+type mockExitError struct {
+	code int
+}
+
+func (e mockExitError) Error() string {
+	return fmt.Sprintf("mock exit error: %d", e.code)
+}
+
+func (e mockExitError) ExitCode() int {
+	return e.code
+}
+
+var nopLogger = zerolog.Nop()
+
+// Helper struct to hold common test dependencies.
+type testContext struct {
+	ctrl              *gomock.Controller
+	config            configuration.Configuration
+	invocationContext *frameworkmocks.MockInvocationContext
+}
+
+// setupTestContext initializes common test objects and handles cleanup automatically.
+func setupTestContext(t *testing.T) *testContext {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	config := configuration.New()
+	config.Set(FlagUseSBOMResolution, true)
+	config.Set(configuration.ORGANIZATION, "test-org-id")
+
+	invocationContext := frameworkmocks.NewMockInvocationContext(ctrl)
+	invocationContext.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
+
+	return &testContext{
+		ctrl:              ctrl,
+		config:            config,
+		invocationContext: invocationContext,
+	}
+}
+
+func createMockSBOMService(t *testing.T, responseBody string, statusCode int) *httptest.Server {
+	t.Helper()
+	mockResponse := mocks.NewMockResponse(
+		"application/json",
+		[]byte(responseBody),
+		statusCode,
+	)
+
+	return mocks.NewMockSBOMService(mockResponse, func(r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Contains(t, r.RequestURI, "/hidden/orgs/test-org-id/sboms/convert")
+		assert.Equal(t, "application/octet-stream", r.Header.Get("Content-Type"))
+		assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
+	})
+}
+
 func Test_callback_SBOMResolution(t *testing.T) {
-	nopLogger := zerolog.Nop()
-
 	t.Run("should return depgraphs from SBOM conversion when use-sbom-resolution flag is enabled", func(t *testing.T) {
-		// Create mock SBOM service response with a depGraph fact
-		mockResponse := mocks.NewMockResponse(
-			"application/json",
-			[]byte(uvSBOMConvertResponse),
-			http.StatusOK,
-		)
+		ctx := setupTestContext(t)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 
-		mockSBOMService := mocks.NewMockSBOMService(mockResponse, func(r *http.Request) {
-			assert.Equal(t, http.MethodPost, r.Method)
-			assert.Contains(t, r.RequestURI, "/hidden/orgs/test-org-id/sboms/convert")
-			assert.Equal(t, "application/octet-stream", r.Header.Get("Content-Type"))
-			assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
-		})
+		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse, http.StatusOK)
 		defer mockSBOMService.Close()
+		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
-		config := configuration.New()
-		config.Set(FlagUseSBOMResolution, true)
-		config.Set(configuration.ORGANIZATION, "test-org-id")
-		config.Set(configuration.API_URL, mockSBOMService.URL)
-
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		engineMock := frameworkmocks.NewMockEngine(ctrl)
-		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
-
-		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
-		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
-		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
-		invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
-
-		// Create mock UV client that returns valid SBOM data
 		mockUVClient := &mocks.MockUVClient{
 			ExportSBOMFunc: func(_ string) ([]byte, error) {
-				// Return a minimal valid CycloneDX SBOM
 				return []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), nil
 			},
 		}
 
-		workflowData, err := callbackWithDI(invocationContextMock, []workflow.Data{}, mockUVClient)
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{uv.NewUvPlugin(mockUVClient)},
+			resolutionHandler.Func(),
+		)
 
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 		assert.Len(t, workflowData, 1)
+		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called")
 
-		// Compare the workflow data payload with the expected depGraph
 		depGraph, ok := workflowData[0].GetPayload().([]byte)
 		require.True(t, ok, "payload should be []byte")
 		assert.JSONEq(t, uvSBOMConvertExpectedDepGraph, string(depGraph))
 	})
 
 	t.Run("should handle UV client errors gracefully", func(t *testing.T) {
-		config := configuration.New()
-		config.Set(FlagUseSBOMResolution, true)
-		config.Set(configuration.ORGANIZATION, "test-org-id")
+		ctx := setupTestContext(t)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		engineMock := frameworkmocks.NewMockEngine(ctrl)
-		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
-
-		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
-		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
-		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
-
-		// Create mock UV client that returns an error
 		mockUVClient := &mocks.MockUVClient{
 			ExportSBOMFunc: func(_ string) ([]byte, error) {
 				return nil, fmt.Errorf("uv command failed")
 			},
 		}
 
-		depGraphs, err := callbackWithDI(invocationContextMock, []workflow.Data{}, mockUVClient)
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{uv.NewUvPlugin(mockUVClient)},
+			resolutionHandler.Func(),
+		)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to export SBOM using uv")
-		assert.Nil(t, depGraphs)
+		assert.Nil(t, workflowData)
+		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called")
 	})
 
 	t.Run("should handle SBOM convert network request errors", func(t *testing.T) {
-		// Create mock SBOM service response with an error status
-		mockResponse := mocks.NewMockResponse(
-			"application/json",
-			[]byte(`{"message":"Internal server error."}`),
-			http.StatusInternalServerError,
-		)
+		ctx := setupTestContext(t)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 
-		mockSBOMService := mocks.NewMockSBOMService(mockResponse, func(r *http.Request) {
-			assert.Equal(t, http.MethodPost, r.Method)
-			assert.Contains(t, r.RequestURI, "/hidden/orgs/test-org-id/sboms/convert")
-			assert.Equal(t, "application/octet-stream", r.Header.Get("Content-Type"))
-			assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
-		})
+		mockSBOMService := createMockSBOMService(t, `{"message":"Internal server error."}`, http.StatusInternalServerError)
 		defer mockSBOMService.Close()
+		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
-		config := configuration.New()
-		config.Set(FlagUseSBOMResolution, true)
-		config.Set(configuration.ORGANIZATION, "test-org-id")
-		config.Set(configuration.API_URL, mockSBOMService.URL)
-
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		engineMock := frameworkmocks.NewMockEngine(ctrl)
-		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
-
-		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
-		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
-		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
-		invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
-
-		// Create mock UV client that returns valid SBOM data
 		mockUVClient := &mocks.MockUVClient{
 			ExportSBOMFunc: func(_ string) ([]byte, error) {
-				// Return a minimal valid CycloneDX SBOM
 				return []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), nil
 			},
 		}
 
-		depGraphs, err := callbackWithDI(invocationContextMock, []workflow.Data{}, mockUVClient)
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{uv.NewUvPlugin(mockUVClient)},
+			resolutionHandler.Func(),
+		)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "analysis of SBOM document failed due to error")
 		assert.Contains(t, err.Error(), "500")
-		assert.Nil(t, depGraphs)
+		assert.Nil(t, workflowData)
+		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called")
 	})
 
 	t.Run("should return error when SBOM conversion fails for any finding when multiple findings are present", func(t *testing.T) {
+		ctx := setupTestContext(t)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagAllProjects, true)
+
 		// Create mock SBOM service with two responses: first success, second error
 		mockResponses := []mocks.MockResponse{
 			mocks.NewMockResponse(
@@ -190,23 +233,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
 		})
 		defer mockSBOMService.Close()
-
-		config := configuration.New()
-		config.Set(FlagUseSBOMResolution, true)
-		config.Set(FlagAllProjects, true)
-		config.Set(configuration.ORGANIZATION, "test-org-id")
-		config.Set(configuration.API_URL, mockSBOMService.URL)
-
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		engineMock := frameworkmocks.NewMockEngine(ctrl)
-		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
-
-		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
-		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
-		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
-		invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
+		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		// Create mock plugin that returns two findings
 		mockPlugin := &mockScaPlugin{
@@ -216,78 +243,82 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			},
 		}
 
-		depGraphs, err := handleSBOMResolution(invocationContextMock, config, &nopLogger, []scaplugin.ScaPlugin{mockPlugin})
+		depGraphs, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "analysis of SBOM document failed due to error")
 		assert.Contains(t, err.Error(), "500")
 		assert.Nil(t, depGraphs)
+		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called")
 	})
 
 	t.Run("should return only first finding when FlagAllProjects is false", func(t *testing.T) {
-		// Create mock SBOM service response
-		mockResponse := mocks.NewMockResponse(
-			"application/json",
-			[]byte(uvSBOMConvertResponse),
-			http.StatusOK,
-		)
+		ctx := setupTestContext(t)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagAllProjects, false)
 
-		mockSBOMService := mocks.NewMockSBOMService(mockResponse, func(r *http.Request) {
-			assert.Equal(t, http.MethodPost, r.Method)
-			assert.Contains(t, r.RequestURI, "/hidden/orgs/test-org-id/sboms/convert")
-		})
+		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse, http.StatusOK)
 		defer mockSBOMService.Close()
+		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
-		config := configuration.New()
-		config.Set(FlagUseSBOMResolution, true)
-		config.Set(FlagAllProjects, false)
-		config.Set(configuration.ORGANIZATION, "test-org-id")
-		config.Set(configuration.API_URL, mockSBOMService.URL)
-
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		engineMock := frameworkmocks.NewMockEngine(ctrl)
-		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
-
-		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
-		invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
-		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
-		invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
-
-		// Create mock UV client that returns valid SBOM data
 		mockUVClient := &mocks.MockUVClient{
 			ExportSBOMFunc: func(_ string) ([]byte, error) {
 				return []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), nil
 			},
 		}
 
-		workflowData, err := callbackWithDI(invocationContextMock, []workflow.Data{}, mockUVClient)
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{uv.NewUvPlugin(mockUVClient)},
+			resolutionHandler.Func(),
+		)
 
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 		// Should only have one finding even if multiple plugins could return findings
 		assert.Len(t, workflowData, 1)
+		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called")
 	})
 
 	t.Run("handleSBOMResolution with FlagAllProjects", func(t *testing.T) {
-		finding1 := scaplugin.Finding{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), FilesProcessed: []string{}}
-		finding2 := scaplugin.Finding{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"test"}]}`), FilesProcessed: []string{}}
-		finding3 := scaplugin.Finding{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"someFinding"}]}`), FilesProcessed: []string{}}
+		finding1 := scaplugin.Finding{
+			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+			FilesProcessed: []string{"uv.lock", "pyproject.toml"},
+		}
+		finding2 := scaplugin.Finding{
+			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"test"}]}`),
+			FilesProcessed: []string{"requirements.txt", "setup.py"},
+		}
+		finding3 := scaplugin.Finding{
+			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"someFinding"}]}`),
+			FilesProcessed: []string{"package.json"},
+		}
 		finding4 := scaplugin.Finding{
 			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"anotherFinding"}]}`),
-			FilesProcessed: []string{},
+			FilesProcessed: []string{"go.mod"},
 		}
 
 		tc := []struct {
-			name                    string
-			allProjects             bool
-			plugins                 []scaplugin.ScaPlugin
-			expectedWorkflowDataLen int
+			name                             string
+			allProjects                      bool
+			initialExclude                   string
+			plugins                          []scaplugin.ScaPlugin
+			expectedWorkflowDataLen          int
+			expectLegacyResolutionToBeCalled bool
+			expectedExclude                  string
 		}{
 			{
-				name:        "should return only first finding when FlagAllProjects is false and BuildFindingsFromDir returns 2 findings",
-				allProjects: false,
+				name:           "should return only first finding when FlagAllProjects is false and BuildFindingsFromDir returns 2 findings",
+				allProjects:    false,
+				initialExclude: "",
 				plugins: []scaplugin.ScaPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{
@@ -296,11 +327,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 						},
 					},
 				},
-				expectedWorkflowDataLen: 1,
+				expectedWorkflowDataLen:          1,
+				expectLegacyResolutionToBeCalled: false,
+				expectedExclude:                  "",
 			},
 			{
-				name:        "should return all findings when FlagAllProjects is true",
-				allProjects: true,
+				name:           "should return all findings when FlagAllProjects is true",
+				allProjects:    true,
+				initialExclude: "",
 				plugins: []scaplugin.ScaPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{
@@ -309,11 +343,15 @@ func Test_callback_SBOMResolution(t *testing.T) {
 						},
 					},
 				},
-				expectedWorkflowDataLen: 2,
+				// Expected: 2 SBOM findings + 1 legacy workflow depgraph = 3
+				expectedWorkflowDataLen:          3,
+				expectLegacyResolutionToBeCalled: true,
+				expectedExclude:                  "uv.lock,pyproject.toml,requirements.txt,setup.py",
 			},
 			{
-				name:        "should continue to next plugin when first plugin returns zero findings and FlagAllProjects is false",
-				allProjects: false,
+				name:           "should continue to next plugin when first plugin returns zero findings and FlagAllProjects is false",
+				allProjects:    false,
+				initialExclude: "",
 				plugins: []scaplugin.ScaPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{},
@@ -324,11 +362,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 						},
 					},
 				},
-				expectedWorkflowDataLen: 1,
+				expectedWorkflowDataLen:          1,
+				expectLegacyResolutionToBeCalled: false,
+				expectedExclude:                  "",
 			},
 			{
-				name:        "should return one finding when multiple plugins return multiple findings and FlagAllProjects is false",
-				allProjects: false,
+				name:           "should return one finding when multiple plugins return multiple findings and FlagAllProjects is false",
+				allProjects:    false,
+				initialExclude: "",
 				plugins: []scaplugin.ScaPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{
@@ -343,11 +384,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 						},
 					},
 				},
-				expectedWorkflowDataLen: 1,
+				expectedWorkflowDataLen:          1,
+				expectLegacyResolutionToBeCalled: false,
+				expectedExclude:                  "",
 			},
 			{
-				name:        "should return all findings when FlagAllProjects is true and multiple plugins return multiple findings",
-				allProjects: true,
+				name:           "should return all findings when FlagAllProjects is true and multiple plugins return multiple findings",
+				allProjects:    true,
+				initialExclude: "",
 				plugins: []scaplugin.ScaPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{
@@ -362,7 +406,43 @@ func Test_callback_SBOMResolution(t *testing.T) {
 						},
 					},
 				},
-				expectedWorkflowDataLen: 4,
+				// Expected: 4 SBOM findings + 1 legacy workflow depgraph = 5
+				expectedWorkflowDataLen:          5,
+				expectLegacyResolutionToBeCalled: true,
+				expectedExclude:                  "uv.lock,pyproject.toml,requirements.txt,setup.py,package.json,go.mod",
+			},
+			{
+				name:           "should call legacy resolution workflow when no SBOM findings are found and FlagAllProjects is false",
+				allProjects:    false,
+				initialExclude: "",
+				plugins: []scaplugin.ScaPlugin{
+					&mockScaPlugin{
+						findings: []scaplugin.Finding{},
+					},
+					&mockScaPlugin{
+						findings: []scaplugin.Finding{},
+					},
+				},
+				expectedWorkflowDataLen:          1,
+				expectLegacyResolutionToBeCalled: true,
+				expectedExclude:                  "",
+			},
+			{
+				name:           "should append FilesProcessed to existing FlagExclude when FlagAllProjects is true",
+				allProjects:    true,
+				initialExclude: "existing-file.txt,another-file.py",
+				plugins: []scaplugin.ScaPlugin{
+					&mockScaPlugin{
+						findings: []scaplugin.Finding{
+							finding1,
+							finding2,
+						},
+					},
+				},
+				// Expected: 2 SBOM findings + 1 legacy workflow depgraph = 3
+				expectedWorkflowDataLen:          3,
+				expectLegacyResolutionToBeCalled: true,
+				expectedExclude:                  "existing-file.txt,another-file.py,uv.lock,pyproject.toml,requirements.txt,setup.py",
 			},
 		}
 
@@ -381,30 +461,152 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				)
 				defer mockSBOMService.Close()
 
-				config := configuration.New()
-				config.Set(FlagUseSBOMResolution, true)
-				config.Set(FlagAllProjects, tc.allProjects)
-				config.Set(configuration.ORGANIZATION, "test-org-id")
-				config.Set(configuration.API_URL, mockSBOMService.URL)
+				ctx := setupTestContext(t)
+				resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+				ctx.config.Set(FlagAllProjects, tc.allProjects)
+				ctx.config.Set(FlagExclude, tc.initialExclude)
+				ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
-				ctrl := gomock.NewController(t)
-				defer ctrl.Finish()
+				if tc.expectLegacyResolutionToBeCalled {
+					dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+					mockWorkflowData := []workflow.Data{
+						workflow.NewData(
+							dataIdentifier,
+							"application/json",
+							[]byte(`{"mock":"data"}`),
+						),
+					}
+					resolutionHandler.ReturnData = mockWorkflowData
+				}
 
-				engineMock := frameworkmocks.NewMockEngine(ctrl)
-				invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
-
-				invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
-				invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
-				invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
-				invocationContextMock.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
-
-				workflowData, err := handleSBOMResolution(invocationContextMock, config, &nopLogger, tc.plugins)
+				workflowData, err := handleSBOMResolutionDI(
+					ctx.invocationContext,
+					ctx.config,
+					&nopLogger,
+					tc.plugins,
+					resolutionHandler.Func(),
+				)
 
 				require.NoError(t, err)
 				assert.NotNil(t, workflowData)
 				assert.Len(t, workflowData, tc.expectedWorkflowDataLen)
+				assert.Equal(t, tc.expectLegacyResolutionToBeCalled, resolutionHandler.Called)
+
+				if tc.expectLegacyResolutionToBeCalled {
+					actualExclude := resolutionHandler.Config.GetString(FlagExclude)
+					assert.Equal(t, tc.expectedExclude, actualExclude, "FlagExclude should contain FilesProcessed from findings")
+				}
 			})
 		}
+	})
+
+	t.Run("should handle exit code 3 (no projects found) gracefully and continue with SBOM data", func(t *testing.T) {
+		ctx := setupTestContext(t)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagAllProjects, true)
+
+		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse, http.StatusOK)
+		defer mockSBOMService.Close()
+		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
+
+		// Create mock plugin that returns a finding
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					FilesProcessed: []string{"uv.lock"},
+				},
+			},
+		}
+
+		// Create an error with exit code 3 (no projects found)
+		exitError3 := mockExitError{code: 3}
+		resolutionHandler.ReturnError = exitError3
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		// Should succeed and return SBOM data despite exit code 3 from legacy workflow
+		require.NoError(t, err)
+		assert.NotNil(t, workflowData)
+		// Should have 1 SBOM finding (legacy workflow returned exit code 3, so no legacy data)
+		assert.Len(t, workflowData, 1)
+		// Legacy resolution should have been called
+		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
+	})
+
+	t.Run("should handle exit code 3 when no SBOM findings are found", func(t *testing.T) {
+		ctx := setupTestContext(t)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagAllProjects, false)
+
+		// Create mock plugin that returns no findings
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{},
+		}
+
+		// Create an error with exit code 3 (no projects found)
+		exitError3 := mockExitError{code: 3}
+		resolutionHandler.ReturnError = exitError3
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		// Should return error when exit code 3 occurs with no SBOM findings
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no supported projects detected")
+		assert.Nil(t, workflowData)
+		// Legacy resolution should have been called
+		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
+	})
+
+	t.Run("should return error for non-exit-code-3 errors from legacy workflow", func(t *testing.T) {
+		ctx := setupTestContext(t)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagAllProjects, true)
+
+		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse, http.StatusOK)
+		defer mockSBOMService.Close()
+		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
+
+		// Create mock plugin that returns a finding
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					FilesProcessed: []string{"uv.lock"},
+				},
+			},
+		}
+
+		// Create an error with exit code 1 (not exit code 3)
+		exitError1 := mockExitError{code: 1}
+		resolutionHandler.ReturnError = exitError1
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		// Should return error for non-exit-code-3 errors
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "error handling legacy workflow")
+		assert.Nil(t, workflowData)
+		// Legacy resolution should have been called
+		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
 	})
 }
 
