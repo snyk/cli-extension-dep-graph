@@ -22,7 +22,7 @@ const (
 
 func NewBuilder(pkgManager *PkgManager, rootPkg *PkgInfo) (*Builder, error) {
 	if pkgManager == nil {
-		return nil, errors.New("cannot create builder without a package manager")
+		return nil, errors.New("cannot create builder without a package manager") //nolint:wrapcheck // Code is copied from `dep-graph-go`
 	}
 
 	if rootPkg == nil {
@@ -118,12 +118,12 @@ func (b *Builder) addNode(nodeID string, pkgInfo *PkgInfo) *Node {
 func (b *Builder) ConnectNodes(parentNodeID, childNodeID string) error {
 	parentNode, ok := b.nodes[parentNodeID]
 	if !ok {
-		return fmt.Errorf("cound not find parent node %s", parentNodeID)
+		return fmt.Errorf("could not find parent node %s", parentNodeID)
 	}
 
 	childNode, ok := b.nodes[childNodeID]
 	if !ok {
-		return fmt.Errorf("cound not find child node %s", childNodeID)
+		return fmt.Errorf("could not find child node %s", childNodeID)
 	}
 
 	parentNode.Deps = append(parentNode.Deps, Dependency{

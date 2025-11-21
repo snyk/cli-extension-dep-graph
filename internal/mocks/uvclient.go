@@ -18,7 +18,12 @@ func (m *MockUVClient) ExportSBOM(inputDir string) (*scaplugin.Finding, error) {
 		return m.ExportSBOMFunc(inputDir)
 	}
 	return &scaplugin.Finding{
-		Sbom:                 []byte(`{"mock":"sbom"}`),
+		Sbom: []byte(`{"mock":"sbom"}`),
+		Metadata: scaplugin.Metadata{
+			PackageManager: "pip",
+			Name:           "mock-project",
+			Version:        "0.0.0",
+		},
 		FileExclusions:       []string{},
 		NormalisedTargetFile: uv.UvLockFileName,
 	}, nil

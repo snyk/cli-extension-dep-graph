@@ -50,12 +50,14 @@ func (c client) ExportSBOM(inputDir string) (*scaplugin.Finding, error) {
 		return nil, fmt.Errorf("failed to execute uv export: %w", err)
 	}
 
-	if err := validateSBOM(output); err != nil {
+	metadata, err := validateSBOM(output)
+	if err != nil {
 		return nil, err
 	}
 
 	return &scaplugin.Finding{
 		Sbom:           output,
+		Metadata:       *metadata,
 		FileExclusions: []string{
 			// TODO(uv): uncomment when we are able to pass these to the CLI correctly. Currently the
 			// `--exclude` flag does not accept paths, it only accepts file or dir names, which does not
@@ -68,27 +70,34 @@ func (c client) ExportSBOM(inputDir string) (*scaplugin.Finding, error) {
 }
 
 // Verifies that the SBOM is valid JSON and has a root component.
-func validateSBOM(sbomData []byte) error {
+func validateSBOM(sbomData []byte) (*scaplugin.Metadata, error) {
 	var sbom struct {
 		Metadata struct {
-			Component json.RawMessage `json:"component"`
+			Component *struct {
+				Name    string `json:"name"`
+				Version string `json:"version"`
+			} `json:"component"`
 		} `json:"metadata"`
 	}
 
 	if err := json.Unmarshal(sbomData, &sbom); err != nil {
-		return ecosystems.NewUnprocessableFileError(
+		return nil, ecosystems.NewUnprocessableFileError(
 			fmt.Sprintf("Failed to parse SBOM JSON: %v", err),
 			snyk_errors.WithCause(err),
 		)
 	}
 
-	if len(sbom.Metadata.Component) == 0 {
-		return ecosystems.NewUnprocessableFileError(
+	if sbom.Metadata.Component == nil {
+		return nil, ecosystems.NewUnprocessableFileError(
 			"SBOM missing root component at metadata.component - uv project may be missing a root package",
 		)
 	}
 
-	return nil
+	return &scaplugin.Metadata{
+		PackageManager: "pip",
+		Name:           sbom.Metadata.Component.Name,
+		Version:        sbom.Metadata.Component.Version,
+	}, nil
 }
 
 func (c *client) ShouldExportSBOM(inputDir string, logger *zerolog.Logger) bool {
