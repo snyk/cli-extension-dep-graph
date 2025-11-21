@@ -4,8 +4,15 @@ import "github.com/rs/zerolog"
 
 type Options struct{}
 
+type Metadata struct {
+	PackageManager string
+	Name           string
+	Version        string
+}
+
 type Finding struct {
 	Sbom                 Sbom     // The raw SBOM bytes
+	Metadata             Metadata // Information about the finding
 	FileExclusions       []string // Paths for files that other plugins should ignore
 	NormalisedTargetFile string   // The target file name without any qualifiers, e.g. `uv.lock` (and not `dir/uv.lock`)
 }

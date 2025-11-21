@@ -28,7 +28,8 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 			"component": {
 				"type": "library",
 				"bom-ref": "test-project-1",
-				"name": "test-project"
+				"name": "test-project",
+				"version": "1.2.3"
 			}
 		}
 	}`
@@ -46,7 +47,11 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 	result, err := client.ExportSBOM("/test/dir")
 
 	assert.NoError(t, err)
+	require.NotNil(t, result)
 	assert.JSONEq(t, validSBOM, string(result.Sbom))
+	assert.Equal(t, "pip", result.Metadata.PackageManager)
+	assert.Equal(t, "test-project", result.Metadata.Name)
+	assert.Equal(t, "1.2.3", result.Metadata.Version)
 }
 
 func TestUVClient_ExportSBOM_Error(t *testing.T) {
@@ -159,11 +164,13 @@ func TestParseAndValidateVersion_UnparseableOutput(t *testing.T) {
 
 func TestValidateSBOM_Success(t *testing.T) {
 	tests := []struct {
-		name string
-		sbom string
+		name            string
+		sbom            string
+		expectedName    string
+		expectedVersion string
 	}{
 		{
-			name: "valid SBOM with component",
+			name: "valid SBOM with full component",
 			sbom: `{
 				"bomFormat": "CycloneDX",
 				"specVersion": "1.5",
@@ -171,35 +178,92 @@ func TestValidateSBOM_Success(t *testing.T) {
 					"component": {
 						"type": "library",
 						"name": "test-project",
+						"version": "1.0.0",
 						"bom-ref": "test-project-1"
 					}
 				}
 			}`,
+			expectedName:    "test-project",
+			expectedVersion: "1.0.0",
 		},
 		{
 			name: "valid SBOM with minimal component",
 			sbom: `{
 				"metadata": {
 					"component": {
-						"name": "my-project"
+						"name": "my-project",
+						"version": "0.1.0"
 					}
 				}
 			}`,
+			expectedName:    "my-project",
+			expectedVersion: "0.1.0",
+		},
+		{
+			name: "component without version",
+			sbom: `{
+				"bomFormat": "CycloneDX",
+				"specVersion": "1.5",
+				"metadata": {
+					"component": {
+						"name": "project-no-version"
+					}
+				}
+			}`,
+			expectedName:    "project-no-version",
+			expectedVersion: "",
+		},
+		{
+			name: "component with empty version string",
+			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "project-empty-version",
+						"version": ""
+					}
+				}
+			}`,
+			expectedName:    "project-empty-version",
+			expectedVersion: "",
+		},
+		{
+			name: "component with additional fields",
+			sbom: `{
+				"bomFormat": "CycloneDX",
+				"specVersion": "1.5",
+				"metadata": {
+					"component": {
+						"type": "application",
+						"name": "complex-project",
+						"version": "3.0.0",
+						"bom-ref": "pkg:pypi/complex-project@3.0.0",
+						"description": "A complex project",
+						"licenses": []
+					}
+				}
+			}`,
+			expectedName:    "complex-project",
+			expectedVersion: "3.0.0",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateSBOM([]byte(tt.sbom))
+			metadata, err := validateSBOM([]byte(tt.sbom))
 			assert.NoError(t, err)
+			require.NotNil(t, metadata)
+			assert.Equal(t, "pip", metadata.PackageManager)
+			assert.Equal(t, tt.expectedName, metadata.Name)
+			assert.Equal(t, tt.expectedVersion, metadata.Version)
 		})
 	}
 }
 
 func TestValidateSBOM_MissingComponent(t *testing.T) {
 	tests := []struct {
-		name string
-		sbom string
+		name               string
+		sbom               string
+		expectedErrMessage string
 	}{
 		{
 			name: "missing component field",
@@ -210,6 +274,7 @@ func TestValidateSBOM_MissingComponent(t *testing.T) {
 					"timestamp": "2025-11-17T16:20:47.525804000Z"
 				}
 			}`,
+			expectedErrMessage: "SBOM missing root component at metadata.component",
 		},
 		{
 			name: "missing metadata",
@@ -217,22 +282,39 @@ func TestValidateSBOM_MissingComponent(t *testing.T) {
 				"bomFormat": "CycloneDX",
 				"specVersion": "1.5"
 			}`,
+			expectedErrMessage: "SBOM missing root component at metadata.component",
+		},
+		{
+			name: "component with empty name",
+			sbom: `{
+				"bomFormat": "CycloneDX",
+				"specVersion": "1.5",
+				"metadata": {
+					"component": {
+						"name": "",
+						"version": "1.0.0"
+					}
+				}
+			}`,
+			expectedErrMessage: "SBOM root component missing name",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateSBOM([]byte(tt.sbom))
+			metadata, err := validateSBOM([]byte(tt.sbom))
+			assert.Nil(t, metadata)
 			require.Error(t, err)
 			var catalogErr snyk_errors.Error
 			assert.True(t, errors.As(err, &catalogErr), "error should be a catalog error")
-			assert.Contains(t, catalogErr.Detail, "SBOM missing root component at metadata.component")
+			assert.Contains(t, catalogErr.Detail, tt.expectedErrMessage)
 		})
 	}
 }
 
 func TestValidateSBOM_InvalidJSON(t *testing.T) {
-	err := validateSBOM([]byte("invalid json"))
+	metadata, err := validateSBOM([]byte("invalid json"))
+	assert.Nil(t, metadata)
 	require.Error(t, err)
 	var catalogErr snyk_errors.Error
 	assert.True(t, errors.As(err, &catalogErr), "error should be a catalog error")

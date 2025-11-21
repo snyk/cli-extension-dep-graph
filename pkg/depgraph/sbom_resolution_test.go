@@ -9,6 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
+	dg "github.com/snyk/cli-extension-dep-graph/internal/depgraph"
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
 	"github.com/snyk/cli-extension-dep-graph/internal/uv"
 	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
@@ -134,6 +135,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ExportSBOMFunc: func(_ string) (*scaplugin.Finding, error) {
 				return &scaplugin.Finding{
 					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project",
+						Version:        "1.0.0",
+					},
 				}, nil
 			},
 		}
@@ -192,6 +198,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ExportSBOMFunc: func(_ string) (*scaplugin.Finding, error) {
 				return &scaplugin.Finding{
 					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project",
+						Version:        "1.0.0",
+					},
 				}, nil
 			},
 		}
@@ -242,8 +253,24 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		// Create mock plugin that returns two findings
 		mockPlugin := &mockScaPlugin{
 			findings: []scaplugin.Finding{
-				{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), FileExclusions: []string{}},
-				{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"test"}]}`), FileExclusions: []string{}},
+				{
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project-1",
+						Version:        "1.0.0",
+					},
+					FileExclusions: []string{},
+				},
+				{
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"test"}]}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project-2",
+						Version:        "2.0.0",
+					},
+					FileExclusions: []string{},
+				},
 			},
 		}
 
@@ -275,6 +302,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ExportSBOMFunc: func(_ string) (*scaplugin.Finding, error) {
 				return &scaplugin.Finding{
 					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project",
+						Version:        "1.0.0",
+					},
 				}, nil
 			},
 		}
@@ -296,19 +328,39 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 	t.Run("handleSBOMResolution with FlagAllProjects", func(t *testing.T) {
 		finding1 := scaplugin.Finding{
-			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+			Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+			Metadata: scaplugin.Metadata{
+				PackageManager: "pip",
+				Name:           "project-1",
+				Version:        "1.0.0",
+			},
 			FileExclusions: []string{"uv.lock", "pyproject.toml"},
 		}
 		finding2 := scaplugin.Finding{
-			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"test"}]}`),
+			Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"test"}]}`),
+			Metadata: scaplugin.Metadata{
+				PackageManager: "pip",
+				Name:           "project-2",
+				Version:        "2.0.0",
+			},
 			FileExclusions: []string{"requirements.txt", "setup.py"},
 		}
 		finding3 := scaplugin.Finding{
-			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"someFinding"}]}`),
+			Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"someFinding"}]}`),
+			Metadata: scaplugin.Metadata{
+				PackageManager: "npm",
+				Name:           "project-3",
+				Version:        "3.0.0",
+			},
 			FileExclusions: []string{"package.json"},
 		}
 		finding4 := scaplugin.Finding{
-			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"anotherFinding"}]}`),
+			Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"anotherFinding"}]}`),
+			Metadata: scaplugin.Metadata{
+				PackageManager: "gomod",
+				Name:           "project-4",
+				Version:        "4.0.0",
+			},
 			FileExclusions: []string{"go.mod"},
 		}
 
@@ -519,7 +571,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		mockPlugin := &mockScaPlugin{
 			findings: []scaplugin.Finding{
 				{
-					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project",
+						Version:        "1.0.0",
+					},
 					FileExclusions: []string{"uv.lock"},
 				},
 			},
@@ -589,7 +646,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		mockPlugin := &mockScaPlugin{
 			findings: []scaplugin.Finding{
 				{
-					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project",
+						Version:        "1.0.0",
+					},
 					FileExclusions: []string{"uv.lock"},
 				},
 			},
@@ -616,6 +678,83 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 }
 
+func Test_emptyDepGraph(t *testing.T) {
+	testCases := []struct {
+		name     string
+		finding  *scaplugin.Finding
+		wantErr  bool
+		validate func(t *testing.T, depGraph *dg.DepGraph)
+	}{
+		{
+			name: "should create empty dep graph with correct package manager",
+			finding: &scaplugin.Finding{
+				Metadata: scaplugin.Metadata{
+					PackageManager: "pip",
+					Name:           "my-project",
+					Version:        "1.0.0",
+				},
+			},
+			wantErr: false,
+			validate: func(t *testing.T, depGraph *dg.DepGraph) {
+				t.Helper()
+
+				require.NotNil(t, depGraph)
+				assert.Equal(t, "pip", depGraph.PkgManager.Name)
+				rootPkg := depGraph.GetRootPkg()
+				require.NotNil(t, rootPkg)
+				assert.Equal(t, "my-project", rootPkg.Info.Name)
+				assert.Equal(t, "1.0.0", rootPkg.Info.Version)
+			},
+		},
+		{
+			name: "should handle empty version",
+			finding: &scaplugin.Finding{
+				Metadata: scaplugin.Metadata{
+					PackageManager: "pip",
+					Name:           "test-package",
+					Version:        "",
+				},
+			},
+			wantErr: false,
+			validate: func(t *testing.T, depGraph *dg.DepGraph) {
+				t.Helper()
+
+				require.NotNil(t, depGraph)
+				assert.Equal(t, "pip", depGraph.PkgManager.Name)
+				rootPkg := depGraph.GetRootPkg()
+				require.NotNil(t, rootPkg)
+				assert.Equal(t, "test-package", rootPkg.Info.Name)
+				assert.Equal(t, "", rootPkg.Info.Version)
+			},
+		},
+		{
+			name: "should error when package manager is missing",
+			finding: &scaplugin.Finding{
+				Metadata: scaplugin.Metadata{
+					PackageManager: "",
+					Name:           "test-package",
+					Version:        "1.0.0",
+				},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			depGraph, err := emptyDepGraph(tc.finding)
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				if tc.validate != nil {
+					tc.validate(t, depGraph)
+				}
+			}
+		})
+	}
+}
+
 func Test_getExclusionsFromFindings(t *testing.T) {
 	testCases := []struct {
 		name     string
@@ -631,7 +770,12 @@ func Test_getExclusionsFromFindings(t *testing.T) {
 			name: "should return empty slice when finding has no files processed",
 			findings: []scaplugin.Finding{
 				{
-					Sbom:           []byte(`{"bomFormat":"CycloneDX"}`),
+					Sbom: []byte(`{"bomFormat":"CycloneDX"}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project",
+						Version:        "1.0.0",
+					},
 					FileExclusions: []string{},
 				},
 			},
@@ -641,7 +785,12 @@ func Test_getExclusionsFromFindings(t *testing.T) {
 			name: "should return files from single finding",
 			findings: []scaplugin.Finding{
 				{
-					Sbom:           []byte(`{"bomFormat":"CycloneDX"}`),
+					Sbom: []byte(`{"bomFormat":"CycloneDX"}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project",
+						Version:        "1.0.0",
+					},
 					FileExclusions: []string{"file1.py", "file2.py"},
 				},
 			},
@@ -651,11 +800,21 @@ func Test_getExclusionsFromFindings(t *testing.T) {
 			name: "should return all files from multiple findings",
 			findings: []scaplugin.Finding{
 				{
-					Sbom:           []byte(`{"bomFormat":"CycloneDX"}`),
+					Sbom: []byte(`{"bomFormat":"CycloneDX"}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project-1",
+						Version:        "1.0.0",
+					},
 					FileExclusions: []string{"file1.py", "file2.py"},
 				},
 				{
-					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5"}`),
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5"}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project-2",
+						Version:        "2.0.0",
+					},
 					FileExclusions: []string{"file3.py", "file4.py", "file5.py"},
 				},
 			},
@@ -665,15 +824,30 @@ func Test_getExclusionsFromFindings(t *testing.T) {
 			name: "should handle mixed findings with and without files processed",
 			findings: []scaplugin.Finding{
 				{
-					Sbom:           []byte(`{"bomFormat":"CycloneDX"}`),
+					Sbom: []byte(`{"bomFormat":"CycloneDX"}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project-1",
+						Version:        "1.0.0",
+					},
 					FileExclusions: []string{},
 				},
 				{
-					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5"}`),
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5"}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project-2",
+						Version:        "2.0.0",
+					},
 					FileExclusions: []string{"file1.py"},
 				},
 				{
-					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.6"}`),
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.6"}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project-3",
+						Version:        "3.0.0",
+					},
 					FileExclusions: []string{"file2.py", "file3.py"},
 				},
 			},
