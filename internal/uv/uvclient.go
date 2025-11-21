@@ -54,11 +54,11 @@ func (c client) ExportSBOM(inputDir string) (*scaplugin.Finding, error) {
 
 	return &scaplugin.Finding{
 		Sbom: output,
-		FilesProcessed: []string{
+		FileExclusions: []string{
 			path.Join(inputDir, RequirementsTxtFileName),
 			path.Join(inputDir, PyprojectTomlFileName),
 		},
-		TargetFile: path.Join(inputDir, UvLockFileName),
+		NormalisedTargetFile: UvLockFileName,
 	}, nil
 }
 

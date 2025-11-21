@@ -106,7 +106,7 @@ func handleSBOMResolutionDI(
 func getExclusionsFromFindings(findings []scaplugin.Finding) []string {
 	exclusions := []string{}
 	for _, f := range findings {
-		exclusions = append(exclusions, f.FilesProcessed...)
+		exclusions = append(exclusions, f.FileExclusions...)
 	}
 	return exclusions
 }
@@ -160,7 +160,7 @@ func sbomToWorkflowData(finding scaplugin.Finding, snykClient *snykclient.SnykCl
 
 	logger.Printf("Successfully converted SBOM, warning(s): %d\n", len(warnings))
 
-	depGraphsData, err := extractDepGraphsFromScans(scans, finding.TargetFile)
+	depGraphsData, err := extractDepGraphsFromScans(scans, finding.NormalisedTargetFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract depgraphs from scan results: %w", err)
 	}

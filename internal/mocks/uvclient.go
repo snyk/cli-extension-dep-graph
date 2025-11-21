@@ -21,11 +21,11 @@ func (m *MockUVClient) ExportSBOM(inputDir string) (*scaplugin.Finding, error) {
 	}
 	return &scaplugin.Finding{
 		Sbom: []byte(`{"mock":"sbom"}`),
-		FilesProcessed: []string{
+		FileExclusions: []string{
 			path.Join(inputDir, uv.RequirementsTxtFileName),
 			path.Join(inputDir, uv.PyprojectTomlFileName),
 		},
-		TargetFile: path.Join(inputDir, uv.UvLockFileName),
+		NormalisedTargetFile: uv.UvLockFileName,
 	}, nil
 }
 
