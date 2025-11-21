@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/rs/zerolog"
 )
@@ -126,12 +127,17 @@ func parseAndValidateVersion(binary, versionOutput string) error {
 		mustAtoi(matches[2]),
 		mustAtoi(matches[3]),
 	}
-	minVersion := Version{0, 9, 10} // Min version containing SBOM export functionality
+	minVersion := Version{0, 9, 11} // Min version containing SBOM export functionality
 	if compareVersions(curVersion, minVersion) >= 0 {
 		return nil
 	}
 
-	return fmt.Errorf("%s version %d.%d.%d is not supported. Minimum required version is 0.9.10", binary, curVersion[0], curVersion[1], curVersion[2])
+	return fmt.Errorf(
+		"%s version %s is not supported. Minimum required version is %s",
+		binary,
+		formatVersion(curVersion),
+		formatVersion(minVersion),
+	)
 }
 
 type Version = [3]int
@@ -156,4 +162,12 @@ func mustAtoi(s string) int {
 		panic(fmt.Sprintf("failed to convert %q to int: %v", s, err))
 	}
 	return i
+}
+
+func formatVersion(version Version) string {
+	versionStrs := []string{}
+	for _, v := range version {
+		versionStrs = append(versionStrs, strconv.Itoa(v))
+	}
+	return strings.Join(versionStrs, ".")
 }
