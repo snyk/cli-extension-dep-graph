@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog"
+	"github.com/snyk/cli-extension-dep-graph/internal/depgraph"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/internal/uv"
 	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
@@ -81,7 +82,7 @@ func handleSBOMResolutionDI(
 	// Convert SBOMs to workflow.Data
 	workflowData := []workflow.Data{}
 	for _, f := range findings { // Could be parallelised in future
-		data, err := sbomToWorkflowData(f, snykClient, logger, remoteRepoURL)
+		data, err := sbomToWorkflowData(&f, snykClient, logger, remoteRepoURL)
 		if err != nil {
 			return nil, fmt.Errorf("error converting SBOM: %w", err)
 		}
@@ -150,7 +151,7 @@ func executeLegacyWorkflow(
 	return nil, fmt.Errorf("error handling legacy workflow: %w", err)
 }
 
-func sbomToWorkflowData(finding scaplugin.Finding, snykClient *snykclient.SnykClient, logger *zerolog.Logger, remoteRepoURL string) ([]workflow.Data, error) {
+func sbomToWorkflowData(finding *scaplugin.Finding, snykClient *snykclient.SnykClient, logger *zerolog.Logger, remoteRepoURL string) ([]workflow.Data, error) {
 	sbomReader := bytes.NewReader(finding.Sbom)
 
 	scans, warnings, err := snykClient.SBOMConvert(context.Background(), logger, sbomReader, remoteRepoURL)
@@ -166,9 +167,30 @@ func sbomToWorkflowData(finding scaplugin.Finding, snykClient *snykclient.SnykCl
 	}
 
 	if len(depGraphsData) == 0 {
-		return nil, fmt.Errorf("no dependency graphs found in SBOM conversion response")
+		depGraph, err := emptyDepGraph(finding)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create empty depgraph: %w", err)
+		}
+
+		data, err := workflowDataFromDepGraph(depGraph, finding.NormalisedTargetFile, "")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create workflow data: %w", err)
+		}
+		depGraphsData = append(depGraphsData, data)
 	}
 	return depGraphsData, nil
+}
+
+func emptyDepGraph(finding *scaplugin.Finding) (*depgraph.DepGraph, error) {
+	builder, err := depgraph.NewBuilder(
+		&depgraph.PkgManager{Name: finding.Metadata.PackageManager},
+		&depgraph.PkgInfo{Name: finding.Metadata.Name, Version: finding.Metadata.Version},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build depgraph: %w", err)
+	}
+	depGraph := builder.Build()
+	return depGraph, nil
 }
 
 func extractDepGraphsFromScans(scans []*snykclient.ScanResult, targetFile string) ([]workflow.Data, error) {
@@ -180,20 +202,11 @@ func extractDepGraphsFromScans(scans []*snykclient.ScanResult, targetFile string
 			if fact.Type != "depGraph" {
 				continue
 			}
-			// Marshal the depgraph data to JSON bytes
-			depGraphBytes, err := json.Marshal(fact.Data)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal depgraph data: %w", err)
-			}
 
 			// Create workflow data with the depgraph
-			data := workflow.NewData(DataTypeID, contentTypeJSON, depGraphBytes)
-
-			data.SetMetaData(contentLocationKey, targetFile)
-			data.SetMetaData(MetaKeyNormalisedTargetFile, targetFile)
-
-			if scan.Identity.Type != "" {
-				data.SetMetaData(MetaKeyTargetFileFromPlugin, scan.Identity.Type)
+			data, err := workflowDataFromDepGraph(fact.Data, targetFile, scan.Identity.Type)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create workflow data: %w", err)
 			}
 
 			depGraphList = append(depGraphList, data)
@@ -201,4 +214,22 @@ func extractDepGraphsFromScans(scans []*snykclient.ScanResult, targetFile string
 	}
 
 	return depGraphList, nil
+}
+
+func workflowDataFromDepGraph(depGraph any, normalisedTargetFile, targetFileFromPlugin string) (workflow.Data, error) {
+	depGraphBytes, err := json.Marshal(depGraph)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal depgraph data: %w", err)
+	}
+
+	data := workflow.NewData(DataTypeID, contentTypeJSON, depGraphBytes)
+
+	data.SetMetaData(contentLocationKey, normalisedTargetFile)
+	data.SetMetaData(MetaKeyNormalisedTargetFile, normalisedTargetFile)
+
+	if targetFileFromPlugin != "" {
+		data.SetMetaData(MetaKeyTargetFileFromPlugin, targetFileFromPlugin)
+	}
+
+	return data, nil
 }

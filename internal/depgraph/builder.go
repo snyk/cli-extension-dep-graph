@@ -22,7 +22,7 @@ const (
 
 func NewBuilder(pkgManager *PkgManager, rootPkg *PkgInfo) (*Builder, error) {
 	if pkgManager == nil {
-		return nil, errors.New("cannot create builder without a package manager")
+		return nil, errors.New("cannot create builder without a package manager") //nolint:wrapcheck // Code is copied from `dep-graph-go`
 	}
 
 	if rootPkg == nil {
