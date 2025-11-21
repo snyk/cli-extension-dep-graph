@@ -89,13 +89,13 @@ func TestParseAndValidateVersion_ValidVersions(t *testing.T) {
 		name   string
 		output string
 	}{
-		{"exact minimum", "uv 0.9.10"},
-		{"patch higher", "uv 0.9.11"},
+		{"exact minimum", "uv 0.9.11"},
+		{"patch higher", "uv 0.9.12"},
 		{"minor higher", "uv 0.10.0"},
 		{"major higher", "uv 1.0.0"},
-		{"with commit hash", "uv 0.9.10 (982851bf9)"},
-		{"with commit hash and suffix", "uv 0.9.10+43 (982851bf9 2025-11-13)"},
-		{"without prefix", "0.9.10"},
+		{"with commit hash", "uv 0.9.11 (982851bf9)"},
+		{"with commit hash and suffix", "uv 0.9.11+43 (982851bf9 2025-11-13)"},
+		{"without prefix", "0.9.11"},
 		{"future version", "uv 2.5.3"},
 	}
 
@@ -113,10 +113,12 @@ func TestParseAndValidateVersion_InvalidVersions(t *testing.T) {
 		output string
 	}{
 		{"patch too low", "uv 0.9.9"},
+		{"exact one below minimum", "uv 0.9.10"},
 		{"minor too low", "uv 0.8.21"},
 		{"major and minor both 0", "uv 0.0.1"},
 		{"minor too low with commit hash", "uv 0.9.9 (982851bf9)"},
 		{"minor too low with commit hash and suffix", "uv 0.9.9+43 (982851bf9 2025-11-13)"},
+		{"one below minimum with commit hash", "uv 0.9.10 (982851bf9)"},
 	}
 
 	for _, tt := range tests {
@@ -124,7 +126,7 @@ func TestParseAndValidateVersion_InvalidVersions(t *testing.T) {
 			err := parseAndValidateVersion("uv", tt.output)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "not supported")
-			assert.Contains(t, err.Error(), "0.9.10")
+			assert.Contains(t, err.Error(), "0.9.11")
 		})
 	}
 }
@@ -248,6 +250,25 @@ func TestCompareVersions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := compareVersions(tt.v1, tt.v2)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestFormatVersion(t *testing.T) {
+	tests := []struct {
+		name     string
+		version  Version
+		expected string
+	}{
+		{"single digit components", Version{1, 2, 3}, "1.2.3"},
+		{"multi digit components", Version{10, 25, 100}, "10.25.100"},
+		{"version with zeros", Version{1, 0, 50}, "1.0.50"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatVersion(tt.version)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
