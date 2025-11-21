@@ -1,8 +1,6 @@
 package mocks
 
 import (
-	"path"
-
 	"github.com/rs/zerolog"
 
 	"github.com/snyk/cli-extension-dep-graph/internal/uv"
@@ -20,11 +18,8 @@ func (m *MockUVClient) ExportSBOM(inputDir string) (*scaplugin.Finding, error) {
 		return m.ExportSBOMFunc(inputDir)
 	}
 	return &scaplugin.Finding{
-		Sbom: []byte(`{"mock":"sbom"}`),
-		FileExclusions: []string{
-			path.Join(inputDir, uv.RequirementsTxtFileName),
-			path.Join(inputDir, uv.PyprojectTomlFileName),
-		},
+		Sbom:                 []byte(`{"mock":"sbom"}`),
+		FileExclusions:       []string{},
 		NormalisedTargetFile: uv.UvLockFileName,
 	}, nil
 }
