@@ -81,7 +81,7 @@ func handleSBOMResolutionDI(
 	// Convert SBOMs to workflow.Data
 	workflowData := []workflow.Data{}
 	for _, f := range findings { // Could be parallelised in future
-		data, err := sbomToWorkflowData(f.Sbom, snykClient, logger, remoteRepoURL)
+		data, err := sbomToWorkflowData(f, snykClient, logger, remoteRepoURL)
 		if err != nil {
 			return nil, fmt.Errorf("error converting SBOM: %w", err)
 		}
@@ -106,7 +106,7 @@ func handleSBOMResolutionDI(
 func getExclusionsFromFindings(findings []scaplugin.Finding) []string {
 	exclusions := []string{}
 	for _, f := range findings {
-		exclusions = append(exclusions, f.FilesProcessed...)
+		exclusions = append(exclusions, f.FileExclusions...)
 	}
 	return exclusions
 }
@@ -150,8 +150,8 @@ func executeLegacyWorkflow(
 	return nil, fmt.Errorf("error handling legacy workflow: %w", err)
 }
 
-func sbomToWorkflowData(sbomOutput []byte, snykClient *snykclient.SnykClient, logger *zerolog.Logger, remoteRepoURL string) ([]workflow.Data, error) {
-	sbomReader := bytes.NewReader(sbomOutput)
+func sbomToWorkflowData(finding scaplugin.Finding, snykClient *snykclient.SnykClient, logger *zerolog.Logger, remoteRepoURL string) ([]workflow.Data, error) {
+	sbomReader := bytes.NewReader(finding.Sbom)
 
 	scans, warnings, err := snykClient.SBOMConvert(context.Background(), logger, sbomReader, remoteRepoURL)
 	if err != nil {
@@ -160,7 +160,7 @@ func sbomToWorkflowData(sbomOutput []byte, snykClient *snykclient.SnykClient, lo
 
 	logger.Printf("Successfully converted SBOM, warning(s): %d\n", len(warnings))
 
-	depGraphsData, err := extractDepGraphsFromScans(scans)
+	depGraphsData, err := extractDepGraphsFromScans(scans, finding.NormalisedTargetFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract depgraphs from scan results: %w", err)
 	}
@@ -171,7 +171,7 @@ func sbomToWorkflowData(sbomOutput []byte, snykClient *snykclient.SnykClient, lo
 	return depGraphsData, nil
 }
 
-func extractDepGraphsFromScans(scans []*snykclient.ScanResult) ([]workflow.Data, error) {
+func extractDepGraphsFromScans(scans []*snykclient.ScanResult, targetFile string) ([]workflow.Data, error) {
 	var depGraphList []workflow.Data
 
 	for _, scan := range scans {
@@ -189,8 +189,8 @@ func extractDepGraphsFromScans(scans []*snykclient.ScanResult) ([]workflow.Data,
 			// Create workflow data with the depgraph
 			data := workflow.NewData(DataTypeID, contentTypeJSON, depGraphBytes)
 
-			data.SetMetaData(contentLocationKey, "uv.lock")
-			data.SetMetaData(MetaKeyNormalisedTargetFile, "uv.lock")
+			data.SetMetaData(contentLocationKey, targetFile)
+			data.SetMetaData(MetaKeyNormalisedTargetFile, targetFile)
 
 			if scan.Identity.Type != "" {
 				data.SetMetaData(MetaKeyTargetFileFromPlugin, scan.Identity.Type)

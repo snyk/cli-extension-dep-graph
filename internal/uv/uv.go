@@ -8,7 +8,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
-const UvLockFileName = "uv.lock"
+const (
+	UvLockFileName          = "uv.lock"
+	RequirementsTxtFileName = "requirements.txt"
+	PyprojectTomlFileName   = "pyproject.toml"
+)
 
 // This is copied from cli-extension-os-flows. We could export from here via GAF config and re-use if this duplication
 // becomes a problem, but this duplication is only temporary.

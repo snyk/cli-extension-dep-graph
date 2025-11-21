@@ -9,10 +9,11 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog"
+	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 )
 
 type Client interface {
-	ExportSBOM(inputDir string) ([]byte, error)
+	ExportSBOM(inputDir string) (*scaplugin.Finding, error)
 	ShouldExportSBOM(inputDir string, logger *zerolog.Logger) bool
 }
 
@@ -40,7 +41,7 @@ func NewUvClientWithExecutor(uvBinary string, executor cmdExecutor) Client {
 }
 
 // exportSBOM exports an SBOM in CycloneDX format using uv.
-func (c client) ExportSBOM(inputDir string) ([]byte, error) {
+func (c client) ExportSBOM(inputDir string) (*scaplugin.Finding, error) {
 	output, err := c.executor.Execute(c.uvBinary, inputDir, "export", "--format", "cyclonedx1.5", "--frozen", "--preview")
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute uv export: %w", err)
@@ -50,7 +51,17 @@ func (c client) ExportSBOM(inputDir string) ([]byte, error) {
 		return nil, err
 	}
 
-	return output, nil
+	return &scaplugin.Finding{
+		Sbom:           output,
+		FileExclusions: []string{
+			// TODO(uv): uncomment when we are able to pass these to the CLI correctly. Currently the
+			// `--exclude` flag does not accept paths, it only accepts file or dir names, which does not
+			// work for our use case.
+			// path.Join(inputDir, uv.RequirementsTxtFileName),
+			// path.Join(inputDir, uv.PyprojectTomlFileName),
+		},
+		NormalisedTargetFile: UvLockFileName,
+	}, nil
 }
 
 // Verifies that the SBOM is valid JSON and has a root component.

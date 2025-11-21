@@ -22,9 +22,9 @@ func (p Plugin) BuildFindingsFromDir(inputDir string, _ scaplugin.Options, logge
 		return []scaplugin.Finding{}, nil
 	}
 
-	sbomOutput, err := p.client.ExportSBOM(inputDir)
+	finding, err := p.client.ExportSBOM(inputDir)
 	if err != nil {
 		return []scaplugin.Finding{}, fmt.Errorf("failed to export SBOM using uv: %w", err)
 	}
-	return []scaplugin.Finding{{Sbom: sbomOutput, FilesProcessed: []string{}}}, nil
+	return []scaplugin.Finding{*finding}, nil
 }
