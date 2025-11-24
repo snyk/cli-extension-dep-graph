@@ -98,9 +98,6 @@ jobs:
     <<: *go_image
     steps:
       - checkout
-      - add_ssh_keys:
-          fingerprints:
-            - "SHA256:w5lYpE8DMWxUdasN8yMbbFdiz6s50PPBJMkV0a1iyZ8"
       - attach_workspace:
           at: /tmp/workspace
       - run:
@@ -121,7 +118,9 @@ jobs:
             
             echo "Creating tag: $NEW_TAG"
             git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
-            git push origin "$NEW_TAG"
+            
+            # Push using HTTPS with GitHub token (no fingerprint needed)
+            git push https://${GH_TOKEN}@github.com/snyk/cli-extension-dep-graph.git "$NEW_TAG"
 
 # Filters for branches
 filters_pr_only: &filters_pr_only
@@ -174,6 +173,8 @@ workflows:
           <<: *filters_main_only
       
       - tag-release:
+          context:
+            - os-ecosystems
           requires:
             - determine-version
           <<: *filters_main_only

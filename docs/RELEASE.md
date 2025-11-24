@@ -105,16 +105,26 @@ ls -la ./dist/
 
 ## CircleCI Configuration
 
-### Required SSH Key
+### Required Context Variable
 
-The CircleCI project must have an SSH key configured for pushing tags to GitHub:
+The CircleCI `os-ecosystems` context must contain:
 
-1. Go to CircleCI → Project Settings → SSH Keys
-2. Add a new SSH key with write access to the repository
-3. The fingerprint is already configured in `.circleci/config.yml`:
-   - `SHA256:w5lYpE8DMWxUdasN8yMbbFdiz6s50PPBJMkV0a1iyZ8`
+- **`GH_TOKEN`**: GitHub Personal Access Token or GitHub App token with `repo` permissions for pushing tags
 
-**Note:** The SSH key must have push permissions to the `snyk/cli-extension-dep-graph` repository.
+### Context Setup
+
+1. Go to CircleCI → Organization Settings → Contexts
+2. Use existing context: `os-ecosystems`
+3. Ensure the context has the environment variable:
+   - **Name:** `GH_TOKEN`
+   - **Value:** GitHub token with `repo` scope
+   - Create token at: https://github.com/settings/tokens (if needed)
+
+**Benefits:**
+- ✅ No SSH key fingerprints to manage
+- ✅ Easy to rotate - just update the context variable
+- ✅ No risk of broken fingerprints after key rotation
+- ✅ Works immediately without SSH key setup
 
 ## Release Artifacts
 
@@ -152,10 +162,11 @@ Each release includes:
 **Problem**: Tag creation fails with permission denied or authentication error.
 
 **Solutions**:
-- Verify SSH key is configured in CircleCI project settings
-- Ensure the fingerprint in `.circleci/config.yml` matches the key in CircleCI
-- Check that the SSH key has push permissions to the repository
-- Verify the SSH key hasn't been revoked or removed from GitHub
+- Verify `GH_TOKEN` is set in the CircleCI context: `os-ecosystems`
+- Ensure the token has `repo` scope permissions
+- Check that the token hasn't expired
+- Verify the token is from a user/app with push permissions to the repository
+- Test the token manually: `curl -H "Authorization: token $GH_TOKEN" https://api.github.com/user`
 
 ### Tag already exists
 
