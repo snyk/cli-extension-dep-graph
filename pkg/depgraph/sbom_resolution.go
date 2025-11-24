@@ -62,7 +62,7 @@ func handleSBOMResolutionDI(
 	for _, sp := range scaPlugins {
 		f, err := sp.BuildFindingsFromDir(inputDir, pluginOptions, logger)
 		if err != nil {
-			return nil, fmt.Errorf("error building SBOM: %w", err)
+			return nil, fmt.Errorf("error building findings: %w", err)
 		}
 		if allProjects {
 			findings = append(findings, f...)

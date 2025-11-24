@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -80,7 +81,9 @@ func TestUVClient_ExportSBOM_InvalidSBOM(t *testing.T) {
 	result, err := client.ExportSBOM("/test/dir")
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "SBOM missing root component")
+	var catalogErr snyk_errors.Error
+	assert.True(t, errors.As(err, &catalogErr), "error should be a catalog error")
+	assert.Contains(t, catalogErr.Detail, "SBOM missing root component")
 	assert.Nil(t, result)
 }
 
@@ -125,8 +128,10 @@ func TestParseAndValidateVersion_InvalidVersions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := parseAndValidateVersion("uv", tt.output)
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "not supported")
-			assert.Contains(t, err.Error(), "0.9.11")
+			var catalogErr snyk_errors.Error
+			assert.True(t, errors.As(err, &catalogErr), "error should be a catalog error")
+			assert.Contains(t, catalogErr.Detail, "not supported")
+			assert.Contains(t, catalogErr.Detail, "0.9.11")
 		})
 	}
 }
@@ -145,7 +150,9 @@ func TestParseAndValidateVersion_UnparseableOutput(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := parseAndValidateVersion("uv", tt.output)
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "unable to parse")
+			var catalogErr snyk_errors.Error
+			assert.True(t, errors.As(err, &catalogErr), "error should be a catalog error")
+			assert.Contains(t, catalogErr.Detail, "unable to parse")
 		})
 	}
 }
@@ -217,7 +224,9 @@ func TestValidateSBOM_MissingComponent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateSBOM([]byte(tt.sbom))
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "SBOM missing root component at metadata.component")
+			var catalogErr snyk_errors.Error
+			assert.True(t, errors.As(err, &catalogErr), "error should be a catalog error")
+			assert.Contains(t, catalogErr.Detail, "SBOM missing root component at metadata.component")
 		})
 	}
 }
@@ -225,7 +234,9 @@ func TestValidateSBOM_MissingComponent(t *testing.T) {
 func TestValidateSBOM_InvalidJSON(t *testing.T) {
 	err := validateSBOM([]byte("invalid json"))
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse SBOM")
+	var catalogErr snyk_errors.Error
+	assert.True(t, errors.As(err, &catalogErr), "error should be a catalog error")
+	assert.Contains(t, catalogErr.Detail, "Failed to parse SBOM JSON")
 }
 
 func TestCompareVersions(t *testing.T) {

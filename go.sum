@@ -195,8 +195,8 @@ github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7
 github.com/rs/xid v1.4.0/go.mod h1:trrq9SKmegXys3aeAKXMUTdJsYXVwGY3RLcfgqegfbg=
 github.com/rs/zerolog v1.29.1 h1:cO+d60CHkknCbvzEWxP0S9K6KqyTjrCNUy1LdQLCGPc=
 github.com/rs/zerolog v1.29.1/go.mod h1:Le6ESbR7hc+DP6Lt1THiV8CQSdkkNrd3R0XbEgp3ZBU=
-github.com/snyk/error-catalog-golang-public v0.0.0-20250310083934-7ac627e3451f h1:plWVxooZeV6rTxu5BXYCe6p9z48r5egblbYM9VW4tvY=
-github.com/snyk/error-catalog-golang-public v0.0.0-20250310083934-7ac627e3451f/go.mod h1:Ytttq7Pw4vOCu9NtRQaOeDU2dhBYUyNBe6kX4+nIIQ4=
+github.com/snyk/error-catalog-golang-public v0.0.0-20251029091002-52bc5ef82c45 h1:CN5E7U5U4oxrkGohSZLLUHbWwVEc1xkyWIoQyIKNMTU=
+github.com/snyk/error-catalog-golang-public v0.0.0-20251029091002-52bc5ef82c45/go.mod h1:Ytttq7Pw4vOCu9NtRQaOeDU2dhBYUyNBe6kX4+nIIQ4=
 github.com/snyk/go-application-framework v0.0.0-20230714085540-37d34ad405bc h1:kyL68unMn+lw5azA+AUr+UcOLsfN8NQ+GXHz6d5VJu0=
 github.com/snyk/go-application-framework v0.0.0-20230714085540-37d34ad405bc/go.mod h1:Aun65T/AmzxjZe9jZZBqia6RHwoS7oq8QB2UfQIcPjU=
 github.com/snyk/go-httpauth v0.0.0-20230512081507-800aedece3cb h1:UwbUBfe1u5MYLhtCNOsFEM98tfEUWqgmaXam/UxU88Q=

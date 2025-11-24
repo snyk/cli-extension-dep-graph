@@ -175,7 +175,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to export SBOM using uv")
+		assert.Contains(t, err.Error(), "uv command failed")
 		assert.Nil(t, workflowData)
 		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called")
 	})

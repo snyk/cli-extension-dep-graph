@@ -10,6 +10,9 @@ import (
 
 	"github.com/rs/zerolog"
 	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
+	clierrors "github.com/snyk/error-catalog-golang-public/cli"
+	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
+	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 )
 
 type Client interface {
@@ -73,11 +76,16 @@ func validateSBOM(sbomData []byte) error {
 	}
 
 	if err := json.Unmarshal(sbomData, &sbom); err != nil {
-		return fmt.Errorf("failed to parse SBOM: %w", err)
+		return ecosystems.NewUnprocessableFileError(
+			fmt.Sprintf("Failed to parse SBOM JSON: %v", err),
+			snyk_errors.WithCause(err),
+		)
 	}
 
 	if len(sbom.Metadata.Component) == 0 {
-		return fmt.Errorf("SBOM missing root component at metadata.component - uv project may be missing a root package")
+		return ecosystems.NewUnprocessableFileError(
+			"SBOM missing root component at metadata.component - uv project may be missing a root package",
+		)
 	}
 
 	return nil
@@ -99,7 +107,10 @@ func (e *defaultCmdExecutor) Execute(binary, dir string, args ...string) ([]byte
 	// Check if uv binary exists in PATH
 	_, err := exec.LookPath(binary)
 	if err != nil {
-		return nil, fmt.Errorf("%s binary not found in PATH", binary)
+		return nil, clierrors.NewGeneralSCAFailureError(
+			fmt.Sprintf("%s binary not found in PATH", binary),
+			snyk_errors.WithCause(err),
+		)
 	}
 
 	//nolint:govet // Reassigning to err is fine
@@ -111,7 +122,10 @@ func (e *defaultCmdExecutor) Execute(binary, dir string, args ...string) ([]byte
 	cmd.Dir = dir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute command: %w\noutput: %s", err, output)
+		return nil, clierrors.NewGeneralSCAFailureError(
+			fmt.Sprintf("failed to execute uv export command: %v\noutput: %s", err, string(output)),
+			snyk_errors.WithCause(err),
+		)
 	}
 	return output, nil
 }
@@ -120,7 +134,10 @@ func checkVersion(binary string) error {
 	cmd := exec.Command(binary, "--version")
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("failed to get %s version: %w\noutput: %s", binary, err, output)
+		return clierrors.NewGeneralSCAFailureError(
+			fmt.Sprintf("failed to get %s version\noutput: %s", binary, string(output)),
+			snyk_errors.WithCause(err),
+		)
 	}
 	return parseAndValidateVersion(binary, string(output))
 }
@@ -130,7 +147,9 @@ func parseAndValidateVersion(binary, versionOutput string) error {
 	matches := versionRe.FindStringSubmatch(versionOutput)
 	// First element in matches is the full match, remainder are capture groups
 	if len(matches) < 4 {
-		return fmt.Errorf("unable to parse %s version from output: %s", binary, versionOutput)
+		return clierrors.NewGeneralSCAFailureError(
+			fmt.Sprintf("unable to parse %s version from output: %s", binary, versionOutput),
+		)
 	}
 
 	curVersion := Version{
@@ -143,11 +162,13 @@ func parseAndValidateVersion(binary, versionOutput string) error {
 		return nil
 	}
 
-	return fmt.Errorf(
-		"%s version %s is not supported. Minimum required version is %s",
-		binary,
-		formatVersion(curVersion),
-		formatVersion(minVersion),
+	return clierrors.NewGeneralSCAFailureError(
+		fmt.Sprintf(
+			"%s version %s is not supported. Minimum required version is %s",
+			binary,
+			formatVersion(curVersion),
+			formatVersion(minVersion),
+		),
 	)
 }
 

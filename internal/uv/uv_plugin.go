@@ -1,8 +1,6 @@
 package uv
 
 import (
-	"fmt"
-
 	"github.com/rs/zerolog"
 	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 )
@@ -24,7 +22,8 @@ func (p Plugin) BuildFindingsFromDir(inputDir string, _ scaplugin.Options, logge
 
 	finding, err := p.client.ExportSBOM(inputDir)
 	if err != nil {
-		return []scaplugin.Finding{}, fmt.Errorf("failed to export SBOM using uv: %w", err)
+		//nolint:wrapcheck // Error is already wrapped with error catalog error from ExportSBOM
+		return []scaplugin.Finding{}, err
 	}
 	return []scaplugin.Finding{*finding}, nil
 }
