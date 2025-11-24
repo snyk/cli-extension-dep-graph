@@ -120,7 +120,7 @@ jobs:
             git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
             
             # Push using HTTPS with GitHub token (no fingerprint needed)
-            git push https://${GH_TOKEN}@github.com/snyk/cli-extension-dep-graph.git "$NEW_TAG"
+            git push https://${GH_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME} "$NEW_TAG"
 
 # Filters for branches
 filters_pr_only: &filters_pr_only

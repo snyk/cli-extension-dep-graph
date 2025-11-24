@@ -61,7 +61,7 @@ When code is merged to `main` using **"Squash and merge"**, the following happen
 
 1. **Run Tests**: All tests (lint, unit tests, integration tests, security scans) must pass
 2. **Determine Version**: The `version-bump.sh` script reads the commit subject (PR title) and determines the version bump
-3. **Tag Release**: If a release is needed (not a chore), a git tag is created and pushed (e.g., `v1.2.3`)
+3. **Tag Release**: If a release is needed (not a chore), a git tag is created and pushed (e.g., `v1.2.3`) using CircleCI's built-in environment variables (`CIRCLE_PROJECT_USERNAME` and `CIRCLE_PROJECT_REPONAME`)
 4. **Build & Release**: GoReleaser creates:
    - GitHub Release with changelog
    - Source archives for Linux, macOS, and Windows
