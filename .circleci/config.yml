@@ -112,8 +112,8 @@ jobs:
             NEW_TAG=$(cat /tmp/workspace/new_tag)
             
             if [ "$BUMP_TYPE" = "none" ]; then
-              echo "Chore commit detected - skipping tag creation"
-              circleci-agent step halt
+              echo "No release needed - skipping tag creation"
+              exit 0
             fi
             
             echo "Creating tag: $NEW_TAG"
