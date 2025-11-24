@@ -9,3 +9,4 @@
 ## Overview
 
 This module implements the Snyk CLI Extension to generate DepGraphs for a local software project.
+
