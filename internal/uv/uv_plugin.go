@@ -23,7 +23,7 @@ func (p Plugin) BuildFindingsFromDir(inputDir string, _ scaplugin.Options, logge
 	finding, err := p.client.ExportSBOM(inputDir)
 	if err != nil {
 		//nolint:wrapcheck // Error is already wrapped with error catalog error from ExportSBOM
-		return []scaplugin.Finding{}, err
+		return nil, err
 	}
 	return []scaplugin.Finding{*finding}, nil
 }
