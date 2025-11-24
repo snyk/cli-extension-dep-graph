@@ -131,8 +131,10 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockUVClient := &mocks.MockUVClient{
-			ExportSBOMFunc: func(_ string) ([]byte, error) {
-				return []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), nil
+			ExportSBOMFunc: func(_ string) (*scaplugin.Finding, error) {
+				return &scaplugin.Finding{
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+				}, nil
 			},
 		}
 
@@ -159,7 +161,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 
 		mockUVClient := &mocks.MockUVClient{
-			ExportSBOMFunc: func(_ string) ([]byte, error) {
+			ExportSBOMFunc: func(_ string) (*scaplugin.Finding, error) {
 				return nil, fmt.Errorf("uv command failed")
 			},
 		}
@@ -187,8 +189,10 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockUVClient := &mocks.MockUVClient{
-			ExportSBOMFunc: func(_ string) ([]byte, error) {
-				return []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), nil
+			ExportSBOMFunc: func(_ string) (*scaplugin.Finding, error) {
+				return &scaplugin.Finding{
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+				}, nil
 			},
 		}
 
@@ -238,8 +242,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		// Create mock plugin that returns two findings
 		mockPlugin := &mockScaPlugin{
 			findings: []scaplugin.Finding{
-				{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), FilesProcessed: []string{}},
-				{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"test"}]}`), FilesProcessed: []string{}},
+				{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), FileExclusions: []string{}},
+				{Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"test"}]}`), FileExclusions: []string{}},
 			},
 		}
 
@@ -268,8 +272,10 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockUVClient := &mocks.MockUVClient{
-			ExportSBOMFunc: func(_ string) ([]byte, error) {
-				return []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`), nil
+			ExportSBOMFunc: func(_ string) (*scaplugin.Finding, error) {
+				return &scaplugin.Finding{
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+				}, nil
 			},
 		}
 
@@ -291,19 +297,19 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	t.Run("handleSBOMResolution with FlagAllProjects", func(t *testing.T) {
 		finding1 := scaplugin.Finding{
 			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
-			FilesProcessed: []string{"uv.lock", "pyproject.toml"},
+			FileExclusions: []string{"uv.lock", "pyproject.toml"},
 		}
 		finding2 := scaplugin.Finding{
 			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"test"}]}`),
-			FilesProcessed: []string{"requirements.txt", "setup.py"},
+			FileExclusions: []string{"requirements.txt", "setup.py"},
 		}
 		finding3 := scaplugin.Finding{
 			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"someFinding"}]}`),
-			FilesProcessed: []string{"package.json"},
+			FileExclusions: []string{"package.json"},
 		}
 		finding4 := scaplugin.Finding{
 			Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"name":"anotherFinding"}]}`),
-			FilesProcessed: []string{"go.mod"},
+			FileExclusions: []string{"go.mod"},
 		}
 
 		tc := []struct {
@@ -514,7 +520,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			findings: []scaplugin.Finding{
 				{
 					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
-					FilesProcessed: []string{"uv.lock"},
+					FileExclusions: []string{"uv.lock"},
 				},
 			},
 		}
@@ -584,7 +590,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			findings: []scaplugin.Finding{
 				{
 					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
-					FilesProcessed: []string{"uv.lock"},
+					FileExclusions: []string{"uv.lock"},
 				},
 			},
 		}
@@ -626,7 +632,7 @@ func Test_getExclusionsFromFindings(t *testing.T) {
 			findings: []scaplugin.Finding{
 				{
 					Sbom:           []byte(`{"bomFormat":"CycloneDX"}`),
-					FilesProcessed: []string{},
+					FileExclusions: []string{},
 				},
 			},
 			expected: []string{},
@@ -636,7 +642,7 @@ func Test_getExclusionsFromFindings(t *testing.T) {
 			findings: []scaplugin.Finding{
 				{
 					Sbom:           []byte(`{"bomFormat":"CycloneDX"}`),
-					FilesProcessed: []string{"file1.py", "file2.py"},
+					FileExclusions: []string{"file1.py", "file2.py"},
 				},
 			},
 			expected: []string{"file1.py", "file2.py"},
@@ -646,11 +652,11 @@ func Test_getExclusionsFromFindings(t *testing.T) {
 			findings: []scaplugin.Finding{
 				{
 					Sbom:           []byte(`{"bomFormat":"CycloneDX"}`),
-					FilesProcessed: []string{"file1.py", "file2.py"},
+					FileExclusions: []string{"file1.py", "file2.py"},
 				},
 				{
 					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5"}`),
-					FilesProcessed: []string{"file3.py", "file4.py", "file5.py"},
+					FileExclusions: []string{"file3.py", "file4.py", "file5.py"},
 				},
 			},
 			expected: []string{"file1.py", "file2.py", "file3.py", "file4.py", "file5.py"},
@@ -660,15 +666,15 @@ func Test_getExclusionsFromFindings(t *testing.T) {
 			findings: []scaplugin.Finding{
 				{
 					Sbom:           []byte(`{"bomFormat":"CycloneDX"}`),
-					FilesProcessed: []string{},
+					FileExclusions: []string{},
 				},
 				{
 					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5"}`),
-					FilesProcessed: []string{"file1.py"},
+					FileExclusions: []string{"file1.py"},
 				},
 				{
 					Sbom:           []byte(`{"bomFormat":"CycloneDX","specVersion":"1.6"}`),
-					FilesProcessed: []string{"file2.py", "file3.py"},
+					FileExclusions: []string{"file2.py", "file3.py"},
 				},
 			},
 			expected: []string{"file1.py", "file2.py", "file3.py"},
