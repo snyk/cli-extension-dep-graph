@@ -67,43 +67,114 @@ jobs:
           mode: auto
           iac-scan: disabled
 
+  determine-version:
+    <<: *go_image
+    steps:
+      - checkout
+      - run:
+          name: Determine version bump and save to workspace
+          command: |
+            chmod +x ./script/version-bump.sh
+            ./script/version-bump.sh
+            
+            # Source the environment to make variables available
+            source $BASH_ENV
+            
+            # Save to workspace
+            mkdir -p /tmp/workspace
+            echo "$BUMP_TYPE" > /tmp/workspace/bump_type
+            echo "$NEW_VERSION" > /tmp/workspace/new_version
+            echo "$NEW_TAG" > /tmp/workspace/new_tag
+            echo "$PREVIOUS_TAG" > /tmp/workspace/previous_tag
+      - persist_to_workspace:
+          root: /tmp/workspace
+          paths:
+            - bump_type
+            - new_version
+            - new_tag
+            - previous_tag
+
+  tag-release:
+    <<: *go_image
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/workspace
+      - run:
+          name: Configure git
+          command: |
+            git config user.email "ci@snyk.io"
+            git config user.name "Snyk CI"
+      - run:
+          name: Create and push tag
+          command: |
+            BUMP_TYPE=$(cat /tmp/workspace/bump_type)
+            NEW_TAG=$(cat /tmp/workspace/new_tag)
+            
+            if [ "$BUMP_TYPE" = "none" ]; then
+              echo "Chore commit detected - skipping tag creation"
+              circleci-agent step halt
+            fi
+            
+            echo "Creating tag: $NEW_TAG"
+            git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
+            
+            # Push using HTTPS with GitHub token (no fingerprint needed)
+            git push https://${GH_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME} "$NEW_TAG"
+
+# Filters for branches
+filters_pr_only: &filters_pr_only
+  filters:
+    branches:
+      ignore:
+        - main
+
+filters_main_only: &filters_main_only
+  filters:
+    branches:
+      only:
+        - main
+
 workflows:
   version: 2
-  CI:
+  test-and-tag:
     jobs:
+      # PR-only jobs - all testing
+      - lint:
+          <<: *filters_pr_only
+      
+      - unit_test:
+          <<: *filters_pr_only
+      
       - prodsec/secrets-scan:
           name: Scan repository for secrets
           context:
             - snyk-bot-slack
           channel: snyk-vuln-alerts-unify
-          filters:
-            branches:
-              ignore:
-                - main
-      - security-scans:
-          name: Security Scans
-          context:
-            - analysis_unify
-      - lint:
-          name: Lint
-          filters:
-            branches:
-              ignore:
-                - main
-      - unit_test:
-          name: Unit tests
-          filters:
-            branches:
-              ignore:
-                - main
+          <<: *filters_pr_only
+      
       - python_integration_test:
-          name: Python << matrix.python_version >> integration tests
           requires:
-            - Unit tests
+            - unit_test
           matrix:
             parameters:
               python_version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
-          filters:
-            branches:
-              ignore:
-                - main
+          <<: *filters_pr_only
+      
+      # Main branch only - security scans and tagging (no test re-runs)
+      - security-scans:
+          context:
+            - analysis_unify
+          <<: *filters_main_only
+      
+      - determine-version:
+          requires:
+            - security-scans
+          <<: *filters_main_only
+      
+      - tag-release:
+          context:
+            - os-ecosystems
+          requires:
+            - determine-version
+          <<: *filters_main_only
