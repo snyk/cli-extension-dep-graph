@@ -19,10 +19,9 @@ const (
 
 // findOptions configures file discovery behavior.
 type findOptions struct {
-	targetFiles    []string
-	includeGlobs   []string
-	excludeGlobs   []string
-	followSymlinks bool
+	targetFiles  []string
+	includeGlobs []string
+	excludeGlobs []string
 }
 
 // FindOption is a functional option for configuring file discovery.
@@ -67,13 +66,6 @@ func WithExclude(pattern string) FindOption {
 func WithExcludes(patterns ...string) FindOption {
 	return func(o *findOptions) {
 		o.excludeGlobs = append(o.excludeGlobs, patterns...)
-	}
-}
-
-// WithFollowSymlinks enables or disables following symbolic links.
-func WithFollowSymlinks(follow bool) FindOption {
-	return func(o *findOptions) {
-		o.followSymlinks = follow
 	}
 }
 
@@ -241,11 +233,6 @@ func walkDirectory(ctx context.Context, absRoot string, opts *findOptions) ([]Fi
 			return handleDirectory(d, relPath, opts.excludeGlobs)
 		}
 
-		// Handle symlinks
-		if d.Type()&fs.ModeSymlink != 0 && !shouldFollowSymlink(path, relPath, opts.followSymlinks) {
-			return nil
-		}
-
 		// Check exclusions and pattern match for files
 		if shouldIncludeFile(d, relPath, opts) {
 			results = append(results, FindResult{
@@ -296,22 +283,6 @@ func handleDirectory(d fs.DirEntry, relPath string, excludePatterns []string) er
 	}
 
 	return nil
-}
-
-// shouldFollowSymlink determines if a symlink should be followed.
-func shouldFollowSymlink(path, relPath string, followSymlinks bool) bool {
-	if !followSymlinks {
-		slog.Debug("Skipping symlink", slog.String(logKeyPath, relPath))
-		return false
-	}
-
-	// Resolve symlink and check if it's a file
-	targetInfo, err := os.Stat(path)
-	if err != nil || targetInfo.IsDir() {
-		return false
-	}
-
-	return true
 }
 
 // shouldIncludeFile determines if a file should be included in results.

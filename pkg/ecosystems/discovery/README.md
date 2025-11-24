@@ -11,7 +11,6 @@ Efficient file discovery utilities for finding manifest and configuration files 
 - **Exclude Patterns**: Skip directories and files using glob patterns
 - **Context Support**: Cancellable operations for long-running searches
 - **Efficient Traversal**: Uses `filepath.WalkDir` for optimal performance
-- **Symlink Handling**: Optional symlink following
 - **Structured Logging**: `slog` integration for debugging
 
 ## Usage
@@ -94,14 +93,6 @@ results, err := discovery.FindFiles(ctx, "/path/to/project",
 results, err := discovery.FindFiles(ctx, "/path/to/project",
     discovery.WithInclude("*.py"),
     discovery.WithExcludes("node_modules", ".*", "__pycache__"))
-```
-
-### Follow Symlinks
-
-```go
-results, err := discovery.FindFiles(ctx, "/path/to/project",
-    discovery.WithInclude("*.txt"),
-    discovery.WithFollowSymlinks(true))
 ```
 
 ### Common Exclude Patterns
