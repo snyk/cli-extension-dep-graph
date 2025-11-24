@@ -20,7 +20,7 @@ Reads the commit subject (PR title) and determines the semantic version bump. Us
 **Supported formats:**
 - `fix:`, `perf:`, `revert:` → PATCH bump
 - `feat:`, `feature:` → MINOR bump
-- `[major]`, `major:` → MAJOR bump
+- `type!:` (e.g., `fix!:`, `feat(api)!:`) → MAJOR bump (breaking changes)
 - `chore:`, `docs:`, `test:`, `ci:`, `style:`, `refactor:`, `build:` → No release
 
 Requires "Squash and merge" to ensure PR title becomes the commit message.

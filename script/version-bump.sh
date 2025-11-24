@@ -13,7 +13,8 @@ PR_TITLE=$(git log -1 --pretty=%s)
 echo "PR title: $PR_TITLE"
 
 # Determine version bump based on PR title
-if [[ "$PR_TITLE" =~ ^\[major\]|^major: ]]; then
+if [[ "$PR_TITLE" =~ ^[a-z]+(\(.*\))?!: ]]; then
+    # Breaking change indicator with ! (e.g., fix!:, feat(api)!:)
     BUMP_TYPE="major"
     MAJOR=$((MAJOR + 1))
     MINOR=0
@@ -28,9 +29,9 @@ elif [[ "$PR_TITLE" =~ ^(fix|perf|revert)(\(.*\))?: ]]; then
 elif [[ "$PR_TITLE" =~ ^(chore|docs|style|refactor|test|ci|build)(\(.*\))?: ]]; then
     BUMP_TYPE="none"
 else
-    echo "Warning: No recognized commit type, defaulting to PATCH"
-    BUMP_TYPE="patch"
-    PATCH=$((PATCH + 1))
+    echo "Warning: No recognized commit type, defaulting to NONE (no release)"
+    echo "PR title should follow Conventional Commits format (validated by GitHub Action)"
+    BUMP_TYPE="none"
 fi
 
 NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"

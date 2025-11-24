@@ -16,7 +16,7 @@ The release system uses **Pull Request titles** following the **Conventional Com
 
 - **`fix:`** or **`fix(scope):`** → Bumps **PATCH** version (e.g., 1.0.0 → 1.0.1)
 - **`feat:`** or **`feat(scope):`** → Bumps **MINOR** version (e.g., 1.0.0 → 1.1.0)
-- **`[major]`** or **`major:`** → Bumps **MAJOR** version (e.g., 1.0.0 → 2.0.0)
+- **`type!:`** (breaking change) → Bumps **MAJOR** version (e.g., 1.0.0 → 2.0.0)
 - **`chore:`**, **`docs:`**, **`style:`**, **`refactor:`**, **`test:`**, **`ci:`** → **No release** created
 
 ### 2. PR Title Examples
@@ -32,11 +32,12 @@ fix(parser): handle edge case in dependency resolution
 feat: add support for new dependency format
 feat(python): add Python 3.13 support
 
-# Major version bump (breaking changes) - Option 1
-[major] redesign API interface
-
-# Major version bump (breaking changes) - Option 2
-major: remove deprecated functions
+# Major version bump (breaking changes)
+# Use ! after type or type(scope) to indicate breaking changes
+fix!: change return type of core API
+feat(api)!: redesign authentication flow
+refactor(parser)!: remove support for legacy format
+chore!: drop support for Python 3.7
 
 # No release (maintenance)
 chore: update dependencies
@@ -48,12 +49,11 @@ test: add integration tests for edge cases
 
 When you create or edit a Pull Request:
 
-1. A GitHub Action automatically validates the PR title
-2. The action posts a comment showing:
-   - ✅ Whether the title is valid
-   - The version bump type (MAJOR, MINOR, PATCH, or NO RELEASE)
-   - Examples if the title is invalid
-3. The PR cannot be merged if the title validation fails
+1. A GitHub Action automatically validates the PR title against the Conventional Commits format
+2. The action will:
+   - ✅ Pass if the title follows the correct format (e.g., `feat:`, `fix:`, `fix!:`)
+   - ❌ Fail if the title is invalid
+3. The check must pass before the PR can be merged
 
 ### 4. CircleCI Workflow
 
@@ -71,19 +71,19 @@ When code is merged to `main` using **"Squash and merge"**, the following happen
 
 ### 5. Increasing the Major Version
 
-There are two ways to trigger a **major version bump** in your PR title:
+To trigger a **major version bump**, add `!` after the type (or scope) in your PR title:
 
-#### Option A: Use `[major]` prefix
 ```
-PR Title: [major] redesign core architecture
-```
-
-#### Option B: Use `major:` prefix
-```
-PR Title: major: remove support for deprecated features
+# Breaking change examples
+PR Title: fix!: change API return type
+PR Title: feat(api)!: redesign authentication flow
+PR Title: refactor(parser)!: remove legacy format support
+PR Title: chore!: drop support for Python 3.7
 ```
 
-**Note:** The `BREAKING CHANGE` keyword in the PR description/body is not currently supported for major version bumps. You must use `[major]` or `major:` in the PR title.
+**Standard:** This follows the [Conventional Commits specification](https://www.conventionalcommits.org/) which uses `!` to indicate breaking changes in the commit subject line.
+
+**Note:** The `BREAKING CHANGE:` footer in commit bodies is part of the Conventional Commits spec, but our PR title validation only checks the subject line. Use `!` in the PR title for automatic major version bumps.
 
 ## Manual Release (Local Testing)
 
@@ -142,10 +142,10 @@ Each release includes:
 **Problem**: Expected a minor bump but got a patch bump.
 
 **Solutions**:
-- Verify PR title follows convention: `feat:` for minor, `fix:` for patch
-- Check the "Determine Version" job output in CircleCI
+- Verify PR title follows convention: `feat:` for minor, `fix:` for patch, `type!:` for major
+- Check the "Determine Version" job output in CircleCI to see the calculated version bump
 - PR title must match the regex patterns in `version-bump.sh`
-- Look at the GitHub Action comment on the PR to see what version bump was expected
+- Ensure the GitHub Action validation check passed on the PR
 
 ### Tag push fails with authentication error
 
@@ -168,9 +168,9 @@ Each release includes:
 ## Best Practices
 
 1. **Use Conventional Commits**: Always format PR titles using the conventional commit format for clear version bumps and changelogs
-2. **Validate PR Title**: The GitHub Action will validate your PR title automatically and show the expected version bump
+2. **Validate PR Title**: The GitHub Action will validate your PR title format automatically
 3. **Squash and Merge**: When merging PRs, use "Squash and merge" - the PR title will become the commit message
-4. **Update PR Title if Needed**: If the GitHub Action shows an invalid title or wrong version bump, edit the PR title before merging
+4. **Update PR Title if Needed**: If the GitHub Action check fails, edit the PR title before merging
 5. **Test Before Merging**: Ensure all tests pass before merging to `main`
 6. **Review Changelog**: After release, review the auto-generated changelog for accuracy
 
