@@ -1,5 +1,6 @@
 # Ecosystems Package
 
+
 The `ecosystems` package provides a unified plugin interface for discovering and building dependency graphs across multiple package managers and programming language ecosystems.
 
 ## Purpose
