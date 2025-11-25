@@ -1,6 +1,13 @@
 //nolint:tagliatelle // Allowing snake case for API response schemas
 package snykclient
 
+import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/snyk/cli-extension-dep-graph/internal/depgraph"
+)
+
 type ScanResultTarget struct {
 	RemoteURL string `json:"remoteUrl"`
 }
@@ -12,8 +19,40 @@ type ScanResultIdentity struct {
 }
 
 type ScanResultFact struct {
-	Type string      `json:"type"`
-	Data interface{} `json:"data"`
+	Type string `json:"type"`
+	Data any    `json:"data"`
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for ScanResultFact.
+// When type is "depGraph", it unmarshals data directly into *depgraph.DepGraph.
+func (f *ScanResultFact) UnmarshalJSON(data []byte) error {
+	var scanResultRaw struct {
+		Type string          `json:"type"`
+		Data json.RawMessage `json:"data"`
+	}
+
+	if err := json.Unmarshal(data, &scanResultRaw); err != nil {
+		return fmt.Errorf("failed to unmarshal ScanResultFact: %w", err)
+	}
+
+	f.Type = scanResultRaw.Type
+
+	switch scanResultRaw.Type {
+	case "depGraph":
+		var depGraph depgraph.DepGraph
+		if err := json.Unmarshal(scanResultRaw.Data, &depGraph); err != nil {
+			return fmt.Errorf("failed to unmarshal depGraph data: %w", err)
+		}
+		f.Data = &depGraph
+	default:
+		var v any
+		if err := json.Unmarshal(scanResultRaw.Data, &v); err != nil {
+			return fmt.Errorf("failed to unmarshal fact data: %w", err)
+		}
+		f.Data = v
+	}
+
+	return nil
 }
 
 type ScanResult struct {

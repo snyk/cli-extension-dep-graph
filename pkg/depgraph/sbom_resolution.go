@@ -209,8 +209,16 @@ func extractDepGraphsFromScans(scans []*snykclient.ScanResult, normalisedTargetF
 				continue
 			}
 
-			// Create workflow data with the depgraph
-			data, err := workflowDataFromDepGraph(fact.Data, normalisedTargetFile, scan.Identity.TargetFile)
+			// ScanResultFact.UnmarshalJSON deserializes fact.Data into *depgraph.DepGraph when type is "depGraph".
+			depGraph, ok := fact.Data.(*depgraph.DepGraph)
+			if !ok {
+				return nil, fmt.Errorf("expected fact.Data to be *depgraph.DepGraph, got %T", fact.Data)
+			}
+			if depGraph == nil {
+				return nil, fmt.Errorf("depGraph is nil for fact with type 'depGraph'")
+			}
+
+			data, err := workflowDataFromDepGraph(depGraph, normalisedTargetFile, scan.Identity.TargetFile)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create workflow data: %w", err)
 			}
@@ -222,7 +230,7 @@ func extractDepGraphsFromScans(scans []*snykclient.ScanResult, normalisedTargetF
 	return depGraphList, nil
 }
 
-func workflowDataFromDepGraph(depGraph any, normalisedTargetFile, targetFileFromPlugin string) (workflow.Data, error) {
+func workflowDataFromDepGraph(depGraph *depgraph.DepGraph, normalisedTargetFile, targetFileFromPlugin string) (workflow.Data, error) {
 	depGraphBytes, err := json.Marshal(depGraph)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal depgraph data: %w", err)
