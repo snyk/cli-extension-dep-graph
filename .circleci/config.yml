@@ -86,6 +86,7 @@ jobs:
             echo "$NEW_VERSION" > /tmp/workspace/new_version
             echo "$NEW_TAG" > /tmp/workspace/new_tag
             echo "$PREVIOUS_TAG" > /tmp/workspace/previous_tag
+            echo "$PR_TITLE" > /tmp/workspace/pr_title
       - persist_to_workspace:
           root: /tmp/workspace
           paths:
@@ -93,6 +94,7 @@ jobs:
             - new_version
             - new_tag
             - previous_tag
+            - pr_title
 
   tag-release:
     <<: *go_image
@@ -110,6 +112,7 @@ jobs:
           command: |
             BUMP_TYPE=$(cat /tmp/workspace/bump_type)
             NEW_TAG=$(cat /tmp/workspace/new_tag)
+            PR_TITLE=$(cat /tmp/workspace/pr_title)
             
             if [ "$BUMP_TYPE" = "none" ]; then
               echo "No release needed - skipping tag creation"
@@ -117,7 +120,8 @@ jobs:
             fi
             
             echo "Creating tag: $NEW_TAG"
-            git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
+            TAG_MESSAGE="Release $NEW_TAG: $PR_TITLE"
+            git tag -a "$NEW_TAG" -m "$TAG_MESSAGE"
             
             # Push using HTTPS with GitHub token (no fingerprint needed)
             git push https://${GH_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME} "$NEW_TAG"

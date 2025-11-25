@@ -1,0 +1,165 @@
+[
+  {
+    "depGraph": {
+      "packages": {
+        "Jinja2@3.1.2": {
+          "packageId": "Jinja2@3.1.2",
+          "packageName": "Jinja2",
+          "version": "3.1.2"
+        },
+        "MarkupSafe@2.1.5": {
+          "packageId": "MarkupSafe@2.1.5",
+          "packageName": "MarkupSafe",
+          "version": "2.1.5"
+        }
+      },
+      "graph": {
+        "Jinja2@3.1.2": [
+          "MarkupSafe@2.1.5"
+        ],
+        "MarkupSafe@2.1.5": null,
+        "root": [
+          "Jinja2@3.1.2"
+        ]
+      },
+      "rootPackageId": "root"
+    },
+    "metadata": {
+      "targetFile": "frontend/requirements.txt",
+      "runtime": "python@3.8.20"
+    }
+  },
+  {
+    "depGraph": {
+      "packages": {
+        "certifi@2025.11.12": {
+          "packageId": "certifi@2025.11.12",
+          "packageName": "certifi",
+          "version": "2025.11.12"
+        },
+        "charset-normalizer@3.4.4": {
+          "packageId": "charset-normalizer@3.4.4",
+          "packageName": "charset-normalizer",
+          "version": "3.4.4"
+        },
+        "idna@3.11": {
+          "packageId": "idna@3.11",
+          "packageName": "idna",
+          "version": "3.11"
+        },
+        "requests@2.31.0": {
+          "packageId": "requests@2.31.0",
+          "packageName": "requests",
+          "version": "2.31.0"
+        },
+        "urllib3@2.2.3": {
+          "packageId": "urllib3@2.2.3",
+          "packageName": "urllib3",
+          "version": "2.2.3"
+        }
+      },
+      "graph": {
+        "certifi@2025.11.12": null,
+        "charset-normalizer@3.4.4": null,
+        "idna@3.11": null,
+        "requests@2.31.0": [
+          "charset-normalizer@3.4.4",
+          "idna@3.11",
+          "urllib3@2.2.3",
+          "certifi@2025.11.12"
+        ],
+        "root": [
+          "requests@2.31.0"
+        ],
+        "urllib3@2.2.3": null
+      },
+      "rootPackageId": "root"
+    },
+    "metadata": {
+      "targetFile": "requirements.txt",
+      "runtime": "python@3.8.20"
+    }
+  },
+  {
+    "depGraph": {
+      "packages": {
+        "Flask@3.0.0": {
+          "packageId": "Flask@3.0.0",
+          "packageName": "Flask",
+          "version": "3.0.0"
+        },
+        "Jinja2@3.1.6": {
+          "packageId": "Jinja2@3.1.6",
+          "packageName": "Jinja2",
+          "version": "3.1.6"
+        },
+        "MarkupSafe@2.1.5": {
+          "packageId": "MarkupSafe@2.1.5",
+          "packageName": "MarkupSafe",
+          "version": "2.1.5"
+        },
+        "Werkzeug@3.0.6": {
+          "packageId": "Werkzeug@3.0.6",
+          "packageName": "Werkzeug",
+          "version": "3.0.6"
+        },
+        "blinker@1.8.2": {
+          "packageId": "blinker@1.8.2",
+          "packageName": "blinker",
+          "version": "1.8.2"
+        },
+        "click@8.1.8": {
+          "packageId": "click@8.1.8",
+          "packageName": "click",
+          "version": "8.1.8"
+        },
+        "importlib_metadata@8.5.0": {
+          "packageId": "importlib_metadata@8.5.0",
+          "packageName": "importlib_metadata",
+          "version": "8.5.0"
+        },
+        "itsdangerous@2.2.0": {
+          "packageId": "itsdangerous@2.2.0",
+          "packageName": "itsdangerous",
+          "version": "2.2.0"
+        },
+        "zipp@3.20.2": {
+          "packageId": "zipp@3.20.2",
+          "packageName": "zipp",
+          "version": "3.20.2"
+        }
+      },
+      "graph": {
+        "Flask@3.0.0": [
+          "Werkzeug@3.0.6",
+          "Jinja2@3.1.6",
+          "itsdangerous@2.2.0",
+          "click@8.1.8",
+          "blinker@1.8.2"
+        ],
+        "Jinja2@3.1.6": [
+          "MarkupSafe@2.1.5"
+        ],
+        "MarkupSafe@2.1.5": null,
+        "Werkzeug@3.0.6": [
+          "MarkupSafe@2.1.5"
+        ],
+        "blinker@1.8.2": null,
+        "click@8.1.8": null,
+        "importlib_metadata@8.5.0": [
+          "zipp@3.20.2"
+        ],
+        "itsdangerous@2.2.0": null,
+        "root": [
+          "Flask@3.0.0"
+        ],
+        "zipp@3.20.2": null
+      },
+      "rootPackageId": "root"
+    },
+    "metadata": {
+      "targetFile": "backend/requirements.txt",
+      "runtime": "python@3.8.20"
+    }
+  }
+]

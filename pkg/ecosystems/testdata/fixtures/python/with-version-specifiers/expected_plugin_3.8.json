@@ -1,0 +1,60 @@
+[
+  {
+    "depGraph": {
+      "packages": {
+        "certifi@2025.11.12": {
+          "packageId": "certifi@2025.11.12",
+          "packageName": "certifi",
+          "version": "2025.11.12"
+        },
+        "charset-normalizer@3.4.4": {
+          "packageId": "charset-normalizer@3.4.4",
+          "packageName": "charset-normalizer",
+          "version": "3.4.4"
+        },
+        "click@8.1.8": {
+          "packageId": "click@8.1.8",
+          "packageName": "click",
+          "version": "8.1.8"
+        },
+        "idna@3.11": {
+          "packageId": "idna@3.11",
+          "packageName": "idna",
+          "version": "3.11"
+        },
+        "requests@2.32.4": {
+          "packageId": "requests@2.32.4",
+          "packageName": "requests",
+          "version": "2.32.4"
+        },
+        "urllib3@2.2.3": {
+          "packageId": "urllib3@2.2.3",
+          "packageName": "urllib3",
+          "version": "2.2.3"
+        }
+      },
+      "graph": {
+        "certifi@2025.11.12": null,
+        "charset-normalizer@3.4.4": null,
+        "click@8.1.8": null,
+        "idna@3.11": null,
+        "requests@2.32.4": [
+          "idna@3.11",
+          "urllib3@2.2.3",
+          "certifi@2025.11.12"
+        ],
+        "root": [
+          "requests@2.32.4",
+          "click@8.1.8",
+          "urllib3@2.2.3"
+        ],
+        "urllib3@2.2.3": null
+      },
+      "rootPackageId": "root"
+    },
+    "metadata": {
+      "targetFile": "requirements.txt",
+      "runtime": "python@3.14.0"
+    }
+  }
+]

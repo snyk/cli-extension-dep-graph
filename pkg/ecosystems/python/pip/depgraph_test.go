@@ -12,7 +12,7 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 )
 
-func TestReport_ToDepgraph(t *testing.T) {
+func TestReport_ToDependencyGraph(t *testing.T) {
 	t.Run("simple report with direct and transitive deps", func(t *testing.T) {
 		report := &Report{
 			Install: []InstallItem{
@@ -48,7 +48,7 @@ func TestReport_ToDepgraph(t *testing.T) {
 			},
 		}
 
-		depgraph, err := report.ToDepgraph()
+		depgraph, err := report.ToDependencyGraph()
 		require.NoError(t, err)
 
 		// Verify structure
@@ -89,7 +89,7 @@ func TestReport_ToDepgraph(t *testing.T) {
 			},
 		}
 
-		depgraph, err := report.ToDepgraph()
+		depgraph, err := report.ToDependencyGraph()
 		require.NoError(t, err)
 
 		assert.Len(t, depgraph.Packages, 2)
@@ -102,7 +102,7 @@ func TestReport_ToDepgraph(t *testing.T) {
 			Install: []InstallItem{},
 		}
 
-		depgraph, err := report.ToDepgraph()
+		depgraph, err := report.ToDependencyGraph()
 		require.NoError(t, err)
 
 		assert.Empty(t, depgraph.Packages)
@@ -111,7 +111,7 @@ func TestReport_ToDepgraph(t *testing.T) {
 
 	t.Run("nil report", func(t *testing.T) {
 		var report *Report
-		_, err := report.ToDepgraph()
+		_, err := report.ToDependencyGraph()
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot be nil")
 	})

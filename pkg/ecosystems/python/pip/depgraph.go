@@ -15,14 +15,14 @@ import (
 // Example: "idna (<4,>=2.5)" -> "idna".
 var depStringPattern = regexp.MustCompile(`^([a-zA-Z0-9._-]+)`)
 
-// ToDepgraph converts a pip install Report into a Depgraph.
+// ToDependencyGraph converts a pip install Report into a DependencyGraph.
 // The root package ID is "root" and points to all direct dependencies.
-func (r *Report) ToDepgraph() (*ecosystems.Depgraph, error) {
+func (r *Report) ToDependencyGraph() (*ecosystems.DependencyGraph, error) {
 	if r == nil {
 		return nil, fmt.Errorf("report cannot be nil")
 	}
 
-	slog.Debug("Converting pip report to depgraph", slog.Int("total_packages", len(r.Install)))
+	slog.Debug("Converting pip report to dependency graph", slog.Int("total_packages", len(r.Install)))
 
 	// First pass: index packages by name for dependency resolution
 	// Pip's dependency resolver ensures only one version of each package is installed
@@ -78,12 +78,12 @@ func (r *Report) ToDepgraph() (*ecosystems.Depgraph, error) {
 	// Add root pointing to direct dependencies
 	graph["root"] = directDeps
 
-	slog.Debug("Successfully converted pip report to depgraph",
+	slog.Debug("Successfully converted pip report to dependency graph",
 		slog.Int("total_packages", len(packages)),
 		slog.Int("direct_dependencies", len(directDeps)),
 		slog.Int("graph_nodes", len(graph)))
 
-	return &ecosystems.Depgraph{
+	return &ecosystems.DependencyGraph{
 		Packages:      packages,
 		Graph:         graph,
 		RootPackageID: "root",
