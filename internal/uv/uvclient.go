@@ -50,7 +50,7 @@ func (c client) ExportSBOM(inputDir string) (*scaplugin.Finding, error) {
 		return nil, fmt.Errorf("failed to execute uv export: %w", err)
 	}
 
-	metadata, err := validateSBOM(output)
+	metadata, err := extractMetadata(output)
 	if err != nil {
 		return nil, err
 	}
@@ -69,8 +69,8 @@ func (c client) ExportSBOM(inputDir string) (*scaplugin.Finding, error) {
 	}, nil
 }
 
-// Verifies that the SBOM is valid JSON and has a root component.
-func validateSBOM(sbomData []byte) (*scaplugin.Metadata, error) {
+// Extracts metadata from the SBOM and validates that it is valid JSON with a root component.
+func extractMetadata(sbomData []byte) (*scaplugin.Metadata, error) {
 	var sbom struct {
 		Metadata struct {
 			Component *struct {

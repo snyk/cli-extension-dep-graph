@@ -162,7 +162,7 @@ func TestParseAndValidateVersion_UnparseableOutput(t *testing.T) {
 	}
 }
 
-func TestValidateSBOM_Success(t *testing.T) {
+func TestExtractMetadata_Success(t *testing.T) {
 	tests := []struct {
 		name            string
 		sbom            string
@@ -249,7 +249,7 @@ func TestValidateSBOM_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			metadata, err := validateSBOM([]byte(tt.sbom))
+			metadata, err := extractMetadata([]byte(tt.sbom))
 			assert.NoError(t, err)
 			require.NotNil(t, metadata)
 			assert.Equal(t, "pip", metadata.PackageManager)
@@ -259,7 +259,7 @@ func TestValidateSBOM_Success(t *testing.T) {
 	}
 }
 
-func TestValidateSBOM_MissingComponent(t *testing.T) {
+func TestExtractMetadata_MissingComponent(t *testing.T) {
 	tests := []struct {
 		name               string
 		sbom               string
@@ -302,7 +302,7 @@ func TestValidateSBOM_MissingComponent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			metadata, err := validateSBOM([]byte(tt.sbom))
+			metadata, err := extractMetadata([]byte(tt.sbom))
 			assert.Nil(t, metadata)
 			require.Error(t, err)
 			var catalogErr snyk_errors.Error
@@ -312,8 +312,8 @@ func TestValidateSBOM_MissingComponent(t *testing.T) {
 	}
 }
 
-func TestValidateSBOM_InvalidJSON(t *testing.T) {
-	metadata, err := validateSBOM([]byte("invalid json"))
+func TestExtractMetadata_InvalidJSON(t *testing.T) {
+	metadata, err := extractMetadata([]byte("invalid json"))
 	assert.Nil(t, metadata)
 	require.Error(t, err)
 	var catalogErr snyk_errors.Error
