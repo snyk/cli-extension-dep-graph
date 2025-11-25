@@ -1,0 +1,95 @@
+[
+  {
+    "depGraph": {
+      "packages": {
+        "black@23.12.1": {
+          "packageId": "black@23.12.1",
+          "packageName": "black",
+          "version": "23.12.1"
+        },
+        "certifi@2025.11.12": {
+          "packageId": "certifi@2025.11.12",
+          "packageName": "certifi",
+          "version": "2025.11.12"
+        },
+        "charset-normalizer@3.4.4": {
+          "packageId": "charset-normalizer@3.4.4",
+          "packageName": "charset-normalizer",
+          "version": "3.4.4"
+        },
+        "click@8.3.1": {
+          "packageId": "click@8.3.1",
+          "packageName": "click",
+          "version": "8.3.1"
+        },
+        "idna@3.11": {
+          "packageId": "idna@3.11",
+          "packageName": "idna",
+          "version": "3.11"
+        },
+        "mypy_extensions@1.1.0": {
+          "packageId": "mypy_extensions@1.1.0",
+          "packageName": "mypy_extensions",
+          "version": "1.1.0"
+        },
+        "packaging@25.0": {
+          "packageId": "packaging@25.0",
+          "packageName": "packaging",
+          "version": "25.0"
+        },
+        "pathspec@0.12.1": {
+          "packageId": "pathspec@0.12.1",
+          "packageName": "pathspec",
+          "version": "0.12.1"
+        },
+        "platformdirs@4.5.0": {
+          "packageId": "platformdirs@4.5.0",
+          "packageName": "platformdirs",
+          "version": "4.5.0"
+        },
+        "requests@2.31.0": {
+          "packageId": "requests@2.31.0",
+          "packageName": "requests",
+          "version": "2.31.0"
+        },
+        "urllib3@2.5.0": {
+          "packageId": "urllib3@2.5.0",
+          "packageName": "urllib3",
+          "version": "2.5.0"
+        }
+      },
+      "graph": {
+        "black@23.12.1": [
+          "click@8.3.1",
+          "packaging@25.0",
+          "pathspec@0.12.1",
+          "platformdirs@4.5.0"
+        ],
+        "certifi@2025.11.12": null,
+        "charset-normalizer@3.4.4": null,
+        "click@8.3.1": null,
+        "idna@3.11": null,
+        "mypy_extensions@1.1.0": null,
+        "packaging@25.0": null,
+        "pathspec@0.12.1": null,
+        "platformdirs@4.5.0": null,
+        "requests@2.31.0": [
+          "charset-normalizer@3.4.4",
+          "idna@3.11",
+          "urllib3@2.5.0",
+          "certifi@2025.11.12"
+        ],
+        "root": [
+          "black@23.12.1",
+          "requests@2.31.0"
+        ],
+        "urllib3@2.5.0": null
+      },
+      "rootPackageId": "root"
+    },
+    "metadata": {
+      "targetFile": "requirements.txt",
+      "runtime": "python@3.14.0"
+    }
+  }
+]

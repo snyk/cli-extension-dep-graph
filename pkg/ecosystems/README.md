@@ -61,12 +61,12 @@ Interface calls in Go are optimized by the compiler and have minimal runtime ove
 
 ## Data Structures
 
-### Depgraph: Adjacency List Representation
+### DependencyGraph: Adjacency List Representation
 
 The dependency graph uses an **adjacency list** structure rather than a nested tree:
 
 ```go
-type Depgraph struct {
+type DependencyGraph struct {
     Packages      map[PackageID]Package     `json:"packages"`
     Graph         map[PackageID][]PackageID `json:"graph"`
     RootPackageID PackageID                 `json:"rootPackageId"`
@@ -84,7 +84,7 @@ type Depgraph struct {
 
 **Example:**
 ```go
-depgraph := Depgraph{
+depgraph := DependencyGraph{
     Packages: map[PackageID]Package{
         "app@1.0.0":  {PackageID: "app@1.0.0", PackageName: "app", Version: "1.0.0"},
         "libA@2.0.0": {PackageID: "libA@2.0.0", PackageName: "libA", Version: "2.0.0"},
@@ -105,14 +105,16 @@ depgraph := Depgraph{
 
 ```go
 type SCAResult struct {
-    DepGraph Depgraph `json:"depGraph"`
-    Metadata Metadata `json:"metadata"`
+    DepGraph *DependencyGraph `json:"depGraph,omitempty"`
+    Metadata Metadata         `json:"metadata"`
+    Error    error            `json:"error,omitempty"`
 }
 ```
 
 Each result contains:
 - **DepGraph**: The complete dependency graph
 - **Metadata**: Context about the analysis (target file, runtime environment)
+- **Error**: Any error encountered during analysis (optional)
 
 Plugins return `[]SCAResult` to support:
 - Monorepos with multiple projects
@@ -234,7 +236,7 @@ To add support for a new ecosystem:
    func (p *Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *ecosystems.SCAPluginOptions) ([]ecosystems.SCAResult, error) {
        // 1. Discover manifest files in dir
        // 2. Resolve dependencies using ecosystem tooling
-       // 3. Build Depgraph from resolved dependencies
+       // 3. Build DependencyGraph from resolved dependencies
        // 4. Return SCAResult with metadata
    }
    ```

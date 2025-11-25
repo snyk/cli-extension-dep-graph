@@ -139,6 +139,19 @@ func classifyPipError(err error) error {
 		return fmt.Errorf("pip install failed: %w", err)
 	}
 
+	// Check for context cancellation or timeout early
+	if errors.Is(pipErr.err, context.Canceled) {
+		// User-initiated cancellation (e.g., Ctrl+C) - not a catalog error
+		return fmt.Errorf("pip install canceled: %w", pipErr.err)
+	}
+	if errors.Is(pipErr.err, context.DeadlineExceeded) {
+		// Timeout - use catalog timeout error
+		return snyk.NewTimeoutError(
+			"Pip install timed out",
+			snyk_errors.WithCause(pipErr.err),
+		)
+	}
+
 	stderr := pipErr.stderr
 
 	// Check for syntax errors in requirements.txt
@@ -178,19 +191,6 @@ func classifyPipError(err error) error {
 		strings.Contains(stderr, "incompatible") {
 		return ecosystems.NewPythonVersionConfictError(
 			fmt.Sprintf("Conflicting package requirements: %s", stderr),
-			snyk_errors.WithCause(pipErr.err),
-		)
-	}
-
-	// Check for context cancellation or timeout
-	if errors.Is(pipErr.err, context.Canceled) {
-		// User-initiated cancellation (e.g., Ctrl+C) - not a catalog error
-		return fmt.Errorf("pip install canceled: %w", pipErr.err)
-	}
-	if errors.Is(pipErr.err, context.DeadlineExceeded) {
-		// Timeout - use catalog timeout error
-		return snyk.NewTimeoutError(
-			fmt.Sprintf("Pip install timed out: %s", stderr),
 			snyk_errors.WithCause(pipErr.err),
 		)
 	}

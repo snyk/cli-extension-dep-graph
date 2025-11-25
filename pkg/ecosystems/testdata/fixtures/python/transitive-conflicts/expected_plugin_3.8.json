@@ -1,0 +1,108 @@
+[
+  {
+    "depGraph": {
+      "packages": {
+        "boto3@1.28.0": {
+          "packageId": "boto3@1.28.0",
+          "packageName": "boto3",
+          "version": "1.28.0"
+        },
+        "botocore@1.31.85": {
+          "packageId": "botocore@1.31.85",
+          "packageName": "botocore",
+          "version": "1.31.85"
+        },
+        "certifi@2025.11.12": {
+          "packageId": "certifi@2025.11.12",
+          "packageName": "certifi",
+          "version": "2025.11.12"
+        },
+        "charset-normalizer@3.4.4": {
+          "packageId": "charset-normalizer@3.4.4",
+          "packageName": "charset-normalizer",
+          "version": "3.4.4"
+        },
+        "idna@3.11": {
+          "packageId": "idna@3.11",
+          "packageName": "idna",
+          "version": "3.11"
+        },
+        "jmespath@1.0.1": {
+          "packageId": "jmespath@1.0.1",
+          "packageName": "jmespath",
+          "version": "1.0.1"
+        },
+        "python-dateutil@2.9.0.post0": {
+          "packageId": "python-dateutil@2.9.0.post0",
+          "packageName": "python-dateutil",
+          "version": "2.9.0.post0"
+        },
+        "requests@2.31.0": {
+          "packageId": "requests@2.31.0",
+          "packageName": "requests",
+          "version": "2.31.0"
+        },
+        "s3transfer@0.6.2": {
+          "packageId": "s3transfer@0.6.2",
+          "packageName": "s3transfer",
+          "version": "0.6.2"
+        },
+        "six@1.17.0": {
+          "packageId": "six@1.17.0",
+          "packageName": "six",
+          "version": "1.17.0"
+        },
+        "urllib3@1.26.20": {
+          "packageId": "urllib3@1.26.20",
+          "packageName": "urllib3",
+          "version": "1.26.20"
+        }
+      },
+      "graph": {
+        "boto3@1.28.0": [
+          "botocore@1.31.85",
+          "jmespath@1.0.1",
+          "s3transfer@0.6.2",
+          "botocore@1.31.85"
+        ],
+        "botocore@1.31.85": [
+          "jmespath@1.0.1",
+          "python-dateutil@2.9.0.post0",
+          "urllib3@1.26.20",
+          "urllib3@1.26.20"
+        ],
+        "certifi@2025.11.12": null,
+        "charset-normalizer@3.4.4": null,
+        "idna@3.11": null,
+        "jmespath@1.0.1": null,
+        "python-dateutil@2.9.0.post0": [
+          "six@1.17.0"
+        ],
+        "requests@2.31.0": [
+          "charset-normalizer@3.4.4",
+          "idna@3.11",
+          "urllib3@1.26.20",
+          "certifi@2025.11.12"
+        ],
+        "root": [
+          "requests@2.31.0",
+          "boto3@1.28.0"
+        ],
+        "s3transfer@0.6.2": [
+          "botocore@1.31.85",
+          "botocore@1.31.85"
+        ],
+        "six@1.17.0": null,
+        "urllib3@1.26.20": [
+          "idna@3.11",
+          "certifi@2025.11.12"
+        ]
+      },
+      "rootPackageId": "root"
+    },
+    "metadata": {
+      "targetFile": "requirements.txt",
+      "runtime": "python@3.8.20"
+    }
+  }
+]

@@ -1,0 +1,68 @@
+[
+  {
+    "depGraph": {
+      "packages": {
+        "certifi@2025.11.12": {
+          "packageId": "certifi@2025.11.12",
+          "packageName": "certifi",
+          "version": "2025.11.12"
+        },
+        "charset-normalizer@3.4.4": {
+          "packageId": "charset-normalizer@3.4.4",
+          "packageName": "charset-normalizer",
+          "version": "3.4.4"
+        },
+        "idna@3.11": {
+          "packageId": "idna@3.11",
+          "packageName": "idna",
+          "version": "3.11"
+        },
+        "importlib-metadata@6.8.0": {
+          "packageId": "importlib-metadata@6.8.0",
+          "packageName": "importlib-metadata",
+          "version": "6.8.0"
+        },
+        "requests@2.31.0": {
+          "packageId": "requests@2.31.0",
+          "packageName": "requests",
+          "version": "2.31.0"
+        },
+        "urllib3@2.2.3": {
+          "packageId": "urllib3@2.2.3",
+          "packageName": "urllib3",
+          "version": "2.2.3"
+        },
+        "zipp@3.20.2": {
+          "packageId": "zipp@3.20.2",
+          "packageName": "zipp",
+          "version": "3.20.2"
+        }
+      },
+      "graph": {
+        "certifi@2025.11.12": null,
+        "charset-normalizer@3.4.4": null,
+        "idna@3.11": null,
+        "importlib-metadata@6.8.0": [
+          "zipp@3.20.2"
+        ],
+        "requests@2.31.0": [
+          "charset-normalizer@3.4.4",
+          "idna@3.11",
+          "urllib3@2.2.3",
+          "certifi@2025.11.12"
+        ],
+        "root": [
+          "requests@2.31.0",
+          "importlib-metadata@6.8.0"
+        ],
+        "urllib3@2.2.3": null,
+        "zipp@3.20.2": null
+      },
+      "rootPackageId": "root"
+    },
+    "metadata": {
+      "targetFile": "requirements.txt",
+      "runtime": "python@3.8.20"
+    }
+  }
+]

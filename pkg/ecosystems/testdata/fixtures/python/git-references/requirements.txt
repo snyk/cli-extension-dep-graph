@@ -1,0 +1,2 @@
+requests==2.31.0
+git+https://github.com/psf/black.git@23.12.1#egg=black

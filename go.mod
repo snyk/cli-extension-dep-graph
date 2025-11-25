@@ -11,6 +11,7 @@ require (
 	github.com/snyk/go-application-framework v0.0.0-20230714085540-37d34ad405bc
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/sync v0.18.0
 )
 
 require (

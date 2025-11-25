@@ -257,6 +257,11 @@ func handleDirectory(d fs.DirEntry, relPath string, excludePatterns []string) er
 		return nil
 	}
 
+	// Never exclude the root directory
+	if relPath == "." {
+		return nil
+	}
+
 	name := d.Name()
 	for _, pattern := range excludePatterns {
 		// Check relative path first (more specific)

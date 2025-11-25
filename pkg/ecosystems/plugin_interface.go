@@ -12,10 +12,10 @@ type Package struct {
 	Version     string    `json:"version"`
 }
 
-// Depgraph represents the complete dependency graph containing all packages
+// DependencyGraph represents the complete dependency graph containing all packages
 // and their relationships in an adjacency list structure, with a root package
 // identifier that marks the entry point of the dependency graph.
-type Depgraph struct {
+type DependencyGraph struct {
 	Packages      map[PackageID]Package     `json:"packages"`
 	Graph         map[PackageID][]PackageID `json:"graph"`
 	RootPackageID PackageID                 `json:"rootPackageId"`
@@ -31,8 +31,9 @@ type Metadata struct {
 // SCAResult represents the result of a Software Composition Analysis (SCA),
 // containing the dependency graph and associated metadata.
 type SCAResult struct {
-	DepGraph Depgraph `json:"depGraph"`
-	Metadata Metadata `json:"metadata"`
+	DepGraph *DependencyGraph `json:"depGraph,omitempty"`
+	Metadata Metadata         `json:"metadata"`
+	Error    error            `json:"error,omitempty"`
 }
 
 // SCAPlugin defines the interface for SCA plugins that build dependency graphs

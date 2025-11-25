@@ -41,8 +41,10 @@ echo "Bump type: $BUMP_TYPE ($LATEST_TAG → $NEW_TAG)"
 
 # Export for CircleCI (only if BASH_ENV is set)
 if [ -n "$BASH_ENV" ]; then
-    echo "export BUMP_TYPE=$BUMP_TYPE" >> $BASH_ENV
-    echo "export NEW_VERSION=$NEW_VERSION" >> $BASH_ENV
-    echo "export NEW_TAG=$NEW_TAG" >> $BASH_ENV
-    echo "export PREVIOUS_TAG=$LATEST_TAG" >> $BASH_ENV
+    echo "export BUMP_TYPE=$BUMP_TYPE" >> "$BASH_ENV"
+    echo "export NEW_VERSION=$NEW_VERSION" >> "$BASH_ENV"
+    echo "export NEW_TAG=$NEW_TAG" >> "$BASH_ENV"
+    echo "export PREVIOUS_TAG=$LATEST_TAG" >> "$BASH_ENV"
+    # Safely export PR title (handles spaces and special characters)
+    printf 'export PR_TITLE=%q\n' "$PR_TITLE" >> "$BASH_ENV"
 fi
