@@ -119,8 +119,8 @@ type cmdExecutor interface {
 type defaultCmdExecutor struct{}
 
 func (e *defaultCmdExecutor) Execute(binary, dir string, args ...string) ([]byte, error) {
-	// Check if uv binary exists in PATH
-	_, err := exec.LookPath(binary)
+	// Check if uv binary exists in PATH and resolve the full path
+	resolvedBinary, err := exec.LookPath(binary)
 	if err != nil {
 		return nil, clierrors.NewGeneralSCAFailureError(
 			fmt.Sprintf("%s binary not found in PATH", binary),
@@ -129,11 +129,11 @@ func (e *defaultCmdExecutor) Execute(binary, dir string, args ...string) ([]byte
 	}
 
 	//nolint:govet // Reassigning to err is fine
-	if err := checkVersion(binary); err != nil {
+	if err := checkVersion(resolvedBinary); err != nil {
 		return nil, err
 	}
 
-	cmd := exec.Command(binary, args...)
+	cmd := exec.Command(resolvedBinary, args...)
 	cmd.Dir = dir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
