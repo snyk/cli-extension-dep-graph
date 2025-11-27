@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,7 +45,7 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 	}
 
 	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	result, err := client.ExportSBOM("/test/dir")
+	result, err := client.ExportSBOM("/test/dir", scaplugin.Options{})
 
 	assert.NoError(t, err)
 	require.NotNil(t, result)
@@ -52,6 +53,37 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 	assert.Equal(t, "pip", result.Metadata.PackageManager)
 	assert.Equal(t, "test-project", result.Metadata.Name)
 	assert.Equal(t, "1.2.3", result.Metadata.Version)
+}
+
+func TestUVClient_ExportSBOM_AllProjects(t *testing.T) {
+	validSBOM := `{
+		"bomFormat": "CycloneDX",
+		"specVersion": "1.5",
+		"metadata": {
+			"component": {
+				"type": "library",
+				"bom-ref": "test-project-1",
+				"name": "test-project",
+				"version": "1.2.3"
+			}
+		}
+	}`
+
+	mockExecutor := &mockCmdExecutor{
+		executeFunc: func(binary, dir string, args ...string) ([]byte, error) {
+			assert.Equal(t, "/path/to/uv", binary)
+			assert.Equal(t, "/test/dir", dir)
+			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--frozen", "--preview", "--all-packages"}, args)
+			return []byte(validSBOM), nil
+		},
+	}
+
+	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
+	result, err := client.ExportSBOM("/test/dir", scaplugin.Options{AllProjects: true})
+
+	assert.NoError(t, err)
+	require.NotNil(t, result)
+	assert.JSONEq(t, validSBOM, string(result.Sbom))
 }
 
 func TestUVClient_ExportSBOM_Error(t *testing.T) {
@@ -63,7 +95,7 @@ func TestUVClient_ExportSBOM_Error(t *testing.T) {
 	}
 
 	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	result, err := client.ExportSBOM("/test/dir")
+	result, err := client.ExportSBOM("/test/dir", scaplugin.Options{})
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, expectedErr)
@@ -83,7 +115,7 @@ func TestUVClient_ExportSBOM_InvalidSBOM(t *testing.T) {
 	}
 
 	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	result, err := client.ExportSBOM("/test/dir")
+	result, err := client.ExportSBOM("/test/dir", scaplugin.Options{})
 
 	require.Error(t, err)
 	var catalogErr snyk_errors.Error
@@ -362,6 +394,202 @@ func TestFormatVersion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := formatVersion(tt.version)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestExtractWorkspacePackages(t *testing.T) {
+	tests := []struct {
+		name     string
+		sbom     string
+		expected []scaplugin.WorkspacePackage
+	}{
+		{
+			name: "single workspace package",
+			sbom: `{
+				"components": [
+					{
+						"name": "lib-core",
+						"version": "0.1.0",
+						"properties": [
+							{"name": "uv:workspace:path", "value": "packages/lib-core"}
+						]
+					}
+				]
+			}`,
+			expected: []scaplugin.WorkspacePackage{
+				{Name: "lib-core", Version: "0.1.0", Path: "packages/lib-core"},
+			},
+		},
+		{
+			name: "multiple workspace packages",
+			sbom: `{
+				"components": [
+					{
+						"name": "lib-core",
+						"version": "0.1.0",
+						"properties": [
+							{"name": "uv:workspace:path", "value": "packages/lib-core"}
+						]
+					},
+					{
+						"name": "lib-utils",
+						"version": "0.2.0",
+						"properties": [
+							{"name": "uv:workspace:path", "value": "packages/lib-utils"}
+						]
+					}
+				]
+			}`,
+			expected: []scaplugin.WorkspacePackage{
+				{Name: "lib-core", Version: "0.1.0", Path: "packages/lib-core"},
+				{Name: "lib-utils", Version: "0.2.0", Path: "packages/lib-utils"},
+			},
+		},
+		{
+			name: "mixed workspace and regular packages",
+			sbom: `{
+				"components": [
+					{
+						"name": "requests",
+						"version": "2.31.0",
+						"purl": "pkg:pypi/requests@2.31.0"
+					},
+					{
+						"name": "lib-core",
+						"version": "0.1.0",
+						"properties": [
+							{"name": "uv:workspace:path", "value": "packages/lib-core"}
+						]
+					},
+					{
+						"name": "pydantic",
+						"version": "2.5.0",
+						"purl": "pkg:pypi/pydantic@2.5.0"
+					}
+				]
+			}`,
+			expected: []scaplugin.WorkspacePackage{
+				{Name: "lib-core", Version: "0.1.0", Path: "packages/lib-core"},
+			},
+		},
+		{
+			name: "component with other properties but not workspace path",
+			sbom: `{
+				"components": [
+					{
+						"name": "colorama",
+						"version": "0.4.6",
+						"properties": [
+							{"name": "uv:package:marker", "value": "sys_platform == 'win32'"}
+						]
+					}
+				]
+			}`,
+			expected: nil,
+		},
+		{
+			name: "component with multiple properties including workspace path",
+			sbom: `{
+				"components": [
+					{
+						"name": "lib-core",
+						"version": "0.1.0",
+						"properties": [
+							{"name": "some:other:property", "value": "some-value"},
+							{"name": "uv:workspace:path", "value": "packages/lib-core"},
+							{"name": "another:property", "value": "another-value"}
+						]
+					}
+				]
+			}`,
+			expected: []scaplugin.WorkspacePackage{
+				{Name: "lib-core", Version: "0.1.0", Path: "packages/lib-core"},
+			},
+		},
+		{
+			name:     "no components",
+			sbom:     `{"components": []}`,
+			expected: nil,
+		},
+		{
+			name:     "empty sbom",
+			sbom:     `{}`,
+			expected: nil,
+		},
+		{
+			name:     "invalid json",
+			sbom:     `invalid`,
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractWorkspacePackages([]byte(tt.sbom))
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TODO(uv): Enable when the CLI `--exclude` flag supports paths.
+func TestBuildFileExclusions(t *testing.T) {
+	t.Skip("Skipped until CLI --exclude flag supports paths")
+
+	tests := []struct {
+		name              string
+		workspacePackages []scaplugin.WorkspacePackage
+		expected          []string
+	}{
+		{
+			name:              "no workspace packages",
+			workspacePackages: nil,
+			expected:          []string{},
+		},
+		{
+			name:              "empty workspace packages",
+			workspacePackages: []scaplugin.WorkspacePackage{},
+			expected:          []string{},
+		},
+		{
+			name: "single workspace package",
+			workspacePackages: []scaplugin.WorkspacePackage{
+				{Name: "lib-core", Version: "0.1.0", Path: "packages/lib-core"},
+			},
+			expected: []string{
+				"packages/lib-core/pyproject.toml",
+				"packages/lib-core/requirements.txt",
+			},
+		},
+		{
+			name: "multiple workspace packages",
+			workspacePackages: []scaplugin.WorkspacePackage{
+				{Name: "lib-core", Version: "0.1.0", Path: "packages/lib-core"},
+				{Name: "lib-utils", Version: "0.2.0", Path: "packages/lib-utils"},
+			},
+			expected: []string{
+				"packages/lib-core/pyproject.toml",
+				"packages/lib-core/requirements.txt",
+				"packages/lib-utils/pyproject.toml",
+				"packages/lib-utils/requirements.txt",
+			},
+		},
+		{
+			name: "workspace package at root",
+			workspacePackages: []scaplugin.WorkspacePackage{
+				{Name: "my-app", Version: "1.0.0", Path: "."},
+			},
+			expected: []string{
+				"pyproject.toml",
+				"requirements.txt",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := buildFileExclusions(tt.workspacePackages)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

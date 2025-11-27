@@ -15,12 +15,12 @@ func NewUvPlugin(client Client) Plugin {
 	}
 }
 
-func (p Plugin) BuildFindingsFromDir(inputDir string, _ scaplugin.Options, logger *zerolog.Logger) ([]scaplugin.Finding, error) {
+func (p Plugin) BuildFindingsFromDir(inputDir string, opts scaplugin.Options, logger *zerolog.Logger) ([]scaplugin.Finding, error) {
 	if !p.client.ShouldExportSBOM(inputDir, logger) {
 		return []scaplugin.Finding{}, nil
 	}
 
-	finding, err := p.client.ExportSBOM(inputDir)
+	finding, err := p.client.ExportSBOM(inputDir, opts)
 	if err != nil {
 		//nolint:wrapcheck // Error is already wrapped with error catalog error from ExportSBOM
 		return nil, err
