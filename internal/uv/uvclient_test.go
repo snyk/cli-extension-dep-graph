@@ -39,7 +39,7 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 		executeFunc: func(binary, dir string, args ...string) ([]byte, error) {
 			assert.Equal(t, "/path/to/uv", binary)
 			assert.Equal(t, "/test/dir", dir)
-			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--frozen", "--preview"}, args)
+			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--frozen", "--preview", "--no-dev"}, args)
 			return []byte(validSBOM), nil
 		},
 	}
@@ -73,7 +73,7 @@ func TestUVClient_ExportSBOM_AllProjects(t *testing.T) {
 		executeFunc: func(binary, dir string, args ...string) ([]byte, error) {
 			assert.Equal(t, "/path/to/uv", binary)
 			assert.Equal(t, "/test/dir", dir)
-			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--frozen", "--preview", "--all-packages"}, args)
+			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--frozen", "--preview", "--all-packages", "--no-dev"}, args)
 			return []byte(validSBOM), nil
 		},
 	}
@@ -84,6 +84,24 @@ func TestUVClient_ExportSBOM_AllProjects(t *testing.T) {
 	assert.NoError(t, err)
 	require.NotNil(t, result)
 	assert.JSONEq(t, validSBOM, string(result.Sbom))
+}
+
+func TestUVClient_ExportSBOM_DevTrue_OmitsNoDevFlag(t *testing.T) {
+	validSBOM := `{"metadata": {"component": {"name": "test", "version": "1.0.0"}}}`
+
+	mockExecutor := &mockCmdExecutor{
+		executeFunc: func(_, _ string, args ...string) ([]byte, error) {
+			for _, arg := range args {
+				assert.NotEqual(t, "--no-dev", arg, "args should not contain --no-dev when Dev is true")
+			}
+			return []byte(validSBOM), nil
+		},
+	}
+
+	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
+	_, err := client.ExportSBOM("/test/dir", scaplugin.Options{Dev: true})
+
+	assert.NoError(t, err)
 }
 
 func TestUVClient_ExportSBOM_Error(t *testing.T) {

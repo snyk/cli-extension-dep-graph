@@ -56,8 +56,10 @@ func handleSBOMResolutionDI(
 	// - check which other flags we need to handle e.g. fail-fast
 
 	allProjects := config.GetBool(FlagAllProjects)
+	dev := config.GetBool(FlagDev)
 	pluginOptions := scaplugin.Options{
 		AllProjects: allProjects,
+		Dev:         dev,
 	}
 
 	// Generate SBOMs
