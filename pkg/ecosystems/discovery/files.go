@@ -69,6 +69,11 @@ func WithExcludes(patterns ...string) FindOption {
 	}
 }
 
+// WithCommonExcludes adds common exclude patterns for files/directories.
+func WithCommonExcludes() FindOption {
+	return WithExcludes(commonExcludes...)
+}
+
 // FindResult represents a discovered file.
 type FindResult struct {
 	Path    string // Absolute path to the file
