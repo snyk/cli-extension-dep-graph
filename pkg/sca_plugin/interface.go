@@ -1,6 +1,10 @@
 package scaplugin
 
-import "github.com/rs/zerolog"
+import (
+	"context"
+
+	"github.com/rs/zerolog"
+)
 
 type Options struct {
 	AllProjects bool
@@ -30,5 +34,5 @@ type Finding struct {
 type Sbom []byte
 
 type ScaPlugin interface {
-	BuildFindingsFromDir(dir string, options Options, logger *zerolog.Logger) ([]Finding, error)
+	BuildFindingsFromDir(ctx context.Context, dir string, options *Options, logger *zerolog.Logger) ([]Finding, error)
 }

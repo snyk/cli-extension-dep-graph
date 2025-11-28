@@ -3,37 +3,31 @@ package mocks
 import (
 	"github.com/rs/zerolog"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/uv"
 	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 )
 
-// MockUVClient is a mock implementation of UVClient for testing
 type MockUVClient struct {
-	ExportSBOMFunc       func(inputDir string, opts scaplugin.Options) (*scaplugin.Finding, error)
-	ShouldExportSBOMFunc func(inputDir string, logger *zerolog.Logger) bool
+	CalledDirs []string
+	ReturnErr  error
 }
 
-func (m *MockUVClient) ExportSBOM(inputDir string, opts scaplugin.Options) (*scaplugin.Finding, error) {
-	if m.ExportSBOMFunc != nil {
-		return m.ExportSBOMFunc(inputDir, opts)
+func (m *MockUVClient) ExportSBOM(inputDir string, _ scaplugin.Options) (*scaplugin.Finding, error) {
+	m.CalledDirs = append(m.CalledDirs, inputDir)
+	if m.ReturnErr != nil {
+		return nil, m.ReturnErr
 	}
 	return &scaplugin.Finding{
 		Sbom: []byte(`{"mock":"sbom"}`),
 		Metadata: scaplugin.Metadata{
 			PackageManager: "pip",
 			Name:           "mock-project",
-			Version:        "0.0.0",
+			Version:        "1.0.0",
 		},
 		FileExclusions:       []string{},
-		NormalisedTargetFile: uv.UvLockFileName,
+		NormalisedTargetFile: "uv.lock",
 	}, nil
 }
 
-func (m *MockUVClient) ShouldExportSBOM(inputDir string, logger *zerolog.Logger) bool {
-	if m.ShouldExportSBOMFunc != nil {
-		return m.ShouldExportSBOMFunc(inputDir, logger)
-	}
+func (m *MockUVClient) ShouldExportSBOM(_ string, _ *zerolog.Logger) bool {
 	return true
 }
-
-var _ uv.Client = (*MockUVClient)(nil)

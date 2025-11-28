@@ -65,7 +65,12 @@ func handleSBOMResolutionDI(
 	// Generate SBOMs
 	findings := []scaplugin.Finding{}
 	for _, sp := range scaPlugins {
-		f, err := sp.BuildFindingsFromDir(inputDir, pluginOptions, logger)
+		f, err := sp.BuildFindingsFromDir(
+			context.Background(),
+			inputDir,
+			&pluginOptions,
+			logger,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("error building findings: %w", err)
 		}

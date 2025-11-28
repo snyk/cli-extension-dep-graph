@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
+	"github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

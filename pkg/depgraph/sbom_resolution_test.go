@@ -1,6 +1,7 @@
 package depgraph
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"net/http"
@@ -10,7 +11,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
-	"github.com/snyk/cli-extension-dep-graph/internal/uv"
 	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 	dg "github.com/snyk/dep-graph/go/pkg/depgraph"
 	"github.com/snyk/go-application-framework/pkg/configuration"
@@ -32,7 +32,12 @@ type mockScaPlugin struct {
 	err      error
 }
 
-func (m *mockScaPlugin) BuildFindingsFromDir(_ string, _ scaplugin.Options, _ *zerolog.Logger) ([]scaplugin.Finding, error) {
+func (m *mockScaPlugin) BuildFindingsFromDir(
+	_ context.Context,
+	_ string,
+	_ *scaplugin.Options,
+	_ *zerolog.Logger,
+) ([]scaplugin.Finding, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -131,16 +136,17 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		defer mockSBOMService.Close()
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
-		mockUVClient := &mocks.MockUVClient{
-			ExportSBOMFunc: func(_ string, _ scaplugin.Options) (*scaplugin.Finding, error) {
-				return &scaplugin.Finding{
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
 					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
 					Metadata: scaplugin.Metadata{
 						PackageManager: "pip",
 						Name:           "test-project",
 						Version:        "1.0.0",
 					},
-				}, nil
+					FileExclusions: []string{},
+				},
 			},
 		}
 
@@ -148,7 +154,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{uv.NewUvPlugin(mockUVClient)},
+			[]scaplugin.ScaPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -166,17 +172,15 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx := setupTestContext(t)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 
-		mockUVClient := &mocks.MockUVClient{
-			ExportSBOMFunc: func(_ string, _ scaplugin.Options) (*scaplugin.Finding, error) {
-				return nil, fmt.Errorf("uv command failed")
-			},
+		mockPlugin := &mockScaPlugin{
+			err: fmt.Errorf("uv command failed"),
 		}
 
 		workflowData, err := handleSBOMResolutionDI(
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{uv.NewUvPlugin(mockUVClient)},
+			[]scaplugin.ScaPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -194,16 +198,17 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		defer mockSBOMService.Close()
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
-		mockUVClient := &mocks.MockUVClient{
-			ExportSBOMFunc: func(_ string, _ scaplugin.Options) (*scaplugin.Finding, error) {
-				return &scaplugin.Finding{
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
 					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
 					Metadata: scaplugin.Metadata{
 						PackageManager: "pip",
 						Name:           "test-project",
 						Version:        "1.0.0",
 					},
-				}, nil
+					FileExclusions: []string{},
+				},
 			},
 		}
 
@@ -211,7 +216,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{uv.NewUvPlugin(mockUVClient)},
+			[]scaplugin.ScaPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -298,16 +303,17 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		defer mockSBOMService.Close()
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
-		mockUVClient := &mocks.MockUVClient{
-			ExportSBOMFunc: func(_ string, _ scaplugin.Options) (*scaplugin.Finding, error) {
-				return &scaplugin.Finding{
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
 					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
 					Metadata: scaplugin.Metadata{
 						PackageManager: "pip",
 						Name:           "test-project",
 						Version:        "1.0.0",
 					},
-				}, nil
+					FileExclusions: []string{},
+				},
 			},
 		}
 
@@ -315,7 +321,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{uv.NewUvPlugin(mockUVClient)},
+			[]scaplugin.ScaPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
