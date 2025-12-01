@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/depgraph"
+	"github.com/snyk/dep-graph/go/pkg/depgraph"
 )
 
 type ScanResultTarget struct {

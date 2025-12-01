@@ -7,6 +7,7 @@ toolchain go1.24.10
 require (
 	github.com/golang/mock v1.6.0
 	github.com/rs/zerolog v1.29.1
+	github.com/snyk/dep-graph/go v0.0.0-20251128083058-1972edcff6cf
 	github.com/snyk/error-catalog-golang-public v0.0.0-20251029091002-52bc5ef82c45
 	github.com/snyk/go-application-framework v0.0.0-20230714085540-37d34ad405bc
 	github.com/spf13/pflag v1.0.5
@@ -17,6 +18,7 @@ require (
 require (
 	github.com/alexbrainman/sspi v0.0.0-20210105120005-909beea2cc74 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/elliotchance/orderedmap/v3 v3.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
