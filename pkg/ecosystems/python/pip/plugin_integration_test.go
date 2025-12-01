@@ -61,8 +61,8 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 			absPath, err := filepath.Abs(fixturePath)
 			require.NoError(t, err, "failed to get absolute path for fixture")
 
-			// Run plugin
-			plugin := Plugin{}
+			// Run plugin with fixture executor
+			plugin := Plugin{Executor: &FixtureExecutor{}}
 			results, err := plugin.BuildDepGraphsFromDir(ctx, absPath, tc.Options)
 			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 
@@ -94,7 +94,7 @@ func TestPlugin_Concurrency(t *testing.T) {
 	absPath, err := filepath.Abs(fixturePath)
 	require.NoError(t, err)
 
-	plugin := Plugin{}
+	plugin := Plugin{Executor: &FixtureExecutor{}}
 	options := ecosystems.NewPluginOptions().WithAllSubProjects(true)
 
 	// Load expected output once
@@ -123,16 +123,19 @@ func TestPlugin_BuildDepGraphsFromDir_PipErrors(t *testing.T) {
 
 	tests := map[string]struct {
 		fixture               string
+		mockStderr            string
 		expectedCode          string
 		expectedDetailSnippet string
 	}{
 		"invalid_syntax": {
 			fixture:               "invalid-syntax",
+			mockStderr:            "ERROR: Invalid requirement: 'invalid===syntax!!!' (from line 1 of requirements.txt)",
 			expectedCode:          "SNYK-OS-PYTHON-0005",
 			expectedDetailSnippet: "Invalid syntax in requirements file",
 		},
 		"nonexistent_package": {
 			fixture:               "nonexistent-package",
+			mockStderr:            "ERROR: Could not find a version that satisfies the requirement nonexistent-package-xyz-123",
 			expectedCode:          "SNYK-OS-PYTHON-0004",
 			expectedDetailSnippet: "Package not found",
 		},
@@ -147,7 +150,7 @@ func TestPlugin_BuildDepGraphsFromDir_PipErrors(t *testing.T) {
 			absPath, err := filepath.Abs(fixturePath)
 			require.NoError(t, err, "failed to get absolute path for fixture")
 
-			plugin := Plugin{}
+			plugin := Plugin{Executor: &MockErrorExecutor{Stderr: tc.mockStderr}}
 			results, err := plugin.BuildDepGraphsFromDir(ctx, absPath, ecosystems.NewPluginOptions())
 			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 
@@ -180,7 +183,7 @@ func TestPlugin_ContextCancellation(t *testing.T) {
 	absPath, err := filepath.Abs(fixturePath)
 	require.NoError(t, err)
 
-	plugin := Plugin{}
+	plugin := Plugin{Executor: &FixtureExecutor{}}
 	results, err := plugin.BuildDepGraphsFromDir(ctx, absPath, ecosystems.NewPluginOptions())
 
 	// Should handle cancellation gracefully

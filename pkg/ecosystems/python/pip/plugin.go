@@ -22,7 +22,11 @@ const (
 	logFieldFile          = "file"
 )
 
-type Plugin struct{}
+type Plugin struct {
+	// Executor is an optional CommandExecutor for running pip commands.
+	// If nil, DefaultExecutor is used.
+	Executor CommandExecutor
+}
 
 // Compile-time check to ensure Plugin implements SCAPlugin interface.
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
@@ -122,7 +126,11 @@ func (p Plugin) buildDepGraphFromFile(ctx context.Context, file discovery.FindRe
 		slog.String("python_version", pythonVersion))
 
 	// Get pip install report (dry-run, no actual installation)
-	report, err := GetInstallReport(ctx, file.Path)
+	executor := p.Executor
+	if executor == nil {
+		executor = &DefaultExecutor{}
+	}
+	report, err := GetInstallReportWithExecutor(ctx, file.Path, executor)
 	if err != nil {
 		return ecosystems.SCAResult{}, fmt.Errorf("failed to get pip install report for %s: %w", file.RelPath, err)
 	}

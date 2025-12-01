@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "pip_version": "25.1.1",
+  "install": [],
+  "environment": {
+    "implementation_name": "cpython",
+    "implementation_version": "3.10.18",
+    "os_name": "posix",
+    "platform_machine": "arm64",
+    "platform_release": "25.1.0",
+    "platform_system": "Darwin",
+    "platform_version": "Darwin Kernel Version 25.1.0: Mon Oct 20 19:34:05 PDT 2025; root:xnu-12377.41.6~2/RELEASE_ARM64_T6041",
+    "python_full_version": "3.10.18",
+    "platform_python_implementation": "CPython",
+    "python_version": "3.10",
+    "sys_platform": "darwin"
+  }
+}

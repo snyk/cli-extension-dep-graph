@@ -114,6 +114,8 @@ func TestGetInstallReport_Fixtures(t *testing.T) {
 		},
 	}
 
+	executor := &FixtureExecutor{}
+
 	for testName, tc := range tests {
 		t.Run(testName, func(t *testing.T) {
 			requirementsPath := getFixturePath(tc.Fixture, "requirements.txt")
@@ -127,7 +129,7 @@ func TestGetInstallReport_Fixtures(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			actual, err := GetInstallReport(ctx, requirementsPath)
+			actual, err := GetInstallReportWithExecutor(ctx, requirementsPath, executor)
 			if err != nil {
 				t.Fatalf("GetInstallReport failed: %v", err)
 			}
@@ -142,6 +144,7 @@ func TestGetInstallReport_Integration_Errors(t *testing.T) {
 	tests := map[string]struct {
 		setupCtx    func() (context.Context, context.CancelFunc)
 		reqPath     string
+		executor    CommandExecutor
 		wantErr     error  // For context errors
 		wantErrCode string // For catalog errors
 	}{
@@ -150,6 +153,7 @@ func TestGetInstallReport_Integration_Errors(t *testing.T) {
 				return context.WithTimeout(context.Background(), 30*time.Second)
 			},
 			reqPath:     "/nonexistent/requirements.txt",
+			executor:    &MockErrorExecutor{Stderr: "ERROR: Could not open requirements file: No such file or directory"},
 			wantErrCode: "SNYK-OS-PYTHON-0009",
 		},
 		"context_cancellation": {
@@ -158,8 +162,9 @@ func TestGetInstallReport_Integration_Errors(t *testing.T) {
 				cancel()
 				return ctx, func() {}
 			},
-			reqPath: getFixturePath("simple", "requirements.txt"),
-			wantErr: context.Canceled,
+			reqPath:  getFixturePath("simple", "requirements.txt"),
+			executor: &FixtureExecutor{},
+			wantErr:  context.Canceled,
 		},
 		"timeout": {
 			setupCtx: func() (context.Context, context.CancelFunc) {
@@ -168,6 +173,7 @@ func TestGetInstallReport_Integration_Errors(t *testing.T) {
 				return ctx, cancel
 			},
 			reqPath:     getFixturePath("simple", "requirements.txt"),
+			executor:    &FixtureExecutor{},
 			wantErrCode: "SNYK-0004",
 		},
 		"invalid_syntax": {
@@ -175,6 +181,7 @@ func TestGetInstallReport_Integration_Errors(t *testing.T) {
 				return context.WithTimeout(context.Background(), 30*time.Second)
 			},
 			reqPath:     getFixturePath("invalid-syntax", "requirements.txt"),
+			executor:    &MockErrorExecutor{Stderr: "ERROR: Invalid requirement: 'invalid===syntax!!!'"},
 			wantErrCode: "SNYK-OS-PYTHON-0005",
 		},
 		"package_not_found": {
@@ -182,6 +189,7 @@ func TestGetInstallReport_Integration_Errors(t *testing.T) {
 				return context.WithTimeout(context.Background(), 30*time.Second)
 			},
 			reqPath:     getFixturePath("nonexistent-package", "requirements.txt"),
+			executor:    &MockErrorExecutor{Stderr: "ERROR: Could not find a version that satisfies the requirement nonexistent-package-xyz-123"},
 			wantErrCode: "SNYK-OS-PYTHON-0004",
 		},
 	}
@@ -191,7 +199,7 @@ func TestGetInstallReport_Integration_Errors(t *testing.T) {
 			ctx, cancel := tt.setupCtx()
 			defer cancel()
 
-			_, err := GetInstallReport(ctx, tt.reqPath)
+			_, err := GetInstallReportWithExecutor(ctx, tt.reqPath, tt.executor)
 
 			if tt.wantErr != nil {
 				assert.True(t, errors.Is(err, tt.wantErr))

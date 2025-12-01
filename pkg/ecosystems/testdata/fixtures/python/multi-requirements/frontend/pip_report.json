@@ -1,0 +1,128 @@
+{
+  "version": "1",
+  "pip_version": "25.1.1",
+  "install": [
+    {
+      "download_info": {
+        "url": "https://files.pythonhosted.org/packages/bc/c3/f068337a370801f372f2f8f6bad74a5c140f6fda3d9de154052708dd3c65/Jinja2-3.1.2-py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=6088930bfe239f0e6710546ab9c19c9ef35e29792895fed6e6e31a023a182a61",
+          "hashes": {
+            "sha256": "6088930bfe239f0e6710546ab9c19c9ef35e29792895fed6e6e31a023a182a61"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.1",
+        "name": "Jinja2",
+        "version": "3.1.2",
+        "platform": [
+          "UNKNOWN"
+        ],
+        "summary": "A very fast and expressive template engine.",
+        "description_content_type": "text/x-rst",
+        "home_page": "https://palletsprojects.com/p/jinja/",
+        "author": "Armin Ronacher",
+        "author_email": "armin.ronacher@active-4.com",
+        "maintainer": "Pallets",
+        "maintainer_email": "contact@palletsprojects.com",
+        "license": "BSD-3-Clause",
+        "license_file": [
+          "LICENSE.rst"
+        ],
+        "classifier": [
+          "Development Status :: 5 - Production/Stable",
+          "Environment :: Web Environment",
+          "Intended Audience :: Developers",
+          "License :: OSI Approved :: BSD License",
+          "Operating System :: OS Independent",
+          "Programming Language :: Python",
+          "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+          "Topic :: Text Processing :: Markup :: HTML"
+        ],
+        "requires_dist": [
+          "MarkupSafe (>=2.0)",
+          "Babel (>=2.7) ; extra == 'i18n'"
+        ],
+        "requires_python": ">=3.7",
+        "project_url": [
+          "Donate, https://palletsprojects.com/donate",
+          "Documentation, https://jinja.palletsprojects.com/",
+          "Changes, https://jinja.palletsprojects.com/changes/",
+          "Source Code, https://github.com/pallets/jinja/",
+          "Issue Tracker, https://github.com/pallets/jinja/issues/",
+          "Twitter, https://twitter.com/PalletsTeam",
+          "Chat, https://discord.gg/pallets"
+        ],
+        "provides_extra": [
+          "i18n"
+        ],
+        "description": "Jinja\n=====\n\nJinja is a fast, expressive, extensible templating engine. Special\nplaceholders in the template allow writing code similar to Python\nsyntax. Then the template is passed data to render the final document.\n\nIt includes:\n\n-   Template inheritance and inclusion.\n-   Define and import macros within templates.\n-   HTML templates can use autoescaping to prevent XSS from untrusted\n    user input.\n-   A sandboxed environment can safely render untrusted templates.\n-   AsyncIO support for generating templates and calling async\n    functions.\n-   I18N support with Babel.\n-   Templates are compiled to optimized Python code just-in-time and\n    cached, or can be compiled ahead-of-time.\n-   Exceptions point to the correct line in templates to make debugging\n    easier.\n-   Extensible filters, tests, functions, and even syntax.\n\nJinja's philosophy is that while application logic belongs in Python if\npossible, it shouldn't make the template designer's job difficult by\nrestricting functionality too much.\n\n\nInstalling\n----------\n\nInstall and update using `pip`_:\n\n.. code-block:: text\n\n    $ pip install -U Jinja2\n\n.. _pip: https://pip.pypa.io/en/stable/getting-started/\n\n\nIn A Nutshell\n-------------\n\n.. code-block:: jinja\n\n    {% extends \"base.html\" %}\n    {% block title %}Members{% endblock %}\n    {% block content %}\n      <ul>\n      {% for user in users %}\n        <li><a href=\"{{ user.url }}\">{{ user.username }}</a></li>\n      {% endfor %}\n      </ul>\n    {% endblock %}\n\n\nDonate\n------\n\nThe Pallets organization develops and supports Jinja and other popular\npackages. In order to grow the community of contributors and users, and\nallow the maintainers to devote more time to the projects, `please\ndonate today`_.\n\n.. _please donate today: https://palletsprojects.com/donate\n\n\nLinks\n-----\n\n-   Documentation: https://jinja.palletsprojects.com/\n-   Changes: https://jinja.palletsprojects.com/changes/\n-   PyPI Releases: https://pypi.org/project/Jinja2/\n-   Source Code: https://github.com/pallets/jinja/\n-   Issue Tracker: https://github.com/pallets/jinja/issues/\n-   Website: https://palletsprojects.com/p/jinja/\n-   Twitter: https://twitter.com/PalletsTeam\n-   Chat: https://discord.gg/pallets\n\n\n"
+      }
+    },
+    {
+      "download_info": {
+        "url": "https://files.pythonhosted.org/packages/98/1b/fbd8eed11021cabd9226c37342fa6ca4e8a98d8188a8d9b66740494960e4/markupsafe-3.0.3-cp310-cp310-macosx_11_0_arm64.whl",
+        "archive_info": {
+          "hash": "sha256=e1c1493fb6e50ab01d20a22826e57520f1284df32f2d8601fdd90b6304601419",
+          "hashes": {
+            "sha256": "e1c1493fb6e50ab01d20a22826e57520f1284df32f2d8601fdd90b6304601419"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": false,
+      "metadata": {
+        "metadata_version": "2.4",
+        "name": "MarkupSafe",
+        "version": "3.0.3",
+        "dynamic": [
+          "license-file"
+        ],
+        "summary": "Safely add untrusted strings to HTML/XML markup.",
+        "description_content_type": "text/markdown",
+        "maintainer_email": "Pallets <contact@palletsprojects.com>",
+        "license_expression": "BSD-3-Clause",
+        "license_file": [
+          "LICENSE.txt"
+        ],
+        "classifier": [
+          "Development Status :: 5 - Production/Stable",
+          "Environment :: Web Environment",
+          "Intended Audience :: Developers",
+          "Operating System :: OS Independent",
+          "Programming Language :: Python",
+          "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+          "Topic :: Text Processing :: Markup :: HTML",
+          "Typing :: Typed"
+        ],
+        "requires_python": ">=3.9",
+        "project_url": [
+          "Donate, https://palletsprojects.com/donate",
+          "Documentation, https://markupsafe.palletsprojects.com/",
+          "Changes, https://markupsafe.palletsprojects.com/page/changes/",
+          "Source, https://github.com/pallets/markupsafe/",
+          "Chat, https://discord.gg/pallets"
+        ],
+        "description": "<div align=\"center\"><img src=\"https://raw.githubusercontent.com/pallets/markupsafe/refs/heads/stable/docs/_static/markupsafe-name.svg\" alt=\"\" height=\"150\"></div>\n\n# MarkupSafe\n\nMarkupSafe implements a text object that escapes characters so it is\nsafe to use in HTML and XML. Characters that have special meanings are\nreplaced so that they display as the actual characters. This mitigates\ninjection attacks, meaning untrusted user input can safely be displayed\non a page.\n\n\n## Examples\n\n```pycon\n>>> from markupsafe import Markup, escape\n\n>>> # escape replaces special characters and wraps in Markup\n>>> escape(\"<script>alert(document.cookie);</script>\")\nMarkup('&lt;script&gt;alert(document.cookie);&lt;/script&gt;')\n\n>>> # wrap in Markup to mark text \"safe\" and prevent escaping\n>>> Markup(\"<strong>Hello</strong>\")\nMarkup('<strong>hello</strong>')\n\n>>> escape(Markup(\"<strong>Hello</strong>\"))\nMarkup('<strong>hello</strong>')\n\n>>> # Markup is a str subclass\n>>> # methods and operators escape their arguments\n>>> template = Markup(\"Hello <em>{name}</em>\")\n>>> template.format(name='\"World\"')\nMarkup('Hello <em>&#34;World&#34;</em>')\n```\n\n## Donate\n\nThe Pallets organization develops and supports MarkupSafe and other\npopular packages. In order to grow the community of contributors and\nusers, and allow the maintainers to devote more time to the projects,\n[please donate today][].\n\n[please donate today]: https://palletsprojects.com/donate\n\n## Contributing\n\nSee our [detailed contributing documentation][contrib] for many ways to\ncontribute, including reporting issues, requesting features, asking or answering\nquestions, and making PRs.\n\n[contrib]: https://palletsprojects.com/contributing/\n"
+      }
+    }
+  ],
+  "environment": {
+    "implementation_name": "cpython",
+    "implementation_version": "3.10.18",
+    "os_name": "posix",
+    "platform_machine": "arm64",
+    "platform_release": "25.1.0",
+    "platform_system": "Darwin",
+    "platform_version": "Darwin Kernel Version 25.1.0: Mon Oct 20 19:34:05 PDT 2025; root:xnu-12377.41.6~2/RELEASE_ARM64_T6041",
+    "python_full_version": "3.10.18",
+    "platform_python_implementation": "CPython",
+    "python_version": "3.10",
+    "sys_platform": "darwin"
+  }
+}

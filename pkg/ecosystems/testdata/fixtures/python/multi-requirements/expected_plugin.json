@@ -32,6 +32,74 @@
   {
     "depGraph": {
       "packages": {
+        "Flask@3.0.0": {
+          "packageId": "Flask@3.0.0",
+          "packageName": "Flask",
+          "version": "3.0.0"
+        },
+        "Jinja2@3.1.6": {
+          "packageId": "Jinja2@3.1.6",
+          "packageName": "Jinja2",
+          "version": "3.1.6"
+        },
+        "MarkupSafe@3.0.3": {
+          "packageId": "MarkupSafe@3.0.3",
+          "packageName": "MarkupSafe",
+          "version": "3.0.3"
+        },
+        "Werkzeug@3.1.4": {
+          "packageId": "Werkzeug@3.1.4",
+          "packageName": "Werkzeug",
+          "version": "3.1.4"
+        },
+        "blinker@1.9.0": {
+          "packageId": "blinker@1.9.0",
+          "packageName": "blinker",
+          "version": "1.9.0"
+        },
+        "click@8.3.1": {
+          "packageId": "click@8.3.1",
+          "packageName": "click",
+          "version": "8.3.1"
+        },
+        "itsdangerous@2.2.0": {
+          "packageId": "itsdangerous@2.2.0",
+          "packageName": "itsdangerous",
+          "version": "2.2.0"
+        }
+      },
+      "graph": {
+        "Flask@3.0.0": [
+          "Werkzeug@3.1.4",
+          "Jinja2@3.1.6",
+          "itsdangerous@2.2.0",
+          "click@8.3.1",
+          "blinker@1.9.0"
+        ],
+        "Jinja2@3.1.6": [
+          "MarkupSafe@3.0.3"
+        ],
+        "MarkupSafe@3.0.3": null,
+        "Werkzeug@3.1.4": [
+          "MarkupSafe@3.0.3"
+        ],
+        "blinker@1.9.0": null,
+        "click@8.3.1": null,
+        "itsdangerous@2.2.0": null,
+        "root": [
+          "Flask@3.0.0"
+        ]
+      },
+      "rootPackageId": "root"
+    },
+    "metadata": {
+      "targetFile": "backend/requirements.txt",
+      "runtime": "python@3.14.0"
+    }
+  },
+  {
+    "depGraph": {
+      "packages": {
         "certifi@2025.11.12": {
           "packageId": "certifi@2025.11.12",
           "packageName": "certifi",
@@ -77,74 +145,6 @@
     },
     "metadata": {
       "targetFile": "requirements.txt",
-      "runtime": "python@3.14.0"
-    }
-  },
-  {
-    "depGraph": {
-      "packages": {
-        "Flask@3.0.0": {
-          "packageId": "Flask@3.0.0",
-          "packageName": "Flask",
-          "version": "3.0.0"
-        },
-        "Jinja2@3.1.6": {
-          "packageId": "Jinja2@3.1.6",
-          "packageName": "Jinja2",
-          "version": "3.1.6"
-        },
-        "MarkupSafe@3.0.3": {
-          "packageId": "MarkupSafe@3.0.3",
-          "packageName": "MarkupSafe",
-          "version": "3.0.3"
-        },
-        "Werkzeug@3.1.3": {
-          "packageId": "Werkzeug@3.1.3",
-          "packageName": "Werkzeug",
-          "version": "3.1.3"
-        },
-        "blinker@1.9.0": {
-          "packageId": "blinker@1.9.0",
-          "packageName": "blinker",
-          "version": "1.9.0"
-        },
-        "click@8.3.1": {
-          "packageId": "click@8.3.1",
-          "packageName": "click",
-          "version": "8.3.1"
-        },
-        "itsdangerous@2.2.0": {
-          "packageId": "itsdangerous@2.2.0",
-          "packageName": "itsdangerous",
-          "version": "2.2.0"
-        }
-      },
-      "graph": {
-        "Flask@3.0.0": [
-          "Werkzeug@3.1.3",
-          "Jinja2@3.1.6",
-          "itsdangerous@2.2.0",
-          "click@8.3.1",
-          "blinker@1.9.0"
-        ],
-        "Jinja2@3.1.6": [
-          "MarkupSafe@3.0.3"
-        ],
-        "MarkupSafe@3.0.3": null,
-        "Werkzeug@3.1.3": [
-          "MarkupSafe@3.0.3"
-        ],
-        "blinker@1.9.0": null,
-        "click@8.3.1": null,
-        "itsdangerous@2.2.0": null,
-        "root": [
-          "Flask@3.0.0"
-        ]
-      },
-      "rootPackageId": "root"
-    },
-    "metadata": {
-      "targetFile": "backend/requirements.txt",
       "runtime": "python@3.14.0"
     }
   }

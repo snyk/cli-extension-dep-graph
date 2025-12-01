@@ -52,6 +52,16 @@
           "packageName": "requests",
           "version": "2.31.0"
         },
+        "tomli@2.3.0": {
+          "packageId": "tomli@2.3.0",
+          "packageName": "tomli",
+          "version": "2.3.0"
+        },
+        "typing_extensions@4.15.0": {
+          "packageId": "typing_extensions@4.15.0",
+          "packageName": "typing_extensions",
+          "version": "4.15.0"
+        },
         "urllib3@2.5.0": {
           "packageId": "urllib3@2.5.0",
           "packageName": "urllib3",
@@ -63,7 +73,8 @@
           "click@8.3.1",
           "packaging@25.0",
           "pathspec@0.12.1",
-          "platformdirs@4.5.0"
+          "platformdirs@4.5.0",
+          "tomli@2.3.0"
         ],
         "certifi@2025.11.12": null,
         "charset-normalizer@3.4.4": null,
@@ -83,6 +94,8 @@
           "black@23.12.1",
           "requests@2.31.0"
         ],
+        "tomli@2.3.0": null,
+        "typing_extensions@4.15.0": null,
         "urllib3@2.5.0": null
       },
       "rootPackageId": "root"
