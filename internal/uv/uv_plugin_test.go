@@ -94,15 +94,7 @@ func TestPlugin_BuildFindingsFromDir(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Setup temp directory
-			tmpDir, err := os.MkdirTemp("", "uv-test-*")
-			if err != nil {
-				t.Fatalf("Failed to create temp dir: %v", err)
-			}
-			defer os.RemoveAll(tmpDir)
-
-			// Create test files
-			createFiles(t, tmpDir, tt.files)
+			tmpDir := createFiles(t, tt.files...)
 
 			// Setup mockClient and plugin
 			mockClient := &mocks.MockUVClient{}
@@ -121,7 +113,7 @@ func TestPlugin_BuildFindingsFromDir(t *testing.T) {
 			}
 
 			// Verify correct directories were processed
-			gotDirs := toRelativePaths(t, tmpDir, mockClient.CalledDirs)
+			gotDirs := mockClient.CalledDirs
 			expectedDirs := append([]string{}, tt.expectedDirs...)
 			sort.Strings(gotDirs)
 			sort.Strings(expectedDirs)
@@ -148,30 +140,80 @@ func TestPlugin_BuildFindingsFromDir(t *testing.T) {
 }
 
 func TestPlugin_BuildFindingsFromDir_ErrorHandling(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "uv-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	createFiles(t, tmpDir, []string{"uv.lock"})
+	tmpDir := createFiles(t, "uv.lock")
 
 	mockClient := &mocks.MockUVClient{ReturnErr: errors.New("export failed")}
 	plugin := NewUvPlugin(mockClient)
 
 	ctx := context.Background()
 	options := &scaplugin.Options{AllProjects: false}
-	_, err = plugin.BuildFindingsFromDir(ctx, tmpDir, options, &logger)
+	findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, &logger)
+	require.NoError(t, err)
 
-	require.Error(t, err)
-	require.ErrorContains(t, err, "failed to export SBOM")
+	require.Len(t, findings, 1)
+	require.NotNil(t, findings[0].Error)
+	require.ErrorContains(t, findings[0].Error, "failed to build dependency graph")
+
+	require.Equal(t, "uv.lock", findings[0].NormalisedTargetFile)
+	require.Empty(t, findings[0].Sbom)
+}
+
+func TestPlugin_BuildFindingsFromDir_MixedSuccessAndFailure(t *testing.T) {
+	// Create multiple lock files
+	tmpDir := createFiles(t,
+		"uv.lock",
+		"project1/uv.lock",
+		"project2/uv.lock",
+	)
+
+	// Setup mock to fail for project1 but succeed for others
+	mockClient := &mocks.MockUVClient{
+		ErrorDirs: map[string]error{
+			"project1": errors.New("uv export failed"),
+		},
+	}
+	plugin := NewUvPlugin(mockClient)
+
+	ctx := context.Background()
+	options := &scaplugin.Options{AllProjects: true}
+	findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, &logger)
+	require.NoError(t, err)
+
+	require.Len(t, findings, 3)
+
+	// Count successful vs error findings
+	successCount := 0
+	errorCount := 0
+	var errorFinding *scaplugin.Finding
+	for i := range findings {
+		if findings[i].Error != nil {
+			errorCount++
+			errorFinding = &findings[i]
+		} else {
+			successCount++
+		}
+	}
+	require.Equal(t, 2, successCount, "Expected 2 successful findings")
+	require.Equal(t, 1, errorCount, "Expected 1 error finding")
+
+	require.NotNil(t, errorFinding)
+	require.ErrorContains(t, errorFinding.Error, "failed to build dependency graph")
+	require.Equal(t, "project1/uv.lock", errorFinding.NormalisedTargetFile)
+	require.Empty(t, errorFinding.Sbom)
 }
 
 // Helper to create files.
-func createFiles(t *testing.T, rootDir string, files []string) {
+func createFiles(t *testing.T, files ...string) string {
 	t.Helper()
+
+	tmpDir, err := os.MkdirTemp("", "uv-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+
 	for _, file := range files {
-		fullPath := filepath.Join(rootDir, file)
+		fullPath := filepath.Join(tmpDir, file)
 		dir := filepath.Dir(fullPath)
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 			t.Fatalf("Failed to create directory %s: %v", dir, err)
@@ -180,18 +222,6 @@ func createFiles(t *testing.T, rootDir string, files []string) {
 			t.Fatalf("Failed to create file %s: %v", fullPath, err)
 		}
 	}
-}
 
-// Helper to convert absolute paths to relative paths for comparison.
-func toRelativePaths(t *testing.T, rootDir string, absPaths []string) []string {
-	t.Helper()
-	result := make([]string, len(absPaths))
-	for i, absPath := range absPaths {
-		relPath, err := filepath.Rel(rootDir, absPath)
-		if err != nil {
-			t.Fatalf("Failed to get relative path: %v", err)
-		}
-		result[i] = relPath
-	}
-	return result
+	return tmpDir
 }

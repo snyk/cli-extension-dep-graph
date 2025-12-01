@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
+	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,7 +45,7 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 	}
 
 	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	result, err := client.ExportSBOM("/test/dir", scaplugin.Options{})
+	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{})
 
 	assert.NoError(t, err)
 	require.NotNil(t, result)
@@ -79,7 +79,7 @@ func TestUVClient_ExportSBOM_AllProjects(t *testing.T) {
 	}
 
 	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	result, err := client.ExportSBOM("/test/dir", scaplugin.Options{AllProjects: true})
+	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{AllProjects: true})
 
 	assert.NoError(t, err)
 	require.NotNil(t, result)
@@ -99,7 +99,7 @@ func TestUVClient_ExportSBOM_DevTrue_OmitsNoDevFlag(t *testing.T) {
 	}
 
 	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	_, err := client.ExportSBOM("/test/dir", scaplugin.Options{Dev: true})
+	_, err := client.ExportSBOM("/test/dir", &scaplugin.Options{Dev: true})
 
 	assert.NoError(t, err)
 }
@@ -113,7 +113,7 @@ func TestUVClient_ExportSBOM_Error(t *testing.T) {
 	}
 
 	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	result, err := client.ExportSBOM("/test/dir", scaplugin.Options{})
+	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{})
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, expectedErr)
@@ -133,7 +133,7 @@ func TestUVClient_ExportSBOM_InvalidSBOM(t *testing.T) {
 	}
 
 	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	result, err := client.ExportSBOM("/test/dir", scaplugin.Options{})
+	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{})
 
 	require.Error(t, err)
 	var catalogErr snyk_errors.Error

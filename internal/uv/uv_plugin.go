@@ -34,16 +34,23 @@ func (p Plugin) BuildFindingsFromDir(
 		return []scaplugin.Finding{}, nil
 	}
 
-	findings := make([]scaplugin.Finding, len(files))
-	for i, file := range files {
-		dir := filepath.Dir(file.Path)
-		logger.Printf("Exporting SBOM for %s", file.Path)
+	findings := []scaplugin.Finding{}
+	for _, file := range files {
+		dir := filepath.Dir(file.RelPath)
+		logger.Printf("Build dependency graph for %s", file.RelPath)
 
-		finding, err := p.client.ExportSBOM(dir, *options)
+		finding, err := p.client.ExportSBOM(dir, options)
 		if err != nil {
-			return nil, fmt.Errorf("failed to export SBOM: %w", err)
+			logger.Printf("Failed to build dependency graph for %s: %v", file.RelPath, err)
+			wrappedErr := fmt.Errorf("failed to build dependency graph for %s: %w", file.RelPath, err)
+			errorFinding := scaplugin.Finding{
+				NormalisedTargetFile: file.RelPath,
+				Error:                wrappedErr,
+			}
+			findings = append(findings, errorFinding)
+			continue
 		}
-		findings[i] = *finding
+		findings = append(findings, *finding)
 	}
 	return findings, nil
 }
