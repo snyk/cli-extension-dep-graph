@@ -9,6 +9,7 @@ import (
 type Options struct {
 	AllProjects bool
 	Dev         bool
+	Exclude     []string
 }
 
 type Metadata struct {
