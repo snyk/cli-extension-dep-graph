@@ -98,10 +98,10 @@
           "packageName": "MarkupSafe",
           "version": "3.0.3"
         },
-        "Werkzeug@3.1.3": {
-          "packageId": "Werkzeug@3.1.3",
+        "Werkzeug@3.1.4": {
+          "packageId": "Werkzeug@3.1.4",
           "packageName": "Werkzeug",
-          "version": "3.1.3"
+          "version": "3.1.4"
         },
         "blinker@1.9.0": {
           "packageId": "blinker@1.9.0",
@@ -121,7 +121,7 @@
       },
       "graph": {
         "Flask@3.0.0": [
-          "Werkzeug@3.1.3",
+          "Werkzeug@3.1.4",
           "Jinja2@3.1.6",
           "itsdangerous@2.2.0",
           "click@8.3.1",
@@ -131,7 +131,7 @@
           "MarkupSafe@3.0.3"
         ],
         "MarkupSafe@3.0.3": null,
-        "Werkzeug@3.1.3": [
+        "Werkzeug@3.1.4": [
           "MarkupSafe@3.0.3"
         ],
         "blinker@1.9.0": null,

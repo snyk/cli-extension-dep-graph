@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -57,6 +58,7 @@ func GetInstallReport(ctx context.Context, requirementsFile string) (*Report, er
 //   - --report -: Output JSON report to stdout (dash means stdout)
 //   - --quiet: Suppress non-error output (except the report)
 //   - -r: Read from requirements file
+//   - --index-url: Custom PyPI index (if PIP_TEST_INDEX_URL is set)
 func GetInstallReportWithExecutor(ctx context.Context, requirementsFile string, executor CommandExecutor) (*Report, error) {
 	if requirementsFile == "" {
 		return nil, fmt.Errorf("requirements file path cannot be empty")
@@ -70,6 +72,11 @@ func GetInstallReportWithExecutor(ctx context.Context, requirementsFile string, 
 		"--report", "-",
 		"--quiet",
 		"-r", requirementsFile,
+	}
+
+	// Add custom index URL from environment variable (for testing with devpi/custom index)
+	if indexURL := os.Getenv("PIP_TEST_INDEX_URL"); indexURL != "" {
+		args = append(args, "--index-url", indexURL)
 	}
 
 	// Execute the command
