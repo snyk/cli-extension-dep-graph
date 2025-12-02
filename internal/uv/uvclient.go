@@ -9,16 +9,21 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rs/zerolog"
 	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 	clierrors "github.com/snyk/error-catalog-golang-public/cli"
 	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 )
 
+const (
+	UvLockFileName          = "uv.lock"
+	RequirementsTxtFileName = "requirements.txt"
+	PyprojectTomlFileName   = "pyproject.toml"
+	UvWorkspacePathProperty = "uv:workspace:path"
+)
+
 type Client interface {
-	ExportSBOM(inputDir string, opts scaplugin.Options) (*scaplugin.Finding, error)
-	ShouldExportSBOM(inputDir string, logger *zerolog.Logger) bool
+	ExportSBOM(inputDir string, opts *scaplugin.Options) (*scaplugin.Finding, error)
 }
 
 type client struct {
@@ -45,7 +50,7 @@ func NewUvClientWithExecutor(uvBinary string, executor cmdExecutor) Client {
 }
 
 // exportSBOM exports an SBOM in CycloneDX format using uv.
-func (c client) ExportSBOM(inputDir string, opts scaplugin.Options) (*scaplugin.Finding, error) {
+func (c client) ExportSBOM(inputDir string, opts *scaplugin.Options) (*scaplugin.Finding, error) {
 	args := []string{"export", "--format", "cyclonedx1.5", "--frozen", "--preview"}
 	if opts.AllProjects {
 		args = append(args, "--all-packages")
@@ -164,10 +169,6 @@ func extractWorkspacePackages(sbomData []byte) []scaplugin.WorkspacePackage {
 	}
 
 	return workspacePackages
-}
-
-func (c *client) ShouldExportSBOM(inputDir string, logger *zerolog.Logger) bool {
-	return HasUvLockFile(inputDir, logger)
 }
 
 // cmdExecutor interface for executing commands mockable.

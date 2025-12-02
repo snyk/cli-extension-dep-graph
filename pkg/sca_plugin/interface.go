@@ -1,6 +1,10 @@
 package scaplugin
 
-import "github.com/rs/zerolog"
+import (
+	"context"
+
+	"github.com/rs/zerolog"
+)
 
 type Options struct {
 	AllProjects bool
@@ -25,10 +29,11 @@ type Finding struct {
 	FileExclusions       []string           // Paths for files that other plugins should ignore
 	NormalisedTargetFile string             // The target file name without any qualifiers, e.g. `uv.lock` (and not `dir/uv.lock`)
 	WorkspacePackages    []WorkspacePackage // Packages that are part of a workspace
+	Error                error              // Error that occurred while building the finding
 }
 
 type Sbom []byte
 
 type ScaPlugin interface {
-	BuildFindingsFromDir(dir string, options Options, logger *zerolog.Logger) ([]Finding, error)
+	BuildFindingsFromDir(ctx context.Context, dir string, options *Options, logger *zerolog.Logger) ([]Finding, error)
 }
