@@ -12,6 +12,7 @@ const (
 	UvLockFileName          = "uv.lock"
 	RequirementsTxtFileName = "requirements.txt"
 	PyprojectTomlFileName   = "pyproject.toml"
+	UvWorkspacePathProperty = "uv:workspace:path"
 )
 
 // This is copied from cli-extension-os-flows. We could export from here via GAF config and re-use if this duplication

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -16,7 +17,7 @@ import (
 )
 
 type Client interface {
-	ExportSBOM(inputDir string) (*scaplugin.Finding, error)
+	ExportSBOM(inputDir string, opts scaplugin.Options) (*scaplugin.Finding, error)
 	ShouldExportSBOM(inputDir string, logger *zerolog.Logger) bool
 }
 
@@ -44,8 +45,12 @@ func NewUvClientWithExecutor(uvBinary string, executor cmdExecutor) Client {
 }
 
 // exportSBOM exports an SBOM in CycloneDX format using uv.
-func (c client) ExportSBOM(inputDir string) (*scaplugin.Finding, error) {
-	output, err := c.executor.Execute(c.uvBinary, inputDir, "export", "--format", "cyclonedx1.5", "--frozen", "--preview")
+func (c client) ExportSBOM(inputDir string, opts scaplugin.Options) (*scaplugin.Finding, error) {
+	args := []string{"export", "--format", "cyclonedx1.5", "--frozen", "--preview"}
+	if opts.AllProjects {
+		args = append(args, "--all-packages")
+	}
+	output, err := c.executor.Execute(c.uvBinary, inputDir, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute uv export: %w", err)
 	}
@@ -55,18 +60,33 @@ func (c client) ExportSBOM(inputDir string) (*scaplugin.Finding, error) {
 		return nil, err
 	}
 
+	workspacePackages := extractWorkspacePackages(output)
+
+	// TODO(uv): uncomment when we are able to pass these to the CLI correctly. Currently the
+	// `--exclude` flag does not accept paths, it only accepts file or dir names, which does not
+	// work for our use case.
+	// fileExclusions := buildFileExclusions(workspacePackages)
+	fileExclusions := []string{}
+
 	return &scaplugin.Finding{
-		Sbom:           output,
-		Metadata:       *metadata,
-		FileExclusions: []string{
-			// TODO(uv): uncomment when we are able to pass these to the CLI correctly. Currently the
-			// `--exclude` flag does not accept paths, it only accepts file or dir names, which does not
-			// work for our use case.
-			// path.Join(inputDir, uv.RequirementsTxtFileName),
-			// path.Join(inputDir, uv.PyprojectTomlFileName),
-		},
+		Sbom:                 output,
+		Metadata:             *metadata,
+		FileExclusions:       fileExclusions,
 		NormalisedTargetFile: UvLockFileName,
+		WorkspacePackages:    workspacePackages,
 	}, nil
+}
+
+// Builds a list of files to exclude from scanning in other plugins.
+func buildFileExclusions(workspacePackages []scaplugin.WorkspacePackage) []string {
+	exclusions := []string{}
+	for _, pkg := range workspacePackages {
+		exclusions = append(exclusions,
+			filepath.Join(pkg.Path, PyprojectTomlFileName),
+			filepath.Join(pkg.Path, RequirementsTxtFileName),
+		)
+	}
+	return exclusions
 }
 
 // Extracts metadata from the SBOM and validates that it is valid JSON with a root component.
@@ -104,6 +124,43 @@ func extractMetadata(sbomData []byte) (*scaplugin.Metadata, error) {
 		Name:           sbom.Metadata.Component.Name,
 		Version:        sbom.Metadata.Component.Version,
 	}, nil
+}
+
+// Minimal representation of a CycloneDX component for extracting workspace packages.
+type cycloneDXComponent struct {
+	Name       string `json:"name"`
+	Version    string `json:"version"`
+	Properties []struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	} `json:"properties"`
+}
+
+// Extracts workspace package information from a CycloneDX SBOM.
+func extractWorkspacePackages(sbomData []byte) []scaplugin.WorkspacePackage {
+	var sbom struct {
+		Components []cycloneDXComponent `json:"components"`
+	}
+
+	if err := json.Unmarshal(sbomData, &sbom); err != nil {
+		return nil
+	}
+
+	var workspacePackages []scaplugin.WorkspacePackage
+	for _, component := range sbom.Components {
+		for _, prop := range component.Properties {
+			if prop.Name == UvWorkspacePathProperty {
+				workspacePackages = append(workspacePackages, scaplugin.WorkspacePackage{
+					Name:    component.Name,
+					Version: component.Version,
+					Path:    prop.Value,
+				})
+				break // Should only have one workspace property per component
+			}
+		}
+	}
+
+	return workspacePackages
 }
 
 func (c *client) ShouldExportSBOM(inputDir string, logger *zerolog.Logger) bool {

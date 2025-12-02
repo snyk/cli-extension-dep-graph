@@ -55,11 +55,13 @@ func handleSBOMResolutionDI(
 	// - handle various options, including --all-projects, --file and --exclude
 	// - check which other flags we need to handle e.g. fail-fast
 
-	pluginOptions := scaplugin.Options{}
+	allProjects := config.GetBool(FlagAllProjects)
+	pluginOptions := scaplugin.Options{
+		AllProjects: allProjects,
+	}
 
 	// Generate SBOMs
 	findings := []scaplugin.Finding{}
-	allProjects := config.GetBool(FlagAllProjects)
 	for _, sp := range scaPlugins {
 		f, err := sp.BuildFindingsFromDir(inputDir, pluginOptions, logger)
 		if err != nil {
@@ -81,8 +83,8 @@ func handleSBOMResolutionDI(
 
 	// Convert SBOMs to workflow.Data
 	workflowData := []workflow.Data{}
-	for _, f := range findings { // Could be parallelised in future
-		data, err := sbomToWorkflowData(&f, snykClient, logger, remoteRepoURL)
+	for i := range findings { // Could be parallelised in future
+		data, err := sbomToWorkflowData(&findings[i], snykClient, logger, remoteRepoURL)
 		if err != nil {
 			return nil, fmt.Errorf("error converting SBOM: %w", err)
 		}
@@ -106,8 +108,8 @@ func handleSBOMResolutionDI(
 
 func getExclusionsFromFindings(findings []scaplugin.Finding) []string {
 	exclusions := []string{}
-	for _, f := range findings {
-		exclusions = append(exclusions, f.FileExclusions...)
+	for i := range findings {
+		exclusions = append(exclusions, findings[i].FileExclusions...)
 	}
 	return exclusions
 }
