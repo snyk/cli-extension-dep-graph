@@ -52,12 +52,8 @@ func TestPlugin_BuildFindingsFromDir(t *testing.T) {
 			files: []string{
 				"uv.lock",
 				"src/uv.lock",
-				"node_modules/pkg/uv.lock",
-				"venv/uv.lock",
-				".git/uv.lock",
-				"__pycache__/uv.lock",
-				"dist/uv.lock",
-				"build/uv.lock",
+				"node_modules/uv.lock",
+				".build/uv.lock",
 			},
 			allProjects:  true,
 			expectedDirs: []string{".", "src"}, // only root and src

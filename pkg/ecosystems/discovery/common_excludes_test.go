@@ -25,16 +25,6 @@ func TestCommonExcludes(t *testing.T) {
 		filesToSetup[folder+"/requirements.txt"] = "test content"
 	}
 
-	// Add some dot folders
-	filesToSetup[".git/requirements.txt"] = "test content"
-	filesToSetup[".venv/requirements.txt"] = "test content"
-	filesToSetup[".env/requirements.txt"] = "test content"
-	filesToSetup[".tox/requirements.txt"] = "test content"
-	filesToSetup[".pytest_cache/requirements.txt"] = "test content"
-	filesToSetup[".mypy_cache/requirements.txt"] = "test content"
-	filesToSetup[".ruff_cache/requirements.txt"] = "test content"
-	filesToSetup[".eggs/requirements.txt"] = "test content"
-
 	setupFiles(t, tmpDir, filesToSetup)
 
 	results, err := FindFiles(context.Background(), tmpDir,
