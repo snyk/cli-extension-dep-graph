@@ -103,6 +103,7 @@ func setupTestContext(t *testing.T) *testContext {
 
 	invocationContext := frameworkmocks.NewMockInvocationContext(ctrl)
 	invocationContext.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
+	invocationContext.EXPECT().Context().Return(context.Background()).AnyTimes()
 
 	return &testContext{
 		ctrl:              ctrl,

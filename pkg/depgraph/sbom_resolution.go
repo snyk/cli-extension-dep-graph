@@ -2,7 +2,6 @@ package depgraph
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -66,7 +65,7 @@ func handleSBOMResolutionDI(
 	findings := []scaplugin.Finding{}
 	for _, sp := range scaPlugins {
 		f, err := sp.BuildFindingsFromDir(
-			context.Background(),
+			ctx.Context(),
 			inputDir,
 			&pluginOptions,
 			logger,
@@ -91,7 +90,7 @@ func handleSBOMResolutionDI(
 	// Convert SBOMs to workflow.Data
 	workflowData := []workflow.Data{}
 	for i := range findings { // Could be parallelised in future
-		data, err := sbomToWorkflowData(&findings[i], snykClient, logger, remoteRepoURL)
+		data, err := sbomToWorkflowData(ctx, &findings[i], snykClient, logger, remoteRepoURL)
 		if err != nil {
 			return nil, fmt.Errorf("error converting SBOM: %w", err)
 		}
@@ -160,10 +159,16 @@ func executeLegacyWorkflow(
 	return nil, fmt.Errorf("error handling legacy workflow: %w", err)
 }
 
-func sbomToWorkflowData(finding *scaplugin.Finding, snykClient *snykclient.SnykClient, logger *zerolog.Logger, remoteRepoURL string) ([]workflow.Data, error) {
+func sbomToWorkflowData(
+	ctx workflow.InvocationContext,
+	finding *scaplugin.Finding,
+	snykClient *snykclient.SnykClient,
+	logger *zerolog.Logger,
+	remoteRepoURL string,
+) ([]workflow.Data, error) {
 	sbomReader := bytes.NewReader(finding.Sbom)
 
-	scans, warnings, err := snykClient.SBOMConvert(context.Background(), logger, sbomReader, remoteRepoURL)
+	scans, warnings, err := snykClient.SBOMConvert(ctx.Context(), logger, sbomReader, remoteRepoURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert SBOM: %w", err)
 	}
