@@ -48,15 +48,108 @@ jobs:
             wget -qO- https://go.dev/dl/go<< pipeline.parameters.go_version >>.0.linux-amd64.tar.gz | sudo tar -C /usr/local -xz
             echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
             source $BASH_ENV
+      - restore_cache:
+          name: Restore devpi package cache
+          keys:
+            - devpi-packages-v1-py<< parameters.python_version >>
+            - devpi-packages-v1-
+      - run:
+          name: Set up devpi (PyPI caching proxy)
+          command: |
+            # Check if cache was restored
+            if [ -d ~/.devpi/server ]; then
+              echo "✓ devpi cache restored ($(du -sh ~/.devpi/server | cut -f1))"
+            else
+              echo "✗ No cache found, will initialize new devpi server"
+            fi
+            
+            # Install devpi
+            pip install devpi-server devpi-client
+            
+            # Initialize if needed
+            if [ ! -d ~/.devpi/server ]; then
+              echo "Initializing new devpi server..."
+              devpi-init
+            fi
+            
+            # Start devpi in background with nohup to keep it running
+            echo "Starting devpi server..."
+            nohup devpi-server --host localhost --port 3141 > /tmp/devpi.log 2>&1 &
+            DEVPI_PID=$!
+            echo "devpi started with PID: $DEVPI_PID"
+            
+            # Wait for devpi to be ready (up to 60 seconds)
+            echo "Waiting for devpi to start..."
+            for i in {1..30}; do
+              if curl -s http://localhost:3141/ > /dev/null 2>&1; then
+                echo "✓ devpi is ready!"
+                break
+              fi
+              echo "Waiting... ($i/30)"
+              sleep 2
+            done
+            
+            # Verify devpi is running
+            if ! curl -s http://localhost:3141/ > /dev/null 2>&1; then
+              echo "ERROR: devpi failed to start"
+              exit 1
+            fi
+            
+            # Configure devpi client
+            devpi use http://localhost:3141
+            devpi login root --password=''
+            
+            # Create or use existing index
+            if devpi index root/stable 2>/dev/null; then
+              echo "✓ Using existing root/stable index"
+            else
+              echo "Creating new root/stable index..."
+              devpi index -c root/stable bases=root/pypi volatile=False
+            fi
+            devpi use root/stable
+            
+            # Verify index is working
+            echo "Verifying index configuration..."
+            devpi getjson /root/stable
+            
+            # Test package lookup
+            echo "Testing package lookup (requests)..."
+            if curl -s "http://localhost:3141/root/stable/+simple/requests/" | grep -q "requests-"; then
+              echo "✓ devpi can proxy to PyPI successfully"
+            else
+              echo "✗ devpi failed to fetch package list from PyPI"
+              exit 1
+            fi
+            
+            # Export for tests
+            echo 'export PIP_TEST_INDEX_URL="http://localhost:3141/root/stable/+simple/"' >> $BASH_ENV
+            source $BASH_ENV
+            echo "✓ PIP_TEST_INDEX_URL set to: $PIP_TEST_INDEX_URL"
       - run:
           name: Verify installations
           command: |
             go version
             python --version
             pip --version
+            echo "PIP_TEST_INDEX_URL: $PIP_TEST_INDEX_URL"
+            echo "devpi cache size: $(du -sh ~/.devpi/server 2>/dev/null || echo '0 (new cache)')"
+            # Verify devpi is still running
+            if curl -s http://localhost:3141/ > /dev/null 2>&1; then
+              echo "✓ devpi server is running"
+            else
+              echo "✗ devpi server is NOT running!"
+              echo "devpi logs:"
+              cat /tmp/devpi.log 2>/dev/null || echo "No logs found"
+              exit 1
+            fi
       - run:
           name: Run Python integration tests
           command: make test-python-integration
+      - save_cache:
+          name: Save devpi package cache
+          key: devpi-packages-v1-py<< parameters.python_version >>
+          paths:
+            - ~/.devpi/server
 
   security-scans:
     <<: *go_image
@@ -146,37 +239,36 @@ workflows:
       # PR-only jobs - all testing
       - lint:
           <<: *filters_pr_only
-      
+
       - unit_test:
           <<: *filters_pr_only
-      
+
       - prodsec/secrets-scan:
           name: Scan repository for secrets
           context:
             - snyk-bot-slack
           channel: snyk-vuln-alerts-unify
           <<: *filters_pr_only
-      
-      ## Temporarily disabled as they are failing due to version updates e.g.
-      # - python_integration_test:
-      #     requires:
-      #       - unit_test
-      #     matrix:
-      #       parameters:
-      #         python_version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
-      #     <<: *filters_pr_only
+
+      - python_integration_test:
+          requires:
+            - unit_test
+          matrix:
+            parameters:
+              python_version: [ "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14" ]
+          <<: *filters_pr_only
       
       # Main branch only - security scans and tagging (no test re-runs)
       - security-scans:
           context:
             - analysis_unify
           <<: *filters_main_only
-      
+
       - determine-version:
           requires:
             - security-scans
           <<: *filters_main_only
-      
+
       - tag-release:
           context:
             - os-ecosystems
