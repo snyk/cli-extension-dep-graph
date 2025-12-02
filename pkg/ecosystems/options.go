@@ -9,8 +9,8 @@ type SCAPluginOptions struct {
 
 // GlobalOptions contains options that apply globally across all SCA plugins.
 type GlobalOptions struct {
-	TargetFile     *string
-	AllSubProjects bool
+	TargetFile  *string
+	AllProjects bool
 }
 
 // PythonOptions contains Python-specific options for dependency graph generation.
@@ -28,7 +28,7 @@ func (o *SCAPluginOptions) WithTargetFile(targetFile string) *SCAPluginOptions {
 	return o
 }
 
-func (o *SCAPluginOptions) WithAllSubProjects(allSubProjects bool) *SCAPluginOptions {
-	o.Global.AllSubProjects = allSubProjects
+func (o *SCAPluginOptions) WithAllProjects(allProjects bool) *SCAPluginOptions {
+	o.Global.AllProjects = allProjects
 	return o
 }

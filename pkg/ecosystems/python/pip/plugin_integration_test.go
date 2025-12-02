@@ -38,17 +38,17 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 	}
 
 	tests := map[string]PluginTestCase{
-		"single_requirements_at_root":           {Fixture: "simple", Options: ecosystems.NewPluginOptions()},
-		"empty_requirements":                    {Fixture: "empty", Options: ecosystems.NewPluginOptions()},
-		"multiple_dependencies":                 {Fixture: "multiple-deps", Options: ecosystems.NewPluginOptions()},
-		"with_version_specifiers":               {Fixture: "with-version-specifiers", Options: ecosystems.NewPluginOptions()},
-		"with_extras":                           {Fixture: "with-extras", Options: ecosystems.NewPluginOptions()},
-		"os_specific_requirements":              {Fixture: "os-specific", Options: ecosystems.NewPluginOptions()},
-		"environment_markers":                   {Fixture: "env-markers", Options: ecosystems.NewPluginOptions()},
-		"git_references":                        {Fixture: "git-references", Options: ecosystems.NewPluginOptions()},
-		"url_references":                        {Fixture: "url-references", Options: ecosystems.NewPluginOptions()},
-		"multiple_requirements_all_subprojects": {Fixture: "multi-requirements", Options: ecosystems.NewPluginOptions().WithAllSubProjects(true)},
-		"transitive_conflicts":                  {Fixture: "transitive-conflicts", Options: ecosystems.NewPluginOptions()},
+		"single_requirements_at_root":        {Fixture: "simple", Options: ecosystems.NewPluginOptions()},
+		"empty_requirements":                 {Fixture: "empty", Options: ecosystems.NewPluginOptions()},
+		"multiple_dependencies":              {Fixture: "multiple-deps", Options: ecosystems.NewPluginOptions()},
+		"with_version_specifiers":            {Fixture: "with-version-specifiers", Options: ecosystems.NewPluginOptions()},
+		"with_extras":                        {Fixture: "with-extras", Options: ecosystems.NewPluginOptions()},
+		"os_specific_requirements":           {Fixture: "os-specific", Options: ecosystems.NewPluginOptions()},
+		"environment_markers":                {Fixture: "env-markers", Options: ecosystems.NewPluginOptions()},
+		"git_references":                     {Fixture: "git-references", Options: ecosystems.NewPluginOptions()},
+		"url_references":                     {Fixture: "url-references", Options: ecosystems.NewPluginOptions()},
+		"multiple_requirements_all_projects": {Fixture: "multi-requirements", Options: ecosystems.NewPluginOptions().WithAllProjects(true)},
+		"transitive_conflicts":               {Fixture: "transitive-conflicts", Options: ecosystems.NewPluginOptions()},
 	}
 
 	for name, tc := range tests {
@@ -95,7 +95,7 @@ func TestPlugin_Concurrency(t *testing.T) {
 	require.NoError(t, err)
 
 	plugin := Plugin{}
-	options := ecosystems.NewPluginOptions().WithAllSubProjects(true)
+	options := ecosystems.NewPluginOptions().WithAllProjects(true)
 
 	// Load expected output once
 	expectedPath := getExpectedOutputPath(t, fixturePath, pythonVersion)

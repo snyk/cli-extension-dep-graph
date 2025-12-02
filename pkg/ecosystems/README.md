@@ -163,7 +163,7 @@ type SCAPluginOptions struct {
 ```
 
 Options support:
-- **Global settings**: Apply to all ecosystems (e.g., `AllSubProjects`, `TargetFile`)
+- **Global settings**: Apply to all ecosystems (e.g., `AllProjects`, `TargetFile`)
 - **Ecosystem-specific settings**: Only relevant to particular package managers
 
 ### Builder Pattern
@@ -171,7 +171,7 @@ Options support:
 ```go
 options := ecosystems.NewPluginOptions().
     WithTargetFile("requirements.txt").
-    WithAllSubProjects(true)
+    WithAllProjects(true)
 
 results, err := plugin.BuildDepGraphsFromDir(ctx, "/path/to/project", options)
 ```
