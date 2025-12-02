@@ -50,6 +50,9 @@ func (c client) ExportSBOM(inputDir string, opts scaplugin.Options) (*scaplugin.
 	if opts.AllProjects {
 		args = append(args, "--all-packages")
 	}
+	if !opts.Dev {
+		args = append(args, "--no-dev")
+	}
 	output, err := c.executor.Execute(c.uvBinary, inputDir, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute uv export: %w", err)

@@ -4,6 +4,7 @@ import "github.com/rs/zerolog"
 
 type Options struct {
 	AllProjects bool
+	Dev         bool
 }
 
 type Metadata struct {
