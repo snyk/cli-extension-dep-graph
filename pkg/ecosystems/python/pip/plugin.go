@@ -94,7 +94,7 @@ func (p Plugin) discoverRequirementsFiles(ctx context.Context, dir string, optio
 		findOpts = []discovery.FindOption{
 			discovery.WithTargetFile(*options.Global.TargetFile),
 		}
-	case options.Global.AllSubProjects:
+	case options.Global.AllProjects:
 		// Find all requirements.txt files recursively
 		// Exclude common directories to avoid scanning unnecessary paths
 		findOpts = []discovery.FindOption{
