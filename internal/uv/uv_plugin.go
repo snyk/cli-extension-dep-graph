@@ -68,6 +68,9 @@ func (p Plugin) discoverLockFiles(
 			discovery.WithInclude(UvLockFileName),
 			discovery.WithCommonExcludes(),
 		}
+		if len(options.Exclude) > 0 {
+			findOpts = append(findOpts, discovery.WithExcludes(options.Exclude...))
+		}
 	default:
 		// Default: find uv.lock at root only
 		findOpts = []discovery.FindOption{

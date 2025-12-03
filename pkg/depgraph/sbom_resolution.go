@@ -56,9 +56,11 @@ func handleSBOMResolutionDI(
 
 	allProjects := config.GetBool(FlagAllProjects)
 	dev := config.GetBool(FlagDev)
+	exclude := parseExcludeFlag(config.GetString(FlagExclude))
 	pluginOptions := scaplugin.Options{
 		AllProjects: allProjects,
 		Dev:         dev,
+		Exclude:     exclude,
 	}
 
 	// Generate SBOMs
@@ -125,6 +127,25 @@ func getExclusionsFromFindings(findings []scaplugin.Finding) []string {
 		exclusions = append(exclusions, findings[i].FileExclusions...)
 	}
 	return exclusions
+}
+
+// parseExcludeFlag parses a comma-separated exclude flag value into a slice of strings.
+func parseExcludeFlag(excludeFlag string) []string {
+	if excludeFlag == "" {
+		return nil
+	}
+	parts := strings.Split(excludeFlag, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }
 
 func applyFindingsExclusions(config configuration.Configuration, findings []scaplugin.Finding) {

@@ -21,6 +21,7 @@ func TestPlugin_BuildFindingsFromDir(t *testing.T) {
 		name         string
 		files        []string // files to create relative to root
 		allProjects  bool
+		exclude      []string // directory/file names to exclude
 		expectedDirs []string // expected directories (relative paths) that should be processed
 		expectedErr  string   // if non-empty, expect error containing this string
 	}{
@@ -57,6 +58,55 @@ func TestPlugin_BuildFindingsFromDir(t *testing.T) {
 			},
 			allProjects:  true,
 			expectedDirs: []string{".", "src"}, // only root and src
+		},
+
+		// CLI exclude flag
+		{
+			name: "excludes directories by name with exclude flag",
+			files: []string{
+				"uv.lock",
+				"dir1/uv.lock",
+				"src/dir1/uv.lock",
+				"src/dir2/uv.lock",
+			},
+			allProjects:  true,
+			exclude:      []string{"dir1"},
+			expectedDirs: []string{".", "src/dir2"},
+		},
+		{
+			name: "excludes multiple directories with exclude flag",
+			files: []string{
+				"uv.lock",
+				"dir1/uv.lock",
+				"dir2/uv.lock",
+				"src/uv.lock",
+				"src/dir1/uv.lock",
+			},
+			allProjects:  true,
+			exclude:      []string{"dir1", "dir2"},
+			expectedDirs: []string{".", "src"},
+		},
+		{
+			name: "exclude flag combined with common excludes",
+			files: []string{
+				"uv.lock",
+				"node_modules/uv.lock",
+				"custom-exclude/uv.lock",
+				"src/uv.lock",
+			},
+			allProjects:  true,
+			exclude:      []string{"custom-exclude"},
+			expectedDirs: []string{".", "src"},
+		},
+		{
+			name: "exclude flag has no effect when allProjects is false",
+			files: []string{
+				"uv.lock",
+				"dir1/uv.lock",
+			},
+			allProjects:  false,
+			exclude:      []string{"dir1"},
+			expectedDirs: []string{"."},
 		},
 
 		// Edge cases
@@ -98,7 +148,7 @@ func TestPlugin_BuildFindingsFromDir(t *testing.T) {
 
 			// Execute
 			ctx := context.Background()
-			options := &scaplugin.Options{AllProjects: tt.allProjects}
+			options := &scaplugin.Options{AllProjects: tt.allProjects, Exclude: tt.exclude}
 			findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, &logger)
 
 			// Check error

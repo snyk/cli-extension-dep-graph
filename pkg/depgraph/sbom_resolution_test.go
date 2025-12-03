@@ -30,14 +30,16 @@ var uvSBOMConvertResponse string
 type mockScaPlugin struct {
 	findings []scaplugin.Finding
 	err      error
+	options  *scaplugin.Options
 }
 
 func (m *mockScaPlugin) BuildFindingsFromDir(
 	_ context.Context,
 	_ string,
-	_ *scaplugin.Options,
+	options *scaplugin.Options,
 	_ *zerolog.Logger,
 ) ([]scaplugin.Finding, error) {
+	m.options = options
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -724,6 +726,80 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Len(t, workflowData, 1, "Should only have 1 workflow data items as one finding has an error")
 		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
 	})
+
+	t.Run("should pass exclude flag to plugin options", func(t *testing.T) {
+		ctx := setupTestContext(t)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagAllProjects, true)
+		ctx.config.Set(FlagExclude, "dir1, dir2 ,dir3")
+
+		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse, http.StatusOK)
+		defer mockSBOMService.Close()
+		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
+
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project",
+						Version:        "1.0.0",
+					},
+					FileExclusions: []string{},
+				},
+			},
+		}
+
+		_, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, mockPlugin.options, "plugin should have been called with options")
+		assert.Equal(t, []string{"dir1", "dir2", "dir3"}, mockPlugin.options.Exclude)
+		assert.True(t, mockPlugin.options.AllProjects)
+	})
+
+	t.Run("should handle empty exclude flag", func(t *testing.T) {
+		ctx := setupTestContext(t)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagExclude, "")
+
+		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse, http.StatusOK)
+		defer mockSBOMService.Close()
+		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
+
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project",
+						Version:        "1.0.0",
+					},
+					FileExclusions: []string{},
+				},
+			},
+		}
+
+		_, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, mockPlugin.options, "plugin should have been called with options")
+		assert.Nil(t, mockPlugin.options.Exclude)
+	})
 }
 
 func Test_emptyDepGraph(t *testing.T) {
@@ -799,6 +875,57 @@ func Test_emptyDepGraph(t *testing.T) {
 					tc.validate(t, depGraph)
 				}
 			}
+		})
+	}
+}
+
+func Test_parseExcludeFlag(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "empty string returns nil",
+			input:    "",
+			expected: nil,
+		},
+		{
+			name:     "single value",
+			input:    "dir1",
+			expected: []string{"dir1"},
+		},
+		{
+			name:     "multiple values",
+			input:    "dir1,dir2,dir3",
+			expected: []string{"dir1", "dir2", "dir3"},
+		},
+		{
+			name:     "trims whitespace around values",
+			input:    "dir1, dir2 , dir3",
+			expected: []string{"dir1", "dir2", "dir3"},
+		},
+		{
+			name:     "filters empty entries",
+			input:    "dir1,,dir2,",
+			expected: []string{"dir1", "dir2"},
+		},
+		{
+			name:     "only commas returns nil",
+			input:    ",,,",
+			expected: nil,
+		},
+		{
+			name:     "whitespace only entries are filtered",
+			input:    "dir1,   ,dir2",
+			expected: []string{"dir1", "dir2"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := parseExcludeFlag(tc.input)
+			assert.Equal(t, tc.expected, result)
 		})
 	}
 }
