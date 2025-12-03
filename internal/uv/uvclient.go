@@ -81,7 +81,7 @@ func (c client) ExportSBOM(inputDir string, opts *scaplugin.Options) (*scaplugin
 		Sbom:                 output,
 		Metadata:             *metadata,
 		FileExclusions:       fileExclusions,
-		NormalisedTargetFile: UvLockFileName,
+		NormalisedTargetFile: filepath.Join(inputDir, PyprojectTomlFileName),
 		WorkspacePackages:    workspacePackages,
 	}, nil
 }
