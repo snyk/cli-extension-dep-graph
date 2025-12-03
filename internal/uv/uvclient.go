@@ -63,12 +63,13 @@ func (c client) ExportSBOM(inputDir string, opts *scaplugin.Options) (*scaplugin
 		return nil, fmt.Errorf("failed to execute uv export: %w", err)
 	}
 
-	metadata, err := extractMetadata(output)
+	sbom, err := parseAndValidateSBOM(output)
 	if err != nil {
 		return nil, err
 	}
 
-	workspacePackages := extractWorkspacePackages(output)
+	metadata := extractMetadata(sbom)
+	workspacePackages := extractWorkspacePackages(sbom)
 
 	// TODO(uv): uncomment when we are able to pass these to the CLI correctly. Currently the
 	// `--exclude` flag does not accept paths, it only accepts file or dir names, which does not
@@ -97,16 +98,31 @@ func buildFileExclusions(workspacePackages []scaplugin.WorkspacePackage) []strin
 	return exclusions
 }
 
-// Extracts metadata from the SBOM and validates that it is valid JSON with a root component.
-func extractMetadata(sbomData []byte) (*scaplugin.Metadata, error) {
-	var sbom struct {
-		Metadata struct {
-			Component *struct {
-				Name    string `json:"name"`
-				Version string `json:"version"`
-			} `json:"component"`
-		} `json:"metadata"`
-	}
+// Minimal representation of a CycloneDX SBOM.
+type cycloneDXSBOM struct {
+	Metadata struct {
+		Component *struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+		} `json:"component"`
+	} `json:"metadata"`
+	Components []cycloneDXComponent `json:"components"`
+}
+
+// Minimal representation of a CycloneDX component.
+type cycloneDXComponent struct {
+	Name       string `json:"name"`
+	Version    string `json:"version"`
+	Properties []struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	} `json:"properties"`
+}
+
+// Parses and validates the SBOM JSON.
+// Returns the parsed struct or an error if parsing or validation fails.
+func parseAndValidateSBOM(sbomData []byte) (*cycloneDXSBOM, error) {
+	var sbom cycloneDXSBOM
 
 	if err := json.Unmarshal(sbomData, &sbom); err != nil {
 		return nil, ecosystems.NewUnprocessableFileError(
@@ -127,33 +143,18 @@ func extractMetadata(sbomData []byte) (*scaplugin.Metadata, error) {
 		)
 	}
 
+	return &sbom, nil
+}
+
+func extractMetadata(sbom *cycloneDXSBOM) *scaplugin.Metadata {
 	return &scaplugin.Metadata{
 		PackageManager: "pip",
 		Name:           sbom.Metadata.Component.Name,
 		Version:        sbom.Metadata.Component.Version,
-	}, nil
+	}
 }
 
-// Minimal representation of a CycloneDX component for extracting workspace packages.
-type cycloneDXComponent struct {
-	Name       string `json:"name"`
-	Version    string `json:"version"`
-	Properties []struct {
-		Name  string `json:"name"`
-		Value string `json:"value"`
-	} `json:"properties"`
-}
-
-// Extracts workspace package information from a CycloneDX SBOM.
-func extractWorkspacePackages(sbomData []byte) []scaplugin.WorkspacePackage {
-	var sbom struct {
-		Components []cycloneDXComponent `json:"components"`
-	}
-
-	if err := json.Unmarshal(sbomData, &sbom); err != nil {
-		return nil
-	}
-
+func extractWorkspacePackages(sbom *cycloneDXSBOM) []scaplugin.WorkspacePackage {
 	var workspacePackages []scaplugin.WorkspacePackage
 	for _, component := range sbom.Components {
 		for _, prop := range component.Properties {

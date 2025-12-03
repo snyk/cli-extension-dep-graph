@@ -299,9 +299,11 @@ func TestExtractMetadata_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			metadata, err := extractMetadata([]byte(tt.sbom))
-			assert.NoError(t, err)
-			require.NotNil(t, metadata)
+			sbom, err := parseAndValidateSBOM([]byte(tt.sbom))
+			require.NoError(t, err)
+			require.NotNil(t, sbom)
+
+			metadata := extractMetadata(sbom)
 			assert.Equal(t, "pip", metadata.PackageManager)
 			assert.Equal(t, tt.expectedName, metadata.Name)
 			assert.Equal(t, tt.expectedVersion, metadata.Version)
@@ -352,8 +354,8 @@ func TestExtractMetadata_MissingComponent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			metadata, err := extractMetadata([]byte(tt.sbom))
-			assert.Nil(t, metadata)
+			sbom, err := parseAndValidateSBOM([]byte(tt.sbom))
+			assert.Nil(t, sbom)
 			require.Error(t, err)
 			var catalogErr snyk_errors.Error
 			assert.True(t, errors.As(err, &catalogErr), "error should be a catalog error")
@@ -363,12 +365,43 @@ func TestExtractMetadata_MissingComponent(t *testing.T) {
 }
 
 func TestExtractMetadata_InvalidJSON(t *testing.T) {
-	metadata, err := extractMetadata([]byte("invalid json"))
-	assert.Nil(t, metadata)
-	require.Error(t, err)
-	var catalogErr snyk_errors.Error
-	assert.True(t, errors.As(err, &catalogErr), "error should be a catalog error")
-	assert.Contains(t, catalogErr.Detail, "Failed to parse SBOM JSON")
+	tests := []struct {
+		name           string
+		sbom           string
+		expectedErrMsg string
+	}{
+		{
+			name:           "invalid json",
+			sbom:           "invalid json",
+			expectedErrMsg: "Failed to parse SBOM JSON",
+		},
+		{
+			name:           "malformed json - missing closing brace",
+			sbom:           `{"metadata": {`,
+			expectedErrMsg: "Failed to parse SBOM JSON",
+		},
+		{
+			name:           "null",
+			sbom:           "null",
+			expectedErrMsg: "SBOM missing root component",
+		},
+		{
+			name:           "empty object",
+			sbom:           "{}",
+			expectedErrMsg: "SBOM missing root component",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sbom, err := parseAndValidateSBOM([]byte(tt.sbom))
+			assert.Nil(t, sbom)
+			require.Error(t, err)
+			var catalogErr snyk_errors.Error
+			assert.True(t, errors.As(err, &catalogErr), "error should be a catalog error")
+			assert.Contains(t, catalogErr.Detail, tt.expectedErrMsg)
+		})
+	}
 }
 
 func TestCompareVersions(t *testing.T) {
@@ -426,6 +459,12 @@ func TestExtractWorkspacePackages(t *testing.T) {
 		{
 			name: "single workspace package",
 			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "test-project",
+						"version": "1.0.0"
+					}
+				},
 				"components": [
 					{
 						"name": "lib-core",
@@ -443,6 +482,12 @@ func TestExtractWorkspacePackages(t *testing.T) {
 		{
 			name: "multiple workspace packages",
 			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "test-project",
+						"version": "1.0.0"
+					}
+				},
 				"components": [
 					{
 						"name": "lib-core",
@@ -468,6 +513,12 @@ func TestExtractWorkspacePackages(t *testing.T) {
 		{
 			name: "mixed workspace and regular packages",
 			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "test-project",
+						"version": "1.0.0"
+					}
+				},
 				"components": [
 					{
 						"name": "requests",
@@ -495,6 +546,12 @@ func TestExtractWorkspacePackages(t *testing.T) {
 		{
 			name: "component with other properties but not workspace path",
 			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "test-project",
+						"version": "1.0.0"
+					}
+				},
 				"components": [
 					{
 						"name": "colorama",
@@ -510,6 +567,12 @@ func TestExtractWorkspacePackages(t *testing.T) {
 		{
 			name: "component with multiple properties including workspace path",
 			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "test-project",
+						"version": "1.0.0"
+					}
+				},
 				"components": [
 					{
 						"name": "lib-core",
@@ -527,25 +590,99 @@ func TestExtractWorkspacePackages(t *testing.T) {
 			},
 		},
 		{
-			name:     "no components",
-			sbom:     `{"components": []}`,
+			name: "no components",
+			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "test-project",
+						"version": "1.0.0"
+					}
+				},
+				"components": []
+			}`,
 			expected: nil,
 		},
 		{
-			name:     "empty sbom",
-			sbom:     `{}`,
+			name: "sbom without components field",
+			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "test-project",
+						"version": "1.0.0"
+					}
+				}
+			}`,
 			expected: nil,
 		},
 		{
-			name:     "invalid json",
-			sbom:     `invalid`,
+			name: "component with empty properties array",
+			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "test-project",
+						"version": "1.0.0"
+					}
+				},
+				"components": [
+					{
+						"name": "some-package",
+						"version": "1.0.0",
+						"properties": []
+					}
+				]
+			}`,
+			expected: nil,
+		},
+		{
+			name: "component with workspace path but empty value",
+			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "test-project",
+						"version": "1.0.0"
+					}
+				},
+				"components": [
+					{
+						"name": "lib-core",
+						"version": "0.1.0",
+						"properties": [
+							{"name": "uv:workspace:path", "value": ""}
+						]
+					}
+				]
+			}`,
+			expected: []scaplugin.WorkspacePackage{
+				{Name: "lib-core", Version: "0.1.0", Path: ""},
+			},
+		},
+		{
+			name: "component with nil properties (missing field)",
+			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "test-project",
+						"version": "1.0.0"
+					}
+				},
+				"components": [
+					{
+						"name": "some-package",
+						"version": "1.0.0"
+					}
+				]
+			}`,
 			expected: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := extractWorkspacePackages([]byte(tt.sbom))
+			sbom, err := parseAndValidateSBOM([]byte(tt.sbom))
+			require.NoError(t, err)
+			require.NotNil(t, sbom)
+
+			result := extractWorkspacePackages(sbom)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
