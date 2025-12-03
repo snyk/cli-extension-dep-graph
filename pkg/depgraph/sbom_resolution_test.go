@@ -114,18 +114,22 @@ func setupTestContext(t *testing.T) *testContext {
 
 func createMockSBOMService(t *testing.T, responseBody string, statusCode int) *httptest.Server {
 	t.Helper()
+
 	mockResponse := mocks.NewMockResponse(
 		"application/json",
 		[]byte(responseBody),
 		statusCode,
 	)
 
-	return mocks.NewMockSBOMService(mockResponse, func(r *http.Request) {
+	mockSBOMService := mocks.NewMockSBOMService(mockResponse, func(r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Contains(t, r.RequestURI, "/hidden/orgs/test-org-id/sboms/convert")
 		assert.Equal(t, "application/octet-stream", r.Header.Get("Content-Type"))
 		assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
 	})
+	t.Cleanup(func() { mockSBOMService.Close() })
+
+	return mockSBOMService
 }
 
 func Test_callback_SBOMResolution(t *testing.T) {
@@ -134,7 +138,6 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 
 		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse, http.StatusOK)
-		defer mockSBOMService.Close()
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockPlugin := &mockScaPlugin{
@@ -196,7 +199,6 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 
 		mockSBOMService := createMockSBOMService(t, `{"message":"Internal server error."}`, http.StatusInternalServerError)
-		defer mockSBOMService.Close()
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockPlugin := &mockScaPlugin{
@@ -301,7 +303,6 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(FlagAllProjects, false)
 
 		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse, http.StatusOK)
-		defer mockSBOMService.Close()
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockPlugin := &mockScaPlugin{
@@ -571,7 +572,6 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(FlagAllProjects, true)
 
 		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse, http.StatusOK)
-		defer mockSBOMService.Close()
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		// Create mock plugin that returns a finding
@@ -646,7 +646,6 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(FlagAllProjects, true)
 
 		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse, http.StatusOK)
-		defer mockSBOMService.Close()
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		// Create mock plugin that returns a finding
@@ -681,6 +680,48 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Contains(t, err.Error(), "error handling legacy workflow")
 		assert.Nil(t, workflowData)
 		// Legacy resolution should have been called
+		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
+	})
+
+	t.Run("should skip findings with errors and only process valid findings", func(t *testing.T) {
+		ctx := setupTestContext(t)
+		ctx.config.Set(FlagAllProjects, true)
+
+		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse, http.StatusOK)
+		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
+
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project-1",
+						Version:        "1.0.0",
+					},
+					FileExclusions: []string{"project1/uv.lock"},
+					Error:          nil,
+				},
+				{
+					FileExclusions: []string{"project2/uv.lock"},
+					Error:          fmt.Errorf("failed to generate SBOM"), // Finding with error
+				},
+			},
+		}
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.NoError(t, err)
+		assert.NotNil(t, workflowData)
+		assert.Len(t, workflowData, 1, "Should only have 1 workflow data items as one finding has an error")
 		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
 	})
 }

@@ -90,7 +90,14 @@ func handleSBOMResolutionDI(
 	// Convert SBOMs to workflow.Data
 	workflowData := []workflow.Data{}
 	for i := range findings { // Could be parallelised in future
-		data, err := sbomToWorkflowData(ctx, &findings[i], snykClient, logger, remoteRepoURL)
+		finding := &findings[i]
+
+		if finding.Error != nil {
+			logger.Printf("Skipping finding for %s which errored with: %v", finding.NormalisedTargetFile, finding.Error)
+			continue
+		}
+
+		data, err := sbomToWorkflowData(ctx, finding, snykClient, logger, remoteRepoURL)
 		if err != nil {
 			return nil, fmt.Errorf("error converting SBOM: %w", err)
 		}
