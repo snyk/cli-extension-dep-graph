@@ -104,6 +104,54 @@ func TestUVClient_ExportSBOM_DevTrue_OmitsNoDevFlag(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestUVClient_ExportSBOM_NormalisedTargetFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		inputDir string
+		expected string
+	}{
+		{
+			name:     "current directory",
+			inputDir: ".",
+			expected: "pyproject.toml",
+		},
+		{
+			name:     "empty directory",
+			inputDir: "",
+			expected: "pyproject.toml",
+		},
+		{
+			name:     "nested directory path",
+			inputDir: "/path/to/project",
+			expected: "/path/to/project/pyproject.toml",
+		},
+		{
+			name:     "relative directory path",
+			inputDir: "relative/path",
+			expected: "relative/path/pyproject.toml",
+		},
+	}
+
+	validSBOM := `{"metadata": {"component": {"name": "test-project", "version": "1.0.0"}}}`
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockExecutor := &mockCmdExecutor{
+				executeFunc: func(_, _ string, _ ...string) ([]byte, error) {
+					return []byte(validSBOM), nil
+				},
+			}
+
+			client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
+			result, err := client.ExportSBOM(tt.inputDir, &scaplugin.Options{})
+
+			assert.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, tt.expected, result.NormalisedTargetFile)
+		})
+	}
+}
+
 func TestUVClient_ExportSBOM_Error(t *testing.T) {
 	expectedErr := errors.New("command failed")
 	mockExecutor := &mockCmdExecutor{
