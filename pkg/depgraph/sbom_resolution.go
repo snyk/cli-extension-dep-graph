@@ -55,10 +55,12 @@ func handleSBOMResolutionDI(
 	// - check which other flags we need to handle e.g. fail-fast
 
 	allProjects := config.GetBool(FlagAllProjects)
+	targetFile := config.GetString(FlagFile)
 	dev := config.GetBool(FlagDev)
 	exclude := parseExcludeFlag(config.GetString(FlagExclude))
 	pluginOptions := scaplugin.Options{
 		AllProjects: allProjects,
+		TargetFile:  targetFile,
 		Dev:         dev,
 		Exclude:     exclude,
 	}

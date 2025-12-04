@@ -185,6 +185,217 @@ func TestPlugin_BuildFindingsFromDir(t *testing.T) {
 	}
 }
 
+func TestPlugin_ShouldNotSkipProcessingWhenNoTargetFileIsSet(t *testing.T) {
+	tmpDir := createFiles(t, "uv.lock", "pyproject.toml", "package.json")
+
+	mockClient := &mocks.MockUVClient{}
+	plugin := NewUvPlugin(mockClient)
+
+	options := &scaplugin.Options{}
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	require.NoError(t, err)
+
+	require.Len(t, findings, 1, "Should return findings")
+	require.NotEmpty(t, mockClient.CalledDirs, "Should have called the uv client")
+}
+
+func TestPlugin_ShouldNotSkipProcessingWhenUvLockFile(t *testing.T) {
+	tmpDir := createFiles(t, "uv.lock", "pyproject.toml", "package.json")
+
+	mockClient := &mocks.MockUVClient{}
+	plugin := NewUvPlugin(mockClient)
+
+	options := &scaplugin.Options{TargetFile: "uv.lock"}
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	require.NoError(t, err)
+
+	require.Len(t, findings, 1, "Should return findings")
+	require.NotEmpty(t, mockClient.CalledDirs, "Should have called the uv client")
+}
+
+func TestPlugin_SkipsProcessingWhenTargetFileIsNotUVFile(t *testing.T) {
+	tmpDir := createFiles(t, "uv.lock", "pyproject.toml", "package.json")
+
+	mockClient := &mocks.MockUVClient{}
+	plugin := NewUvPlugin(mockClient)
+
+	options := &scaplugin.Options{TargetFile: "package.json"}
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	require.NoError(t, err)
+
+	require.Len(t, findings, 0, "Should return no findings")
+	require.Empty(t, mockClient.CalledDirs, "Should not call the uv client")
+}
+
+func TestPlugin_SkipsProcessingWhenTargetFileIsAPyProjectTomlFile(t *testing.T) {
+	tmpDir := createFiles(t, "uv.lock", "pyproject.toml", "package.json")
+
+	mockClient := &mocks.MockUVClient{}
+	plugin := NewUvPlugin(mockClient)
+
+	options := &scaplugin.Options{TargetFile: "pyproject.toml"}
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	require.NoError(t, err)
+
+	require.Len(t, findings, 0, "Should return no findings")
+	require.Empty(t, mockClient.CalledDirs, "Should not call the uv client")
+}
+
+func TestPlugin_ShouldNotSkipProcessingWhenTargetFileIsRelativeFolderPath(t *testing.T) {
+	tmpDir := createFiles(t,
+		"my-project/uv.lock",
+		"my-project/pyproject.toml",
+		"other-project/uv.lock",
+		"other-project/pyproject.toml",
+	)
+
+	mockClient := &mocks.MockUVClient{}
+	plugin := NewUvPlugin(mockClient)
+
+	options := &scaplugin.Options{TargetFile: "my-project/uv.lock"}
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	require.NoError(t, err)
+
+	require.Len(t, findings, 1, "Should return findings for the specific uv.lock file")
+	require.NotEmpty(t, mockClient.CalledDirs, "Should have called the uv client")
+	require.Equal(t, "my-project", mockClient.CalledDirs[0], "Should have called uv client with the correct directory")
+}
+
+func TestPlugin_ShouldSkipProcessingWhenTargetFileIsNotUvLockInRelativeFolderPath(t *testing.T) {
+	tmpDir := createFiles(t,
+		"my-project/package.json",
+		"my-project/package-lock.json",
+		"other-project/uv.lock",
+		"other-project/pyproject.toml",
+	)
+
+	mockClient := &mocks.MockUVClient{}
+	plugin := NewUvPlugin(mockClient)
+
+	options := &scaplugin.Options{TargetFile: "my-project/package.json"}
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	require.NoError(t, err)
+
+	require.Len(t, findings, 0, "Should return no findings")
+	require.Empty(t, mockClient.CalledDirs, "Should not call the uv client")
+}
+
+func TestPlugin_ShouldRaiseErrorWhenTargetFileIsUvLockInRelativeFolderButDoesNotExist(t *testing.T) {
+	tmpDir := createFiles(t,
+		"my-project/package.json",
+		"my-project/package-lock.json",
+		"other-project/uv.lock",
+		"other-project/pyproject.toml",
+	)
+
+	mockClient := &mocks.MockUVClient{}
+	plugin := NewUvPlugin(mockClient)
+
+	options := &scaplugin.Options{TargetFile: "my-project/uv.lock"}
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+
+	require.Error(t, err)
+	require.ErrorContains(t, err, "failed to find uv lockfiles")
+
+	require.Len(t, findings, 0, "Should return no findings")
+	require.Empty(t, mockClient.CalledDirs, "Should not call the uv client")
+}
+
+func TestPlugin_ShouldProcessUvLockWhenTargetFileIsAbsolutePath(t *testing.T) {
+	tmpDir := createFiles(t,
+		"my-project/uv.lock",
+		"my-project/pyproject.toml",
+		"other-project/uv.lock",
+	)
+
+	mockClient := &mocks.MockUVClient{}
+	plugin := NewUvPlugin(mockClient)
+
+	// Use absolute path for target file
+	absolutePath := filepath.Join(tmpDir, "my-project", "uv.lock")
+	options := &scaplugin.Options{TargetFile: absolutePath}
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	require.NoError(t, err)
+
+	require.Len(t, findings, 1, "Should return findings for the specific uv.lock file")
+	require.NotEmpty(t, mockClient.CalledDirs, "Should have called the uv client")
+	require.Equal(t, "my-project", mockClient.CalledDirs[0], "Should have called uv client with the correct directory")
+}
+
+func TestPlugin_ShouldProcessUvLockWhenTargetFileIsAbsolutePathWithSymlink(t *testing.T) {
+	// Create temp directory and files
+	tmpDir := createFiles(t, "uv.lock", "pyproject.toml")
+
+	// Resolve any symlinks in the temp directory path (e.g., /tmp -> /private/tmp on macOS)
+	resolvedTmpDir, err := filepath.EvalSymlinks(tmpDir)
+	require.NoError(t, err)
+
+	// Create a symlink to the temp directory
+	symlinkDir, err := os.MkdirTemp("", "uv-symlink-test-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.RemoveAll(symlinkDir) })
+
+	symlinkPath := filepath.Join(symlinkDir, "project-link")
+	err = os.Symlink(resolvedTmpDir, symlinkPath)
+	require.NoError(t, err)
+
+	mockClient := &mocks.MockUVClient{}
+	plugin := NewUvPlugin(mockClient)
+
+	// Use absolute path through the symlink for target file
+	absolutePathThroughSymlink := filepath.Join(symlinkPath, "uv.lock")
+	options := &scaplugin.Options{TargetFile: absolutePathThroughSymlink}
+
+	// Pass the original tmpDir as inputDir (which may have symlinks like /tmp)
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	require.NoError(t, err)
+
+	require.Len(t, findings, 1, "Should return findings for the uv.lock file accessed through symlink")
+	require.NotEmpty(t, mockClient.CalledDirs, "Should have called the uv client")
+	require.Equal(t, ".", mockClient.CalledDirs[0], "Should have resolved to root directory")
+}
+
+func TestPlugin_ShouldSkipWhenAbsolutePathTargetFileIsNotUvLock(t *testing.T) {
+	tmpDir := createFiles(t,
+		"uv.lock",
+		"pyproject.toml",
+		"package.json",
+	)
+
+	mockClient := &mocks.MockUVClient{}
+	plugin := NewUvPlugin(mockClient)
+
+	// Use absolute path to a non-uv.lock file
+	absolutePath := filepath.Join(tmpDir, "package.json")
+	options := &scaplugin.Options{TargetFile: absolutePath}
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	require.NoError(t, err)
+
+	require.Len(t, findings, 0, "Should return no findings")
+	require.Empty(t, mockClient.CalledDirs, "Should not call the uv client")
+}
+
+func TestPlugin_ShouldHandleAbsolutePathInNestedDirectory(t *testing.T) {
+	tmpDir := createFiles(t,
+		"uv.lock",
+		"backend/services/uv.lock",
+		"backend/services/pyproject.toml",
+	)
+
+	mockClient := &mocks.MockUVClient{}
+	plugin := NewUvPlugin(mockClient)
+
+	// Use absolute path to deeply nested uv.lock
+	absolutePath := filepath.Join(tmpDir, "backend", "services", "uv.lock")
+	options := &scaplugin.Options{TargetFile: absolutePath}
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	require.NoError(t, err)
+
+	require.Len(t, findings, 1, "Should return findings for the nested uv.lock file")
+	require.NotEmpty(t, mockClient.CalledDirs, "Should have called the uv client")
+	require.Equal(t, "backend/services", mockClient.CalledDirs[0], "Should have called uv client with the correct nested directory")
+}
+
 func TestPlugin_BuildFindingsFromDir_ErrorHandling(t *testing.T) {
 	tmpDir := createFiles(t, "uv.lock")
 
