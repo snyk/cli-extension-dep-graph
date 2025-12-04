@@ -8,6 +8,7 @@ import (
 
 type Options struct {
 	AllProjects bool
+	TargetFile  string
 	Dev         bool
 	Exclude     []string
 }

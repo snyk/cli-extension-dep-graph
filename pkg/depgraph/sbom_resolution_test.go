@@ -765,6 +765,42 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.True(t, mockPlugin.options.AllProjects)
 	})
 
+	t.Run("should pass file flag to plugin options", func(t *testing.T) {
+		ctx := setupTestContext(t)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagFile, "Gemfile")
+
+		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse, http.StatusOK)
+		defer mockSBOMService.Close()
+		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
+
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					Sbom: []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}`),
+					Metadata: scaplugin.Metadata{
+						PackageManager: "pip",
+						Name:           "test-project",
+						Version:        "1.0.0",
+					},
+					FileExclusions: []string{},
+				},
+			},
+		}
+
+		_, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.ScaPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, mockPlugin.options, "plugin should have been called with options")
+		assert.Equal(t, "Gemfile", mockPlugin.options.TargetFile)
+	})
+
 	t.Run("should handle empty exclude flag", func(t *testing.T) {
 		ctx := setupTestContext(t)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
