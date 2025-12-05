@@ -23,6 +23,8 @@ type ScanResultFact struct {
 	Data any    `json:"data"`
 }
 
+const depGraphKey = "depGraph"
+
 // UnmarshalJSON implements custom JSON unmarshaling for ScanResultFact.
 // When type is "depGraph", it unmarshals data directly into *depgraph.DepGraph.
 func (f *ScanResultFact) UnmarshalJSON(data []byte) error {
@@ -38,7 +40,7 @@ func (f *ScanResultFact) UnmarshalJSON(data []byte) error {
 	f.Type = scanResultRaw.Type
 
 	switch scanResultRaw.Type {
-	case "depGraph":
+	case depGraphKey:
 		var depGraph depgraph.DepGraph
 		if err := json.Unmarshal(scanResultRaw.Data, &depGraph); err != nil {
 			return fmt.Errorf("failed to unmarshal depGraph data: %w", err)
@@ -62,6 +64,27 @@ type ScanResult struct {
 	Target          ScanResultTarget   `json:"target"`
 	Identity        ScanResultIdentity `json:"identity"`
 	TargetReference string             `json:"targetReference,omitempty"`
+}
+
+func (sr *ScanResult) DepGraphs() ([]*depgraph.DepGraph, error) {
+	depGraphList := []*depgraph.DepGraph{}
+	for _, fact := range sr.Facts {
+		if fact.Type != depGraphKey {
+			continue
+		}
+
+		// ScanResultFact.UnmarshalJSON deserializes fact.Data into *depgraph.DepGraph when type is "depGraph".
+		depGraph, ok := fact.Data.(*depgraph.DepGraph)
+		if !ok {
+			return nil, fmt.Errorf("expected fact.Data to be *depgraph.DepGraph, got %T", fact.Data)
+		}
+		if depGraph == nil {
+			return nil, fmt.Errorf("depGraph is nil for fact with type 'depGraph'")
+		}
+
+		depGraphList = append(depGraphList, depGraph)
+	}
+	return depGraphList, nil
 }
 
 type ConversionWarning struct {

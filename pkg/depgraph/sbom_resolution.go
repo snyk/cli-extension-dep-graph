@@ -1,7 +1,6 @@
 package depgraph
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -10,7 +9,6 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/internal/uv"
 	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
-	"github.com/snyk/dep-graph/go/pkg/depgraph"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 )
@@ -20,12 +18,25 @@ func handleSBOMResolution(
 	config configuration.Configuration,
 	logger *zerolog.Logger,
 ) ([]workflow.Data, error) {
+	orgID := config.GetString(configuration.ORGANIZATION)
+	if orgID == "" {
+		logger.Printf("ERROR: failed to determine org id\n")
+		return nil, snykclient.NewEmptyOrgError()
+	}
+
+	remoteRepoURL := config.GetString("remote-repo-url")
+	snykClient := snykclient.NewSnykClient(
+		ctx.GetNetworkAccess().GetHttpClient(),
+		config.GetString(configuration.API_URL),
+		orgID,
+	)
+
 	return handleSBOMResolutionDI(
 		ctx,
 		config,
 		logger,
 		[]scaplugin.ScaPlugin{
-			uv.NewUvPlugin(uv.NewUvClient()),
+			uv.NewUvPlugin(uv.NewUvClient(), snykClient, remoteRepoURL),
 		},
 		handleLegacyResolution,
 	)
@@ -65,7 +76,7 @@ func handleSBOMResolutionDI(
 		Exclude:     exclude,
 	}
 
-	// Generate SBOMs
+	// Generate Findings
 	findings := []scaplugin.Finding{}
 	for _, sp := range scaPlugins {
 		f, err := sp.BuildFindingsFromDir(
@@ -77,35 +88,28 @@ func handleSBOMResolutionDI(
 		if err != nil {
 			return nil, fmt.Errorf("error building findings: %w", err)
 		}
-		if allProjects {
-			findings = append(findings, f...)
-		} else if len(f) > 0 {
-			findings = append(findings, f[0])
+		findings = append(findings, f...)
+		if !allProjects && len(f) > 0 {
+			// If `allProjects` is false we don't want more than one project
 			break
 		}
 	}
 
-	remoteRepoURL := config.GetString("remote-repo-url")
-	snykClient := snykclient.NewSnykClient(
-		ctx.GetNetworkAccess().GetHttpClient(),
-		config.GetString(configuration.API_URL),
-		orgID)
-
-	// Convert SBOMs to workflow.Data
+	// Convert Findings to workflow.Data
 	workflowData := []workflow.Data{}
 	for i := range findings { // Could be parallelised in future
 		finding := &findings[i]
 
 		if finding.Error != nil {
-			logger.Printf("Skipping finding for %s which errored with: %v", finding.NormalisedTargetFile, finding.Error)
+			logger.Printf("Skipping finding for %s which errored with: %v", finding.LockFile, finding.Error)
 			continue
 		}
 
-		data, err := sbomToWorkflowData(ctx, finding, snykClient, logger, remoteRepoURL)
+		data, err := workflowDataFromDepGraph(finding)
 		if err != nil {
-			return nil, fmt.Errorf("error converting SBOM: %w", err)
+			return nil, fmt.Errorf("failed to create workflow data: %w", err)
 		}
-		workflowData = append(workflowData, data...)
+		workflowData = append(workflowData, data)
 	}
 
 	if len(findings) == 0 || allProjects {
@@ -189,105 +193,18 @@ func executeLegacyWorkflow(
 	return nil, fmt.Errorf("error handling legacy workflow: %w", err)
 }
 
-func sbomToWorkflowData(
-	ctx workflow.InvocationContext,
-	finding *scaplugin.Finding,
-	snykClient *snykclient.SnykClient,
-	logger *zerolog.Logger,
-	remoteRepoURL string,
-) ([]workflow.Data, error) {
-	sbomReader := bytes.NewReader(finding.Sbom)
-
-	scans, warnings, err := snykClient.SBOMConvert(ctx.Context(), logger, sbomReader, remoteRepoURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert SBOM: %w", err)
-	}
-
-	logger.Printf("Successfully converted SBOM, warning(s): %d\n", len(warnings))
-
-	depGraphsData, err := extractDepGraphsFromScans(scans, finding.NormalisedTargetFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract depgraphs from scan results: %w", err)
-	}
-
-	if len(depGraphsData) == 0 {
-		depGraph, err := emptyDepGraph(finding)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create empty depgraph: %w", err)
-		}
-
-		data, err := workflowDataFromDepGraph(depGraph, finding.NormalisedTargetFile, "")
-		if err != nil {
-			return nil, fmt.Errorf("failed to create workflow data: %w", err)
-		}
-		depGraphsData = append(depGraphsData, data)
-	}
-	return depGraphsData, nil
-}
-
-func emptyDepGraph(finding *scaplugin.Finding) (*depgraph.DepGraph, error) {
-	if finding.Metadata.PackageManager == "" {
-		return nil, fmt.Errorf("found empty PackageManager on finding.Metadata")
-	}
-	if finding.Metadata.Name == "" {
-		return nil, fmt.Errorf("found empty Name on finding.Metadata")
-	}
-	builder, err := depgraph.NewBuilder(
-		&depgraph.PkgManager{Name: finding.Metadata.PackageManager},
-		&depgraph.PkgInfo{Name: finding.Metadata.Name, Version: finding.Metadata.Version},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build depgraph: %w", err)
-	}
-	depGraph := builder.Build()
-	return depGraph, nil
-}
-
-func extractDepGraphsFromScans(scans []*snykclient.ScanResult, normalisedTargetFile string) ([]workflow.Data, error) {
-	var depGraphList []workflow.Data
-
-	for _, scan := range scans {
-		// Look for depgraph facts in this scan result
-		for _, fact := range scan.Facts {
-			if fact.Type != "depGraph" {
-				continue
-			}
-
-			// ScanResultFact.UnmarshalJSON deserializes fact.Data into *depgraph.DepGraph when type is "depGraph".
-			depGraph, ok := fact.Data.(*depgraph.DepGraph)
-			if !ok {
-				return nil, fmt.Errorf("expected fact.Data to be *depgraph.DepGraph, got %T", fact.Data)
-			}
-			if depGraph == nil {
-				return nil, fmt.Errorf("depGraph is nil for fact with type 'depGraph'")
-			}
-
-			data, err := workflowDataFromDepGraph(depGraph, normalisedTargetFile, scan.Identity.TargetFile)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create workflow data: %w", err)
-			}
-
-			depGraphList = append(depGraphList, data)
-		}
-	}
-
-	return depGraphList, nil
-}
-
-func workflowDataFromDepGraph(depGraph *depgraph.DepGraph, normalisedTargetFile, targetFileFromPlugin string) (workflow.Data, error) {
-	depGraphBytes, err := json.Marshal(depGraph)
+func workflowDataFromDepGraph(finding *scaplugin.Finding) (workflow.Data, error) {
+	depGraphBytes, err := json.Marshal(finding.DepGraph)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal depgraph data: %w", err)
 	}
 
 	data := workflow.NewData(DataTypeID, contentTypeJSON, depGraphBytes)
 
-	data.SetMetaData(contentLocationKey, normalisedTargetFile)
-	data.SetMetaData(MetaKeyNormalisedTargetFile, normalisedTargetFile)
-
-	if targetFileFromPlugin != "" {
-		data.SetMetaData(MetaKeyTargetFileFromPlugin, targetFileFromPlugin)
-	}
+	targetFile := finding.ManifestFile
+	data.SetMetaData(contentLocationKey, targetFile)
+	data.SetMetaData(MetaKeyNormalisedTargetFile, targetFile)
+	data.SetMetaData(MetaKeyTargetFileFromPlugin, targetFile)
 
 	return data, nil
 }
