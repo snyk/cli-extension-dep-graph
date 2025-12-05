@@ -3,6 +3,7 @@ package uv
 import (
 	"context"
 	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
+	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 	"github.com/stretchr/testify/require"
 )
@@ -143,13 +145,29 @@ func TestPlugin_BuildFindingsFromDir(t *testing.T) {
 			tmpDir := createFiles(t, tt.files...)
 
 			// Setup mockClient and plugin
-			mockClient := &mocks.MockUVClient{}
+			mockClient := &MockClient{}
 			plugin := NewUvPlugin(mockClient)
 
 			// Execute
 			ctx := context.Background()
 			options := &scaplugin.Options{AllProjects: tt.allProjects, Exclude: tt.exclude}
-			findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, &logger)
+			// Create mock SBOM service for conversion - need enough responses for all lock files
+			expectedCount := len(tt.expectedDirs)
+			mockResponses := make([]mocks.MockResponse, expectedCount)
+			//nolint:lll // Long JSON string for mock response
+			mockResponseBody := `{"scanResults":[{"facts":[{"type":"depGraph","data":{"schemaVersion":"1.3.0","pkgManager":{"name":"pip"},"pkgs":[{"id":"mock-project@1.0.0","info":{"name":"mock-project","version":"1.0.0"}}],"graph":{"rootNodeId":"root-node","nodes":[{"nodeId":"root-node","pkgId":"mock-project@1.0.0","deps":[]}]}}}]}],"warnings":[]}`
+			for i := range expectedCount {
+				mockResponses[i] = mocks.NewMockResponse(
+					"application/json",
+					[]byte(mockResponseBody),
+					http.StatusOK,
+				)
+			}
+			mockSBOMService := mocks.NewMockSBOMServiceMultiResponse(mockResponses)
+			t.Cleanup(func() { mockSBOMService.Close() })
+			snykClient := snykclient.NewSnykClient(mockSBOMService.Client(), mockSBOMService.URL, "test-org")
+			conversionConfig := scaplugin.NewConversionConfig("", snykClient)
+			findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, &conversionConfig, &logger)
 
 			// Check error
 			if tt.expectedErr != "" {
@@ -188,12 +206,17 @@ func TestPlugin_BuildFindingsFromDir(t *testing.T) {
 func TestPlugin_BuildFindingsFromDir_ErrorHandling(t *testing.T) {
 	tmpDir := createFiles(t, "uv.lock")
 
-	mockClient := &mocks.MockUVClient{ReturnErr: errors.New("export failed")}
+	mockClient := &MockClient{ReturnErr: errors.New("export failed")}
 	plugin := NewUvPlugin(mockClient)
 
 	ctx := context.Background()
 	options := &scaplugin.Options{AllProjects: false}
-	findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, &logger)
+	mockResponse := mocks.NewMockResponse("application/json", []byte(`{}`), http.StatusOK)
+	mockSBOMService := mocks.NewMockSBOMService(mockResponse)
+	t.Cleanup(func() { mockSBOMService.Close() })
+	snykClient := snykclient.NewSnykClient(mockSBOMService.Client(), mockSBOMService.URL, "test-org")
+	conversionConfig := scaplugin.NewConversionConfig("", snykClient)
+	findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, &conversionConfig, &logger)
 	require.NoError(t, err)
 
 	require.Len(t, findings, 1)
@@ -201,7 +224,7 @@ func TestPlugin_BuildFindingsFromDir_ErrorHandling(t *testing.T) {
 	require.ErrorContains(t, findings[0].Error, "failed to build dependency graph")
 
 	require.Equal(t, "uv.lock", findings[0].NormalisedTargetFile)
-	require.Empty(t, findings[0].Sbom)
+	require.Nil(t, findings[0].DepGraph)
 }
 
 func TestPlugin_BuildFindingsFromDir_MixedSuccessAndFailure(t *testing.T) {
@@ -213,7 +236,7 @@ func TestPlugin_BuildFindingsFromDir_MixedSuccessAndFailure(t *testing.T) {
 	)
 
 	// Setup mock to fail for project1 but succeed for others
-	mockClient := &mocks.MockUVClient{
+	mockClient := &MockClient{
 		ErrorDirs: map[string]error{
 			"project1": errors.New("uv export failed"),
 		},
@@ -222,7 +245,18 @@ func TestPlugin_BuildFindingsFromDir_MixedSuccessAndFailure(t *testing.T) {
 
 	ctx := context.Background()
 	options := &scaplugin.Options{AllProjects: true}
-	findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, &logger)
+	// Mock SBOM service: project1 fails at ExportSBOM (before conversion), so only "." and "project2" need conversion responses
+	//nolint:lll // Long JSON string for mock response
+	mockResponseBody := `{"scanResults":[{"facts":[{"type":"depGraph","data":{"schemaVersion":"1.3.0","pkgManager":{"name":"pip"},"pkgs":[{"id":"mock-project@1.0.0","info":{"name":"mock-project","version":"1.0.0"}}],"graph":{"rootNodeId":"root-node","nodes":[{"nodeId":"root-node","pkgId":"mock-project@1.0.0","deps":[]}]}}}]}],"warnings":[]}`
+	mockResponses := []mocks.MockResponse{
+		mocks.NewMockResponse("application/json", []byte(mockResponseBody), http.StatusOK),
+		mocks.NewMockResponse("application/json", []byte(mockResponseBody), http.StatusOK),
+	}
+	mockSBOMService := mocks.NewMockSBOMServiceMultiResponse(mockResponses)
+	t.Cleanup(func() { mockSBOMService.Close() })
+	snykClient := snykclient.NewSnykClient(mockSBOMService.Client(), mockSBOMService.URL, "test-org")
+	conversionConfig := scaplugin.NewConversionConfig("", snykClient)
+	findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, &conversionConfig, &logger)
 	require.NoError(t, err)
 
 	require.Len(t, findings, 3)
@@ -245,7 +279,7 @@ func TestPlugin_BuildFindingsFromDir_MixedSuccessAndFailure(t *testing.T) {
 	require.NotNil(t, errorFinding)
 	require.ErrorContains(t, errorFinding.Error, "failed to build dependency graph")
 	require.Equal(t, "project1/uv.lock", errorFinding.NormalisedTargetFile)
-	require.Empty(t, errorFinding.Sbom)
+	require.Nil(t, errorFinding.DepGraph)
 }
 
 // Helper to create files.

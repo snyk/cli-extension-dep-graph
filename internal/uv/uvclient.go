@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -23,7 +22,7 @@ const (
 )
 
 type Client interface {
-	ExportSBOM(inputDir string, opts *scaplugin.Options) (*scaplugin.Finding, error)
+	ExportSBOM(inputDir string, opts *scaplugin.Options) (Sbom, error)
 }
 
 type client struct {
@@ -49,8 +48,16 @@ func NewUvClientWithExecutor(uvBinary string, executor cmdExecutor) Client {
 	}
 }
 
+type Sbom []byte
+
+type WorkspacePackage struct {
+	Name    string
+	Version string
+	Path    string // Relative path to the workspace package directory
+}
+
 // exportSBOM exports an SBOM in CycloneDX format using uv.
-func (c client) ExportSBOM(inputDir string, opts *scaplugin.Options) (*scaplugin.Finding, error) {
+func (c client) ExportSBOM(inputDir string, opts *scaplugin.Options) (Sbom, error) {
 	args := []string{"export", "--format", "cyclonedx1.5", "--frozen", "--preview"}
 	if opts.AllProjects {
 		args = append(args, "--all-packages")
@@ -63,39 +70,7 @@ func (c client) ExportSBOM(inputDir string, opts *scaplugin.Options) (*scaplugin
 		return nil, fmt.Errorf("failed to execute uv export: %w", err)
 	}
 
-	sbom, err := parseAndValidateSBOM(output)
-	if err != nil {
-		return nil, err
-	}
-
-	metadata := extractMetadata(sbom)
-	workspacePackages := extractWorkspacePackages(sbom)
-
-	// TODO(uv): uncomment when we are able to pass these to the CLI correctly. Currently the
-	// `--exclude` flag does not accept paths, it only accepts file or dir names, which does not
-	// work for our use case.
-	// fileExclusions := buildFileExclusions(workspacePackages)
-	fileExclusions := []string{}
-
-	return &scaplugin.Finding{
-		Sbom:                 output,
-		Metadata:             *metadata,
-		FileExclusions:       fileExclusions,
-		NormalisedTargetFile: filepath.Join(inputDir, PyprojectTomlFileName),
-		WorkspacePackages:    workspacePackages,
-	}, nil
-}
-
-// Builds a list of files to exclude from scanning in other plugins.
-func buildFileExclusions(workspacePackages []scaplugin.WorkspacePackage) []string {
-	exclusions := []string{}
-	for _, pkg := range workspacePackages {
-		exclusions = append(exclusions,
-			filepath.Join(pkg.Path, PyprojectTomlFileName),
-			filepath.Join(pkg.Path, RequirementsTxtFileName),
-		)
-	}
-	return exclusions
+	return output, nil
 }
 
 // Minimal representation of a CycloneDX SBOM.
@@ -121,7 +96,7 @@ type cycloneDXComponent struct {
 
 // Parses and validates the SBOM JSON.
 // Returns the parsed struct or an error if parsing or validation fails.
-func parseAndValidateSBOM(sbomData []byte) (*cycloneDXSBOM, error) {
+func parseAndValidateSBOM(sbomData Sbom) (*cycloneDXSBOM, error) {
 	var sbom cycloneDXSBOM
 
 	if err := json.Unmarshal(sbomData, &sbom); err != nil {
@@ -154,12 +129,12 @@ func extractMetadata(sbom *cycloneDXSBOM) *scaplugin.Metadata {
 	}
 }
 
-func extractWorkspacePackages(sbom *cycloneDXSBOM) []scaplugin.WorkspacePackage {
-	var workspacePackages []scaplugin.WorkspacePackage
+func extractWorkspacePackages(sbom *cycloneDXSBOM) []WorkspacePackage {
+	var workspacePackages []WorkspacePackage
 	for _, component := range sbom.Components {
 		for _, prop := range component.Properties {
 			if prop.Name == UvWorkspacePathProperty {
-				workspacePackages = append(workspacePackages, scaplugin.WorkspacePackage{
+				workspacePackages = append(workspacePackages, WorkspacePackage{
 					Name:    component.Name,
 					Version: component.Version,
 					Path:    prop.Value,
