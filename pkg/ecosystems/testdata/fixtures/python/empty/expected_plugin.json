@@ -1,11 +1,29 @@
 [
   {
     "depGraph": {
-      "packages": {},
-      "graph": {
-        "root": null
+      "schemaVersion": "1.3.0",
+      "pkgManager": {
+        "name": "pip"
       },
-      "rootPackageId": "root"
+      "pkgs": [
+        {
+          "id": "root@0.0.0",
+          "info": {
+            "name": "root",
+            "version": "0.0.0"
+          }
+        }
+      ],
+      "graph": {
+        "rootNodeId": "root-node",
+        "nodes": [
+          {
+            "nodeId": "root-node",
+            "pkgId": "root@0.0.0",
+            "deps": []
+          }
+        ]
+      }
     },
     "metadata": {
       "targetFile": "requirements.txt",

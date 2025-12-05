@@ -220,7 +220,9 @@ func getExpectedOutputPath(t *testing.T, fixturePath, pythonVersion string) stri
 	return ""
 }
 
-// assertResultsMatchExpected compares actual results against exact expected output
+// assertResultsMatchExpected compares actual results against expected output by comparing JSON representations.
+// This is necessary because the depgraph.DepGraph type has internal unexported fields that are populated
+// when building via the builder but not when deserializing from JSON.
 func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAResult, fixtureName string) {
 	t.Helper()
 
@@ -245,8 +247,14 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 		sortActual[i].Error = nil // Error field isn't in expected JSON
 	}
 
-	// Compare exact structures
-	assert.Equal(t, sortExpected, sortActual, "[%s] results mismatch", fixtureName)
+	// Compare by JSON representation to ignore internal unexported fields in depgraph.DepGraph
+	actualJSON, err := json.Marshal(sortActual)
+	require.NoError(t, err, "[%s] failed to marshal actual results", fixtureName)
+
+	expectedJSON, err := json.Marshal(sortExpected)
+	require.NoError(t, err, "[%s] failed to marshal expected results", fixtureName)
+
+	assert.JSONEq(t, string(expectedJSON), string(actualJSON), "[%s] results mismatch", fixtureName)
 }
 
 // loadExpectedResults loads expected SCA results from a JSON file

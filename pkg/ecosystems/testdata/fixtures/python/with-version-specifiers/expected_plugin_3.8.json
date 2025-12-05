@@ -1,56 +1,124 @@
 [
   {
     "depGraph": {
-      "packages": {
-        "certifi@2025.11.12": {
-          "packageId": "certifi@2025.11.12",
-          "packageName": "certifi",
-          "version": "2025.11.12"
+      "schemaVersion": "1.3.0",
+      "pkgManager": {
+        "name": "pip"
+      },
+      "pkgs": [
+        {
+          "id": "root@0.0.0",
+          "info": {
+            "name": "root",
+            "version": "0.0.0"
+          }
         },
-        "charset-normalizer@3.4.4": {
-          "packageId": "charset-normalizer@3.4.4",
-          "packageName": "charset-normalizer",
-          "version": "3.4.4"
+        {
+          "id": "requests@2.32.4",
+          "info": {
+            "name": "requests",
+            "version": "2.32.4"
+          }
         },
-        "click@8.1.8": {
-          "packageId": "click@8.1.8",
-          "packageName": "click",
-          "version": "8.1.8"
+        {
+          "id": "click@8.1.8",
+          "info": {
+            "name": "click",
+            "version": "8.1.8"
+          }
         },
-        "idna@3.11": {
-          "packageId": "idna@3.11",
-          "packageName": "idna",
-          "version": "3.11"
+        {
+          "id": "urllib3@2.2.3",
+          "info": {
+            "name": "urllib3",
+            "version": "2.2.3"
+          }
         },
-        "requests@2.32.4": {
-          "packageId": "requests@2.32.4",
-          "packageName": "requests",
-          "version": "2.32.4"
+        {
+          "id": "certifi@2025.11.12",
+          "info": {
+            "name": "certifi",
+            "version": "2025.11.12"
+          }
         },
-        "urllib3@2.2.3": {
-          "packageId": "urllib3@2.2.3",
-          "packageName": "urllib3",
-          "version": "2.2.3"
+        {
+          "id": "charset-normalizer@3.4.4",
+          "info": {
+            "name": "charset-normalizer",
+            "version": "3.4.4"
+          }
+        },
+        {
+          "id": "idna@3.11",
+          "info": {
+            "name": "idna",
+            "version": "3.11"
+          }
         }
-      },
+      ],
       "graph": {
-        "certifi@2025.11.12": null,
-        "charset-normalizer@3.4.4": null,
-        "click@8.1.8": null,
-        "idna@3.11": null,
-        "requests@2.32.4": [
-          "idna@3.11",
-          "urllib3@2.2.3",
-          "certifi@2025.11.12"
-        ],
-        "root": [
-          "requests@2.32.4",
-          "click@8.1.8",
-          "urllib3@2.2.3"
-        ],
-        "urllib3@2.2.3": null
-      },
-      "rootPackageId": "root"
+        "rootNodeId": "root-node",
+        "nodes": [
+          {
+            "nodeId": "root-node",
+            "pkgId": "root@0.0.0",
+            "deps": [
+              {
+                "nodeId": "requests@2.32.4"
+              },
+              {
+                "nodeId": "click@8.1.8"
+              },
+              {
+                "nodeId": "urllib3@2.2.3"
+              }
+            ]
+          },
+          {
+            "nodeId": "requests@2.32.4",
+            "pkgId": "requests@2.32.4",
+            "deps": [
+              {
+                "nodeId": "charset-normalizer@3.4.4"
+              },
+              {
+                "nodeId": "idna@3.11"
+              },
+              {
+                "nodeId": "urllib3@2.2.3"
+              },
+              {
+                "nodeId": "certifi@2025.11.12"
+              }
+            ]
+          },
+          {
+            "nodeId": "click@8.1.8",
+            "pkgId": "click@8.1.8",
+            "deps": []
+          },
+          {
+            "nodeId": "urllib3@2.2.3",
+            "pkgId": "urllib3@2.2.3",
+            "deps": []
+          },
+          {
+            "nodeId": "certifi@2025.11.12",
+            "pkgId": "certifi@2025.11.12",
+            "deps": []
+          },
+          {
+            "nodeId": "charset-normalizer@3.4.4",
+            "pkgId": "charset-normalizer@3.4.4",
+            "deps": []
+          },
+          {
+            "nodeId": "idna@3.11",
+            "pkgId": "idna@3.11",
+            "deps": []
+          }
+        ]
+      }
     },
     "metadata": {
       "targetFile": "requirements.txt",
