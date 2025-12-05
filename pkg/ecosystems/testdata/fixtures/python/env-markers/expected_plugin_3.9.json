@@ -14,6 +14,20 @@
           }
         },
         {
+          "id": "importlib-metadata@6.8.0",
+          "info": {
+            "name": "importlib-metadata",
+            "version": "6.8.0"
+          }
+        },
+        {
+          "id": "zipp@3.23.0",
+          "info": {
+            "name": "zipp",
+            "version": "3.23.0"
+          }
+        },
+        {
           "id": "requests@2.31.0",
           "info": {
             "name": "requests",
@@ -21,10 +35,10 @@
           }
         },
         {
-          "id": "importlib-metadata@6.8.0",
+          "id": "certifi@2025.11.12",
           "info": {
-            "name": "importlib-metadata",
-            "version": "6.8.0"
+            "name": "certifi",
+            "version": "2025.11.12"
           }
         },
         {
@@ -42,24 +56,10 @@
           }
         },
         {
-          "id": "urllib3@2.5.0",
+          "id": "urllib3@2.6.0",
           "info": {
             "name": "urllib3",
-            "version": "2.5.0"
-          }
-        },
-        {
-          "id": "certifi@2025.11.12",
-          "info": {
-            "name": "certifi",
-            "version": "2025.11.12"
-          }
-        },
-        {
-          "id": "zipp@3.23.0",
-          "info": {
-            "name": "zipp",
-            "version": "3.23.0"
+            "version": "2.6.0"
           }
         }
       ],
@@ -71,28 +71,10 @@
             "pkgId": "root@0.0.0",
             "deps": [
               {
-                "nodeId": "requests@2.31.0"
-              },
-              {
                 "nodeId": "importlib-metadata@6.8.0"
-              }
-            ]
-          },
-          {
-            "nodeId": "requests@2.31.0",
-            "pkgId": "requests@2.31.0",
-            "deps": [
-              {
-                "nodeId": "charset-normalizer@3.4.4"
               },
               {
-                "nodeId": "idna@3.11"
-              },
-              {
-                "nodeId": "urllib3@2.5.0"
-              },
-              {
-                "nodeId": "certifi@2025.11.12"
+                "nodeId": "requests@2.31.0"
               }
             ]
           },
@@ -106,6 +88,34 @@
             ]
           },
           {
+            "nodeId": "zipp@3.23.0",
+            "pkgId": "zipp@3.23.0",
+            "deps": []
+          },
+          {
+            "nodeId": "requests@2.31.0",
+            "pkgId": "requests@2.31.0",
+            "deps": [
+              {
+                "nodeId": "certifi@2025.11.12"
+              },
+              {
+                "nodeId": "charset-normalizer@3.4.4"
+              },
+              {
+                "nodeId": "idna@3.11"
+              },
+              {
+                "nodeId": "urllib3@2.6.0"
+              }
+            ]
+          },
+          {
+            "nodeId": "certifi@2025.11.12",
+            "pkgId": "certifi@2025.11.12",
+            "deps": []
+          },
+          {
             "nodeId": "charset-normalizer@3.4.4",
             "pkgId": "charset-normalizer@3.4.4",
             "deps": []
@@ -116,18 +126,8 @@
             "deps": []
           },
           {
-            "nodeId": "urllib3@2.5.0",
-            "pkgId": "urllib3@2.5.0",
-            "deps": []
-          },
-          {
-            "nodeId": "certifi@2025.11.12",
-            "pkgId": "certifi@2025.11.12",
-            "deps": []
-          },
-          {
-            "nodeId": "zipp@3.23.0",
-            "pkgId": "zipp@3.23.0",
+            "nodeId": "urllib3@2.6.0",
+            "pkgId": "urllib3@2.6.0",
             "deps": []
           }
         ]
@@ -135,7 +135,7 @@
     },
     "metadata": {
       "targetFile": "requirements.txt",
-      "runtime": "python@3.8.20"
+      "runtime": "python@3.9.25"
     }
   }
 ]

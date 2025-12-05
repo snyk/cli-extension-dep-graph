@@ -21,6 +21,20 @@
           }
         },
         {
+          "id": "pysocks@1.7.1",
+          "info": {
+            "name": "pysocks",
+            "version": "1.7.1"
+          }
+        },
+        {
+          "id": "certifi@2025.11.12",
+          "info": {
+            "name": "certifi",
+            "version": "2025.11.12"
+          }
+        },
+        {
           "id": "charset-normalizer@3.4.4",
           "info": {
             "name": "charset-normalizer",
@@ -35,24 +49,10 @@
           }
         },
         {
-          "id": "urllib3@2.5.0",
+          "id": "urllib3@2.6.0",
           "info": {
             "name": "urllib3",
-            "version": "2.5.0"
-          }
-        },
-        {
-          "id": "certifi@2025.11.12",
-          "info": {
-            "name": "certifi",
-            "version": "2025.11.12"
-          }
-        },
-        {
-          "id": "pysocks@1.7.1",
-          "info": {
-            "name": "pysocks",
-            "version": "1.7.1"
+            "version": "2.6.0"
           }
         }
       ],
@@ -73,21 +73,31 @@
             "pkgId": "requests@2.31.0",
             "deps": [
               {
+                "nodeId": "pysocks@1.7.1"
+              },
+              {
+                "nodeId": "certifi@2025.11.12"
+              },
+              {
                 "nodeId": "charset-normalizer@3.4.4"
               },
               {
                 "nodeId": "idna@3.11"
               },
               {
-                "nodeId": "urllib3@2.5.0"
-              },
-              {
-                "nodeId": "certifi@2025.11.12"
-              },
-              {
-                "nodeId": "pysocks@1.7.1"
+                "nodeId": "urllib3@2.6.0"
               }
             ]
+          },
+          {
+            "nodeId": "pysocks@1.7.1",
+            "pkgId": "pysocks@1.7.1",
+            "deps": []
+          },
+          {
+            "nodeId": "certifi@2025.11.12",
+            "pkgId": "certifi@2025.11.12",
+            "deps": []
           },
           {
             "nodeId": "charset-normalizer@3.4.4",
@@ -100,21 +110,16 @@
             "deps": []
           },
           {
-            "nodeId": "urllib3@2.5.0",
-            "pkgId": "urllib3@2.5.0",
+            "nodeId": "urllib3@2.6.0",
+            "pkgId": "urllib3@2.6.0",
             "deps": [
               {
-                "nodeId": "pysocks@1.7.1"
+                "nodeId": "pysocks@1.7.1:pruned"
               }
             ]
           },
           {
-            "nodeId": "certifi@2025.11.12",
-            "pkgId": "certifi@2025.11.12",
-            "deps": []
-          },
-          {
-            "nodeId": "pysocks@1.7.1",
+            "nodeId": "pysocks@1.7.1:pruned",
             "pkgId": "pysocks@1.7.1",
             "deps": []
           }
@@ -123,7 +128,7 @@
     },
     "metadata": {
       "targetFile": "requirements.txt",
-      "runtime": "python@3.8.20"
+      "runtime": "python@3.9.25"
     }
   }
 ]

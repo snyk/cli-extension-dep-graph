@@ -66,6 +66,9 @@
             "pkgId": "requests@2.31.0",
             "deps": [
               {
+                "nodeId": "certifi@2025.11.12"
+              },
+              {
                 "nodeId": "charset-normalizer@3.4.4"
               },
               {
@@ -73,9 +76,6 @@
               },
               {
                 "nodeId": "urllib3@2.2.3"
-              },
-              {
-                "nodeId": "certifi@2025.11.12"
               }
             ]
           },
@@ -104,7 +104,7 @@
     },
     "metadata": {
       "targetFile": "requirements.txt",
-      "runtime": "python@3.14.0"
+      "runtime": "python@3.8.20"
     }
   }
 ]

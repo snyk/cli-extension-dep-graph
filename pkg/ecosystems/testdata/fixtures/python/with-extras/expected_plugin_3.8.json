@@ -21,6 +21,13 @@
           }
         },
         {
+          "id": "pysocks@1.7.1",
+          "info": {
+            "name": "pysocks",
+            "version": "1.7.1"
+          }
+        },
+        {
           "id": "certifi@2025.11.12",
           "info": {
             "name": "certifi",
@@ -39,13 +46,6 @@
           "info": {
             "name": "idna",
             "version": "3.11"
-          }
-        },
-        {
-          "id": "pysocks@1.7.1",
-          "info": {
-            "name": "pysocks",
-            "version": "1.7.1"
           }
         },
         {
@@ -73,6 +73,12 @@
             "pkgId": "requests@2.31.0",
             "deps": [
               {
+                "nodeId": "pysocks@1.7.1"
+              },
+              {
+                "nodeId": "certifi@2025.11.12"
+              },
+              {
                 "nodeId": "charset-normalizer@3.4.4"
               },
               {
@@ -80,14 +86,13 @@
               },
               {
                 "nodeId": "urllib3@2.2.3"
-              },
-              {
-                "nodeId": "certifi@2025.11.12"
-              },
-              {
-                "nodeId": "pysocks@1.7.1"
               }
             ]
+          },
+          {
+            "nodeId": "pysocks@1.7.1",
+            "pkgId": "pysocks@1.7.1",
+            "deps": []
           },
           {
             "nodeId": "certifi@2025.11.12",
@@ -105,18 +110,18 @@
             "deps": []
           },
           {
-            "nodeId": "pysocks@1.7.1",
-            "pkgId": "pysocks@1.7.1",
-            "deps": []
-          },
-          {
             "nodeId": "urllib3@2.2.3",
             "pkgId": "urllib3@2.2.3",
             "deps": [
               {
-                "nodeId": "pysocks@1.7.1"
+                "nodeId": "pysocks@1.7.1:pruned"
               }
             ]
+          },
+          {
+            "nodeId": "pysocks@1.7.1:pruned",
+            "pkgId": "pysocks@1.7.1",
+            "deps": []
           }
         ]
       }

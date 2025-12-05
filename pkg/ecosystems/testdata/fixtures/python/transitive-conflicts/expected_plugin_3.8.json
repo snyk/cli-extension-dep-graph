@@ -14,13 +14,6 @@
           }
         },
         {
-          "id": "requests@2.31.0",
-          "info": {
-            "name": "requests",
-            "version": "2.31.0"
-          }
-        },
-        {
           "id": "boto3@1.28.0",
           "info": {
             "name": "boto3",
@@ -35,45 +28,10 @@
           }
         },
         {
-          "id": "certifi@2025.11.12",
-          "info": {
-            "name": "certifi",
-            "version": "2025.11.12"
-          }
-        },
-        {
-          "id": "charset-normalizer@3.4.4",
-          "info": {
-            "name": "charset-normalizer",
-            "version": "3.4.4"
-          }
-        },
-        {
-          "id": "idna@3.11",
-          "info": {
-            "name": "idna",
-            "version": "3.11"
-          }
-        },
-        {
           "id": "jmespath@1.0.1",
           "info": {
             "name": "jmespath",
             "version": "1.0.1"
-          }
-        },
-        {
-          "id": "s3transfer@0.6.2",
-          "info": {
-            "name": "s3transfer",
-            "version": "0.6.2"
-          }
-        },
-        {
-          "id": "urllib3@1.26.20",
-          "info": {
-            "name": "urllib3",
-            "version": "1.26.20"
           }
         },
         {
@@ -89,6 +47,48 @@
             "name": "six",
             "version": "1.17.0"
           }
+        },
+        {
+          "id": "urllib3@1.26.20",
+          "info": {
+            "name": "urllib3",
+            "version": "1.26.20"
+          }
+        },
+        {
+          "id": "certifi@2025.11.12",
+          "info": {
+            "name": "certifi",
+            "version": "2025.11.12"
+          }
+        },
+        {
+          "id": "idna@3.11",
+          "info": {
+            "name": "idna",
+            "version": "3.11"
+          }
+        },
+        {
+          "id": "s3transfer@0.6.2",
+          "info": {
+            "name": "s3transfer",
+            "version": "0.6.2"
+          }
+        },
+        {
+          "id": "requests@2.31.0",
+          "info": {
+            "name": "requests",
+            "version": "2.31.0"
+          }
+        },
+        {
+          "id": "charset-normalizer@3.4.4",
+          "info": {
+            "name": "charset-normalizer",
+            "version": "3.4.4"
+          }
         }
       ],
       "graph": {
@@ -99,28 +99,10 @@
             "pkgId": "root@0.0.0",
             "deps": [
               {
-                "nodeId": "requests@2.31.0"
-              },
-              {
                 "nodeId": "boto3@1.28.0"
-              }
-            ]
-          },
-          {
-            "nodeId": "requests@2.31.0",
-            "pkgId": "requests@2.31.0",
-            "deps": [
-              {
-                "nodeId": "charset-normalizer@3.4.4"
               },
               {
-                "nodeId": "idna@3.11"
-              },
-              {
-                "nodeId": "urllib3@1.26.20"
-              },
-              {
-                "nodeId": "certifi@2025.11.12"
+                "nodeId": "requests@2.31.0"
               }
             ]
           },
@@ -132,13 +114,13 @@
                 "nodeId": "botocore@1.31.85"
               },
               {
-                "nodeId": "jmespath@1.0.1"
+                "nodeId": "botocore@1.31.85:pruned"
+              },
+              {
+                "nodeId": "jmespath@1.0.1:pruned"
               },
               {
                 "nodeId": "s3transfer@0.6.2"
-              },
-              {
-                "nodeId": "botocore@1.31.85"
               }
             ]
           },
@@ -156,53 +138,14 @@
                 "nodeId": "urllib3@1.26.20"
               },
               {
-                "nodeId": "urllib3@1.26.20"
+                "nodeId": "urllib3@1.26.20:pruned"
               }
             ]
-          },
-          {
-            "nodeId": "certifi@2025.11.12",
-            "pkgId": "certifi@2025.11.12",
-            "deps": []
-          },
-          {
-            "nodeId": "charset-normalizer@3.4.4",
-            "pkgId": "charset-normalizer@3.4.4",
-            "deps": []
-          },
-          {
-            "nodeId": "idna@3.11",
-            "pkgId": "idna@3.11",
-            "deps": []
           },
           {
             "nodeId": "jmespath@1.0.1",
             "pkgId": "jmespath@1.0.1",
             "deps": []
-          },
-          {
-            "nodeId": "s3transfer@0.6.2",
-            "pkgId": "s3transfer@0.6.2",
-            "deps": [
-              {
-                "nodeId": "botocore@1.31.85"
-              },
-              {
-                "nodeId": "botocore@1.31.85"
-              }
-            ]
-          },
-          {
-            "nodeId": "urllib3@1.26.20",
-            "pkgId": "urllib3@1.26.20",
-            "deps": [
-              {
-                "nodeId": "idna@3.11"
-              },
-              {
-                "nodeId": "certifi@2025.11.12"
-              }
-            ]
           },
           {
             "nodeId": "python-dateutil@2.9.0.post0",
@@ -216,6 +159,88 @@
           {
             "nodeId": "six@1.17.0",
             "pkgId": "six@1.17.0",
+            "deps": []
+          },
+          {
+            "nodeId": "urllib3@1.26.20",
+            "pkgId": "urllib3@1.26.20",
+            "deps": [
+              {
+                "nodeId": "certifi@2025.11.12"
+              },
+              {
+                "nodeId": "idna@3.11"
+              }
+            ]
+          },
+          {
+            "nodeId": "certifi@2025.11.12",
+            "pkgId": "certifi@2025.11.12",
+            "deps": []
+          },
+          {
+            "nodeId": "idna@3.11",
+            "pkgId": "idna@3.11",
+            "deps": []
+          },
+          {
+            "nodeId": "urllib3@1.26.20:pruned",
+            "pkgId": "urllib3@1.26.20",
+            "deps": []
+          },
+          {
+            "nodeId": "botocore@1.31.85:pruned",
+            "pkgId": "botocore@1.31.85",
+            "deps": []
+          },
+          {
+            "nodeId": "jmespath@1.0.1:pruned",
+            "pkgId": "jmespath@1.0.1",
+            "deps": []
+          },
+          {
+            "nodeId": "s3transfer@0.6.2",
+            "pkgId": "s3transfer@0.6.2",
+            "deps": [
+              {
+                "nodeId": "botocore@1.31.85:pruned"
+              },
+              {
+                "nodeId": "botocore@1.31.85:pruned"
+              }
+            ]
+          },
+          {
+            "nodeId": "requests@2.31.0",
+            "pkgId": "requests@2.31.0",
+            "deps": [
+              {
+                "nodeId": "certifi@2025.11.12:pruned"
+              },
+              {
+                "nodeId": "charset-normalizer@3.4.4"
+              },
+              {
+                "nodeId": "idna@3.11:pruned"
+              },
+              {
+                "nodeId": "urllib3@1.26.20:pruned"
+              }
+            ]
+          },
+          {
+            "nodeId": "certifi@2025.11.12:pruned",
+            "pkgId": "certifi@2025.11.12",
+            "deps": []
+          },
+          {
+            "nodeId": "charset-normalizer@3.4.4",
+            "pkgId": "charset-normalizer@3.4.4",
+            "deps": []
+          },
+          {
+            "nodeId": "idna@3.11:pruned",
+            "pkgId": "idna@3.11",
             "deps": []
           }
         ]

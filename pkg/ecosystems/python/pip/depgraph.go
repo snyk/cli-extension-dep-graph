@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
@@ -49,11 +50,8 @@ func (r *Report) ToDependencyGraph() (*depgraph.DepGraph, error) {
 		return nil, fmt.Errorf("failed to create depgraph builder: %w", err)
 	}
 
-	// Pre-allocate with known capacity
+	// Build package index by normalized name
 	packageByName := make(map[string]*packageInfo, numPackages)
-	directDepNodeIDs := make([]string, 0, numPackages/2) // Estimate ~50% are direct
-
-	// First pass: build index, add nodes, and collect direct deps
 	for i := range r.Install {
 		item := &r.Install[i]
 
@@ -64,61 +62,128 @@ func (r *Report) ToDependencyGraph() (*depgraph.DepGraph, error) {
 				slog.String("package", item.Metadata.Name))
 			version = "?"
 		}
-		nodeID := normalizedName + "@" + version // Faster than fmt.Sprintf
+		nodeID := normalizedName + "@" + version
 
-		// Cache computed values
-		info := &packageInfo{
+		packageByName[normalizedName] = &packageInfo{
 			normalizedName: normalizedName,
 			version:        version,
 			nodeID:         nodeID,
 			item:           item,
 		}
-		packageByName[normalizedName] = info
-
-		// Add node to builder
-		builder.AddNode(nodeID, &depgraph.PkgInfo{
-			Name:    normalizedName,
-			Version: version,
-		})
-
-		// Track direct dependencies
-		if item.IsDirectDependency() {
-			directDepNodeIDs = append(directDepNodeIDs, nodeID)
-		}
 	}
 
-	// Second pass: connect dependencies (must be after all nodes exist)
+	// Collect direct dependencies
+	var directDeps []*packageInfo
 	for _, info := range packageByName {
-		for _, depString := range info.item.Metadata.RequiresDist {
-			depName := extractPackageName(depString)
-			if depName == "" {
-				continue
-			}
-
-			depInfo, found := packageByName[normalizePackageName(depName)]
-			if !found {
-				continue
-			}
-
-			if err := builder.ConnectNodes(info.nodeID, depInfo.nodeID); err != nil {
-				return nil, fmt.Errorf("failed to connect dependency %s -> %s: %w", info.nodeID, depInfo.nodeID, err)
-			}
+		if info.item.IsDirectDependency() {
+			directDeps = append(directDeps, info)
 		}
 	}
 
-	// Connect root node to direct dependencies
-	rootNodeID := builder.GetRootNode().NodeID
-	for _, depNodeID := range directDepNodeIDs {
-		if err := builder.ConnectNodes(rootNodeID, depNodeID); err != nil {
-			return nil, fmt.Errorf("failed to connect root to dependency %s: %w", depNodeID, err)
-		}
+	// Create virtual root package info for DFS starting point
+	rootPkg := &packageInfo{
+		normalizedName: "root",
+		version:        "0.0.0",
+		nodeID:         builder.GetRootNode().NodeID,
+		item: &InstallItem{
+			Metadata: PackageMetadata{
+				Name:    "root",
+				Version: "0.0.0",
+			},
+		},
+	}
+
+	// Build dependency list for root (direct dependencies)
+	rootDeps := make([]string, 0, len(directDeps))
+	for _, dep := range directDeps {
+		rootDeps = append(rootDeps, dep.normalizedName)
+	}
+	// Sort for deterministic traversal order
+	sort.Strings(rootDeps)
+
+	// DFS traversal with pruning
+	visited := make(map[string]bool)
+	if err := dfsVisit(builder, packageByName, rootPkg, rootDeps, visited); err != nil {
+		return nil, err
 	}
 
 	slog.Debug("Successfully converted pip report to dependency graph",
 		slog.Int("total_packages", numPackages),
-		slog.Int("direct_dependencies", len(directDepNodeIDs)))
+		slog.Int("direct_dependencies", len(directDeps)))
 
 	return builder.Build(), nil
+}
+
+// dfsVisit performs depth-first traversal to build the dependency graph.
+// It tracks visited nodes and creates pruned nodes for cycles/repeated dependencies.
+func dfsVisit(
+	builder *depgraph.Builder,
+	packageByName map[string]*packageInfo,
+	pkg *packageInfo,
+	depNames []string,
+	visited map[string]bool,
+) error {
+	parentID := pkg.nodeID
+
+	for _, depName := range depNames {
+		depInfo, found := packageByName[normalizePackageName(depName)]
+		if !found {
+			continue
+		}
+
+		childID := depInfo.nodeID
+
+		// Check if already visited - create pruned node if so
+		if visited[childID] {
+			prunedID := childID + ":pruned"
+			prunedNode := builder.AddNode(prunedID, &depgraph.PkgInfo{
+				Name:    depInfo.normalizedName,
+				Version: depInfo.version,
+			})
+			// Set pruned label to match pip-deps behavior
+			prunedNode.Info = &depgraph.NodeInfo{
+				Labels: map[string]string{"pruned": "true"},
+			}
+
+			if err := builder.ConnectNodes(parentID, prunedID); err != nil {
+				return fmt.Errorf("failed to connect pruned dependency %s -> %s: %w", parentID, prunedID, err)
+			}
+			continue
+		}
+
+		// Add node and connect to parent
+		builder.AddNode(childID, &depgraph.PkgInfo{
+			Name:    depInfo.normalizedName,
+			Version: depInfo.version,
+		})
+
+		if err := builder.ConnectNodes(parentID, childID); err != nil {
+			return fmt.Errorf("failed to connect dependency %s -> %s: %w", parentID, childID, err)
+		}
+
+		// Mark as visited and recurse
+		visited[childID] = true
+
+		// Get dependencies for this package (sorted for deterministic order)
+		childDepNames := extractDepNames(depInfo.item.Metadata.RequiresDist)
+		sort.Strings(childDepNames)
+		if err := dfsVisit(builder, packageByName, depInfo, childDepNames, visited); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// extractDepNames extracts package names from a list of dependency strings.
+func extractDepNames(requiresDist []string) []string {
+	names := make([]string, 0, len(requiresDist))
+	for _, depString := range requiresDist {
+		if name := extractPackageName(depString); name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 // extractPackageName extracts the package name from a dependency string.

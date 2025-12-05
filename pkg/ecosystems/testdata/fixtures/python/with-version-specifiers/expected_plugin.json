@@ -14,13 +14,6 @@
           }
         },
         {
-          "id": "requests@2.32.5",
-          "info": {
-            "name": "requests",
-            "version": "2.32.5"
-          }
-        },
-        {
           "id": "click@8.1.8",
           "info": {
             "name": "click",
@@ -28,10 +21,17 @@
           }
         },
         {
-          "id": "urllib3@2.5.0",
+          "id": "requests@2.32.5",
           "info": {
-            "name": "urllib3",
-            "version": "2.5.0"
+            "name": "requests",
+            "version": "2.32.5"
+          }
+        },
+        {
+          "id": "certifi@2025.11.12",
+          "info": {
+            "name": "certifi",
+            "version": "2025.11.12"
           }
         },
         {
@@ -49,10 +49,10 @@
           }
         },
         {
-          "id": "certifi@2025.11.12",
+          "id": "urllib3@2.6.0",
           "info": {
-            "name": "certifi",
-            "version": "2025.11.12"
+            "name": "urllib3",
+            "version": "2.6.0"
           }
         }
       ],
@@ -64,31 +64,13 @@
             "pkgId": "root@0.0.0",
             "deps": [
               {
-                "nodeId": "requests@2.32.5"
-              },
-              {
                 "nodeId": "click@8.1.8"
               },
               {
-                "nodeId": "urllib3@2.5.0"
-              }
-            ]
-          },
-          {
-            "nodeId": "requests@2.32.5",
-            "pkgId": "requests@2.32.5",
-            "deps": [
-              {
-                "nodeId": "charset-normalizer@3.4.4"
+                "nodeId": "requests@2.32.5"
               },
               {
-                "nodeId": "idna@3.11"
-              },
-              {
-                "nodeId": "urllib3@2.5.0"
-              },
-              {
-                "nodeId": "certifi@2025.11.12"
+                "nodeId": "urllib3@2.6.0:pruned"
               }
             ]
           },
@@ -98,8 +80,26 @@
             "deps": []
           },
           {
-            "nodeId": "urllib3@2.5.0",
-            "pkgId": "urllib3@2.5.0",
+            "nodeId": "requests@2.32.5",
+            "pkgId": "requests@2.32.5",
+            "deps": [
+              {
+                "nodeId": "certifi@2025.11.12"
+              },
+              {
+                "nodeId": "charset-normalizer@3.4.4"
+              },
+              {
+                "nodeId": "idna@3.11"
+              },
+              {
+                "nodeId": "urllib3@2.6.0"
+              }
+            ]
+          },
+          {
+            "nodeId": "certifi@2025.11.12",
+            "pkgId": "certifi@2025.11.12",
             "deps": []
           },
           {
@@ -113,8 +113,13 @@
             "deps": []
           },
           {
-            "nodeId": "certifi@2025.11.12",
-            "pkgId": "certifi@2025.11.12",
+            "nodeId": "urllib3@2.6.0",
+            "pkgId": "urllib3@2.6.0",
+            "deps": []
+          },
+          {
+            "nodeId": "urllib3@2.6.0:pruned",
+            "pkgId": "urllib3@2.6.0",
             "deps": []
           }
         ]
@@ -122,7 +127,7 @@
     },
     "metadata": {
       "targetFile": "requirements.txt",
-      "runtime": "python@3.14.0"
+      "runtime": "python@3.14.1"
     }
   }
 ]

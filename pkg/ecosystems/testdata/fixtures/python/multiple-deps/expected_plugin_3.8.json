@@ -14,17 +14,17 @@
           }
         },
         {
-          "id": "requests@2.31.0",
-          "info": {
-            "name": "requests",
-            "version": "2.31.0"
-          }
-        },
-        {
           "id": "click@8.1.7",
           "info": {
             "name": "click",
             "version": "8.1.7"
+          }
+        },
+        {
+          "id": "requests@2.31.0",
+          "info": {
+            "name": "requests",
+            "version": "2.31.0"
           }
         },
         {
@@ -64,17 +64,25 @@
             "pkgId": "root@0.0.0",
             "deps": [
               {
-                "nodeId": "requests@2.31.0"
+                "nodeId": "click@8.1.7"
               },
               {
-                "nodeId": "click@8.1.7"
+                "nodeId": "requests@2.31.0"
               }
             ]
+          },
+          {
+            "nodeId": "click@8.1.7",
+            "pkgId": "click@8.1.7",
+            "deps": []
           },
           {
             "nodeId": "requests@2.31.0",
             "pkgId": "requests@2.31.0",
             "deps": [
+              {
+                "nodeId": "certifi@2025.11.12"
+              },
               {
                 "nodeId": "charset-normalizer@3.4.4"
               },
@@ -83,16 +91,8 @@
               },
               {
                 "nodeId": "urllib3@2.2.3"
-              },
-              {
-                "nodeId": "certifi@2025.11.12"
               }
             ]
-          },
-          {
-            "nodeId": "click@8.1.7",
-            "pkgId": "click@8.1.7",
-            "deps": []
           },
           {
             "nodeId": "certifi@2025.11.12",
@@ -119,7 +119,7 @@
     },
     "metadata": {
       "targetFile": "requirements.txt",
-      "runtime": "python@3.14.0"
+      "runtime": "python@3.8.20"
     }
   }
 ]

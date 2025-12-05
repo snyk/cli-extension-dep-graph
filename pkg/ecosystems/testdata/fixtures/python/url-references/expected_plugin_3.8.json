@@ -14,17 +14,17 @@
           }
         },
         {
-          "id": "requests@2.31.0",
-          "info": {
-            "name": "requests",
-            "version": "2.31.0"
-          }
-        },
-        {
           "id": "certifi@2023.7.22",
           "info": {
             "name": "certifi",
             "version": "2023.7.22"
+          }
+        },
+        {
+          "id": "requests@2.31.0",
+          "info": {
+            "name": "requests",
+            "version": "2.31.0"
           }
         },
         {
@@ -57,17 +57,25 @@
             "pkgId": "root@0.0.0",
             "deps": [
               {
-                "nodeId": "requests@2.31.0"
+                "nodeId": "certifi@2023.7.22"
               },
               {
-                "nodeId": "certifi@2023.7.22"
+                "nodeId": "requests@2.31.0"
               }
             ]
+          },
+          {
+            "nodeId": "certifi@2023.7.22",
+            "pkgId": "certifi@2023.7.22",
+            "deps": []
           },
           {
             "nodeId": "requests@2.31.0",
             "pkgId": "requests@2.31.0",
             "deps": [
+              {
+                "nodeId": "certifi@2023.7.22:pruned"
+              },
               {
                 "nodeId": "charset-normalizer@3.4.4"
               },
@@ -76,14 +84,11 @@
               },
               {
                 "nodeId": "urllib3@2.2.3"
-              },
-              {
-                "nodeId": "certifi@2023.7.22"
               }
             ]
           },
           {
-            "nodeId": "certifi@2023.7.22",
+            "nodeId": "certifi@2023.7.22:pruned",
             "pkgId": "certifi@2023.7.22",
             "deps": []
           },
@@ -107,7 +112,7 @@
     },
     "metadata": {
       "targetFile": "requirements.txt",
-      "runtime": "python@3.14.0"
+      "runtime": "python@3.8.20"
     }
   }
 ]

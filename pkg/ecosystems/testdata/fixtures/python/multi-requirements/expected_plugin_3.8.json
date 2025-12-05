@@ -14,114 +14,6 @@
           }
         },
         {
-          "id": "requests@2.31.0",
-          "info": {
-            "name": "requests",
-            "version": "2.31.0"
-          }
-        },
-        {
-          "id": "certifi@2025.11.12",
-          "info": {
-            "name": "certifi",
-            "version": "2025.11.12"
-          }
-        },
-        {
-          "id": "charset-normalizer@3.4.4",
-          "info": {
-            "name": "charset-normalizer",
-            "version": "3.4.4"
-          }
-        },
-        {
-          "id": "idna@3.11",
-          "info": {
-            "name": "idna",
-            "version": "3.11"
-          }
-        },
-        {
-          "id": "urllib3@2.2.3",
-          "info": {
-            "name": "urllib3",
-            "version": "2.2.3"
-          }
-        }
-      ],
-      "graph": {
-        "rootNodeId": "root-node",
-        "nodes": [
-          {
-            "nodeId": "root-node",
-            "pkgId": "root@0.0.0",
-            "deps": [
-              {
-                "nodeId": "requests@2.31.0"
-              }
-            ]
-          },
-          {
-            "nodeId": "requests@2.31.0",
-            "pkgId": "requests@2.31.0",
-            "deps": [
-              {
-                "nodeId": "charset-normalizer@3.4.4"
-              },
-              {
-                "nodeId": "idna@3.11"
-              },
-              {
-                "nodeId": "urllib3@2.2.3"
-              },
-              {
-                "nodeId": "certifi@2025.11.12"
-              }
-            ]
-          },
-          {
-            "nodeId": "certifi@2025.11.12",
-            "pkgId": "certifi@2025.11.12",
-            "deps": []
-          },
-          {
-            "nodeId": "charset-normalizer@3.4.4",
-            "pkgId": "charset-normalizer@3.4.4",
-            "deps": []
-          },
-          {
-            "nodeId": "idna@3.11",
-            "pkgId": "idna@3.11",
-            "deps": []
-          },
-          {
-            "nodeId": "urllib3@2.2.3",
-            "pkgId": "urllib3@2.2.3",
-            "deps": []
-          }
-        ]
-      }
-    },
-    "metadata": {
-      "targetFile": "requirements.txt",
-      "runtime": "python@3.8.20"
-    }
-  },
-  {
-    "depGraph": {
-      "schemaVersion": "1.3.0",
-      "pkgManager": {
-        "name": "pip"
-      },
-      "pkgs": [
-        {
-          "id": "root@0.0.0",
-          "info": {
-            "name": "root",
-            "version": "0.0.0"
-          }
-        },
-        {
           "id": "jinja2@3.1.2",
           "info": {
             "name": "jinja2",
@@ -185,10 +77,139 @@
           }
         },
         {
+          "id": "requests@2.31.0",
+          "info": {
+            "name": "requests",
+            "version": "2.31.0"
+          }
+        },
+        {
+          "id": "certifi@2025.11.12",
+          "info": {
+            "name": "certifi",
+            "version": "2025.11.12"
+          }
+        },
+        {
+          "id": "charset-normalizer@3.4.4",
+          "info": {
+            "name": "charset-normalizer",
+            "version": "3.4.4"
+          }
+        },
+        {
+          "id": "idna@3.11",
+          "info": {
+            "name": "idna",
+            "version": "3.11"
+          }
+        },
+        {
+          "id": "urllib3@2.2.3",
+          "info": {
+            "name": "urllib3",
+            "version": "2.2.3"
+          }
+        }
+      ],
+      "graph": {
+        "rootNodeId": "root-node",
+        "nodes": [
+          {
+            "nodeId": "root-node",
+            "pkgId": "root@0.0.0",
+            "deps": [
+              {
+                "nodeId": "requests@2.31.0"
+              }
+            ]
+          },
+          {
+            "nodeId": "requests@2.31.0",
+            "pkgId": "requests@2.31.0",
+            "deps": [
+              {
+                "nodeId": "certifi@2025.11.12"
+              },
+              {
+                "nodeId": "charset-normalizer@3.4.4"
+              },
+              {
+                "nodeId": "idna@3.11"
+              },
+              {
+                "nodeId": "urllib3@2.2.3"
+              }
+            ]
+          },
+          {
+            "nodeId": "certifi@2025.11.12",
+            "pkgId": "certifi@2025.11.12",
+            "deps": []
+          },
+          {
+            "nodeId": "charset-normalizer@3.4.4",
+            "pkgId": "charset-normalizer@3.4.4",
+            "deps": []
+          },
+          {
+            "nodeId": "idna@3.11",
+            "pkgId": "idna@3.11",
+            "deps": []
+          },
+          {
+            "nodeId": "urllib3@2.2.3",
+            "pkgId": "urllib3@2.2.3",
+            "deps": []
+          }
+        ]
+      }
+    },
+    "metadata": {
+      "targetFile": "requirements.txt",
+      "runtime": "python@3.8.20"
+    }
+  },
+  {
+    "depGraph": {
+      "schemaVersion": "1.3.0",
+      "pkgManager": {
+        "name": "pip"
+      },
+      "pkgs": [
+        {
+          "id": "root@0.0.0",
+          "info": {
+            "name": "root",
+            "version": "0.0.0"
+          }
+        },
+        {
           "id": "flask@3.0.0",
           "info": {
             "name": "flask",
             "version": "3.0.0"
+          }
+        },
+        {
+          "id": "jinja2@3.1.6",
+          "info": {
+            "name": "jinja2",
+            "version": "3.1.6"
+          }
+        },
+        {
+          "id": "markupsafe@2.1.5",
+          "info": {
+            "name": "markupsafe",
+            "version": "2.1.5"
+          }
+        },
+        {
+          "id": "werkzeug@3.0.6",
+          "info": {
+            "name": "werkzeug",
+            "version": "3.0.6"
           }
         },
         {
@@ -213,38 +234,17 @@
           }
         },
         {
-          "id": "itsdangerous@2.2.0",
-          "info": {
-            "name": "itsdangerous",
-            "version": "2.2.0"
-          }
-        },
-        {
-          "id": "jinja2@3.1.6",
-          "info": {
-            "name": "jinja2",
-            "version": "3.1.6"
-          }
-        },
-        {
-          "id": "werkzeug@3.0.6",
-          "info": {
-            "name": "werkzeug",
-            "version": "3.0.6"
-          }
-        },
-        {
-          "id": "markupsafe@2.1.5",
-          "info": {
-            "name": "markupsafe",
-            "version": "2.1.5"
-          }
-        },
-        {
           "id": "zipp@3.20.2",
           "info": {
             "name": "zipp",
             "version": "3.20.2"
+          }
+        },
+        {
+          "id": "itsdangerous@2.2.0",
+          "info": {
+            "name": "itsdangerous",
+            "version": "2.2.0"
           }
         }
       ],
@@ -265,24 +265,52 @@
             "pkgId": "flask@3.0.0",
             "deps": [
               {
-                "nodeId": "werkzeug@3.0.6"
-              },
-              {
                 "nodeId": "jinja2@3.1.6"
               },
               {
-                "nodeId": "itsdangerous@2.2.0"
-              },
-              {
-                "nodeId": "click@8.1.8"
+                "nodeId": "werkzeug@3.0.6"
               },
               {
                 "nodeId": "blinker@1.8.2"
               },
               {
-                "nodeId": "importlib-metadata@8.5.0"
+                "nodeId": "click@8.1.8"
+              },
+              {
+                "nodeId": "importlib-metadata@8.5.0:pruned"
+              },
+              {
+                "nodeId": "itsdangerous@2.2.0"
               }
             ]
+          },
+          {
+            "nodeId": "jinja2@3.1.6",
+            "pkgId": "jinja2@3.1.6",
+            "deps": [
+              {
+                "nodeId": "markupsafe@2.1.5"
+              }
+            ]
+          },
+          {
+            "nodeId": "markupsafe@2.1.5",
+            "pkgId": "markupsafe@2.1.5",
+            "deps": []
+          },
+          {
+            "nodeId": "werkzeug@3.0.6",
+            "pkgId": "werkzeug@3.0.6",
+            "deps": [
+              {
+                "nodeId": "markupsafe@2.1.5:pruned"
+              }
+            ]
+          },
+          {
+            "nodeId": "markupsafe@2.1.5:pruned",
+            "pkgId": "markupsafe@2.1.5",
+            "deps": []
           },
           {
             "nodeId": "blinker@1.8.2",
@@ -308,36 +336,18 @@
             ]
           },
           {
-            "nodeId": "itsdangerous@2.2.0",
-            "pkgId": "itsdangerous@2.2.0",
-            "deps": []
-          },
-          {
-            "nodeId": "jinja2@3.1.6",
-            "pkgId": "jinja2@3.1.6",
-            "deps": [
-              {
-                "nodeId": "markupsafe@2.1.5"
-              }
-            ]
-          },
-          {
-            "nodeId": "werkzeug@3.0.6",
-            "pkgId": "werkzeug@3.0.6",
-            "deps": [
-              {
-                "nodeId": "markupsafe@2.1.5"
-              }
-            ]
-          },
-          {
-            "nodeId": "markupsafe@2.1.5",
-            "pkgId": "markupsafe@2.1.5",
-            "deps": []
-          },
-          {
             "nodeId": "zipp@3.20.2",
             "pkgId": "zipp@3.20.2",
+            "deps": []
+          },
+          {
+            "nodeId": "importlib-metadata@8.5.0:pruned",
+            "pkgId": "importlib-metadata@8.5.0",
+            "deps": []
+          },
+          {
+            "nodeId": "itsdangerous@2.2.0",
+            "pkgId": "itsdangerous@2.2.0",
             "deps": []
           }
         ]

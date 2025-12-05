@@ -14,13 +14,6 @@
           }
         },
         {
-          "id": "requests@2.31.0",
-          "info": {
-            "name": "requests",
-            "version": "2.31.0"
-          }
-        },
-        {
           "id": "black@23.12.1",
           "info": {
             "name": "black",
@@ -28,31 +21,10 @@
           }
         },
         {
-          "id": "certifi@2025.11.12",
-          "info": {
-            "name": "certifi",
-            "version": "2025.11.12"
-          }
-        },
-        {
-          "id": "charset-normalizer@3.4.4",
-          "info": {
-            "name": "charset-normalizer",
-            "version": "3.4.4"
-          }
-        },
-        {
           "id": "click@8.1.8",
           "info": {
             "name": "click",
             "version": "8.1.8"
-          }
-        },
-        {
-          "id": "idna@3.11",
-          "info": {
-            "name": "idna",
-            "version": "3.11"
           }
         },
         {
@@ -98,6 +70,34 @@
           }
         },
         {
+          "id": "requests@2.31.0",
+          "info": {
+            "name": "requests",
+            "version": "2.31.0"
+          }
+        },
+        {
+          "id": "certifi@2025.11.12",
+          "info": {
+            "name": "certifi",
+            "version": "2025.11.12"
+          }
+        },
+        {
+          "id": "charset-normalizer@3.4.4",
+          "info": {
+            "name": "charset-normalizer",
+            "version": "3.4.4"
+          }
+        },
+        {
+          "id": "idna@3.11",
+          "info": {
+            "name": "idna",
+            "version": "3.11"
+          }
+        },
+        {
           "id": "urllib3@2.2.3",
           "info": {
             "name": "urllib3",
@@ -113,28 +113,10 @@
             "pkgId": "root@0.0.0",
             "deps": [
               {
-                "nodeId": "requests@2.31.0"
-              },
-              {
                 "nodeId": "black@23.12.1"
-              }
-            ]
-          },
-          {
-            "nodeId": "requests@2.31.0",
-            "pkgId": "requests@2.31.0",
-            "deps": [
-              {
-                "nodeId": "charset-normalizer@3.4.4"
               },
               {
-                "nodeId": "idna@3.11"
-              },
-              {
-                "nodeId": "urllib3@2.2.3"
-              },
-              {
-                "nodeId": "certifi@2025.11.12"
+                "nodeId": "requests@2.31.0"
               }
             ]
           },
@@ -166,23 +148,8 @@
             ]
           },
           {
-            "nodeId": "certifi@2025.11.12",
-            "pkgId": "certifi@2025.11.12",
-            "deps": []
-          },
-          {
-            "nodeId": "charset-normalizer@3.4.4",
-            "pkgId": "charset-normalizer@3.4.4",
-            "deps": []
-          },
-          {
             "nodeId": "click@8.1.8",
             "pkgId": "click@8.1.8",
-            "deps": []
-          },
-          {
-            "nodeId": "idna@3.11",
-            "pkgId": "idna@3.11",
             "deps": []
           },
           {
@@ -216,6 +183,39 @@
             "deps": []
           },
           {
+            "nodeId": "requests@2.31.0",
+            "pkgId": "requests@2.31.0",
+            "deps": [
+              {
+                "nodeId": "certifi@2025.11.12"
+              },
+              {
+                "nodeId": "charset-normalizer@3.4.4"
+              },
+              {
+                "nodeId": "idna@3.11"
+              },
+              {
+                "nodeId": "urllib3@2.2.3"
+              }
+            ]
+          },
+          {
+            "nodeId": "certifi@2025.11.12",
+            "pkgId": "certifi@2025.11.12",
+            "deps": []
+          },
+          {
+            "nodeId": "charset-normalizer@3.4.4",
+            "pkgId": "charset-normalizer@3.4.4",
+            "deps": []
+          },
+          {
+            "nodeId": "idna@3.11",
+            "pkgId": "idna@3.11",
+            "deps": []
+          },
+          {
             "nodeId": "urllib3@2.2.3",
             "pkgId": "urllib3@2.2.3",
             "deps": []
@@ -225,7 +225,7 @@
     },
     "metadata": {
       "targetFile": "requirements.txt",
-      "runtime": "python@3.14.0"
+      "runtime": "python@3.8.20"
     }
   }
 ]
