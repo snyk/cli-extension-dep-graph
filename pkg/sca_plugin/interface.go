@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/rs/zerolog"
+	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/dep-graph/go/pkg/depgraph"
 )
 
 type Options struct {
@@ -12,29 +14,39 @@ type Options struct {
 	Exclude     []string
 }
 
+type ConversionConfig struct {
+	RemoteRepoURL string
+	SnykClient    *snykclient.SnykClient
+}
+
+func NewConversionConfig(remoteRepoURL string, snykClient *snykclient.SnykClient) ConversionConfig {
+	return ConversionConfig{
+		RemoteRepoURL: remoteRepoURL,
+		SnykClient:    snykClient,
+	}
+}
+
 type Metadata struct {
 	PackageManager string
 	Name           string
 	Version        string
 }
 
-type WorkspacePackage struct {
-	Name    string
-	Version string
-	Path    string // Relative path to the workspace package directory
-}
-
 type Finding struct {
-	Sbom                 Sbom               // The raw SBOM bytes
-	Metadata             Metadata           // Information about the finding
-	FileExclusions       []string           // Paths for files that other plugins should ignore
-	NormalisedTargetFile string             // The target file name without any qualifiers, e.g. `uv.lock` (and not `dir/uv.lock`)
-	WorkspacePackages    []WorkspacePackage // Packages that are part of a workspace
-	Error                error              // Error that occurred while building the finding
+	DepGraph       *depgraph.DepGraph // The dependency graph
+	FileExclusions []string           // Paths for files that other plugins should ignore
+	// TODO: are the two file fields below correct?
+	NormalisedTargetFile string // The lock file path relative to inputDir, e.g. `uv.lock` or `project1/uv.lock`
+	TargetFileFromPlugin string // The manifest file path from the plugin, e.g. `pyproject.toml` or `project1/pyproject.toml`
+	Error                error  // Error that occurred while building the finding
 }
-
-type Sbom []byte
 
 type ScaPlugin interface {
-	BuildFindingsFromDir(ctx context.Context, dir string, options *Options, logger *zerolog.Logger) ([]Finding, error)
+	BuildFindingsFromDir(
+		ctx context.Context,
+		dir string,
+		options *Options,
+		conversionConfig *ConversionConfig,
+		logger *zerolog.Logger,
+	) ([]Finding, error)
 }
