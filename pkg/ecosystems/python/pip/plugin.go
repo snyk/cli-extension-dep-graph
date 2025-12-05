@@ -134,8 +134,7 @@ func (p Plugin) buildDepGraphFromFile(ctx context.Context, file discovery.FindRe
 	}
 
 	slog.Debug("Successfully built dependency graph",
-		slog.String(logFieldFile, file.RelPath),
-		slog.Int("packages", len(depGraph.Packages)))
+		slog.String(logFieldFile, file.RelPath))
 
 	return ecosystems.SCAResult{
 		DepGraph: depGraph,

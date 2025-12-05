@@ -1,104 +1,250 @@
 [
   {
     "depGraph": {
-      "packages": {
-        "boto3@1.28.0": {
-          "packageId": "boto3@1.28.0",
-          "packageName": "boto3",
-          "version": "1.28.0"
+      "schemaVersion": "1.3.0",
+      "pkgManager": {
+        "name": "pip"
+      },
+      "pkgs": [
+        {
+          "id": "root@0.0.0",
+          "info": {
+            "name": "root",
+            "version": "0.0.0"
+          }
         },
-        "botocore@1.31.85": {
-          "packageId": "botocore@1.31.85",
-          "packageName": "botocore",
-          "version": "1.31.85"
+        {
+          "id": "boto3@1.28.0",
+          "info": {
+            "name": "boto3",
+            "version": "1.28.0"
+          }
         },
-        "certifi@2025.11.12": {
-          "packageId": "certifi@2025.11.12",
-          "packageName": "certifi",
-          "version": "2025.11.12"
+        {
+          "id": "botocore@1.31.85",
+          "info": {
+            "name": "botocore",
+            "version": "1.31.85"
+          }
         },
-        "charset-normalizer@3.4.4": {
-          "packageId": "charset-normalizer@3.4.4",
-          "packageName": "charset-normalizer",
-          "version": "3.4.4"
+        {
+          "id": "jmespath@1.0.1",
+          "info": {
+            "name": "jmespath",
+            "version": "1.0.1"
+          }
         },
-        "idna@3.11": {
-          "packageId": "idna@3.11",
-          "packageName": "idna",
-          "version": "3.11"
+        {
+          "id": "python-dateutil@2.9.0.post0",
+          "info": {
+            "name": "python-dateutil",
+            "version": "2.9.0.post0"
+          }
         },
-        "jmespath@1.0.1": {
-          "packageId": "jmespath@1.0.1",
-          "packageName": "jmespath",
-          "version": "1.0.1"
+        {
+          "id": "six@1.17.0",
+          "info": {
+            "name": "six",
+            "version": "1.17.0"
+          }
         },
-        "python-dateutil@2.9.0.post0": {
-          "packageId": "python-dateutil@2.9.0.post0",
-          "packageName": "python-dateutil",
-          "version": "2.9.0.post0"
+        {
+          "id": "urllib3@2.0.7",
+          "info": {
+            "name": "urllib3",
+            "version": "2.0.7"
+          }
         },
-        "requests@2.31.0": {
-          "packageId": "requests@2.31.0",
-          "packageName": "requests",
-          "version": "2.31.0"
+        {
+          "id": "certifi@2025.11.12",
+          "info": {
+            "name": "certifi",
+            "version": "2025.11.12"
+          }
         },
-        "s3transfer@0.6.2": {
-          "packageId": "s3transfer@0.6.2",
-          "packageName": "s3transfer",
-          "version": "0.6.2"
+        {
+          "id": "idna@3.11",
+          "info": {
+            "name": "idna",
+            "version": "3.11"
+          }
         },
-        "six@1.17.0": {
-          "packageId": "six@1.17.0",
-          "packageName": "six",
-          "version": "1.17.0"
+        {
+          "id": "s3transfer@0.6.2",
+          "info": {
+            "name": "s3transfer",
+            "version": "0.6.2"
+          }
         },
-        "urllib3@2.0.7": {
-          "packageId": "urllib3@2.0.7",
-          "packageName": "urllib3",
-          "version": "2.0.7"
+        {
+          "id": "requests@2.31.0",
+          "info": {
+            "name": "requests",
+            "version": "2.31.0"
+          }
+        },
+        {
+          "id": "charset-normalizer@3.4.4",
+          "info": {
+            "name": "charset-normalizer",
+            "version": "3.4.4"
+          }
         }
-      },
+      ],
       "graph": {
-        "boto3@1.28.0": [
-          "botocore@1.31.85",
-          "jmespath@1.0.1",
-          "s3transfer@0.6.2",
-          "botocore@1.31.85"
-        ],
-        "botocore@1.31.85": [
-          "jmespath@1.0.1",
-          "python-dateutil@2.9.0.post0",
-          "urllib3@2.0.7",
-          "urllib3@2.0.7"
-        ],
-        "certifi@2025.11.12": null,
-        "charset-normalizer@3.4.4": null,
-        "idna@3.11": null,
-        "jmespath@1.0.1": null,
-        "python-dateutil@2.9.0.post0": [
-          "six@1.17.0"
-        ],
-        "requests@2.31.0": [
-          "charset-normalizer@3.4.4",
-          "idna@3.11",
-          "urllib3@2.0.7",
-          "certifi@2025.11.12"
-        ],
-        "root": [
-          "requests@2.31.0",
-          "boto3@1.28.0"
-        ],
-        "s3transfer@0.6.2": [
-          "botocore@1.31.85",
-          "botocore@1.31.85"
-        ],
-        "six@1.17.0": null,
-        "urllib3@2.0.7": [
-          "certifi@2025.11.12",
-          "idna@3.11"
+        "rootNodeId": "root-node",
+        "nodes": [
+          {
+            "nodeId": "root-node",
+            "pkgId": "root@0.0.0",
+            "deps": [
+              {
+                "nodeId": "boto3@1.28.0"
+              },
+              {
+                "nodeId": "requests@2.31.0"
+              }
+            ]
+          },
+          {
+            "nodeId": "boto3@1.28.0",
+            "pkgId": "boto3@1.28.0",
+            "deps": [
+              {
+                "nodeId": "botocore@1.31.85"
+              },
+              {
+                "nodeId": "botocore@1.31.85:pruned"
+              },
+              {
+                "nodeId": "jmespath@1.0.1:pruned"
+              },
+              {
+                "nodeId": "s3transfer@0.6.2"
+              }
+            ]
+          },
+          {
+            "nodeId": "botocore@1.31.85",
+            "pkgId": "botocore@1.31.85",
+            "deps": [
+              {
+                "nodeId": "jmespath@1.0.1"
+              },
+              {
+                "nodeId": "python-dateutil@2.9.0.post0"
+              },
+              {
+                "nodeId": "urllib3@2.0.7"
+              },
+              {
+                "nodeId": "urllib3@2.0.7:pruned"
+              }
+            ]
+          },
+          {
+            "nodeId": "jmespath@1.0.1",
+            "pkgId": "jmespath@1.0.1",
+            "deps": []
+          },
+          {
+            "nodeId": "python-dateutil@2.9.0.post0",
+            "pkgId": "python-dateutil@2.9.0.post0",
+            "deps": [
+              {
+                "nodeId": "six@1.17.0"
+              }
+            ]
+          },
+          {
+            "nodeId": "six@1.17.0",
+            "pkgId": "six@1.17.0",
+            "deps": []
+          },
+          {
+            "nodeId": "urllib3@2.0.7",
+            "pkgId": "urllib3@2.0.7",
+            "deps": [
+              {
+                "nodeId": "certifi@2025.11.12"
+              },
+              {
+                "nodeId": "idna@3.11"
+              }
+            ]
+          },
+          {
+            "nodeId": "certifi@2025.11.12",
+            "pkgId": "certifi@2025.11.12",
+            "deps": []
+          },
+          {
+            "nodeId": "idna@3.11",
+            "pkgId": "idna@3.11",
+            "deps": []
+          },
+          {
+            "nodeId": "urllib3@2.0.7:pruned",
+            "pkgId": "urllib3@2.0.7",
+            "deps": []
+          },
+          {
+            "nodeId": "botocore@1.31.85:pruned",
+            "pkgId": "botocore@1.31.85",
+            "deps": []
+          },
+          {
+            "nodeId": "jmespath@1.0.1:pruned",
+            "pkgId": "jmespath@1.0.1",
+            "deps": []
+          },
+          {
+            "nodeId": "s3transfer@0.6.2",
+            "pkgId": "s3transfer@0.6.2",
+            "deps": [
+              {
+                "nodeId": "botocore@1.31.85:pruned"
+              },
+              {
+                "nodeId": "botocore@1.31.85:pruned"
+              }
+            ]
+          },
+          {
+            "nodeId": "requests@2.31.0",
+            "pkgId": "requests@2.31.0",
+            "deps": [
+              {
+                "nodeId": "certifi@2025.11.12:pruned"
+              },
+              {
+                "nodeId": "charset-normalizer@3.4.4"
+              },
+              {
+                "nodeId": "idna@3.11:pruned"
+              },
+              {
+                "nodeId": "urllib3@2.0.7:pruned"
+              }
+            ]
+          },
+          {
+            "nodeId": "certifi@2025.11.12:pruned",
+            "pkgId": "certifi@2025.11.12",
+            "deps": []
+          },
+          {
+            "nodeId": "charset-normalizer@3.4.4",
+            "pkgId": "charset-normalizer@3.4.4",
+            "deps": []
+          },
+          {
+            "nodeId": "idna@3.11:pruned",
+            "pkgId": "idna@3.11",
+            "deps": []
+          }
         ]
-      },
-      "rootPackageId": "root"
+      }
     },
     "metadata": {
       "targetFile": "requirements.txt",

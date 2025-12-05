@@ -61,65 +61,197 @@ Interface calls in Go are optimized by the compiler and have minimal runtime ove
 
 ## Data Structures
 
-### DependencyGraph: Adjacency List Representation
+### DepGraph: Snyk Dependency Graph Format
 
-The dependency graph uses an **adjacency list** structure rather than a nested tree:
+The `SCAResult.DepGraph` field uses the standard Snyk dependency graph format from `github.com/snyk/dep-graph/go/pkg/depgraph`:
 
 ```go
-type DependencyGraph struct {
-    Packages      map[PackageID]Package     `json:"packages"`
-    Graph         map[PackageID][]PackageID `json:"graph"`
-    RootPackageID PackageID                 `json:"rootPackageId"`
+import "github.com/snyk/dep-graph/go/pkg/depgraph"
+
+type SCAResult struct {
+    DepGraph *depgraph.DepGraph `json:"depGraph,omitempty"`
+    Metadata Metadata           `json:"metadata"`
+    Error    error              `json:"error,omitempty"`
 }
 ```
 
-#### Why Adjacency List?
+#### DepGraph Structure
 
-**Advantages:**
-- ✅ **No Duplication**: Shared dependencies appear once in memory
-- ✅ **Efficient Queries**: O(n) to find all packages that depend on X
-- ✅ **Cycle Detection**: Standard graph algorithms work naturally
-- ✅ **Memory Efficient**: Large graphs with many shared dependencies use less memory
-- ✅ **Standard Format**: Compatible with graph analysis tools and algorithms
+The `depgraph.DepGraph` type provides a standardized format for representing dependency graphs:
 
-**Example:**
-```go
-depgraph := DependencyGraph{
-    Packages: map[PackageID]Package{
-        "app@1.0.0":  {PackageID: "app@1.0.0", PackageName: "app", Version: "1.0.0"},
-        "libA@2.0.0": {PackageID: "libA@2.0.0", PackageName: "libA", Version: "2.0.0"},
-        "libB@3.0.0": {PackageID: "libB@3.0.0", PackageName: "libB", Version: "3.0.0"},
-        "shared@1.5.0": {PackageID: "shared@1.5.0", PackageName: "shared", Version: "1.5.0"},
+```json
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "pip"
+  },
+  "pkgs": [
+    {
+      "id": "root@0.0.0",
+      "info": {
+        "name": "root",
+        "version": "0.0.0"
+      }
     },
-    Graph: map[PackageID][]PackageID{
-        "app@1.0.0":    {"libA@2.0.0", "libB@3.0.0"},
-        "libA@2.0.0":   {"shared@1.5.0"},
-        "libB@3.0.0":   {"shared@1.5.0"}, // shared dependency appears only once in Packages
-        "shared@1.5.0": {},
-    },
-    RootPackageID: "app@1.0.0",
+    {
+      "id": "requests@2.31.0",
+      "info": {
+        "name": "requests",
+        "version": "2.31.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "root@0.0.0",
+        "deps": [
+          { "nodeId": "requests@2.31.0" }
+        ]
+      },
+      {
+        "nodeId": "requests@2.31.0",
+        "pkgId": "requests@2.31.0",
+        "deps": []
+      }
+    ]
+  }
 }
+```
+
+#### Key Components
+
+| Field | Description |
+|-------|-------------|
+| `schemaVersion` | Version of the dep-graph schema (e.g., "1.3.0") |
+| `pkgManager` | Package manager info with `name` (e.g., "pip", "npm") |
+| `pkgs` | Array of all packages with `id` and `info` (name, version) |
+| `graph.rootNodeId` | ID of the root node in the graph |
+| `graph.nodes` | Array of nodes, each with `nodeId`, `pkgId`, and `deps` |
+
+#### Building a DepGraph
+
+Use the `depgraph.Builder` to construct dependency graphs:
+
+```go
+import "github.com/snyk/dep-graph/go/pkg/depgraph"
+
+// Create a builder with package manager and root package info
+builder, err := depgraph.NewBuilder(
+    &depgraph.PkgManager{Name: "pip"},
+    &depgraph.PkgInfo{Name: "root", Version: "0.0.0"},
+)
+if err != nil {
+    return nil, err
+}
+
+// Add package nodes
+builder.AddNode("requests@2.31.0", &depgraph.PkgInfo{
+    Name:    "requests",
+    Version: "2.31.0",
+})
+
+// Connect dependencies
+rootNode := builder.GetRootNode()
+err = builder.ConnectNodes(rootNode.NodeID, "requests@2.31.0")
+if err != nil {
+    return nil, err
+}
+
+// Build the final graph
+depGraph := builder.Build()
 ```
 
 ### SCAResult: Analysis Output
 
 ```go
 type SCAResult struct {
-    DepGraph *DependencyGraph `json:"depGraph,omitempty"`
-    Metadata Metadata         `json:"metadata"`
-    Error    error            `json:"error,omitempty"`
+    DepGraph *depgraph.DepGraph `json:"depGraph,omitempty"`
+    Metadata Metadata           `json:"metadata"`
+    Error    error              `json:"error,omitempty"`
 }
 ```
 
 Each result contains:
-- **DepGraph**: The complete dependency graph
+- **DepGraph**: The complete dependency graph using Snyk's standard format
 - **Metadata**: Context about the analysis (target file, runtime environment)
 - **Error**: Any error encountered during analysis (optional)
+
+### Metadata
+
+```go
+type Metadata struct {
+    TargetFile string `json:"targetFile"`  // Path to the manifest file (e.g., "requirements.txt")
+    Runtime    string `json:"runtime"`     // Runtime environment (e.g., "python@3.11.0")
+}
+```
 
 Plugins return `[]SCAResult` to support:
 - Monorepos with multiple projects
 - Projects with multiple dependency graphs (e.g., runtime + dev dependencies)
 - Workspaces (npm, yarn, cargo)
+
+## Configuration
+
+### SCAPluginOptions
+
+```go
+type SCAPluginOptions struct {
+    Global GlobalOptions    // Options that apply to all plugins
+    Python *PythonOptions   // Python-specific options
+}
+```
+
+### GlobalOptions
+
+Options that apply across all ecosystem plugins:
+
+```go
+type GlobalOptions struct {
+    TargetFile  *string  // Specific manifest file to analyze
+    AllProjects bool     // Discover and analyze all projects in directory
+}
+```
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `TargetFile` | `*string` | Path to a specific manifest file to analyze. When set, only this file is processed. |
+| `AllProjects` | `bool` | When `true`, recursively discovers and analyzes all supported manifest files in the directory. |
+
+### PythonOptions
+
+Python-specific options (currently empty, reserved for future use):
+
+```go
+type PythonOptions struct{}
+```
+
+### Builder Pattern
+
+Use the fluent builder pattern to configure options:
+
+```go
+// Analyze a specific file
+options := ecosystems.NewPluginOptions().
+    WithTargetFile("requirements.txt")
+
+// Analyze all projects in directory
+options := ecosystems.NewPluginOptions().
+    WithAllProjects(true)
+
+// Default options (single project at root)
+options := ecosystems.NewPluginOptions()
+```
+
+### Available Builder Methods
+
+| Method | Description |
+|--------|-------------|
+| `NewPluginOptions()` | Creates a new options instance with defaults |
+| `WithTargetFile(path string)` | Sets a specific manifest file to analyze |
+| `WithAllProjects(bool)` | Enables/disables recursive project discovery |
 
 ## Plugin Implementations
 
@@ -129,6 +261,7 @@ Plugins are organized by ecosystem:
 pkg/ecosystems/
 ├── plugin_interface.go    # Core interface definition
 ├── options.go             # Configuration types
+├── discovery/             # File discovery utilities
 └── python/
     ├── pip/
     │   └── plugin.go      # Pip plugin implementation
@@ -140,8 +273,8 @@ pkg/ecosystems/
 
 #### Python Ecosystem
 
-- **pip**: Discovers dependencies from `requirements.txt`
-- **uv**: Modern Python package manager and resolver
+- **pip**: Discovers dependencies from `requirements.txt` using `pip install --dry-run --report`
+- **uv**: Modern Python package manager and resolver (in development)
 
 ### Future Ecosystems
 
@@ -151,31 +284,6 @@ The architecture supports adding plugins for:
 - **.NET**: NuGet
 - **Go**: Go modules
 
-## Configuration
-
-### SCAPluginOptions
-
-```go
-type SCAPluginOptions struct {
-    Global GlobalOptions    // Options for all plugins
-    Python *PythonOptions   // Python-specific options
-}
-```
-
-Options support:
-- **Global settings**: Apply to all ecosystems (e.g., `AllProjects`, `TargetFile`)
-- **Ecosystem-specific settings**: Only relevant to particular package managers
-
-### Builder Pattern
-
-```go
-options := ecosystems.NewPluginOptions().
-    WithTargetFile("requirements.txt").
-    WithAllProjects(true)
-
-results, err := plugin.BuildDepGraphsFromDir(ctx, "/path/to/project", options)
-```
-
 ## Usage Examples
 
 ### Basic Usage
@@ -183,6 +291,7 @@ results, err := plugin.BuildDepGraphsFromDir(ctx, "/path/to/project", options)
 ```go
 import (
     "context"
+    "fmt"
     "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
     "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pip"
 )
@@ -202,10 +311,41 @@ func main() {
     }
     
     for _, result := range results {
+        if result.Error != nil {
+            fmt.Printf("Error analyzing %s: %v\n", result.Metadata.TargetFile, result.Error)
+            continue
+        }
+        
         fmt.Printf("Target: %s\n", result.Metadata.TargetFile)
-        fmt.Printf("Root Package: %s\n", result.DepGraph.RootPackageID)
-        fmt.Printf("Total Packages: %d\n", len(result.DepGraph.Packages))
+        fmt.Printf("Runtime: %s\n", result.Metadata.Runtime)
+        fmt.Printf("Package Manager: %s\n", result.DepGraph.PkgManager.Name)
+        fmt.Printf("Total Packages: %d\n", len(result.DepGraph.Pkgs))
     }
+}
+```
+
+### Analyzing All Projects
+
+```go
+options := ecosystems.NewPluginOptions().
+    WithAllProjects(true)
+
+results, err := plugin.BuildDepGraphsFromDir(ctx, "/path/to/monorepo", options)
+// Returns results for all requirements.txt files found
+```
+
+### Handling Errors in Results
+
+```go
+for _, result := range results {
+    if result.Error != nil {
+        // Individual file failed, but others may have succeeded
+        log.Printf("Failed to analyze %s: %v", result.Metadata.TargetFile, result.Error)
+        continue
+    }
+    
+    // Process successful result
+    processDepGraph(result.DepGraph)
 }
 ```
 
@@ -225,6 +365,7 @@ To add support for a new ecosystem:
    import (
        "context"
        "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+       "github.com/snyk/dep-graph/go/pkg/depgraph"
    )
    
    type Plugin struct {
@@ -236,7 +377,7 @@ To add support for a new ecosystem:
    func (p *Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *ecosystems.SCAPluginOptions) ([]ecosystems.SCAResult, error) {
        // 1. Discover manifest files in dir
        // 2. Resolve dependencies using ecosystem tooling
-       // 3. Build DependencyGraph from resolved dependencies
+       // 3. Build depgraph.DepGraph using the builder
        // 4. Return SCAResult with metadata
    }
    ```
@@ -264,7 +405,8 @@ To add support for a new ecosystem:
        results, err := plugin.BuildDepGraphsFromDir(context.Background(), "./testdata", options)
        assert.NoError(t, err)
        assert.Len(t, results, 1)
-       // More assertions
+       assert.NotNil(t, results[0].DepGraph)
+       assert.Equal(t, "mymanager", results[0].DepGraph.PkgManager.Name)
    }
    ```
 
@@ -283,11 +425,11 @@ To add support for a new ecosystem:
 - ✅ Easy to add new package manager support
 - ✅ Testable with dependency injection
 - ✅ Type-safe with compile-time checks
-- ✅ Efficient graph operations
+- ✅ Standard Snyk dep-graph format
 
 ### For External Consumers
 - ✅ Well-defined interface to implement
-- ✅ Standard dependency graph format
+- ✅ Standard dependency graph format compatible with Snyk tools
 - ✅ Compatible with Snyk workflows
 - ✅ No tight coupling to Snyk internals
 - ✅ Extensible for custom ecosystems
@@ -297,3 +439,4 @@ To add support for a new ecosystem:
 - [Interface definition](./plugin_interface.go)
 - [Configuration options](./options.go)
 - [Python plugins](./python/)
+- [Snyk dep-graph package](https://github.com/snyk/dep-graph)
