@@ -26,7 +26,12 @@ func (p Plugin) BuildFindingsFromDir(
 	options *scaplugin.Options,
 	logger *zerolog.Logger,
 ) ([]scaplugin.Finding, error) {
-	files, err := p.discoverLockFiles(ctx, inputDir, options)
+	if options.TargetFile != "" && filepath.Base(options.TargetFile) != UvLockFileName {
+		logger.Printf("Skipping processing uv plugin for %s as it is not a 'uv.lock' file", options.TargetFile)
+		return []scaplugin.Finding{}, nil
+	}
+
+	files, err := p.discoverLockFiles(ctx, inputDir, options.TargetFile, options)
 	if err != nil {
 		return nil, err
 	}
@@ -58,6 +63,7 @@ func (p Plugin) BuildFindingsFromDir(
 func (p Plugin) discoverLockFiles(
 	ctx context.Context,
 	dir string,
+	targetFile string,
 	options *scaplugin.Options,
 ) ([]discovery.FindResult, error) {
 	var findOpts []discovery.FindOption
@@ -72,9 +78,11 @@ func (p Plugin) discoverLockFiles(
 			findOpts = append(findOpts, discovery.WithExcludes(options.Exclude...))
 		}
 	default:
-		// Default: find uv.lock at root only
-		findOpts = []discovery.FindOption{
-			discovery.WithTargetFile(UvLockFileName),
+		if targetFile != "" {
+			findOpts = append(findOpts, discovery.WithTargetFile(targetFile))
+		} else {
+			// Default: find uv.lock at root only
+			findOpts = append(findOpts, discovery.WithTargetFile(UvLockFileName))
 		}
 	}
 
