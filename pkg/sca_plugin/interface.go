@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rs/zerolog"
+	"github.com/snyk/dep-graph/go/pkg/depgraph"
 )
 
 type Options struct {
@@ -19,23 +20,20 @@ type Metadata struct {
 	Version        string
 }
 
-type WorkspacePackage struct {
-	Name    string
-	Version string
-	Path    string // Relative path to the workspace package directory
-}
-
 type Finding struct {
-	Sbom                 Sbom               // The raw SBOM bytes
-	Metadata             Metadata           // Information about the finding
-	FileExclusions       []string           // Paths for files that other plugins should ignore
-	NormalisedTargetFile string             // The target file name without any qualifiers, e.g. `uv.lock` (and not `dir/uv.lock`)
-	WorkspacePackages    []WorkspacePackage // Packages that are part of a workspace
-	Error                error              // Error that occurred while building the finding
-}
+	DepGraph       *depgraph.DepGraph // The dependency graph.
+	FileExclusions []string           // Paths for files that other plugins should ignore, as they (or related files) have already been processed by the plugin.
+	LockFile       string             // The lock file path relative to the input directory.
+	ManifestFile   string             // The manifest file path relative to the input directory.
 
-type Sbom []byte
+	Error error // Error that occurred while building the finding, if any.
+}
 
 type ScaPlugin interface {
-	BuildFindingsFromDir(ctx context.Context, dir string, options *Options, logger *zerolog.Logger) ([]Finding, error)
+	BuildFindingsFromDir(
+		ctx context.Context,
+		dir string,
+		options *Options,
+		logger *zerolog.Logger,
+	) ([]Finding, error)
 }
