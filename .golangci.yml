@@ -26,10 +26,10 @@ linters-settings:
   gocyclo:
     min-complexity: 15
   gofumpt:
-    module-path: github.com/snyk/cli-extension-os-flows
+    module-path: github.com/snyk/cli-extension-dep-graph
     extra-rules: true
   goimports:
-    local-prefixes: github.com/snyk/cli-extension-os-flows
+    local-prefixes: github.com/snyk/cli-extension-dep-graph
   gosimple:
     checks: ["all"]
   govet:
@@ -53,7 +53,6 @@ linters-settings:
   revive:
     rules:
       - name: blank-imports
-        disabled: true
       - name: context-as-argument
       - name: context-keys-type
       - name: dot-imports
@@ -65,7 +64,6 @@ linters-settings:
       - name: increment-decrement
       - name: var-naming
       - name: var-declaration
-        disabled: true
       - name: package-comments
       - name: range
       - name: receiver-naming
@@ -78,6 +76,7 @@ linters-settings:
       - name: unused-parameter
       - name: unreachable-code
       - name: redefines-builtin-id
+      - name: redundant-import-alias
   staticcheck:
     checks: ["all"]
   stylecheck:

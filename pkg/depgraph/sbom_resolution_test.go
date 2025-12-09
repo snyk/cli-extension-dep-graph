@@ -10,8 +10,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
-	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
-	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 	dg "github.com/snyk/dep-graph/go/pkg/depgraph"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	frameworkmocks "github.com/snyk/go-application-framework/pkg/mocks"
@@ -19,6 +17,9 @@ import (
 	"github.com/snyk/go-application-framework/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
+	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
 //go:embed testdata/uv-sbom-convert-expected-dep-graph.json
@@ -174,7 +175,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{mockPlugin},
+			[]scaplugin.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -200,7 +201,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{mockPlugin},
+			[]scaplugin.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -222,7 +223,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{mockPlugin},
+			[]scaplugin.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -267,7 +268,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{mockPlugin},
+			[]scaplugin.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -304,7 +305,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{mockPlugin},
+			[]scaplugin.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -341,7 +342,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{mockPlugin},
+			[]scaplugin.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -382,7 +383,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			name                             string
 			allProjects                      bool
 			initialExclude                   string
-			plugins                          []scaplugin.ScaPlugin
+			plugins                          []scaplugin.SCAPlugin
 			expectedWorkflowDataLen          int
 			expectLegacyResolutionToBeCalled bool
 			expectedExclude                  string
@@ -391,7 +392,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				name:           "should return all findings from single plugin when FlagAllProjects is false (e.g. single workspace project with multiple findings)",
 				allProjects:    false,
 				initialExclude: "",
-				plugins: []scaplugin.ScaPlugin{
+				plugins: []scaplugin.SCAPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{
 							finding1,
@@ -407,7 +408,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				name:           "should return all findings when FlagAllProjects is true",
 				allProjects:    true,
 				initialExclude: "",
-				plugins: []scaplugin.ScaPlugin{
+				plugins: []scaplugin.SCAPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{
 							finding1,
@@ -424,7 +425,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				name:           "should continue to next plugin when first plugin returns zero findings and FlagAllProjects is false",
 				allProjects:    false,
 				initialExclude: "",
-				plugins: []scaplugin.ScaPlugin{
+				plugins: []scaplugin.SCAPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{},
 					},
@@ -442,7 +443,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				name:           "should stop at first plugin and return its findings when FlagAllProjects is false",
 				allProjects:    false,
 				initialExclude: "",
-				plugins: []scaplugin.ScaPlugin{
+				plugins: []scaplugin.SCAPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{
 							finding1,
@@ -464,7 +465,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				name:           "should return all findings when FlagAllProjects is true and multiple plugins return multiple findings",
 				allProjects:    true,
 				initialExclude: "",
-				plugins: []scaplugin.ScaPlugin{
+				plugins: []scaplugin.SCAPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{
 							finding1,
@@ -487,7 +488,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				name:           "should call legacy resolution workflow when no SBOM findings are found and FlagAllProjects is false",
 				allProjects:    false,
 				initialExclude: "",
-				plugins: []scaplugin.ScaPlugin{
+				plugins: []scaplugin.SCAPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{},
 					},
@@ -503,7 +504,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				name:           "should append FilesProcessed to existing FlagExclude when FlagAllProjects is true",
 				allProjects:    true,
 				initialExclude: "existing-file.txt,another-file.py",
-				plugins: []scaplugin.ScaPlugin{
+				plugins: []scaplugin.SCAPlugin{
 					&mockScaPlugin{
 						findings: []scaplugin.Finding{
 							finding1,
@@ -600,7 +601,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{mockPlugin},
+			[]scaplugin.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -631,7 +632,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{mockPlugin},
+			[]scaplugin.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -671,7 +672,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{mockPlugin},
+			[]scaplugin.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -713,7 +714,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{mockPlugin},
+			[]scaplugin.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -748,7 +749,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{mockPlugin},
+			[]scaplugin.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -782,7 +783,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{mockPlugin},
+			[]scaplugin.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -815,7 +816,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.ScaPlugin{mockPlugin},
+			[]scaplugin.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 

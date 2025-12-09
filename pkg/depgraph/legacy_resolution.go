@@ -5,9 +5,10 @@ import (
 	"strconv"
 
 	"github.com/rs/zerolog"
-	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
+
+	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 )
 
 var legacyWorkflowID = workflow.NewWorkflowIdentifier(legacyCLIWorkflowIDStr)

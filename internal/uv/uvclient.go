@@ -8,10 +8,11 @@ import (
 	"strconv"
 	"strings"
 
-	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 	clierrors "github.com/snyk/error-catalog-golang-public/cli"
 	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
+
+	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
 const (

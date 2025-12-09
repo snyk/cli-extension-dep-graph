@@ -29,7 +29,7 @@ type Finding struct {
 	Error error // Error that occurred while building the finding, if any.
 }
 
-type ScaPlugin interface {
+type SCAPlugin interface {
 	BuildFindingsFromDir(
 		ctx context.Context,
 		dir string,

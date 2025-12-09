@@ -6,9 +6,10 @@ import (
 	"io"
 
 	"github.com/rs/zerolog"
-	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
-	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
+
+	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
 func SbomToDepGraphs(
