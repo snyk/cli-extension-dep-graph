@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -728,6 +729,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 	t.Run("should log snyk_errors.Error details for support debugging", func(t *testing.T) {
 		ctx := setupTestContext(t)
+		ctx.config.Set(FlagAllProjects, true) // allProjects must be true for errors to be skipped and logged
 
 		snykErr := snyk_errors.Error{
 			ID:     "SNYK-TEST-001",
@@ -869,6 +871,47 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, mockPlugin.options, "plugin should have been called with options")
 		assert.Nil(t, mockPlugin.options.Exclude)
+	})
+
+	t.Run("should return snyk_errors.Error when finding has error and allProjects is false", func(t *testing.T) {
+		ctx := setupTestContext(t)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagAllProjects, false)
+
+		snykErr := snyk_errors.Error{
+			ID:     "SNYK-TEST-001",
+			Title:  "Test Error Title",
+			Detail: "Detailed error information for support debugging",
+		}
+
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					FileExclusions: []string{"uv.lock"},
+					LockFile:       "uv.lock",
+					Error:          snykErr,
+				},
+			},
+		}
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.SCAPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.Error(t, err)
+		assert.Nil(t, workflowData)
+		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called when error is returned early")
+
+		// Verify the returned error is a snyk_errors.Error
+		var returnedSnykErr snyk_errors.Error
+		require.True(t, errors.As(err, &returnedSnykErr), "returned error should be a snyk_errors.Error")
+		assert.Equal(t, "SNYK-TEST-001", returnedSnykErr.ID)
+		assert.Equal(t, "Test Error Title", returnedSnykErr.Title)
+		assert.Equal(t, "Detailed error information for support debugging", returnedSnykErr.Detail)
 	})
 }
 
