@@ -6,11 +6,12 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog"
-	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
-	"github.com/snyk/cli-extension-dep-graph/internal/uv"
-	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
+
+	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/internal/uv"
+	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
 func handleSBOMResolution(
@@ -35,7 +36,7 @@ func handleSBOMResolution(
 		ctx,
 		config,
 		logger,
-		[]scaplugin.ScaPlugin{
+		[]scaplugin.SCAPlugin{
 			uv.NewUvPlugin(uv.NewUvClient(), snykClient, remoteRepoURL),
 		},
 		handleLegacyResolution,
@@ -46,7 +47,7 @@ func handleSBOMResolutionDI(
 	ctx workflow.InvocationContext,
 	config configuration.Configuration,
 	logger *zerolog.Logger,
-	scaPlugins []scaplugin.ScaPlugin,
+	scaPlugins []scaplugin.SCAPlugin,
 	depGraphWorkflowFunc ResolutionHandlerFunc,
 ) ([]workflow.Data, error) {
 	inputDir := config.GetString(configuration.INPUT_DIRECTORY)

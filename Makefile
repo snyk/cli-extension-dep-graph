@@ -5,14 +5,25 @@ GOMOD=$(GOCMD) mod
 GOBUILD=$(GOCMD) build
 GOTEST=$(GOCMD) test
 
+GOLANGCI_LINT_V=v1.64.6
+
 all:
 	$(info  "completed running make file for golang project")
+
 fmt:
 	@go fmt ./...
+
+install-tools:
+	@echo "Installing golangci-lint..."
+	@mkdir -p .bin
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b .bin $(GOLANGCI_LINT_V)
+
 lint:
-	./script/lint.sh
+	$(if $(CI),golangci-lint,.bin/golangci-lint) run -v
+
 tidy:
 	$(GOMOD) tidy -v
+
 test:
 	$(GOTEST) ./... -coverprofile cp.out
 

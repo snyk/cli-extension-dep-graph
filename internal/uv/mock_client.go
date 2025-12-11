@@ -1,7 +1,7 @@
 package uv
 
 import (
-	scaplugin "github.com/snyk/cli-extension-dep-graph/pkg/sca_plugin"
+	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
 type MockClient struct {

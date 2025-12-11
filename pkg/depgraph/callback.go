@@ -1,8 +1,6 @@
 package depgraph
 
 import (
-	_ "embed"
-
 	"github.com/rs/zerolog"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
