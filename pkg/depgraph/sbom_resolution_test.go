@@ -1,6 +1,7 @@
 package depgraph
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
 	dg "github.com/snyk/dep-graph/go/pkg/depgraph"
+	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	frameworkmocks "github.com/snyk/go-application-framework/pkg/mocks"
 	"github.com/snyk/go-application-framework/pkg/networking"
@@ -722,6 +724,50 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.NotNil(t, workflowData)
 		assert.Len(t, workflowData, 1, "Should return only the valid finding since legacy workflow returns nil")
 		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
+	})
+
+	t.Run("should log snyk_errors.Error details for support debugging", func(t *testing.T) {
+		ctx := setupTestContext(t)
+
+		snykErr := snyk_errors.Error{
+			ID:     "SNYK-TEST-001",
+			Title:  "Test Error Title",
+			Detail: "Detailed error information for support debugging",
+		}
+
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					FileExclusions: []string{"uv.lock"},
+					LockFile:       "uv.lock",
+					Error:          snykErr,
+				},
+			},
+		}
+
+		var logBuffer bytes.Buffer
+		testLogger := zerolog.New(&logBuffer)
+
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&testLogger,
+			[]scaplugin.SCAPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.NoError(t, err)
+		assert.NotNil(t, workflowData)
+		assert.Len(t, workflowData, 0, "Should skip finding with error")
+
+		// Verify that the log output contains the detail
+		logOutput := logBuffer.String()
+		assert.Contains(t, logOutput, "Detailed error information for support debugging",
+			"Log should contain snyk_errors.Error Detail field for support debugging")
+		assert.Contains(t, logOutput, "Skipping finding for",
+			"Log should contain the error context")
 	})
 
 	t.Run("should pass exclude flag to plugin options", func(t *testing.T) {

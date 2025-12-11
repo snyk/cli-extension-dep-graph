@@ -2,10 +2,12 @@ package depgraph
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/rs/zerolog"
+	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 
@@ -102,7 +104,7 @@ func handleSBOMResolutionDI(
 		finding := &findings[i]
 
 		if finding.Error != nil {
-			logger.Printf("Skipping finding for %s which errored with: %v", finding.LockFile, finding.Error)
+			logFindingError(logger, finding.LockFile, finding.Error)
 			continue
 		}
 
@@ -126,6 +128,15 @@ func handleSBOMResolutionDI(
 	}
 
 	return workflowData, nil
+}
+
+func logFindingError(logger *zerolog.Logger, lockFile string, err error) {
+	var snykErr snyk_errors.Error
+	if errors.As(err, &snykErr) && snykErr.Detail != "" {
+		logger.Printf("Skipping finding for %s which errored with: %v (details: %s)", lockFile, err, snykErr.Detail)
+	} else {
+		logger.Printf("Skipping finding for %s which errored with: %v", lockFile, err)
+	}
 }
 
 func getExclusionsFromFindings(findings []scaplugin.Finding) []string {
