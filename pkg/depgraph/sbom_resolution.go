@@ -105,6 +105,9 @@ func handleSBOMResolutionDI(
 
 		if finding.Error != nil {
 			logFindingError(logger, finding.LockFile, finding.Error)
+			if !allProjects {
+				return nil, finding.Error
+			}
 			continue
 		}
 
