@@ -105,10 +105,11 @@ type testContext struct {
 	ctrl              *gomock.Controller
 	config            configuration.Configuration
 	invocationContext *frameworkmocks.MockInvocationContext
+	userInterface     *frameworkmocks.MockUserInterface
 }
 
 // setupTestContext initializes common test objects and handles cleanup automatically.
-func setupTestContext(t *testing.T) *testContext {
+func setupTestContext(t *testing.T, withDefaultUI bool) *testContext {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
@@ -121,10 +122,17 @@ func setupTestContext(t *testing.T) *testContext {
 	invocationContext.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
 	invocationContext.EXPECT().Context().Return(context.Background()).AnyTimes()
 
+	mockUI := frameworkmocks.NewMockUserInterface(ctrl)
+	invocationContext.EXPECT().GetUserInterface().Return(mockUI).AnyTimes()
+	if withDefaultUI {
+		mockUI.EXPECT().Output(gomock.Any()).Return(nil).AnyTimes()
+	}
+
 	return &testContext{
 		ctrl:              ctrl,
 		config:            config,
 		invocationContext: invocationContext,
+		userInterface:     mockUI,
 	}
 }
 
@@ -150,7 +158,7 @@ func createMockSBOMService(t *testing.T, responseBody string) *httptest.Server {
 
 func Test_callback_SBOMResolution(t *testing.T) {
 	t.Run("should return depgraphs from SBOM conversion when use-sbom-resolution flag is enabled", func(t *testing.T) {
-		ctx := setupTestContext(t)
+		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 
 		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse)
@@ -193,7 +201,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("should handle UV client errors gracefully", func(t *testing.T) {
-		ctx := setupTestContext(t)
+		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 
 		mockPlugin := &mockScaPlugin{
@@ -215,7 +223,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("should handle SBOM convert network request errors", func(t *testing.T) {
-		ctx := setupTestContext(t)
+		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 
 		mockPlugin := &mockScaPlugin{
@@ -238,7 +246,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("should skip findings with errors and only process valid findings when allProjects is true", func(t *testing.T) {
-		ctx := setupTestContext(t)
+		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 		ctx.config.Set(FlagAllProjects, true)
 
@@ -282,7 +290,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("should return error when SBOM conversion fails for all findings when multiple findings are present", func(t *testing.T) {
-		ctx := setupTestContext(t)
+		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 		ctx.config.Set(FlagAllProjects, true)
 
@@ -323,7 +331,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("should return only first finding when FlagAllProjects is false", func(t *testing.T) {
-		ctx := setupTestContext(t)
+		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 		ctx.config.Set(FlagAllProjects, false)
 
@@ -537,7 +545,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				)
 				defer mockSBOMService.Close()
 
-				ctx := setupTestContext(t)
+				ctx := setupTestContext(t, true)
 				resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 				ctx.config.Set(FlagAllProjects, tc.allProjects)
 				ctx.config.Set(FlagExclude, tc.initialExclude)
@@ -577,7 +585,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("should handle exit code 3 (no projects found) gracefully and continue with SBOM data", func(t *testing.T) {
-		ctx := setupTestContext(t)
+		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 		ctx.config.Set(FlagAllProjects, true)
 
@@ -618,7 +626,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("should handle exit code 3 when no SBOM findings are found", func(t *testing.T) {
-		ctx := setupTestContext(t)
+		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 		ctx.config.Set(FlagAllProjects, false)
 
@@ -648,7 +656,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("should return error for non-exit-code-3 errors from legacy workflow", func(t *testing.T) {
-		ctx := setupTestContext(t)
+		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 		ctx.config.Set(FlagAllProjects, true)
 
@@ -688,7 +696,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("should skip findings with errors when legacy workflow returns no data", func(t *testing.T) {
-		ctx := setupTestContext(t)
+		ctx := setupTestContext(t, true)
 		ctx.config.Set(FlagAllProjects, true)
 
 		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse)
@@ -728,7 +736,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("should log snyk_errors.Error details for support debugging", func(t *testing.T) {
-		ctx := setupTestContext(t)
+		ctx := setupTestContext(t, true)
 		ctx.config.Set(FlagAllProjects, true) // allProjects must be true for errors to be skipped and logged
 
 		snykErr := snyk_errors.Error{
@@ -773,7 +781,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("should pass exclude flag to plugin options", func(t *testing.T) {
-		ctx := setupTestContext(t)
+		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 		ctx.config.Set(FlagAllProjects, true)
 		ctx.config.Set(FlagExclude, "dir1, dir2 ,dir3")
@@ -808,7 +816,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("should pass file flag to plugin options", func(t *testing.T) {
-		ctx := setupTestContext(t)
+		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 		ctx.config.Set(FlagFile, "Gemfile")
 
@@ -841,7 +849,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("should handle empty exclude flag", func(t *testing.T) {
-		ctx := setupTestContext(t)
+		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 		ctx.config.Set(FlagExclude, "")
 
@@ -874,7 +882,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("should return snyk_errors.Error when finding has error and allProjects is false", func(t *testing.T) {
-		ctx := setupTestContext(t)
+		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 		ctx.config.Set(FlagAllProjects, false)
 
@@ -912,6 +920,79 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Equal(t, "SNYK-TEST-001", returnedSnykErr.ID)
 		assert.Equal(t, "Test Error Title", returnedSnykErr.Title)
 		assert.Equal(t, "Detailed error information for support debugging", returnedSnykErr.Detail)
+	})
+
+	t.Run("should output problem findings through UI when allProjects is true", func(t *testing.T) {
+		ctx := setupTestContext(t, false)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagAllProjects, true)
+
+		// Create a snyk error and a regular error
+		snykErr := snyk_errors.Error{
+			ID:     "SNYK-TEST-001",
+			Title:  "Test Error Title",
+			Detail: "Detailed error to help the customer debug the issue",
+		}
+		regularErr := fmt.Errorf("Failure message should not be shown to the user")
+
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					DepGraph:       createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
+					FileExclusions: []string{},
+					LockFile:       "valid-project/uv.lock",
+					ManifestFile:   "valid-project/pyproject.toml",
+					Error:          nil,
+				},
+				{
+					FileExclusions: []string{"project1/uv.lock"},
+					LockFile:       "project1/uv.lock",
+					Error:          snykErr,
+				},
+				{
+					FileExclusions: []string{"project2/uv.lock"},
+					LockFile:       "project2/uv.lock",
+					Error:          regularErr,
+				},
+			},
+		}
+
+		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+		mockWorkflowData := []workflow.Data{
+			workflow.NewData(
+				dataIdentifier,
+				"application/json",
+				[]byte(`{"mock":"data"}`),
+			),
+		}
+		resolutionHandler.ReturnData = mockWorkflowData
+
+		// Capture the output to verify it contains expected error messages
+		var capturedOutput string
+		ctx.userInterface.EXPECT().Output(gomock.Any()).DoAndReturn(func(msg string) error {
+			capturedOutput = msg
+			return nil
+		}).Times(1)
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.SCAPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.NoError(t, err)
+		assert.NotNil(t, workflowData)
+
+		assert.Contains(t, capturedOutput, "project1/uv.lock", "Output should mention the first problem file")
+		assert.Contains(t, capturedOutput, "project2/uv.lock", "Output should mention the second problem file")
+		assert.Contains(t, capturedOutput, "Detailed error to help the customer debug the issue",
+			"Output should include snyk_errors.Error Detail field")
+		assert.Contains(t, capturedOutput, "could not process manifest file",
+			"Output should output a generic message rather than the error details of a non-snyk error")
+		assert.Contains(t, capturedOutput, "2 potential projects failed to get dependencies",
+			"Output should include number of failed potential projects")
 	})
 }
 
