@@ -134,14 +134,7 @@ func handleSBOMResolutionDI(
 		}
 	}
 
-	if len(problemFindings) > 0 {
-		message := renderWarningForProblemFindings(problemFindings)
-
-		err := ctx.GetUserInterface().Output(message + "\n")
-		if err != nil {
-			logger.Printf("Failed to output warning message: %v", err)
-		}
-	}
+	outputAnyWarnings(ctx, logger, problemFindings)
 
 	return workflowData, nil
 }
@@ -152,6 +145,17 @@ func logFindingError(logger *zerolog.Logger, lockFile string, err error) {
 		logger.Printf("Skipping finding for %s which errored with: %v (details: %s)", lockFile, err, snykErr.Detail)
 	} else {
 		logger.Printf("Skipping finding for %s which errored with: %v", lockFile, err)
+	}
+}
+
+func outputAnyWarnings(ctx workflow.InvocationContext, logger *zerolog.Logger, problemFindings []scaplugin.Finding) {
+	if len(problemFindings) > 0 {
+		message := renderWarningForProblemFindings(problemFindings)
+
+		err := ctx.GetUserInterface().Output(message + "\n")
+		if err != nil {
+			logger.Printf("Failed to output warning message: %v", err)
+		}
 	}
 }
 
