@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/rs/zerolog"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/snyk/go-application-framework/pkg/configuration"
@@ -100,14 +101,17 @@ func handleSBOMResolutionDI(
 
 	// Convert Findings to workflow.Data
 	workflowData := []workflow.Data{}
+	problemFindings := make([]scaplugin.Finding, 0)
 	for i := range findings { // Could be parallelised in future
 		finding := &findings[i]
 
 		if finding.Error != nil {
 			logFindingError(logger, finding.LockFile, finding.Error)
+			problemFindings = append(problemFindings, *finding)
 			if !allProjects {
 				return nil, finding.Error
 			}
+
 			continue
 		}
 
@@ -130,6 +134,8 @@ func handleSBOMResolutionDI(
 		}
 	}
 
+	outputAnyWarnings(ctx, logger, problemFindings)
+
 	return workflowData, nil
 }
 
@@ -140,6 +146,34 @@ func logFindingError(logger *zerolog.Logger, lockFile string, err error) {
 	} else {
 		logger.Printf("Skipping finding for %s which errored with: %v", lockFile, err)
 	}
+}
+
+func outputAnyWarnings(ctx workflow.InvocationContext, logger *zerolog.Logger, problemFindings []scaplugin.Finding) {
+	if len(problemFindings) > 0 {
+		message := renderWarningForProblemFindings(problemFindings)
+
+		err := ctx.GetUserInterface().Output(message + "\n")
+		if err != nil {
+			logger.Printf("Failed to output warning message: %v", err)
+		}
+	}
+}
+
+func renderWarningForProblemFindings(problemFindings []scaplugin.Finding) string {
+	outputMessage := ""
+	for _, finding := range problemFindings {
+		outputMessage += fmt.Sprintf("\n%s:", finding.LockFile)
+		var snykErr snyk_errors.Error
+		if errors.As(finding.Error, &snykErr) && snykErr.Detail != "" {
+			outputMessage += fmt.Sprintf("\n  %s", snykErr.Detail)
+		} else {
+			outputMessage += "\n  could not process manifest file"
+		}
+	}
+	outputMessage += fmt.Sprintf("\n✗ %d potential projects failed to get dependencies.", len(problemFindings))
+
+	redStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "9", Dark: "1"})
+	return redStyle.Render(outputMessage)
 }
 
 func getExclusionsFromFindings(findings []scaplugin.Finding) []string {
