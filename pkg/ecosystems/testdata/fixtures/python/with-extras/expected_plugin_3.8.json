@@ -112,15 +112,6 @@
           {
             "nodeId": "urllib3@2.2.3",
             "pkgId": "urllib3@2.2.3",
-            "deps": [
-              {
-                "nodeId": "pysocks@1.7.1:pruned"
-              }
-            ]
-          },
-          {
-            "nodeId": "pysocks@1.7.1:pruned",
-            "pkgId": "pysocks@1.7.1",
             "deps": []
           }
         ]

@@ -3,7 +3,6 @@ package pip
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os/exec"
 	"strings"
 	"sync"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
 
 const (
@@ -29,6 +29,11 @@ var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
 // BuildDepGraphsFromDir discovers and builds dependency graphs for Python pip projects.
 func (p Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *ecosystems.SCAPluginOptions) ([]ecosystems.SCAResult, error) {
+	log := options.Global.Logger
+	if log == nil {
+		log = logger.Nop()
+	}
+
 	// Discover requirements.txt files
 	files, err := p.discoverRequirementsFiles(ctx, dir, options)
 	if err != nil {
@@ -36,7 +41,7 @@ func (p Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *
 	}
 
 	if len(files) == 0 {
-		slog.Info("No requirements.txt files found", slog.String("dir", dir))
+		log.Info(ctx, "No requirements.txt files found", logger.Attr("dir", dir))
 		return []ecosystems.SCAResult{}, nil
 	}
 
@@ -56,11 +61,11 @@ func (p Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *
 
 	for _, file := range files {
 		g.Go(func() error {
-			result, err := p.buildDepGraphFromFile(ctx, file, pythonVersion)
+			result, err := p.buildDepGraphFromFile(ctx, log, file, pythonVersion)
 			if err != nil {
-				slog.Error("Failed to build dependency graph",
-					slog.String(logFieldFile, file.RelPath),
-					slog.Any("error", err))
+				log.Error(ctx, "Failed to build dependency graph",
+					logger.Attr(logFieldFile, file.RelPath),
+					logger.Err(err))
 				result = ecosystems.SCAResult{
 					Metadata: ecosystems.Metadata{
 						TargetFile: file.RelPath,
@@ -116,10 +121,10 @@ func (p Plugin) discoverRequirementsFiles(ctx context.Context, dir string, optio
 }
 
 // buildDepGraphFromFile builds a dependency graph from a requirements.txt file.
-func (p Plugin) buildDepGraphFromFile(ctx context.Context, file discovery.FindResult, pythonVersion string) (ecosystems.SCAResult, error) {
-	slog.Debug("Building dependency graph",
-		slog.String(logFieldFile, file.RelPath),
-		slog.String("python_version", pythonVersion))
+func (p Plugin) buildDepGraphFromFile(ctx context.Context, log logger.Logger, file discovery.FindResult, pythonVersion string) (ecosystems.SCAResult, error) {
+	log.Debug(ctx, "Building dependency graph",
+		logger.Attr(logFieldFile, file.RelPath),
+		logger.Attr("python_version", pythonVersion))
 
 	// Get pip install report (dry-run, no actual installation)
 	report, err := GetInstallReport(ctx, file.Path)
@@ -128,13 +133,13 @@ func (p Plugin) buildDepGraphFromFile(ctx context.Context, file discovery.FindRe
 	}
 
 	// Convert report to dependency graph
-	depGraph, err := report.ToDependencyGraph()
+	depGraph, err := report.ToDependencyGraph(ctx, log)
 	if err != nil {
 		return ecosystems.SCAResult{}, fmt.Errorf("failed to convert pip report to dependency graph for %s: %w", file.RelPath, err)
 	}
 
-	slog.Debug("Successfully built dependency graph",
-		slog.String(logFieldFile, file.RelPath))
+	log.Debug(ctx, "Successfully built dependency graph",
+		logger.Attr(logFieldFile, file.RelPath))
 
 	return ecosystems.SCAResult{
 		DepGraph: depGraph,

@@ -42,10 +42,10 @@
           }
         },
         {
-          "id": "urllib3@2.6.0",
+          "id": "urllib3@2.6.2",
           "info": {
             "name": "urllib3",
-            "version": "2.6.0"
+            "version": "2.6.2"
           }
         }
       ],
@@ -75,7 +75,7 @@
                 "nodeId": "idna@3.11"
               },
               {
-                "nodeId": "urllib3@2.6.0"
+                "nodeId": "urllib3@2.6.2"
               }
             ]
           },
@@ -95,8 +95,8 @@
             "deps": []
           },
           {
-            "nodeId": "urllib3@2.6.0",
-            "pkgId": "urllib3@2.6.0",
+            "nodeId": "urllib3@2.6.2",
+            "pkgId": "urllib3@2.6.2",
             "deps": []
           }
         ]

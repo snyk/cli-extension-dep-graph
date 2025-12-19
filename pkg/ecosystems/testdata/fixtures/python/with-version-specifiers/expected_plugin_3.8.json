@@ -70,7 +70,7 @@
                 "nodeId": "requests@2.32.4"
               },
               {
-                "nodeId": "urllib3@2.2.3:pruned"
+                "nodeId": "urllib3@2.2.3"
               }
             ]
           },
@@ -114,11 +114,6 @@
           },
           {
             "nodeId": "urllib3@2.2.3",
-            "pkgId": "urllib3@2.2.3",
-            "deps": []
-          },
-          {
-            "nodeId": "urllib3@2.2.3:pruned",
             "pkgId": "urllib3@2.2.3",
             "deps": []
           }

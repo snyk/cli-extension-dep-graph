@@ -105,10 +105,10 @@
           }
         },
         {
-          "id": "urllib3@2.6.0",
+          "id": "urllib3@2.6.2",
           "info": {
             "name": "urllib3",
-            "version": "2.6.0"
+            "version": "2.6.2"
           }
         }
       ],
@@ -138,7 +138,7 @@
                 "nodeId": "idna@3.11"
               },
               {
-                "nodeId": "urllib3@2.6.0"
+                "nodeId": "urllib3@2.6.2"
               }
             ]
           },
@@ -158,8 +158,8 @@
             "deps": []
           },
           {
-            "nodeId": "urllib3@2.6.0",
-            "pkgId": "urllib3@2.6.0",
+            "nodeId": "urllib3@2.6.2",
+            "pkgId": "urllib3@2.6.2",
             "deps": []
           }
         ]
@@ -310,6 +310,11 @@
           {
             "nodeId": "markupsafe@3.0.3:pruned",
             "pkgId": "markupsafe@3.0.3",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
             "deps": []
           },
           {
@@ -343,6 +348,11 @@
           {
             "nodeId": "importlib-metadata@8.7.0:pruned",
             "pkgId": "importlib-metadata@8.7.0",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
             "deps": []
           },
           {
