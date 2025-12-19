@@ -23,12 +23,13 @@ type Report struct {
 
 // InstallItem represents a single package in the pip install report.
 type InstallItem struct {
-	Metadata  PackageMetadata `json:"metadata"`
-	Requested bool            `json:"requested"` // True if explicitly requested in requirements
+	Metadata        PackageMetadata `json:"metadata"`
+	Requested       bool            `json:"requested"`        // True if explicitly requested in requirements
+	RequestedExtras []string        `json:"requested_extras"` //nolint:tagliatelle // pip's JSON output uses snake_case
 }
 
 // IsDirectDependency returns true if this package is a direct dependency.
-func (item InstallItem) IsDirectDependency() bool {
+func (item *InstallItem) IsDirectDependency() bool {
 	return item.Requested
 }
 

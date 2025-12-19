@@ -6,7 +6,8 @@
         "version": "2.31.0",
         "requires_dist": null
       },
-      "requested": true
+      "requested": true,
+      "requested_extras": ["security", "socks"]
     },
     {
       "metadata": {

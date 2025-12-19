@@ -14,69 +14,6 @@
           }
         },
         {
-          "id": "jinja2@3.1.2",
-          "info": {
-            "name": "jinja2",
-            "version": "3.1.2"
-          }
-        },
-        {
-          "id": "markupsafe@2.1.5",
-          "info": {
-            "name": "markupsafe",
-            "version": "2.1.5"
-          }
-        }
-      ],
-      "graph": {
-        "rootNodeId": "root-node",
-        "nodes": [
-          {
-            "nodeId": "root-node",
-            "pkgId": "root@0.0.0",
-            "deps": [
-              {
-                "nodeId": "jinja2@3.1.2"
-              }
-            ]
-          },
-          {
-            "nodeId": "jinja2@3.1.2",
-            "pkgId": "jinja2@3.1.2",
-            "deps": [
-              {
-                "nodeId": "markupsafe@2.1.5"
-              }
-            ]
-          },
-          {
-            "nodeId": "markupsafe@2.1.5",
-            "pkgId": "markupsafe@2.1.5",
-            "deps": []
-          }
-        ]
-      }
-    },
-    "metadata": {
-      "targetFile": "frontend/requirements.txt",
-      "runtime": "python@3.8.20"
-    }
-  },
-  {
-    "depGraph": {
-      "schemaVersion": "1.3.0",
-      "pkgManager": {
-        "name": "pip"
-      },
-      "pkgs": [
-        {
-          "id": "root@0.0.0",
-          "info": {
-            "name": "root",
-            "version": "0.0.0"
-          }
-        },
-        {
           "id": "requests@2.31.0",
           "info": {
             "name": "requests",
@@ -167,6 +104,69 @@
     },
     "metadata": {
       "targetFile": "requirements.txt",
+      "runtime": "python@3.8.20"
+    }
+  },
+  {
+    "depGraph": {
+      "schemaVersion": "1.3.0",
+      "pkgManager": {
+        "name": "pip"
+      },
+      "pkgs": [
+        {
+          "id": "root@0.0.0",
+          "info": {
+            "name": "root",
+            "version": "0.0.0"
+          }
+        },
+        {
+          "id": "jinja2@3.1.2",
+          "info": {
+            "name": "jinja2",
+            "version": "3.1.2"
+          }
+        },
+        {
+          "id": "markupsafe@2.1.5",
+          "info": {
+            "name": "markupsafe",
+            "version": "2.1.5"
+          }
+        }
+      ],
+      "graph": {
+        "rootNodeId": "root-node",
+        "nodes": [
+          {
+            "nodeId": "root-node",
+            "pkgId": "root@0.0.0",
+            "deps": [
+              {
+                "nodeId": "jinja2@3.1.2"
+              }
+            ]
+          },
+          {
+            "nodeId": "jinja2@3.1.2",
+            "pkgId": "jinja2@3.1.2",
+            "deps": [
+              {
+                "nodeId": "markupsafe@2.1.5"
+              }
+            ]
+          },
+          {
+            "nodeId": "markupsafe@2.1.5",
+            "pkgId": "markupsafe@2.1.5",
+            "deps": []
+          }
+        ]
+      }
+    },
+    "metadata": {
+      "targetFile": "frontend/requirements.txt",
       "runtime": "python@3.8.20"
     }
   },
@@ -310,6 +310,11 @@
           {
             "nodeId": "markupsafe@2.1.5:pruned",
             "pkgId": "markupsafe@2.1.5",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
             "deps": []
           },
           {
@@ -343,6 +348,11 @@
           {
             "nodeId": "importlib-metadata@8.5.0:pruned",
             "pkgId": "importlib-metadata@8.5.0",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
             "deps": []
           },
           {

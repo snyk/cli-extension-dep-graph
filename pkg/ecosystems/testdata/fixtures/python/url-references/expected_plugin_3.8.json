@@ -74,7 +74,7 @@
             "pkgId": "requests@2.31.0",
             "deps": [
               {
-                "nodeId": "certifi@2023.7.22:pruned"
+                "nodeId": "certifi@2023.7.22"
               },
               {
                 "nodeId": "charset-normalizer@3.4.4"
@@ -86,11 +86,6 @@
                 "nodeId": "urllib3@2.2.3"
               }
             ]
-          },
-          {
-            "nodeId": "certifi@2023.7.22:pruned",
-            "pkgId": "certifi@2023.7.22",
-            "deps": []
           },
           {
             "nodeId": "charset-normalizer@3.4.4",

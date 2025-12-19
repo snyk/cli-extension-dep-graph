@@ -56,20 +56,6 @@
           }
         },
         {
-          "id": "certifi@2025.11.12",
-          "info": {
-            "name": "certifi",
-            "version": "2025.11.12"
-          }
-        },
-        {
-          "id": "idna@3.11",
-          "info": {
-            "name": "idna",
-            "version": "3.11"
-          }
-        },
-        {
           "id": "s3transfer@0.6.2",
           "info": {
             "name": "s3transfer",
@@ -84,10 +70,24 @@
           }
         },
         {
+          "id": "certifi@2025.11.12",
+          "info": {
+            "name": "certifi",
+            "version": "2025.11.12"
+          }
+        },
+        {
           "id": "charset-normalizer@3.4.4",
           "info": {
             "name": "charset-normalizer",
             "version": "3.4.4"
+          }
+        },
+        {
+          "id": "idna@3.11",
+          "info": {
+            "name": "idna",
+            "version": "3.11"
           }
         }
       ],
@@ -114,9 +114,6 @@
                 "nodeId": "botocore@1.31.85"
               },
               {
-                "nodeId": "botocore@1.31.85:pruned"
-              },
-              {
                 "nodeId": "jmespath@1.0.1:pruned"
               },
               {
@@ -136,9 +133,6 @@
               },
               {
                 "nodeId": "urllib3@2.0.7"
-              },
-              {
-                "nodeId": "urllib3@2.0.7:pruned"
               }
             ]
           },
@@ -164,12 +158,52 @@
           {
             "nodeId": "urllib3@2.0.7",
             "pkgId": "urllib3@2.0.7",
+            "deps": []
+          },
+          {
+            "nodeId": "jmespath@1.0.1:pruned",
+            "pkgId": "jmespath@1.0.1",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "s3transfer@0.6.2",
+            "pkgId": "s3transfer@0.6.2",
+            "deps": [
+              {
+                "nodeId": "botocore@1.31.85:pruned"
+              }
+            ]
+          },
+          {
+            "nodeId": "botocore@1.31.85:pruned",
+            "pkgId": "botocore@1.31.85",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "requests@2.31.0",
+            "pkgId": "requests@2.31.0",
             "deps": [
               {
                 "nodeId": "certifi@2025.11.12"
               },
               {
+                "nodeId": "charset-normalizer@3.4.4"
+              },
+              {
                 "nodeId": "idna@3.11"
+              },
+              {
+                "nodeId": "urllib3@2.0.7"
               }
             ]
           },
@@ -179,67 +213,12 @@
             "deps": []
           },
           {
-            "nodeId": "idna@3.11",
-            "pkgId": "idna@3.11",
-            "deps": []
-          },
-          {
-            "nodeId": "urllib3@2.0.7:pruned",
-            "pkgId": "urllib3@2.0.7",
-            "deps": []
-          },
-          {
-            "nodeId": "botocore@1.31.85:pruned",
-            "pkgId": "botocore@1.31.85",
-            "deps": []
-          },
-          {
-            "nodeId": "jmespath@1.0.1:pruned",
-            "pkgId": "jmespath@1.0.1",
-            "deps": []
-          },
-          {
-            "nodeId": "s3transfer@0.6.2",
-            "pkgId": "s3transfer@0.6.2",
-            "deps": [
-              {
-                "nodeId": "botocore@1.31.85:pruned"
-              },
-              {
-                "nodeId": "botocore@1.31.85:pruned"
-              }
-            ]
-          },
-          {
-            "nodeId": "requests@2.31.0",
-            "pkgId": "requests@2.31.0",
-            "deps": [
-              {
-                "nodeId": "certifi@2025.11.12:pruned"
-              },
-              {
-                "nodeId": "charset-normalizer@3.4.4"
-              },
-              {
-                "nodeId": "idna@3.11:pruned"
-              },
-              {
-                "nodeId": "urllib3@2.0.7:pruned"
-              }
-            ]
-          },
-          {
-            "nodeId": "certifi@2025.11.12:pruned",
-            "pkgId": "certifi@2025.11.12",
-            "deps": []
-          },
-          {
             "nodeId": "charset-normalizer@3.4.4",
             "pkgId": "charset-normalizer@3.4.4",
             "deps": []
           },
           {
-            "nodeId": "idna@3.11:pruned",
+            "nodeId": "idna@3.11",
             "pkgId": "idna@3.11",
             "deps": []
           }
