@@ -32,7 +32,8 @@ func normalizePackageName(name string) string {
 
 // packageInfo holds pre-computed package information to avoid redundant calculations.
 type packageInfo struct {
-	normalizedName string
+	originalName   string // Original name from package metadata (used in graph)
+	normalizedName string // Normalized name for lookups only
 	version        string
 	nodeID         string
 	item           *InstallItem
@@ -62,16 +63,18 @@ func (r *Report) ToDependencyGraph(ctx context.Context, log logger.Logger) (*dep
 	for i := range r.Install {
 		item := &r.Install[i]
 
-		normalizedName := normalizePackageName(item.Metadata.Name)
+		originalName := item.Metadata.Name
+		normalizedName := normalizePackageName(originalName)
 		version := item.Metadata.Version
 		if version == "" {
 			log.Debug(ctx, "Package has empty version, using fallback",
-				logger.Attr("package", item.Metadata.Name))
+				logger.Attr("package", originalName))
 			version = "?"
 		}
-		nodeID := normalizedName + "@" + version
+		nodeID := originalName + "@" + version
 
 		packageByName[normalizedName] = &packageInfo{
+			originalName:   originalName,
 			normalizedName: normalizedName,
 			version:        version,
 			nodeID:         nodeID,
@@ -157,7 +160,7 @@ func dfsVisit(
 			prunedNodeID := fmt.Sprintf("%s:pruned", childID)
 
 			builder.AddNode(prunedNodeID, &depgraph.PkgInfo{
-				Name:    depInfo.normalizedName,
+				Name:    depInfo.originalName,
 				Version: depInfo.version,
 			}, depgraph.WithNodeInfo(&depgraph.NodeInfo{
 				Labels: map[string]string{"pruned": "true"},
@@ -171,7 +174,7 @@ func dfsVisit(
 
 		// Add node and connect to parent
 		builder.AddNode(childID, &depgraph.PkgInfo{
-			Name:    depInfo.normalizedName,
+			Name:    depInfo.originalName,
 			Version: depInfo.version,
 		})
 

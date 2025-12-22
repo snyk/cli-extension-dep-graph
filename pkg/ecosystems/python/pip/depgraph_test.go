@@ -15,6 +15,73 @@ import (
 )
 
 func TestReport_ToDependencyGraph(t *testing.T) {
+	t.Run("preserves original package names in graph", func(t *testing.T) {
+		report := &Report{
+			Install: []InstallItem{
+				{
+					Metadata: PackageMetadata{
+						Name:    "BeautifulSoup4", // Mixed case
+						Version: "4.12.2",
+						RequiresDist: []string{
+							"soupsieve>1.2",
+						},
+					},
+					Requested: true,
+				},
+				{
+					Metadata: PackageMetadata{
+						Name:    "python_dateutil", // Underscore
+						Version: "2.8.2",
+						RequiresDist: []string{
+							"six>=1.5",
+						},
+					},
+					Requested: true,
+				},
+				{
+					Metadata: PackageMetadata{
+						Name:         "soupsieve",
+						Version:      "2.5",
+						RequiresDist: []string{},
+					},
+					Requested: false,
+				},
+				{
+					Metadata: PackageMetadata{
+						Name:         "six",
+						Version:      "1.17.0",
+						RequiresDist: []string{},
+					},
+					Requested: false,
+				},
+			},
+		}
+
+		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop())
+		require.NoError(t, err)
+		require.NotNil(t, dg)
+
+		// Verify original names are preserved in packages
+		pkgByName := make(map[string]string) // name -> version
+		for _, pkg := range dg.Pkgs {
+			pkgByName[pkg.Info.Name] = pkg.Info.Version
+		}
+		assert.Equal(t, "4.12.2", pkgByName["BeautifulSoup4"], "BeautifulSoup4 should preserve mixed case")
+		assert.Equal(t, "2.8.2", pkgByName["python_dateutil"], "python_dateutil should preserve underscore")
+		assert.Equal(t, "2.5", pkgByName["soupsieve"])
+		assert.Equal(t, "1.17.0", pkgByName["six"])
+
+		// Verify original names are preserved in nodeIDs
+		nodeByID := make(map[string]bool)
+		for _, node := range dg.Graph.Nodes {
+			nodeByID[node.NodeID] = true
+		}
+		assert.True(t, nodeByID["BeautifulSoup4@4.12.2"], "BeautifulSoup4 nodeID should preserve mixed case")
+		assert.True(t, nodeByID["python_dateutil@2.8.2"], "python_dateutil nodeID should preserve underscore")
+		assert.True(t, nodeByID["soupsieve@2.5"])
+		assert.True(t, nodeByID["six@1.17.0"])
+	})
+
 	t.Run("simple report with direct and transitive deps", func(t *testing.T) {
 		report := &Report{
 			Install: []InstallItem{
