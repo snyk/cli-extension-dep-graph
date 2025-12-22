@@ -2,6 +2,7 @@ package pip
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	snyk_ecosystems "github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
+	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
@@ -63,9 +65,18 @@ func (p Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *
 		g.Go(func() error {
 			result, err := p.buildDepGraphFromFile(ctx, log, file, pythonVersion)
 			if err != nil {
-				log.Error(ctx, "Failed to build dependency graph",
+				attrs := []logger.Field{
 					logger.Attr(logFieldFile, file.RelPath),
-					logger.Err(err))
+					logger.Err(err),
+				}
+
+				var snykErr snyk_errors.Error
+				if errors.As(err, &snykErr) && snykErr.Detail != "" {
+					attrs = append(attrs, logger.Attr("detail", snykErr.Detail))
+				}
+
+				log.Error(ctx, "Failed to build dependency graph", attrs...)
+
 				result = ecosystems.SCAResult{
 					Metadata: ecosystems.Metadata{
 						TargetFile: file.RelPath,

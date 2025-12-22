@@ -15,12 +15,12 @@ import (
 )
 
 func TestReport_ToDependencyGraph(t *testing.T) {
-	t.Run("preserves original package names in graph", func(t *testing.T) {
+	t.Run("normalizes package names to match pipenv key field", func(t *testing.T) {
 		report := &Report{
 			Install: []InstallItem{
 				{
 					Metadata: PackageMetadata{
-						Name:    "BeautifulSoup4", // Mixed case
+						Name:    "BeautifulSoup4", // Mixed case in pip metadata
 						Version: "4.12.2",
 						RequiresDist: []string{
 							"soupsieve>1.2",
@@ -30,11 +30,27 @@ func TestReport_ToDependencyGraph(t *testing.T) {
 				},
 				{
 					Metadata: PackageMetadata{
-						Name:    "python_dateutil", // Underscore
-						Version: "2.8.2",
+						Name:    "Jinja2", // Mixed case in pip metadata
+						Version: "3.1.2",
 						RequiresDist: []string{
-							"six>=1.5",
+							"MarkupSafe>=2.0",
 						},
+					},
+					Requested: true,
+				},
+				{
+					Metadata: PackageMetadata{
+						Name:         "mypy_extensions", // Underscore in pip metadata
+						Version:      "1.0.0",
+						RequiresDist: []string{},
+					},
+					Requested: true,
+				},
+				{
+					Metadata: PackageMetadata{
+						Name:         "zc.lockfile", // Dot in pip metadata
+						Version:      "3.0.0",
+						RequiresDist: []string{},
 					},
 					Requested: true,
 				},
@@ -48,8 +64,8 @@ func TestReport_ToDependencyGraph(t *testing.T) {
 				},
 				{
 					Metadata: PackageMetadata{
-						Name:         "six",
-						Version:      "1.17.0",
+						Name:         "MarkupSafe",
+						Version:      "2.1.3",
 						RequiresDist: []string{},
 					},
 					Requested: false,
@@ -61,25 +77,29 @@ func TestReport_ToDependencyGraph(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, dg)
 
-		// Verify original names are preserved in packages
+		// Verify names are normalized in packages (lowercase + _ and . replaced with -)
 		pkgByName := make(map[string]string) // name -> version
 		for _, pkg := range dg.Pkgs {
 			pkgByName[pkg.Info.Name] = pkg.Info.Version
 		}
-		assert.Equal(t, "4.12.2", pkgByName["BeautifulSoup4"], "BeautifulSoup4 should preserve mixed case")
-		assert.Equal(t, "2.8.2", pkgByName["python_dateutil"], "python_dateutil should preserve underscore")
+		assert.Equal(t, "4.12.2", pkgByName["beautifulsoup4"], "BeautifulSoup4 should be normalized")
+		assert.Equal(t, "3.1.2", pkgByName["jinja2"], "Jinja2 should be normalized")
+		assert.Equal(t, "1.0.0", pkgByName["mypy-extensions"], "mypy_extensions should have _ replaced with -")
+		assert.Equal(t, "3.0.0", pkgByName["zc.lockfile"], "zc.lockfile maintains .")
 		assert.Equal(t, "2.5", pkgByName["soupsieve"])
-		assert.Equal(t, "1.17.0", pkgByName["six"])
+		assert.Equal(t, "2.1.3", pkgByName["markupsafe"], "MarkupSafe should be normalized")
 
-		// Verify original names are preserved in nodeIDs
+		// Verify names are normalized in nodeIDs
 		nodeByID := make(map[string]bool)
 		for _, node := range dg.Graph.Nodes {
 			nodeByID[node.NodeID] = true
 		}
-		assert.True(t, nodeByID["BeautifulSoup4@4.12.2"], "BeautifulSoup4 nodeID should preserve mixed case")
-		assert.True(t, nodeByID["python_dateutil@2.8.2"], "python_dateutil nodeID should preserve underscore")
+		assert.True(t, nodeByID["beautifulsoup4@4.12.2"], "BeautifulSoup4 nodeID should be normalized")
+		assert.True(t, nodeByID["jinja2@3.1.2"], "Jinja2 nodeID should be normalized")
+		assert.True(t, nodeByID["mypy-extensions@1.0.0"], "mypy_extensions nodeID should have _ replaced with -")
+		assert.True(t, nodeByID["zc.lockfile@3.0.0"], "zc.lockfile nodeID should maintain .")
 		assert.True(t, nodeByID["soupsieve@2.5"])
-		assert.True(t, nodeByID["six@1.17.0"])
+		assert.True(t, nodeByID["markupsafe@2.1.3"], "MarkupSafe nodeID should be normalized")
 	})
 
 	t.Run("simple report with direct and transitive deps", func(t *testing.T) {

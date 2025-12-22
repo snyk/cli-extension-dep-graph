@@ -26,14 +26,12 @@ var extraPattern = regexp.MustCompile(`extra\s*==\s*['"]([^'"]+)['"]`)
 func normalizePackageName(name string) string {
 	normalized := strings.ToLower(name)
 	normalized = strings.ReplaceAll(normalized, "_", "-")
-	normalized = strings.ReplaceAll(normalized, ".", "-")
 	return normalized
 }
 
 // packageInfo holds pre-computed package information to avoid redundant calculations.
 type packageInfo struct {
-	originalName   string // Original name from package metadata (used in graph)
-	normalizedName string // Normalized name for lookups only
+	normalizedName string
 	version        string
 	nodeID         string
 	item           *InstallItem
@@ -63,18 +61,16 @@ func (r *Report) ToDependencyGraph(ctx context.Context, log logger.Logger) (*dep
 	for i := range r.Install {
 		item := &r.Install[i]
 
-		originalName := item.Metadata.Name
-		normalizedName := normalizePackageName(originalName)
+		normalizedName := normalizePackageName(item.Metadata.Name)
 		version := item.Metadata.Version
 		if version == "" {
 			log.Debug(ctx, "Package has empty version, using fallback",
-				logger.Attr("package", originalName))
+				logger.Attr("package", item.Metadata.Name))
 			version = "?"
 		}
-		nodeID := originalName + "@" + version
+		nodeID := normalizedName + "@" + version
 
 		packageByName[normalizedName] = &packageInfo{
-			originalName:   originalName,
 			normalizedName: normalizedName,
 			version:        version,
 			nodeID:         nodeID,
@@ -160,7 +156,7 @@ func dfsVisit(
 			prunedNodeID := fmt.Sprintf("%s:pruned", childID)
 
 			builder.AddNode(prunedNodeID, &depgraph.PkgInfo{
-				Name:    depInfo.originalName,
+				Name:    depInfo.normalizedName,
 				Version: depInfo.version,
 			}, depgraph.WithNodeInfo(&depgraph.NodeInfo{
 				Labels: map[string]string{"pruned": "true"},
@@ -174,7 +170,7 @@ func dfsVisit(
 
 		// Add node and connect to parent
 		builder.AddNode(childID, &depgraph.PkgInfo{
-			Name:    depInfo.originalName,
+			Name:    depInfo.normalizedName,
 			Version: depInfo.version,
 		})
 
