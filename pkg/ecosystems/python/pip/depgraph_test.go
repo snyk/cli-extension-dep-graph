@@ -15,6 +15,93 @@ import (
 )
 
 func TestReport_ToDependencyGraph(t *testing.T) {
+	t.Run("normalizes package names to match pipenv key field", func(t *testing.T) {
+		report := &Report{
+			Install: []InstallItem{
+				{
+					Metadata: PackageMetadata{
+						Name:    "BeautifulSoup4", // Mixed case in pip metadata
+						Version: "4.12.2",
+						RequiresDist: []string{
+							"soupsieve>1.2",
+						},
+					},
+					Requested: true,
+				},
+				{
+					Metadata: PackageMetadata{
+						Name:    "Jinja2", // Mixed case in pip metadata
+						Version: "3.1.2",
+						RequiresDist: []string{
+							"MarkupSafe>=2.0",
+						},
+					},
+					Requested: true,
+				},
+				{
+					Metadata: PackageMetadata{
+						Name:         "mypy_extensions", // Underscore in pip metadata
+						Version:      "1.0.0",
+						RequiresDist: []string{},
+					},
+					Requested: true,
+				},
+				{
+					Metadata: PackageMetadata{
+						Name:         "zc.lockfile", // Dot in pip metadata
+						Version:      "3.0.0",
+						RequiresDist: []string{},
+					},
+					Requested: true,
+				},
+				{
+					Metadata: PackageMetadata{
+						Name:         "soupsieve",
+						Version:      "2.5",
+						RequiresDist: []string{},
+					},
+					Requested: false,
+				},
+				{
+					Metadata: PackageMetadata{
+						Name:         "MarkupSafe",
+						Version:      "2.1.3",
+						RequiresDist: []string{},
+					},
+					Requested: false,
+				},
+			},
+		}
+
+		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop())
+		require.NoError(t, err)
+		require.NotNil(t, dg)
+
+		// Verify names are normalized in packages (lowercase + _ and . replaced with -)
+		pkgByName := make(map[string]string) // name -> version
+		for _, pkg := range dg.Pkgs {
+			pkgByName[pkg.Info.Name] = pkg.Info.Version
+		}
+		assert.Equal(t, "4.12.2", pkgByName["beautifulsoup4"], "BeautifulSoup4 should be normalized")
+		assert.Equal(t, "3.1.2", pkgByName["jinja2"], "Jinja2 should be normalized")
+		assert.Equal(t, "1.0.0", pkgByName["mypy-extensions"], "mypy_extensions should have _ replaced with -")
+		assert.Equal(t, "3.0.0", pkgByName["zc.lockfile"], "zc.lockfile maintains .")
+		assert.Equal(t, "2.5", pkgByName["soupsieve"])
+		assert.Equal(t, "2.1.3", pkgByName["markupsafe"], "MarkupSafe should be normalized")
+
+		// Verify names are normalized in nodeIDs
+		nodeByID := make(map[string]bool)
+		for _, node := range dg.Graph.Nodes {
+			nodeByID[node.NodeID] = true
+		}
+		assert.True(t, nodeByID["beautifulsoup4@4.12.2"], "BeautifulSoup4 nodeID should be normalized")
+		assert.True(t, nodeByID["jinja2@3.1.2"], "Jinja2 nodeID should be normalized")
+		assert.True(t, nodeByID["mypy-extensions@1.0.0"], "mypy_extensions nodeID should have _ replaced with -")
+		assert.True(t, nodeByID["zc.lockfile@3.0.0"], "zc.lockfile nodeID should maintain .")
+		assert.True(t, nodeByID["soupsieve@2.5"])
+		assert.True(t, nodeByID["markupsafe@2.1.3"], "MarkupSafe nodeID should be normalized")
+	})
+
 	t.Run("simple report with direct and transitive deps", func(t *testing.T) {
 		report := &Report{
 			Install: []InstallItem{

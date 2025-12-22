@@ -26,7 +26,6 @@ var extraPattern = regexp.MustCompile(`extra\s*==\s*['"]([^'"]+)['"]`)
 func normalizePackageName(name string) string {
 	normalized := strings.ToLower(name)
 	normalized = strings.ReplaceAll(normalized, "_", "-")
-	normalized = strings.ReplaceAll(normalized, ".", "-")
 	return normalized
 }
 

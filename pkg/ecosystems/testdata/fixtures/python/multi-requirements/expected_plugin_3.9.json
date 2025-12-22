@@ -227,10 +227,10 @@
           }
         },
         {
-          "id": "importlib-metadata@8.7.0",
+          "id": "importlib-metadata@8.7.1",
           "info": {
             "name": "importlib-metadata",
-            "version": "8.7.0"
+            "version": "8.7.1"
           }
         },
         {
@@ -277,7 +277,7 @@
                 "nodeId": "click@8.1.8"
               },
               {
-                "nodeId": "importlib-metadata@8.7.0:pruned"
+                "nodeId": "importlib-metadata@8.7.1:pruned"
               },
               {
                 "nodeId": "itsdangerous@2.2.0"
@@ -327,13 +327,13 @@
             "pkgId": "click@8.1.8",
             "deps": [
               {
-                "nodeId": "importlib-metadata@8.7.0"
+                "nodeId": "importlib-metadata@8.7.1"
               }
             ]
           },
           {
-            "nodeId": "importlib-metadata@8.7.0",
-            "pkgId": "importlib-metadata@8.7.0",
+            "nodeId": "importlib-metadata@8.7.1",
+            "pkgId": "importlib-metadata@8.7.1",
             "deps": [
               {
                 "nodeId": "zipp@3.23.0"
@@ -346,8 +346,8 @@
             "deps": []
           },
           {
-            "nodeId": "importlib-metadata@8.7.0:pruned",
-            "pkgId": "importlib-metadata@8.7.0",
+            "nodeId": "importlib-metadata@8.7.1:pruned",
+            "pkgId": "importlib-metadata@8.7.1",
             "info": {
               "labels": {
                 "pruned": "true"
