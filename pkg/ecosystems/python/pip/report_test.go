@@ -28,7 +28,7 @@ func TestGetInstallReportWithExecutor_EmptyRequirementsFile(t *testing.T) {
 	executor := &MockExecutor{}
 	ctx := context.Background()
 
-	_, err := GetInstallReportWithExecutor(ctx, "", executor)
+	_, err := GetInstallReportWithExecutor(ctx, "", false, executor)
 
 	if err == nil {
 		t.Fatal("expected error for empty requirements file")
@@ -46,7 +46,7 @@ func TestGetInstallReportWithExecutor_InvalidJSON(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, err := GetInstallReportWithExecutor(ctx, "requirements.txt", executor)
+	_, err := GetInstallReportWithExecutor(ctx, "requirements.txt", false, executor)
 
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")

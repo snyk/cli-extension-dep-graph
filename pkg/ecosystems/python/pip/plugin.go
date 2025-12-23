@@ -63,7 +63,7 @@ func (p Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *
 
 	for _, file := range files {
 		g.Go(func() error {
-			result, err := p.buildDepGraphFromFile(ctx, log, file, pythonVersion)
+			result, err := p.buildDepGraphFromFile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation)
 			if err != nil {
 				attrs := []logger.Field{
 					logger.Attr(logFieldFile, file.RelPath),
@@ -132,13 +132,19 @@ func (p Plugin) discoverRequirementsFiles(ctx context.Context, dir string, optio
 }
 
 // buildDepGraphFromFile builds a dependency graph from a requirements.txt file.
-func (p Plugin) buildDepGraphFromFile(ctx context.Context, log logger.Logger, file discovery.FindResult, pythonVersion string) (ecosystems.SCAResult, error) {
+func (p Plugin) buildDepGraphFromFile(
+	ctx context.Context,
+	log logger.Logger,
+	file discovery.FindResult,
+	pythonVersion string,
+	noBuildIsolation bool,
+) (ecosystems.SCAResult, error) {
 	log.Debug(ctx, "Building dependency graph",
 		logger.Attr(logFieldFile, file.RelPath),
 		logger.Attr("python_version", pythonVersion))
 
 	// Get pip install report (dry-run, no actual installation)
-	report, err := GetInstallReport(ctx, file.Path)
+	report, err := GetInstallReport(ctx, file.Path, noBuildIsolation)
 	if err != nil {
 		return ecosystems.SCAResult{}, fmt.Errorf("failed to get pip install report for %s: %w", file.RelPath, err)
 	}

@@ -127,7 +127,7 @@ func TestGetInstallReport_Fixtures(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			actual, err := GetInstallReport(ctx, requirementsPath)
+			actual, err := GetInstallReport(ctx, requirementsPath, false)
 			if err != nil {
 				t.Fatalf("GetInstallReport failed: %v", err)
 			}
@@ -191,7 +191,7 @@ func TestGetInstallReport_Integration_Errors(t *testing.T) {
 			ctx, cancel := tt.setupCtx()
 			defer cancel()
 
-			_, err := GetInstallReport(ctx, tt.reqPath)
+			_, err := GetInstallReport(ctx, tt.reqPath, false)
 
 			if tt.wantErr != nil {
 				assert.True(t, errors.Is(err, tt.wantErr))

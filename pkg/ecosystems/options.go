@@ -17,7 +17,9 @@ type GlobalOptions struct {
 }
 
 // PythonOptions contains Python-specific options for dependency graph generation.
-type PythonOptions struct{}
+type PythonOptions struct {
+	NoBuildIsolation bool
+}
 
 func NewPluginOptions() *SCAPluginOptions {
 	return &SCAPluginOptions{
@@ -40,5 +42,10 @@ func (o *SCAPluginOptions) WithAllProjects(allProjects bool) *SCAPluginOptions {
 
 func (o *SCAPluginOptions) WithLogger(l logger.Logger) *SCAPluginOptions {
 	o.Global.Logger = l
+	return o
+}
+
+func (o *SCAPluginOptions) WithNoBuildIsolation(noBuildIsolation bool) *SCAPluginOptions {
+	o.Python.NoBuildIsolation = noBuildIsolation
 	return o
 }
