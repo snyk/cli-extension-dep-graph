@@ -922,6 +922,229 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Equal(t, "Detailed error information for support debugging", returnedSnykErr.Detail)
 	})
 
+	t.Run("should fail fast and return exit code 2 when fail-fast is enabled with all-projects", func(t *testing.T) {
+		ctx := setupTestContext(t, true)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagAllProjects, true)
+		ctx.config.Set(FlagFailFast, true)
+
+		snykErr := snyk_errors.Error{
+			ID:     "SNYK-TEST-001",
+			Title:  "Test Error Title",
+			Detail: "Detailed error information for debugging",
+		}
+
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					DepGraph:       createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
+					FileExclusions: []string{},
+					LockFile:       "valid-project/uv.lock",
+					ManifestFile:   "valid-project/pyproject.toml",
+					Error:          nil,
+				},
+				{
+					FileExclusions: []string{"project1/uv.lock"},
+					LockFile:       "project1/uv.lock",
+					Error:          snykErr,
+				},
+				{
+					FileExclusions: []string{"project2/uv.lock"},
+					LockFile:       "project2/uv.lock",
+					Error:          fmt.Errorf("This should not be processed"),
+				},
+			},
+		}
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.SCAPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.Error(t, err)
+		assert.Nil(t, workflowData)
+		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called when fail-fast triggers")
+
+		var ec exitCoder
+		require.True(t, errors.As(err, &ec), "error should implement exitCoder")
+		assert.Equal(t, 2, ec.ExitCode(), "exit code should be 2 for fail-fast")
+		assert.Contains(t, err.Error(), "project1/uv.lock")
+	})
+
+	t.Run("should fail fast on first error with snyk error details", func(t *testing.T) {
+		ctx := setupTestContext(t, true)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagAllProjects, true)
+		ctx.config.Set(FlagFailFast, true)
+
+		snykErr := snyk_errors.Error{
+			ID:     "SNYK-TEST-002",
+			Title:  "SBOM Conversion Failed",
+			Detail: "The SBOM document could not be converted due to invalid format",
+		}
+
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					FileExclusions: []string{"project1/uv.lock"},
+					LockFile:       "project1/uv.lock",
+					Error:          snykErr,
+				},
+			},
+		}
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.SCAPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.Error(t, err)
+		assert.Nil(t, workflowData)
+		assert.Contains(t, err.Error(), "The SBOM document could not be converted due to invalid format")
+		assert.Contains(t, err.Error(), "project1/uv.lock")
+
+		var ec exitCoder
+		require.True(t, errors.As(err, &ec), "error should implement exitCoder")
+		assert.Equal(t, 2, ec.ExitCode())
+	})
+
+	t.Run("should not fail fast when fail-fast is false with all-projects", func(t *testing.T) {
+		ctx := setupTestContext(t, false)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagAllProjects, true)
+		ctx.config.Set(FlagFailFast, false)
+
+		snykErr := snyk_errors.Error{
+			ID:     "SNYK-TEST-001",
+			Title:  "Test Error Title",
+			Detail: "Detailed error to help the customer debug the issue",
+		}
+
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					DepGraph:       createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
+					FileExclusions: []string{},
+					LockFile:       "valid-project/uv.lock",
+					ManifestFile:   "valid-project/pyproject.toml",
+					Error:          nil,
+				},
+				{
+					FileExclusions: []string{"project1/uv.lock"},
+					LockFile:       "project1/uv.lock",
+					Error:          snykErr,
+				},
+			},
+		}
+
+		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+		mockWorkflowData := []workflow.Data{
+			workflow.NewData(
+				dataIdentifier,
+				"application/json",
+				[]byte(`{"mock":"data"}`),
+			),
+		}
+		resolutionHandler.ReturnData = mockWorkflowData
+
+		var capturedOutput string
+		ctx.userInterface.EXPECT().Output(gomock.Any()).DoAndReturn(func(msg string) error {
+			capturedOutput = msg
+			return nil
+		}).Times(1)
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.SCAPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.NoError(t, err)
+		assert.NotNil(t, workflowData)
+		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
+		assert.Contains(t, capturedOutput, "project1/uv.lock")
+	})
+
+	t.Run("should ignore fail-fast when all-projects is false", func(t *testing.T) {
+		ctx := setupTestContext(t, true)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagAllProjects, false)
+		ctx.config.Set(FlagFailFast, true)
+
+		snykErr := snyk_errors.Error{
+			ID:     "SNYK-TEST-001",
+			Title:  "Test Error Title",
+			Detail: "Detailed error information",
+		}
+
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					FileExclusions: []string{"uv.lock"},
+					LockFile:       "uv.lock",
+					Error:          snykErr,
+				},
+			},
+		}
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.SCAPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.Error(t, err)
+		assert.Nil(t, workflowData)
+
+		var ec exitCoder
+		if errors.As(err, &ec) {
+			assert.NotEqual(t, 2, ec.ExitCode(), "exit code should not be 2 when all-projects is false")
+		}
+	})
+
+	t.Run("should pass fail-fast flag to plugin options", func(t *testing.T) {
+		ctx := setupTestContext(t, true)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagAllProjects, true)
+		ctx.config.Set(FlagFailFast, true)
+
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+					FileExclusions: []string{},
+					LockFile:       "uv.lock",
+					ManifestFile:   "pyproject.toml",
+				},
+			},
+		}
+
+		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse)
+		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
+
+		_, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.SCAPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, mockPlugin.options, "plugin should have been called with options")
+		assert.True(t, mockPlugin.options.FailFast, "FailFast should be true in plugin options")
+	})
+
 	t.Run("should output problem findings through UI when allProjects is true", func(t *testing.T) {
 		ctx := setupTestContext(t, false)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)

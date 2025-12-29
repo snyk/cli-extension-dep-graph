@@ -12,6 +12,7 @@ type Options struct {
 	TargetFile  string
 	Dev         bool
 	Exclude     []string
+	FailFast    bool
 }
 
 type Metadata struct {
