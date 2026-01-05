@@ -46,6 +46,7 @@ func handleSBOMResolution(
 	)
 }
 
+//nolint:gocyclo // Complex orchestration logic with multiple flag combinations
 func handleSBOMResolutionDI(
 	ctx workflow.InvocationContext,
 	config configuration.Configuration,
@@ -67,17 +68,19 @@ func handleSBOMResolutionDI(
 	// TODO(uv):
 	// - validate options - we can't have both all-projects and file args
 	// - handle various options, including --all-projects, --file and --exclude
-	// - check which other flags we need to handle e.g. fail-fast
+	// - check which other flags we need to handle
 
 	allProjects := config.GetBool(FlagAllProjects)
 	targetFile := config.GetString(FlagFile)
 	dev := config.GetBool(FlagDev)
 	exclude := parseExcludeFlag(config.GetString(FlagExclude))
+	failFast := config.GetBool(FlagFailFast)
 	pluginOptions := scaplugin.Options{
 		AllProjects: allProjects,
 		TargetFile:  targetFile,
 		Dev:         dev,
 		Exclude:     exclude,
+		FailFast:    failFast,
 	}
 
 	// Generate Findings
@@ -92,6 +95,16 @@ func handleSBOMResolutionDI(
 		if err != nil {
 			return nil, fmt.Errorf("error building findings: %w", err)
 		}
+
+		if failFast && allProjects {
+			for _, finding := range f {
+				if finding.Error != nil {
+					logFindingError(logger, finding.LockFile, finding.Error)
+					return nil, createFailFastError(finding.LockFile, finding.Error)
+				}
+			}
+		}
+
 		findings = append(findings, f...)
 		if !allProjects && len(f) > 0 {
 			// If `allProjects` is false we don't want more than one project
@@ -108,6 +121,7 @@ func handleSBOMResolutionDI(
 		if finding.Error != nil {
 			logFindingError(logger, finding.LockFile, finding.Error)
 			problemFindings = append(problemFindings, *finding)
+
 			if !allProjects {
 				return nil, finding.Error
 			}
