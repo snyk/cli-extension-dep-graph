@@ -48,8 +48,8 @@ type PackageMetadata struct {
 //
 // This is a convenience wrapper around GetInstallReportWithExecutor that uses
 // the default executor. For testing, use GetInstallReportWithExecutor directly.
-func GetInstallReport(ctx context.Context, requirementsFile string) (*Report, error) {
-	return GetInstallReportWithExecutor(ctx, requirementsFile, &DefaultExecutor{})
+func GetInstallReport(ctx context.Context, requirementsFile string, noBuildIsolation bool) (*Report, error) {
+	return GetInstallReportWithExecutor(ctx, requirementsFile, noBuildIsolation, &DefaultExecutor{})
 }
 
 // GetInstallReportWithExecutor is a testable version that accepts a CommandExecutor.
@@ -59,8 +59,9 @@ func GetInstallReport(ctx context.Context, requirementsFile string) (*Report, er
 //   - --report -: Output JSON report to stdout (dash means stdout)
 //   - --quiet: Suppress non-error output (except the report)
 //   - -r: Read from requirements file
+//   - --no-build-isolation: Disable build isolation when noBuildIsolation is true
 //   - --index-url: Custom PyPI index (if PIP_TEST_INDEX_URL is set)
-func GetInstallReportWithExecutor(ctx context.Context, requirementsFile string, executor CommandExecutor) (*Report, error) {
+func GetInstallReportWithExecutor(ctx context.Context, requirementsFile string, noBuildIsolation bool, executor CommandExecutor) (*Report, error) {
 	if requirementsFile == "" {
 		return nil, fmt.Errorf("requirements file path cannot be empty")
 	}
@@ -73,6 +74,10 @@ func GetInstallReportWithExecutor(ctx context.Context, requirementsFile string, 
 		"--report", "-",
 		"--quiet",
 		"-r", requirementsFile,
+	}
+
+	if noBuildIsolation {
+		args = append(args, "--no-build-isolation")
 	}
 
 	// Add custom index URL from environment variable (for testing with devpi/custom index)
