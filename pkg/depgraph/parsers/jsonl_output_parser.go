@@ -22,6 +22,7 @@ type jsonLine struct {
 	NormalisedTargetFile string          `json:"normalisedTargetFile"`
 	TargetFileFromPlugin *string         `json:"targetFileFromPlugin"`
 	Target               json.RawMessage `json:"target"`
+	Error                json.RawMessage `json:"error"`
 }
 
 // ParseOutput parses JSONL formatted dependency graph output.
@@ -47,6 +48,7 @@ func (j *JSONLOutputParser) ParseOutput(data []byte) ([]DepGraphOutput, error) {
 			TargetFileFromPlugin: parsed.TargetFileFromPlugin,
 			Target:               parsed.Target,
 			DepGraph:             parsed.DepGraph,
+			Error:                parsed.Error,
 		})
 	}
 

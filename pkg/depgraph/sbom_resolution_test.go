@@ -881,6 +881,65 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Nil(t, mockPlugin.options.Exclude)
 	})
 
+	t.Run("should handle legacy workflow data with errors attached and output warnings", func(t *testing.T) {
+		ctx := setupTestContext(t, false)
+		ctx.config.Set(FlagAllProjects, true)
+
+		// Create mock plugin that returns no findings to trigger legacy workflow
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{},
+		}
+
+		// Create workflow data with an error attached
+		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+		validData := workflow.NewData(
+			dataIdentifier,
+			"application/json",
+			[]byte(`{}`),
+		)
+
+		errorData := workflow.NewData(
+			dataIdentifier,
+			"application/json",
+			[]byte(`{}`),
+		)
+		errorData.SetMetaData(contentLocationKey, "legacy-project/requirements.txt")
+		errorData.AddError(snyk_errors.Error{
+			ID:     "SNYK-LEGACY-001",
+			Title:  "Legacy Error Title",
+			Detail: "Detailed legacy error information for debugging",
+		})
+
+		resolutionHandler := NewCalledResolutionHandlerFunc([]workflow.Data{validData, errorData}, nil)
+
+		// Capture the output to verify it contains expected error messages
+		var capturedOutput string
+		ctx.userInterface.EXPECT().Output(gomock.Any()).DoAndReturn(func(msg string) error {
+			capturedOutput = msg
+			return nil
+		}).Times(1)
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.SCAPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.NoError(t, err)
+		assert.NotNil(t, workflowData)
+		assert.Len(t, workflowData, 1, "Should return only the valid data, filtering out error data")
+		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
+
+		// Verify that the warning output contains the legacy error details
+		assert.Contains(t, capturedOutput, "legacy-project/requirements.txt", "Output should mention the problem file")
+		assert.Contains(t, capturedOutput, "Detailed legacy error information for debugging",
+			"Output should include snyk_errors.Error Detail field from legacy data")
+		assert.Contains(t, capturedOutput, "1/2 potential projects failed to get dependencies",
+			"Output should include number of failed potential projects")
+	})
+
 	t.Run("should return snyk_errors.Error when finding has error and allProjects is false", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
@@ -1214,7 +1273,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			"Output should include snyk_errors.Error Detail field")
 		assert.Contains(t, capturedOutput, "could not process manifest file",
 			"Output should output a generic message rather than the error details of a non-snyk error")
-		assert.Contains(t, capturedOutput, "2 potential projects failed to get dependencies",
+		assert.Contains(t, capturedOutput, "2/4 potential projects failed to get dependencies",
 			"Output should include number of failed potential projects")
 	})
 }
@@ -1268,6 +1327,56 @@ func Test_parseExcludeFlag(t *testing.T) {
 			assert.Equal(t, tc.expected, result)
 		})
 	}
+}
+
+func Test_extractProblemFindings(t *testing.T) {
+	t.Run("should return findings with lockFile from metadata", func(t *testing.T) {
+		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+		data := workflow.NewData(dataIdentifier, "application/json", []byte(`{}`))
+		data.SetMetaData(contentLocationKey, "project/requirements.txt")
+
+		errList := []snyk_errors.Error{
+			{ID: "SNYK-001", Title: "Error 1"},
+			{ID: "SNYK-002", Title: "Error 2"},
+		}
+
+		findings := extractProblemFindings(&nopLogger, data, errList)
+
+		require.Len(t, findings, 2)
+		assert.Equal(t, "project/requirements.txt", findings[0].LockFile)
+		assert.Equal(t, "project/requirements.txt", findings[1].LockFile)
+		assert.Equal(t, errList[0], findings[0].Error)
+		assert.Equal(t, errList[1], findings[1].Error)
+	})
+
+	t.Run("should use 'unknown' as lockFile when metadata retrieval fails", func(t *testing.T) {
+		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+		data := workflow.NewData(dataIdentifier, "application/json", []byte(`{}`))
+		// Intentionally NOT setting metadata for contentLocationKey
+
+		errList := []snyk_errors.Error{
+			{ID: "SNYK-001", Title: "Error 1"},
+		}
+
+		findings := extractProblemFindings(&nopLogger, data, errList)
+
+		require.Len(t, findings, 1)
+		assert.Equal(t, "unknown", findings[0].LockFile)
+		assert.Equal(t, errList[0], findings[0].Error)
+	})
+
+	t.Run("should return empty findings when errList is empty", func(t *testing.T) {
+		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+		data := workflow.NewData(dataIdentifier, "application/json", []byte(`{}`))
+		data.SetMetaData(contentLocationKey, "project/requirements.txt")
+
+		errList := []snyk_errors.Error{}
+
+		findings := extractProblemFindings(&nopLogger, data, errList)
+
+		assert.Len(t, findings, 0)
+		assert.NotNil(t, findings)
+	})
 }
 
 func Test_getExclusionsFromFindings(t *testing.T) {

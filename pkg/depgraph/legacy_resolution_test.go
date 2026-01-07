@@ -20,6 +20,9 @@ var payload string
 //go:embed testdata/jsonl_output
 var jsonlPayload string
 
+//go:embed testdata/jsonl_dep_graph_with_error_output
+var jsonlDepGraphWithErrorPayload string
+
 //go:embed testdata/expected_dep_graph.json
 var expectedDepGraph string
 
@@ -267,6 +270,35 @@ func Test_LegacyResolution(t *testing.T) {
 
 		// assert
 		assert.ErrorIs(t, err, errNoDepGraphsFound)
+	})
+
+	t.Run("should include errors from dep graphs in workflow data", func(t *testing.T) {
+		config.Set(FlagPrintEffectiveGraphWithErrors, true)
+
+		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+		data := workflow.NewData(
+			dataIdentifier,
+			contentTypeJSON,
+			[]byte(jsonlDepGraphWithErrorPayload))
+		engineMock.
+			EXPECT().
+			InvokeWithConfig(legacyWorkflowID, config).
+			Return([]workflow.Data{data}, nil).
+			Times(1)
+
+		depGraphs, err := handleLegacyResolution(invocationContextMock, config, &nopLogger)
+		require.Nil(t, err)
+		require.Len(t, depGraphs, 2)
+
+		verifyMeta(t, depGraphs[0], MetaKeyNormalisedTargetFile, "some normalised target file")
+
+		// verify error
+		verifyMeta(t, depGraphs[1], MetaKeyNormalisedTargetFile, "some normalised target file")
+		errorList := depGraphs[1].GetErrorList()
+		require.Len(t, errorList, 1)
+		assert.Equal(t, "SNYK-CLI-0000", errorList[0].ErrorCode)
+		assert.Equal(t, "Unspecified Error", errorList[0].Title)
+		assert.Equal(t, "Something went wrong", errorList[0].Detail)
 	})
 }
 

@@ -7,36 +7,37 @@ const (
 )
 
 const (
-	FlagFailFast                     = "fail-fast"
-	FlagAllProjects                  = "all-projects"
-	FlagDev                          = "dev"
-	FlagExclude                      = "exclude"
-	FlagFile                         = "file"
-	FlagDetectionDepth               = "detection-depth"
-	FlagPruneRepeatedSubdependencies = "prune-repeated-subdependencies"
-	FlagMavenAggregateProject        = "maven-aggregate-project"
-	FlagScanUnmanaged                = "scan-unmanaged"
-	FlagScanAllUnmanaged             = "scan-all-unmanaged"
-	FlagSubProject                   = "sub-project"
-	FlagGradleSubProject             = "gradle-sub-project"
-	FlagGradleNormalizeDeps          = "gradle-normalize-deps"
-	FlagAllSubProjects               = "all-sub-projects"
-	FlagConfigurationMatching        = "configuration-matching"
-	FlagConfigurationAttributes      = "configuration-attributes"
-	FlagInitScript                   = "init-script"
-	FlagYarnWorkspaces               = "yarn-workspaces"
-	FlagPythonCommand                = "command"
-	FlagPythonSkipUnresolved         = "skip-unresolved"
-	FlagPythonPackageManager         = "package-manager"
-	FlagNPMStrictOutOfSync           = "strict-out-of-sync"
-	FlagNugetAssetsProjectName       = "assets-project-name"
-	FlagNugetPkgsFolder              = "packages-folder"
-	FlagUnmanagedMaxDepth            = "max-depth"
-	FlagIncludeProvenance            = "include-provenance"
-	FlagUseSBOMResolution            = "use-sbom-resolution"
-	FlagPrintEffectiveGraph          = "effective-graph"
-	FlagDotnetRuntimeResolution      = "dotnet-runtime-resolution"
-	FlagDotnetTargetFramework        = "dotnet-target-framework"
+	FlagFailFast                      = "fail-fast"
+	FlagAllProjects                   = "all-projects"
+	FlagDev                           = "dev"
+	FlagExclude                       = "exclude"
+	FlagFile                          = "file"
+	FlagDetectionDepth                = "detection-depth"
+	FlagPruneRepeatedSubdependencies  = "prune-repeated-subdependencies"
+	FlagMavenAggregateProject         = "maven-aggregate-project"
+	FlagScanUnmanaged                 = "scan-unmanaged"
+	FlagScanAllUnmanaged              = "scan-all-unmanaged"
+	FlagSubProject                    = "sub-project"
+	FlagGradleSubProject              = "gradle-sub-project"
+	FlagGradleNormalizeDeps           = "gradle-normalize-deps"
+	FlagAllSubProjects                = "all-sub-projects"
+	FlagConfigurationMatching         = "configuration-matching"
+	FlagConfigurationAttributes       = "configuration-attributes"
+	FlagInitScript                    = "init-script"
+	FlagYarnWorkspaces                = "yarn-workspaces"
+	FlagPythonCommand                 = "command"
+	FlagPythonSkipUnresolved          = "skip-unresolved"
+	FlagPythonPackageManager          = "package-manager"
+	FlagNPMStrictOutOfSync            = "strict-out-of-sync"
+	FlagNugetAssetsProjectName        = "assets-project-name"
+	FlagNugetPkgsFolder               = "packages-folder"
+	FlagUnmanagedMaxDepth             = "max-depth"
+	FlagIncludeProvenance             = "include-provenance"
+	FlagUseSBOMResolution             = "use-sbom-resolution"
+	FlagPrintEffectiveGraph           = "effective-graph"
+	FlagPrintEffectiveGraphWithErrors = "effective-graph-with-errors"
+	FlagDotnetRuntimeResolution       = "dotnet-runtime-resolution"
+	FlagDotnetTargetFramework         = "dotnet-target-framework"
 )
 
 func getFlagSet() *pflag.FlagSet {
@@ -70,6 +71,7 @@ func getFlagSet() *pflag.FlagSet {
 	flagSet.Bool(FlagIncludeProvenance, false, "Include checksums in purl to support package provenance.")
 	flagSet.Bool(FlagUseSBOMResolution, false, "Use SBOM resolution instead of legacy CLI.")
 	flagSet.Bool(FlagPrintEffectiveGraph, false, "Return the pruned dependency graph.")
+	flagSet.Bool(FlagPrintEffectiveGraphWithErrors, false, "Return errors in the pruned dependency graph output.")
 	flagSet.Bool(FlagDotnetRuntimeResolution, false, "Required. You must use this option when you test .NET projects using Runtime Resolution Scanning.")
 	flagSet.String(FlagDotnetTargetFramework, "",
 		"Optional. You may use this option if your solution contains multiple <TargetFramework> directives. "+

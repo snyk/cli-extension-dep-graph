@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/rs/zerolog"
+	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 
@@ -38,7 +39,7 @@ func handleLegacyResolution(ctx workflow.InvocationContext, config configuration
 		return nil, errNoDepGraphsFound
 	}
 
-	workflowOutputData := mapToWorkflowData(depGraphs)
+	workflowOutputData := mapToWorkflowData(depGraphs, logger)
 	logger.Printf("DepGraph workflow done (extracted %d dependency graphs)", len(workflowOutputData))
 	return workflowOutputData, nil
 }
@@ -48,10 +49,14 @@ func chooseGraphArgument(config configuration.Configuration) (string, parsers.Ou
 		return "--print-effective-graph", parsers.NewJSONL()
 	}
 
+	if config.GetBool(FlagPrintEffectiveGraphWithErrors) {
+		return "--print-effective-graph-with-errors", parsers.NewJSONL()
+	}
+
 	return "--print-graph", parsers.NewPlainText()
 }
 
-func mapToWorkflowData(depGraphs []parsers.DepGraphOutput) []workflow.Data {
+func mapToWorkflowData(depGraphs []parsers.DepGraphOutput, logger *zerolog.Logger) []workflow.Data {
 	depGraphList := []workflow.Data{}
 	for _, depGraph := range depGraphs {
 		data := workflow.NewData(DataTypeID, contentTypeJSON, depGraph.DepGraph)
@@ -62,6 +67,16 @@ func mapToWorkflowData(depGraphs []parsers.DepGraphOutput) []workflow.Data {
 		}
 		if depGraph.Target != nil {
 			data.SetMetaData(MetaKeyTarget, string(depGraph.Target))
+		}
+		if depGraph.Error != nil {
+			snykErrors, err := snyk_errors.FromJSONAPIErrorBytes(depGraph.Error)
+			if err != nil {
+				logger.Printf("failed to parse error from depgraph output: %v", err)
+			} else {
+				for i := range len(snykErrors) {
+					data.AddError(snykErrors[i])
+				}
+			}
 		}
 		depGraphList = append(depGraphList, data)
 	}

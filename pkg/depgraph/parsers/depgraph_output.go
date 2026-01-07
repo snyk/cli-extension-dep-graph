@@ -6,4 +6,5 @@ type DepGraphOutput struct {
 	TargetFileFromPlugin *string
 	Target               []byte
 	DepGraph             []byte
+	Error                []byte
 }
