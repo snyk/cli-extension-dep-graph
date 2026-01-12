@@ -29,8 +29,9 @@ func buildTestHelper(t *testing.T) string {
 }
 
 func TestDefaultCmdExecutor(t *testing.T) {
+	mockMinVersion(t)
 	helperBin := buildTestHelper(t)
-	version := formatVersion(minVersion)
+	version := formatVersion(testMinVersion)
 	t.Setenv("TESTHELPER_VERSION", version)
 
 	t.Run("returns stdout only", func(t *testing.T) {
@@ -121,7 +122,20 @@ func TestDefaultCmdExecutor(t *testing.T) {
 	})
 }
 
+// value used to mock out `minVersion`.
+var testMinVersion = Version{0, 9, 11}
+
+// sets the package var `minVersion` to the mock value `testMinVersion`.
+func mockMinVersion(t *testing.T) {
+	t.Helper()
+	original := minVersion
+	minVersion = testMinVersion
+	t.Cleanup(func() { minVersion = original })
+}
+
 func TestParseAndValidateVersion_ValidVersions(t *testing.T) {
+	mockMinVersion(t)
+
 	tests := []struct {
 		name   string
 		output string
@@ -145,6 +159,8 @@ func TestParseAndValidateVersion_ValidVersions(t *testing.T) {
 }
 
 func TestParseAndValidateVersion_InvalidVersions(t *testing.T) {
+	mockMinVersion(t)
+
 	tests := []struct {
 		name   string
 		output string
@@ -165,7 +181,7 @@ func TestParseAndValidateVersion_InvalidVersions(t *testing.T) {
 			var catalogErr snyk_errors.Error
 			assert.True(t, errors.As(err, &catalogErr), "error should be a catalog error")
 			assert.Contains(t, catalogErr.Detail, "not supported")
-			assert.Contains(t, catalogErr.Detail, "0.9.11")
+			assert.Contains(t, catalogErr.Detail, formatVersion(testMinVersion))
 		})
 	}
 }
