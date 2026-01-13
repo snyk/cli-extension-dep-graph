@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	clierrors "github.com/snyk/error-catalog-golang-public/cli"
+	snykerrors "github.com/snyk/error-catalog-golang-public/snyk"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 )
 
@@ -86,7 +87,7 @@ func parseAndValidateVersion(binary, versionOutput string) error {
 		return nil
 	}
 
-	return clierrors.NewGeneralSCAFailureError(
+	return snykerrors.NewRequirementsNotMetError(
 		fmt.Sprintf(
 			"%s version %s is not supported. Minimum required version is %s",
 			binary,
