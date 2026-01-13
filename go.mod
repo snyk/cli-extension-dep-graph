@@ -9,7 +9,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/rs/zerolog v1.34.0
 	github.com/snyk/dep-graph/go v0.0.0-20251219134535-fcb262dc6d25
-	github.com/snyk/error-catalog-golang-public v0.0.0-20251029091002-52bc5ef82c45
+	github.com/snyk/error-catalog-golang-public v0.0.0-20260108110943-21ad0c940c14
 	github.com/snyk/go-application-framework v0.0.0-20251201143055-028dabb99a6d
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.11.1
