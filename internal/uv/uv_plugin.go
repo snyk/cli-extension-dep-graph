@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/rs/zerolog"
@@ -182,16 +183,34 @@ func (p Plugin) discoverLockFiles(
 		if targetFile != "" {
 			findOpts = append(findOpts, discovery.WithTargetFile(targetFile))
 		} else {
-			// Default: find uv.lock at root only
-			findOpts = append(findOpts, discovery.WithTargetFile(UvLockFileName))
+			rootLockPath := filepath.Join(dir, UvLockFileName)
+			// Default to root uv.lock file if it exists
+			if fileExists(rootLockPath) {
+				findRes := []discovery.FindResult{{
+					Path:    rootLockPath,
+					RelPath: UvLockFileName,
+				}}
+				return findRes, nil
+			}
+
+			// No root uv.lock file and no targetFile specified - return empty slice
+			return []discovery.FindResult{}, nil
 		}
 	}
 
 	files, err := discovery.FindFiles(ctx, dir, findOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find uv lockfiles: %w", err)
+		return nil, fmt.Errorf("failed to find uv lockfile(s): %w", err)
 	}
 	return files, nil
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return !info.IsDir()
 }
 
 var _ scaplugin.SCAPlugin = (*Plugin)(nil)

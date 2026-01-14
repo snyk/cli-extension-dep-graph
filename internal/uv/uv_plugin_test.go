@@ -218,10 +218,10 @@ func TestPlugin_BuildFindingsFromDir(t *testing.T) {
 			expectedDirs: []string{},
 		},
 		{
-			name:        "missing root file with AllProjects false",
-			files:       []string{"README.md"},
-			allProjects: false,
-			expectedErr: "failed to find uv lockfiles",
+			name:         "missing root file with AllProjects false",
+			files:        []string{"README.md"},
+			allProjects:  false,
+			expectedDirs: []string{}, // empty result, no error
 		},
 
 		// Multiple projects
@@ -410,7 +410,7 @@ func TestPlugin_ShouldRaiseErrorWhenTargetFileIsUvLockInRelativeFolderButDoesNot
 	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
 
 	require.Error(t, err)
-	require.ErrorContains(t, err, "failed to find uv lockfiles")
+	require.ErrorContains(t, err, "failed to find uv lockfile(s)")
 
 	require.Len(t, findings, 0, "Should return no findings")
 	require.Empty(t, mockClient.CalledDirs, "Should not call the uv client")
@@ -654,6 +654,136 @@ func TestFindWorkspacePackage_EmptyWorkspacePackages(t *testing.T) {
 	result := findWorkspacePackage(depGraph, workspacePackages)
 
 	assert.Nil(t, result)
+}
+
+func TestPlugin_DiscoverLockFiles(t *testing.T) {
+	tests := []struct {
+		name string
+
+		files       []string // files to create relative to root
+		allProjects bool
+		targetFile  string
+		exclude     []string
+
+		expectedFiles []string // expected relative paths of discovered files
+		expectedErr   string   // if non-empty, expect error containing this string
+	}{
+		// ========== AllProjects = true ==========
+		{
+			name:          "AllProjects true - finds all uv.lock files including nested",
+			files:         []string{"uv.lock", "project1/uv.lock", "foo/pyproject.toml", "a/b/c/uv.lock"},
+			allProjects:   true,
+			targetFile:    "",
+			expectedFiles: []string{"uv.lock", "project1/uv.lock", "a/b/c/uv.lock"},
+		},
+		{
+			name:          "AllProjects true - no files found",
+			files:         []string{"README.md", "pyproject.toml"},
+			allProjects:   true,
+			targetFile:    "",
+			expectedFiles: []string{},
+		},
+		{
+			name:          "AllProjects true - excludes common folders",
+			files:         []string{"uv.lock", "src/uv.lock", "node_modules/uv.lock", ".build/uv.lock"},
+			allProjects:   true,
+			targetFile:    "",
+			expectedFiles: []string{"uv.lock", "src/uv.lock"}, // node_modules and .build excluded
+		},
+		{
+			name:          "AllProjects true - ignores excluded directories",
+			files:         []string{"uv.lock", "dir1/uv.lock", "dir2/uv.lock", "src/uv.lock"},
+			allProjects:   true,
+			targetFile:    "",
+			exclude:       []string{"dir1", "dir2"},
+			expectedFiles: []string{"uv.lock", "src/uv.lock"},
+		},
+
+		// ========== AllProjects = false, targetFile = "" ==========
+		{
+			name:          "AllProjects false, targetFile empty - finds only root uv.lock",
+			files:         []string{"uv.lock", "project1/uv.lock", "project2/uv.lock"},
+			allProjects:   false,
+			targetFile:    "",
+			expectedFiles: []string{"uv.lock"},
+		},
+		{
+			name:          "AllProjects false, targetFile empty - no root file returns empty slice",
+			files:         []string{"project1/uv.lock"},
+			allProjects:   false,
+			targetFile:    "",
+			expectedFiles: []string{}, // Empty slice, no error
+		},
+
+		// ========== AllProjects = false, targetFile != "" ==========
+		{
+			name:          "AllProjects false, targetFile specified - finds nested file",
+			files:         []string{"uv.lock", "project1/uv.lock"},
+			allProjects:   false,
+			targetFile:    "project1/uv.lock",
+			expectedFiles: []string{"project1/uv.lock"},
+		},
+		{
+			name:          "AllProjects false, targetFile specified - deep nested file",
+			files:         []string{"uv.lock", "a/b/c/uv.lock"},
+			allProjects:   false,
+			targetFile:    "a/b/c/uv.lock",
+			expectedFiles: []string{"a/b/c/uv.lock"},
+		},
+		{
+			name:        "AllProjects false, targetFile specified - file doesn't exist returns error",
+			files:       []string{"uv.lock", "project1/uv.lock"},
+			allProjects: false,
+			targetFile:  "nonexistent/uv.lock",
+			expectedErr: "failed to find uv lockfile(s)",
+		},
+		{
+			name:          "AllProjects false, targetFile specified - ignores other files",
+			files:         []string{"uv.lock", "project1/uv.lock", "project2/uv.lock"},
+			allProjects:   false,
+			targetFile:    "project1/uv.lock",
+			expectedFiles: []string{"project1/uv.lock"}, // Only the specified file
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := createFiles(t, tt.files...)
+			plugin := NewUvPlugin(&MockClient{}, nil, "")
+
+			ctx := context.Background()
+			options := &scaplugin.Options{
+				AllProjects: tt.allProjects,
+				TargetFile:  tt.targetFile,
+				Exclude:     tt.exclude,
+			}
+
+			files, err := plugin.discoverLockFiles(ctx, tmpDir, tt.targetFile, options)
+
+			if tt.expectedErr != "" {
+				require.Error(t, err)
+				require.ErrorContains(t, err, tt.expectedErr)
+				require.Nil(t, files)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, files)
+
+			// Extract relative paths from results
+			relPaths := make([]string, len(files))
+			for i, f := range files {
+				relPaths[i] = f.RelPath
+			}
+
+			// Sort for comparison
+			sort.Strings(relPaths)
+			sort.Strings(tt.expectedFiles)
+
+			require.Equal(t, tt.expectedFiles, relPaths,
+				"Expected files %v, got %v", tt.expectedFiles, relPaths)
+		})
+	}
 }
 
 // Helper to create files.
