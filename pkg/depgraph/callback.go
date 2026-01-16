@@ -1,6 +1,8 @@
 package depgraph
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
@@ -20,9 +22,12 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 
 	logger.Print("DepGraph workflow start")
 
-	if config.GetBool(FlagUseSBOMResolution) {
-		return handleSBOMResolution(ctx, config, logger)
-	}
+	// if config.GetBool(FlagUseSBOMResolution) {
+	return handleSBOMResolution(ctx, config, logger)
+	// }
+
+	panic(fmt.Sprintf("FlagUseSBOMResolution (val) = %v", config.Get(FlagUseSBOMResolution)))
+	panic("Didn't find FlagUseSBOMResolution")
 
 	return handleLegacyResolution(ctx, config, logger)
 }
