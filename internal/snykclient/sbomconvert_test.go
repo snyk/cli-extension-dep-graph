@@ -12,7 +12,10 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	pkglogger "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
+
+var logger = pkglogger.Nop()
 
 func Test_SBOMConvert(t *testing.T) {
 	response := mocks.NewMockResponse(
@@ -34,7 +37,7 @@ func Test_SBOMConvert(t *testing.T) {
 	client := snykclient.NewSnykClient(mockHTTPClient.Client(), mockHTTPClient.URL, "org1")
 	depsResp, warnResp, err := client.SBOMConvert(
 		context.Background(),
-		&logger,
+		logger,
 		bytes.NewBuffer([]byte(sbomContent)),
 		"github.com/snyk/cli-extension-dep-graph")
 
@@ -61,7 +64,7 @@ func Test_SBOMConvert_InvalidJSONReturned(t *testing.T) {
 	client := snykclient.NewSnykClient(mockHTTPClient.Client(), mockHTTPClient.URL, "org1")
 	_, _, err := client.SBOMConvert(
 		context.Background(),
-		&logger,
+		logger,
 		strings.NewReader(`{"foo":"bar"}`),
 		"github.com/snyk/cli-extension-dep-graph")
 
@@ -106,7 +109,7 @@ func Test_SBOMConvert_ServerErrors(t *testing.T) {
 			client := snykclient.NewSnykClient(mockHTTPClient.Client(), mockHTTPClient.URL, "org1")
 			_, _, err := client.SBOMConvert(
 				context.Background(),
-				&logger,
+				logger,
 				bytes.NewBufferString(sbomContent),
 				"github.com/snyk/cli-extension-dep-graph")
 

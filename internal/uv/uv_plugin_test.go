@@ -9,17 +9,17 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
-var logger = zerolog.Nop()
+var testLogger = logger.Nop()
 
 const validSBOMJSON = `{
 	"metadata": {
@@ -257,7 +257,7 @@ func TestPlugin_BuildFindingsFromDir(t *testing.T) {
 			// Execute
 			ctx := context.Background()
 			options := &scaplugin.Options{AllProjects: tt.allProjects, Exclude: tt.exclude}
-			findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, &logger)
+			findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, testLogger)
 
 			// Check error
 			if tt.expectedErr != "" {
@@ -301,7 +301,7 @@ func TestPlugin_ShouldNotSkipProcessingWhenNoTargetFileIsSet(t *testing.T) {
 	plugin := NewUvPlugin(mockClient, snykClient, "")
 
 	options := &scaplugin.Options{}
-	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, testLogger)
 	require.NoError(t, err)
 
 	require.Len(t, findings, 1, "Should return findings")
@@ -316,7 +316,7 @@ func TestPlugin_ShouldNotSkipProcessingWhenUvLockFile(t *testing.T) {
 	plugin := NewUvPlugin(mockClient, snykClient, "")
 
 	options := &scaplugin.Options{TargetFile: "uv.lock"}
-	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, testLogger)
 	require.NoError(t, err)
 
 	require.Len(t, findings, 1, "Should return findings")
@@ -331,7 +331,7 @@ func TestPlugin_SkipsProcessingWhenTargetFileIsNotUVFile(t *testing.T) {
 	plugin := NewUvPlugin(mockClient, snykClient, "")
 
 	options := &scaplugin.Options{TargetFile: "package.json"}
-	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, testLogger)
 	require.NoError(t, err)
 
 	require.Len(t, findings, 0, "Should return no findings")
@@ -346,7 +346,7 @@ func TestPlugin_SkipsProcessingWhenTargetFileIsAPyProjectTomlFile(t *testing.T) 
 	plugin := NewUvPlugin(mockClient, snykClient, "")
 
 	options := &scaplugin.Options{TargetFile: "pyproject.toml"}
-	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, testLogger)
 	require.NoError(t, err)
 
 	require.Len(t, findings, 0, "Should return no findings")
@@ -366,7 +366,7 @@ func TestPlugin_ShouldNotSkipProcessingWhenTargetFileIsRelativeFolderPath(t *tes
 	plugin := NewUvPlugin(mockClient, snykClient, "")
 
 	options := &scaplugin.Options{TargetFile: "my-project/uv.lock"}
-	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, testLogger)
 	require.NoError(t, err)
 
 	require.Len(t, findings, 1, "Should return findings for the specific uv.lock file")
@@ -387,7 +387,7 @@ func TestPlugin_ShouldSkipProcessingWhenTargetFileIsNotUvLockInRelativeFolderPat
 	plugin := NewUvPlugin(mockClient, snykClient, "")
 
 	options := &scaplugin.Options{TargetFile: "my-project/package.json"}
-	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, testLogger)
 	require.NoError(t, err)
 
 	require.Len(t, findings, 0, "Should return no findings")
@@ -407,7 +407,7 @@ func TestPlugin_ShouldRaiseErrorWhenTargetFileIsUvLockInRelativeFolderButDoesNot
 	plugin := NewUvPlugin(mockClient, snykClient, "")
 
 	options := &scaplugin.Options{TargetFile: "my-project/uv.lock"}
-	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, &logger)
+	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, testLogger)
 
 	require.Error(t, err)
 	require.ErrorContains(t, err, "failed to find uv lockfile(s)")
@@ -425,7 +425,7 @@ func TestPlugin_BuildFindingsFromDir_ErrorHandling(t *testing.T) {
 
 	ctx := context.Background()
 	options := &scaplugin.Options{AllProjects: false}
-	findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, &logger)
+	findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, testLogger)
 	require.NoError(t, err)
 
 	require.Len(t, findings, 1)
@@ -461,7 +461,7 @@ func TestPlugin_BuildFindingsFromDir_MixedSuccessAndFailure(t *testing.T) {
 	}
 	snykClient := setupMockSnykClientMultiResponse(t, mockResponses)
 	plugin := NewUvPlugin(mockClient, snykClient, "")
-	findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, &logger)
+	findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, testLogger)
 	require.NoError(t, err)
 
 	require.Len(t, findings, 3)
@@ -493,7 +493,7 @@ func TestBuildFindings_Success(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &logger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
@@ -508,7 +508,7 @@ func TestBuildFindings_InvalidSBOM(t *testing.T) {
 	snykClient := setupMockSnykClient(t, `{}`)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &logger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
 
 	assert.Error(t, err)
 	assert.Nil(t, findings)
@@ -524,7 +524,7 @@ func TestBuildFindings_MissingRootComponent(t *testing.T) {
 	snykClient := setupMockSnykClient(t, `{}`)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &logger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
 
 	assert.Error(t, err)
 	assert.Nil(t, findings)
@@ -537,7 +537,7 @@ func TestBuildFindings_ConversionError(t *testing.T) {
 	snykClient := setupMockSnykClientMultiResponse(t, []mocks.MockResponse{mockResponse})
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &logger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
 
 	assert.Error(t, err)
 	assert.Nil(t, findings)
@@ -550,7 +550,7 @@ func TestBuildFindings_MultipleDepGraphs(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &logger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 2)
@@ -584,7 +584,7 @@ func TestBuildFindings_WorkspacePackage(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &logger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
@@ -598,7 +598,7 @@ func TestBuildFindings_PathConstruction_RootDir(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &logger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
@@ -612,7 +612,7 @@ func TestBuildFindings_PathConstruction_NestedDir(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "project1/uv.lock", "project1", &logger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "project1/uv.lock", "project1", testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)

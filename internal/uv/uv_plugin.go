@@ -7,12 +7,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/rs/zerolog"
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
 	"github.com/snyk/cli-extension-dep-graph/internal/conversion"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
@@ -34,10 +34,10 @@ func (p Plugin) BuildFindingsFromDir(
 	ctx context.Context,
 	inputDir string,
 	options *scaplugin.Options,
-	logger *zerolog.Logger,
+	log logger.Logger,
 ) ([]scaplugin.Finding, error) {
 	if options.TargetFile != "" && filepath.Base(options.TargetFile) != UvLockFileName {
-		logger.Printf("Skipping processing uv plugin for %s as it is not a 'uv.lock' file", options.TargetFile)
+		log.Info(ctx, "Skipping processing uv plugin", logger.Attr("targetFile", options.TargetFile), logger.Attr("reason", "not a 'uv.lock' file"))
 		return []scaplugin.Finding{}, nil
 	}
 
@@ -53,11 +53,11 @@ func (p Plugin) BuildFindingsFromDir(
 	for _, file := range files {
 		lockFilePath := file.RelPath // e.g., "uv.lock" or "project1/uv.lock"
 		lockFileDir := filepath.Dir(lockFilePath)
-		logger.Printf("Building dependency graph for %s", lockFilePath)
+		log.Info(ctx, "Building dependency graph", logger.Attr("lockFile", lockFilePath))
 
 		sbom, err := p.client.ExportSBOM(lockFileDir, options)
 		if err != nil {
-			logger.Printf("Failed to build dependency graph for %s: %v", lockFilePath, err)
+			log.Error(ctx, "Failed to build dependency graph", logger.Attr("lockFile", lockFilePath), logger.Err(err))
 			wrappedErr := fmt.Errorf("failed to build dependency graph for %s: %w", lockFilePath, err)
 
 			errorFinding := scaplugin.Finding{
@@ -67,7 +67,7 @@ func (p Plugin) BuildFindingsFromDir(
 			findings = append(findings, errorFinding)
 			continue
 		}
-		fs, err := p.buildFindings(ctx, sbom, lockFilePath, lockFileDir, logger)
+		fs, err := p.buildFindings(ctx, sbom, lockFilePath, lockFileDir, log)
 		if err != nil {
 			return nil, err
 		}
@@ -86,7 +86,7 @@ func (p Plugin) buildFindings(
 	sbom Sbom,
 	lockFilePath string,
 	lockFileDir string,
-	logger *zerolog.Logger,
+	log logger.Logger,
 ) ([]scaplugin.Finding, error) {
 	parsedSbom, err := parseAndValidateSBOM(sbom)
 	if err != nil {
@@ -101,7 +101,7 @@ func (p Plugin) buildFindings(
 		bytes.NewReader(sbom),
 		metadata,
 		p.snykClient,
-		logger,
+		log,
 		p.remoteRepoURL,
 	)
 	if err != nil {

@@ -3,8 +3,9 @@ package scaplugin
 import (
 	"context"
 
-	"github.com/rs/zerolog"
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
+
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
 
 type Options struct {
@@ -35,6 +36,6 @@ type SCAPlugin interface {
 		ctx context.Context,
 		dir string,
 		options *Options,
-		logger *zerolog.Logger,
+		log logger.Logger,
 	) ([]Finding, error)
 }

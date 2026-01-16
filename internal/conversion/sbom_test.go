@@ -7,18 +7,18 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
 func TestSbomToDepGraphs_Success(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := logger.Nop()
 	sbom := bytes.NewReader([]byte(`{"test": "sbom"}`))
 	metadata := &scaplugin.Metadata{
 		PackageManager: "pip",
@@ -30,7 +30,7 @@ func TestSbomToDepGraphs_Success(t *testing.T) {
 	mockService, snykClient := setupMockSnykClient(t, mockResponseBody, http.StatusOK)
 	defer mockService.Close()
 
-	depGraphs, err := SbomToDepGraphs(context.Background(), sbom, metadata, snykClient, &logger, "")
+	depGraphs, err := SbomToDepGraphs(context.Background(), sbom, metadata, snykClient, logger, "")
 
 	require.NoError(t, err)
 	require.Len(t, depGraphs, 1)
@@ -41,7 +41,7 @@ func TestSbomToDepGraphs_Success(t *testing.T) {
 }
 
 func TestSbomToDepGraphs_EmptyScans_CreatesEmptyDepGraph(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := logger.Nop()
 	sbom := bytes.NewReader([]byte(`{"test": "sbom"}`))
 	metadata := &scaplugin.Metadata{
 		PackageManager: "pip",
@@ -53,7 +53,7 @@ func TestSbomToDepGraphs_EmptyScans_CreatesEmptyDepGraph(t *testing.T) {
 	mockService, snykClient := setupMockSnykClient(t, mockResponseBody, http.StatusOK)
 	defer mockService.Close()
 
-	depGraphs, err := SbomToDepGraphs(context.Background(), sbom, metadata, snykClient, &logger, "")
+	depGraphs, err := SbomToDepGraphs(context.Background(), sbom, metadata, snykClient, logger, "")
 
 	require.NoError(t, err)
 	require.Len(t, depGraphs, 1)
@@ -64,7 +64,7 @@ func TestSbomToDepGraphs_EmptyScans_CreatesEmptyDepGraph(t *testing.T) {
 }
 
 func TestSbomToDepGraphs_MultipleDepGraphs(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := logger.Nop()
 	sbom := bytes.NewReader([]byte(`{"test": "sbom"}`))
 	metadata := &scaplugin.Metadata{
 		PackageManager: "pip",
@@ -76,7 +76,7 @@ func TestSbomToDepGraphs_MultipleDepGraphs(t *testing.T) {
 	mockService, snykClient := setupMockSnykClient(t, mockResponseBody, http.StatusOK)
 	defer mockService.Close()
 
-	depGraphs, err := SbomToDepGraphs(context.Background(), sbom, metadata, snykClient, &logger, "")
+	depGraphs, err := SbomToDepGraphs(context.Background(), sbom, metadata, snykClient, logger, "")
 
 	require.NoError(t, err)
 	require.Len(t, depGraphs, 2)
@@ -85,7 +85,7 @@ func TestSbomToDepGraphs_MultipleDepGraphs(t *testing.T) {
 }
 
 func TestSbomToDepGraphs_ConversionError(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := logger.Nop()
 	sbom := bytes.NewReader([]byte(`{"test": "sbom"}`))
 	metadata := &scaplugin.Metadata{
 		PackageManager: "pip",
@@ -96,7 +96,7 @@ func TestSbomToDepGraphs_ConversionError(t *testing.T) {
 	mockService, snykClient := setupMockSnykClient(t, `{"error": "invalid"}`, http.StatusBadRequest)
 	defer mockService.Close()
 
-	depGraphs, err := SbomToDepGraphs(context.Background(), sbom, metadata, snykClient, &logger, "")
+	depGraphs, err := SbomToDepGraphs(context.Background(), sbom, metadata, snykClient, logger, "")
 
 	assert.Error(t, err)
 	assert.Nil(t, depGraphs)
@@ -104,7 +104,7 @@ func TestSbomToDepGraphs_ConversionError(t *testing.T) {
 }
 
 func TestSbomToDepGraphs_EmptyDepGraphCreationError_EmptyName(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := logger.Nop()
 	sbom := bytes.NewReader([]byte(`{"test": "sbom"}`))
 	metadata := &scaplugin.Metadata{
 		PackageManager: "uv",
@@ -116,7 +116,7 @@ func TestSbomToDepGraphs_EmptyDepGraphCreationError_EmptyName(t *testing.T) {
 	mockService, snykClient := setupMockSnykClient(t, mockResponseBody, http.StatusOK)
 	defer mockService.Close()
 
-	depGraphs, err := SbomToDepGraphs(context.Background(), sbom, metadata, snykClient, &logger, "")
+	depGraphs, err := SbomToDepGraphs(context.Background(), sbom, metadata, snykClient, logger, "")
 
 	assert.Error(t, err)
 	assert.Nil(t, depGraphs)

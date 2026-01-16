@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/rs/zerolog"
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
@@ -17,15 +17,15 @@ func SbomToDepGraphs(
 	sbom io.Reader,
 	metadata *scaplugin.Metadata,
 	snykClient *snykclient.SnykClient,
-	logger *zerolog.Logger,
+	log logger.Logger,
 	remoteRepoURL string,
 ) ([]*depgraph.DepGraph, error) {
-	scans, warnings, err := snykClient.SBOMConvert(ctx, logger, sbom, remoteRepoURL)
+	scans, warnings, err := snykClient.SBOMConvert(ctx, log, sbom, remoteRepoURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert SBOM: %w", err)
 	}
 
-	logger.Printf("Successfully converted SBOM, warning(s): %d\n", len(warnings))
+	log.Info(ctx, "Successfully converted SBOM", logger.Attr("warnings", len(warnings)))
 
 	depGraphsData, err := extractDepGraphsFromScans(scans)
 	if err != nil {

@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
@@ -41,7 +42,7 @@ func (m *mockScaPlugin) BuildFindingsFromDir(
 	_ context.Context,
 	_ string,
 	options *scaplugin.Options,
-	_ *zerolog.Logger,
+	_ logger.Logger,
 ) ([]scaplugin.Finding, error) {
 	m.options = options
 	if m.err != nil {
