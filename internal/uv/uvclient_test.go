@@ -40,7 +40,7 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 		executeFunc: func(binary, dir string, args ...string) ([]byte, error) {
 			assert.Equal(t, "/path/to/uv", binary)
 			assert.Equal(t, "/test/dir", dir)
-			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--frozen", "--preview", "--no-dev"}, args)
+			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--locked", "--preview", "--no-dev"}, args)
 			return []byte(validSBOM), nil
 		},
 	}
@@ -71,7 +71,7 @@ func TestUVClient_ExportSBOM_AllProjects(t *testing.T) {
 		executeFunc: func(binary, dir string, args ...string) ([]byte, error) {
 			assert.Equal(t, "/path/to/uv", binary)
 			assert.Equal(t, "/test/dir", dir)
-			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--frozen", "--preview", "--all-packages", "--no-dev"}, args)
+			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--locked", "--preview", "--all-packages", "--no-dev"}, args)
 			return []byte(validSBOM), nil
 		},
 	}

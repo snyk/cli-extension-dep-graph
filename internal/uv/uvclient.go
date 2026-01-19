@@ -54,7 +54,7 @@ type WorkspacePackage struct {
 
 // exportSBOM exports an SBOM in CycloneDX format using uv.
 func (c client) ExportSBOM(inputDir string, opts *scaplugin.Options) (Sbom, error) {
-	args := []string{"export", "--format", "cyclonedx1.5", "--frozen", "--preview"}
+	args := []string{"export", "--format", "cyclonedx1.5", "--locked", "--preview"}
 	if opts.AllProjects {
 		args = append(args, "--all-packages")
 	}
