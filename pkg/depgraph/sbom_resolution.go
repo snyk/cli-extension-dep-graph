@@ -136,6 +136,8 @@ func handleSBOMResolutionDI(
 		workflowData = append(workflowData, data)
 	}
 
+	totalFindings := len(findings)
+
 	if len(findings) == 0 || allProjects {
 		applyFindingsExclusions(config, findings)
 
@@ -143,12 +145,21 @@ func handleSBOMResolutionDI(
 		if err != nil {
 			return nil, err
 		}
-		if legacyData != nil {
-			workflowData = append(workflowData, legacyData...)
-		}
+
+		legacyWorkflowData, legacyProblemFindings := processLegacyData(logger, legacyData)
+		workflowData = append(workflowData, legacyWorkflowData...)
+		problemFindings = append(problemFindings, legacyProblemFindings...)
+
+		totalFindings += len(legacyData)
 	}
 
-	outputAnyWarnings(ctx, logger, problemFindings)
+	// TODO: This is a temporary implementation for rendering warnings.
+	// The long-term plan is for the CLI to handle all warning rendering.
+	// This will require extensions to handle `workflow.Data` objects with
+	// errors and propagate them upstream rather than rendering them directly.
+	// This change will require coordinated updates across extensions to
+	// ensure backwards compatibility and avoid breakages.
+	outputAnyWarnings(ctx, logger, problemFindings, totalFindings)
 
 	return workflowData, nil
 }
@@ -162,9 +173,9 @@ func logFindingError(logger *zerolog.Logger, lockFile string, err error) {
 	}
 }
 
-func outputAnyWarnings(ctx workflow.InvocationContext, logger *zerolog.Logger, problemFindings []scaplugin.Finding) {
+func outputAnyWarnings(ctx workflow.InvocationContext, logger *zerolog.Logger, problemFindings []scaplugin.Finding, totalFindings int) {
 	if len(problemFindings) > 0 {
-		message := renderWarningForProblemFindings(problemFindings)
+		message := renderWarningForProblemFindings(problemFindings, totalFindings)
 
 		err := ctx.GetUserInterface().Output(message + "\n")
 		if err != nil {
@@ -173,7 +184,7 @@ func outputAnyWarnings(ctx workflow.InvocationContext, logger *zerolog.Logger, p
 	}
 }
 
-func renderWarningForProblemFindings(problemFindings []scaplugin.Finding) string {
+func renderWarningForProblemFindings(problemFindings []scaplugin.Finding, totalFindings int) string {
 	outputMessage := ""
 	for _, finding := range problemFindings {
 		outputMessage += fmt.Sprintf("\n%s:", finding.LockFile)
@@ -184,10 +195,45 @@ func renderWarningForProblemFindings(problemFindings []scaplugin.Finding) string
 			outputMessage += "\n  could not process manifest file"
 		}
 	}
-	outputMessage += fmt.Sprintf("\n✗ %d potential projects failed to get dependencies.", len(problemFindings))
+	outputMessage += fmt.Sprintf("\n✗ %d/%d potential projects failed to get dependencies.", len(problemFindings), totalFindings)
 
 	redStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "9", Dark: "1"})
 	return redStyle.Render(outputMessage)
+}
+
+// processLegacyData separates successful dependency graphs from errors in the legacy data.
+// It returns workflow data containing only valid dependency graphs, while converting
+// any errors into problem findings that can be reported as warnings.
+func processLegacyData(logger *zerolog.Logger, legacyData []workflow.Data) ([]workflow.Data, []scaplugin.Finding) {
+	workflowData := make([]workflow.Data, 0, len(legacyData))
+	problemFindings := make([]scaplugin.Finding, 0)
+
+	for _, data := range legacyData {
+		errList := data.GetErrorList()
+		if len(errList) > 0 {
+			problemFindings = append(problemFindings, extractProblemFindings(logger, data, errList)...)
+			continue
+		}
+		workflowData = append(workflowData, data)
+	}
+
+	return workflowData, problemFindings
+}
+
+func extractProblemFindings(logger *zerolog.Logger, data workflow.Data, errList []snyk_errors.Error) []scaplugin.Finding {
+	findings := make([]scaplugin.Finding, 0, len(errList))
+	lockFile, metaErr := data.GetMetaData(contentLocationKey)
+	if metaErr != nil {
+		logger.Printf("Failed to get metadata %s for workflow data: %v", contentLocationKey, metaErr)
+		lockFile = "unknown"
+	}
+	for i := range errList {
+		findings = append(findings, scaplugin.Finding{
+			LockFile: lockFile,
+			Error:    errList[i],
+		})
+	}
+	return findings
 }
 
 func getExclusionsFromFindings(findings []scaplugin.Finding) []string {
@@ -238,7 +284,11 @@ func executeLegacyWorkflow(
 	depGraphWorkflowFunc ResolutionHandlerFunc,
 	findings []scaplugin.Finding,
 ) ([]workflow.Data, error) {
-	legacyData, err := depGraphWorkflowFunc(ctx, config, logger)
+	legacyConfig := config.Clone()
+	legacyConfig.Unset(FlagPrintEffectiveGraph)
+	legacyConfig.Set(FlagPrintEffectiveGraphWithErrors, true)
+
+	legacyData, err := depGraphWorkflowFunc(ctx, legacyConfig, logger)
 	if err == nil {
 		return legacyData, nil
 	}
