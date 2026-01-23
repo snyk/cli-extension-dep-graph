@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/rs/zerolog"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
 
 const (
@@ -22,13 +22,13 @@ const (
 
 func (t *SnykClient) SBOMConvert(
 	ctx context.Context,
-	logger *zerolog.Logger,
+	log logger.Logger,
 	sbom io.Reader,
 	remoteRepoURL string,
 ) ([]*ScanResult, []*ConversionWarning, error) {
 	u, err := buildSBOMConvertAPIURL(t.apiBaseURL, sbomConvertAPIVersion, t.orgID, remoteRepoURL)
 	if err != nil {
-		logger.Printf("ERROR: failed to build SBOM convert API URL: %s\n", err)
+		log.Error(ctx, "Failed to build SBOM convert API URL", logger.Err(err))
 		return nil, nil, NewSCAError(err)
 	}
 
@@ -36,12 +36,12 @@ func (t *SnykClient) SBOMConvert(
 	writer := gzip.NewWriter(body)
 	_, err = io.Copy(writer, sbom)
 	if err != nil {
-		logger.Printf("ERROR: failed to compress SBOM content: %s\n", err)
+		log.Error(ctx, "Failed to compress SBOM content", logger.Err(err))
 		return nil, nil, NewSCAError(err)
 	}
 	err = writer.Close()
 	if err != nil {
-		logger.Printf("ERROR: failed to close gzip writer: %s\n", err)
+		log.Error(ctx, "Failed to close gzip writer", logger.Err(err))
 		return nil, nil, NewSCAError(err)
 	}
 
@@ -52,7 +52,7 @@ func (t *SnykClient) SBOMConvert(
 		body,
 	)
 	if err != nil {
-		logger.Printf("ERROR: failed to create HTTP request for SBOM conversion: %s\n", err)
+		log.Error(ctx, "Failed to create HTTP request for SBOM conversion", logger.Err(err))
 		return nil, nil, NewSCAError(err)
 	}
 
@@ -61,7 +61,7 @@ func (t *SnykClient) SBOMConvert(
 
 	resp, err := t.client.Do(req)
 	if err != nil {
-		logger.Printf("ERROR: failed to execute HTTP request for SBOM conversion: %s\n", err)
+		log.Error(ctx, "Failed to execute HTTP request for SBOM conversion", logger.Err(err))
 		return nil, nil, NewSCAError(err)
 	}
 	defer func() {
@@ -70,20 +70,20 @@ func (t *SnykClient) SBOMConvert(
 
 	if resp.StatusCode > 399 && resp.StatusCode < 500 {
 		reqErr := errorWithRequestID("request to analyze SBOM document was rejected", resp)
-		logger.Printf("ERROR: request to analyze SBOM document was rejected: %s\n", reqErr)
+		log.Error(ctx, "Request to analyze SBOM document was rejected", logger.Err(reqErr))
 		return nil, nil, NewSCAError(reqErr)
 	}
 
 	if resp.StatusCode > 499 {
 		reqErr := errorWithRequestID("analysis of SBOM document failed due to error", resp)
-		logger.Printf("ERROR: analysis of SBOM document failed due to error: %s\n", reqErr)
+		log.Error(ctx, "Analysis of SBOM document failed due to error", logger.Err(reqErr))
 		return nil, nil, NewSCAError(reqErr)
 	}
 
 	var convertResp SBOMConvertResponse
 	err = json.NewDecoder(resp.Body).Decode(&convertResp)
 	if err != nil {
-		logger.Printf("ERROR: failed to decode SBOM conversion response: %s\n", err)
+		log.Error(ctx, "Failed to decode SBOM conversion response", logger.Err(err))
 		return nil, nil, NewSCAError(err)
 	}
 

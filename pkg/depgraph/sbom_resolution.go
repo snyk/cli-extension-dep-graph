@@ -14,6 +14,7 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/internal/uv"
+	ecosystemslogger "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
@@ -84,13 +85,14 @@ func handleSBOMResolutionDI(
 	}
 
 	// Generate Findings
+	pluginLogger := ecosystemslogger.NewFromZerolog(logger)
 	findings := []scaplugin.Finding{}
 	for _, sp := range scaPlugins {
 		f, err := sp.BuildFindingsFromDir(
 			ctx.Context(),
 			inputDir,
 			&pluginOptions,
-			logger,
+			pluginLogger,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error building findings: %w", err)

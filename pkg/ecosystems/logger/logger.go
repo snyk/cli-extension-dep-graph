@@ -20,7 +20,11 @@ func Attr(key string, value any) Field {
 
 // Err creates a Field for an error with the standard "error" key.
 func Err(err error) Field {
-	return Field{Key: "err_msg", Value: err.Error()}
+	var errMsg string
+	if err != nil {
+		errMsg = err.Error()
+	}
+	return Field{Key: "err_msg", Value: errMsg}
 }
 
 // Logger is an interface for logging that supports Info, Debug, and Error operations.
