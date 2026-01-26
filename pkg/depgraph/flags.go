@@ -36,6 +36,7 @@ const (
 	FlagUseSBOMResolution             = "use-sbom-resolution"
 	FlagPrintEffectiveGraph           = "effective-graph"
 	FlagPrintEffectiveGraphWithErrors = "effective-graph-with-errors"
+	FlagPrintGraphWithErrors          = "graph-with-errors"
 	FlagDotnetRuntimeResolution       = "dotnet-runtime-resolution"
 	FlagDotnetTargetFramework         = "dotnet-target-framework"
 )
@@ -70,8 +71,9 @@ func getFlagSet() *pflag.FlagSet {
 	flagSet.Int(FlagUnmanagedMaxDepth, 0, "Specify the maximum level of archive extraction for unmanaged scanning.")
 	flagSet.Bool(FlagIncludeProvenance, false, "Include checksums in purl to support package provenance.")
 	flagSet.Bool(FlagUseSBOMResolution, false, "Use SBOM resolution instead of legacy CLI.")
-	flagSet.Bool(FlagPrintEffectiveGraph, false, "Return the pruned dependency graph.")
-	flagSet.Bool(FlagPrintEffectiveGraphWithErrors, false, "Return errors in the pruned dependency graph output.")
+	flagSet.Bool(FlagPrintEffectiveGraph, false, "Return the pruned dependency graph in JSONL format.")
+	flagSet.Bool(FlagPrintEffectiveGraphWithErrors, false, "Return the pruned dependency with errors in JSONL format.")
+	flagSet.Bool(FlagPrintGraphWithErrors, false, "Return the full dependency graph with errors in JSONL format.")
 	flagSet.Bool(FlagDotnetRuntimeResolution, false, "Required. You must use this option when you test .NET projects using Runtime Resolution Scanning.")
 	flagSet.String(FlagDotnetTargetFramework, "",
 		"Optional. You may use this option if your solution contains multiple <TargetFramework> directives. "+

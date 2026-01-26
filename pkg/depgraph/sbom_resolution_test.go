@@ -1277,6 +1277,22 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Contains(t, capturedOutput, "2/4 potential projects failed to get dependencies",
 			"Output should include number of failed potential projects")
 	})
+
+	t.Run("executeLegacyWorkflow should default to effective-graph-with-errors when graph-with-errors is not set", func(t *testing.T) {
+		legacyConfig := invokeLegacyWorkflowAndGetConfig(t)
+
+		assert.False(t, legacyConfig.GetBool(FlagPrintGraphWithErrors))
+		assert.True(t, legacyConfig.GetBool(FlagPrintEffectiveGraphWithErrors))
+	})
+
+	t.Run("executeLegacyWorkflow should preserve graph-with-errors and not set effective-graph-with-errors", func(t *testing.T) {
+		legacyConfig := invokeLegacyWorkflowAndGetConfig(t, func(config configuration.Configuration) {
+			config.Set(FlagPrintGraphWithErrors, true)
+		})
+
+		assert.True(t, legacyConfig.GetBool(FlagPrintGraphWithErrors))
+		assert.False(t, legacyConfig.GetBool(FlagPrintEffectiveGraphWithErrors))
+	})
 }
 
 func Test_parseExcludeFlag(t *testing.T) {
@@ -1469,4 +1485,34 @@ func Test_getExclusionsFromFindings(t *testing.T) {
 			}
 		})
 	}
+}
+
+// invokeLegacyWorkflowAndGetConfig runs handleSBOMResolutionDI with an empty plugin
+// (which forces the legacy workflow path) and returns the config that was passed to
+// the legacy resolution handler. Optional configFns can modify the input config before invocation.
+func invokeLegacyWorkflowAndGetConfig(t *testing.T, configFns ...func(configuration.Configuration)) configuration.Configuration {
+	t.Helper()
+
+	ctx := setupTestContext(t, true)
+	for _, fn := range configFns {
+		fn(ctx.config)
+	}
+
+	dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+	resolutionHandler := NewCalledResolutionHandlerFunc(
+		[]workflow.Data{workflow.NewData(dataIdentifier, "application/json", []byte(`{"mock":"data"}`))},
+		nil,
+	)
+
+	_, err := handleSBOMResolutionDI(
+		ctx.invocationContext,
+		ctx.config,
+		&nopLogger,
+		[]scaplugin.SCAPlugin{&mockScaPlugin{}},
+		resolutionHandler.Func(),
+	)
+
+	require.NoError(t, err)
+	require.True(t, resolutionHandler.Called)
+	return resolutionHandler.Config
 }

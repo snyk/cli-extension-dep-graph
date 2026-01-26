@@ -288,7 +288,13 @@ func executeLegacyWorkflow(
 ) ([]workflow.Data, error) {
 	legacyConfig := config.Clone()
 	legacyConfig.Unset(FlagPrintEffectiveGraph)
-	legacyConfig.Set(FlagPrintEffectiveGraphWithErrors, true)
+
+	// Ensure that we print the graph with errors as JSONL.
+	// Either FlagPrintGraphWithErrors or FlagPrintEffectiveGraphWithErrors must be set, with the latter
+	// ensuring that graphs are returned pruned (for testing), and the former unpruned (for SBOM output).
+	if !config.GetBool(FlagPrintGraphWithErrors) {
+		legacyConfig.Set(FlagPrintEffectiveGraphWithErrors, true)
+	}
 
 	legacyData, err := depGraphWorkflowFunc(ctx, legacyConfig, logger)
 	if err == nil {

@@ -257,6 +257,36 @@ func Test_LegacyResolution(t *testing.T) {
 		verifyMeta(t, depGraphs[0], MetaKeyTarget, `{"key":"some target value"}`)
 	})
 
+	t.Run("should return full dep graphs in JSONL format when graph-with-errors is requested", func(t *testing.T) {
+		config.Set(FlagPrintGraphWithErrors, true)
+		config.Set(FlagPrintEffectiveGraph, false)
+		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+		data := workflow.NewData(dataIdentifier, contentTypeJSON, []byte(jsonlPayload))
+		engineMock.
+			EXPECT().
+			InvokeWithConfig(legacyWorkflowID, config).
+			Return([]workflow.Data{data}, nil).
+			Times(1)
+
+		depGraphs, err := handleLegacyResolution(invocationContextMock, config, &nopLogger)
+		require.Nil(t, err)
+
+		assert.Len(t, depGraphs, 1)
+
+		actualDepGraph, ok := depGraphs[0].GetPayload().([]byte)
+		require.True(t, ok, errMsgPayloadShouldBeByte)
+		assert.Contains(t, string(actualDepGraph), "npm")
+
+		verifyMeta(t, depGraphs[0], MetaKeyNormalisedTargetFile, "some normalised target file")
+		verifyMeta(t, depGraphs[0], MetaKeyTargetFileFromPlugin, "some target file from plugin")
+		verifyMeta(t, depGraphs[0], MetaKeyTarget, `{"key":"some target value"}`)
+
+		// Verify the CLI receives --print-graph-with-errors argument
+		testCmdArgs := config.Get(configuration.RAW_CMD_ARGS)
+		assert.Contains(t, testCmdArgs, "--print-graph-with-errors")
+		assert.NotContains(t, testCmdArgs, "--print-effective-graph")
+	})
+
 	t.Run("should error if no dependency graphs found", func(t *testing.T) {
 		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
 		data := workflow.NewData(dataIdentifier, contentTypeJSON, []byte{})

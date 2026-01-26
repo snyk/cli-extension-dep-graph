@@ -53,6 +53,10 @@ func chooseGraphArgument(config configuration.Configuration) (string, parsers.Ou
 		return "--print-effective-graph-with-errors", parsers.NewJSONL()
 	}
 
+	if config.GetBool(FlagPrintGraphWithErrors) {
+		return "--print-graph-with-errors", parsers.NewJSONL()
+	}
+
 	return "--print-graph", parsers.NewPlainText()
 }
 
