@@ -29,12 +29,28 @@ func normalizePackageName(name string) string {
 	return normalized
 }
 
-// packageInfo holds pre-computed package information to avoid redundant calculations.
-type packageInfo struct {
-	normalizedName string
-	version        string
-	nodeID         string
-	item           *InstallItem
+// packageLookup provides fast access to packages by normalized name using indices
+type packageLookup struct {
+	nameToIndex map[string]int
+	install     []InstallItem
+}
+
+// findPackage returns the install item for a normalized package name, or nil if not found
+func (pl *packageLookup) findPackage(normalizedName string) *InstallItem {
+	if index, exists := pl.nameToIndex[normalizedName]; exists {
+		return &pl.install[index]
+	}
+	return nil
+}
+
+// getNodeID generates the node ID for a package without storing it
+func getNodeID(item *InstallItem) string {
+	normalizedName := normalizePackageName(item.Metadata.Name)
+	version := item.Metadata.Version
+	if version == "" {
+		version = "?"
+	}
+	return normalizedName + "@" + version
 }
 
 // ToDependencyGraph converts a pip install Report into a DepGraph using the dep-graph builder.
@@ -56,62 +72,41 @@ func (r *Report) ToDependencyGraph(ctx context.Context, log logger.Logger) (*dep
 		return nil, fmt.Errorf("failed to create depgraph builder: %w", err)
 	}
 
-	// Build package index by normalized name
-	packageByName := make(map[string]*packageInfo, numPackages)
+	// Build lightweight package lookup using only indices (no data duplication)
+	lookup := &packageLookup{
+		nameToIndex: make(map[string]int, numPackages),
+		install:     r.Install,
+	}
 	for i := range r.Install {
 		item := &r.Install[i]
-
 		normalizedName := normalizePackageName(item.Metadata.Name)
-		version := item.Metadata.Version
-		if version == "" {
+		lookup.nameToIndex[normalizedName] = i
+
+		if item.Metadata.Version == "" {
 			log.Debug(ctx, "Package has empty version, using fallback",
 				logger.Attr("package", item.Metadata.Name))
-			version = "?"
-		}
-		nodeID := normalizedName + "@" + version
-
-		packageByName[normalizedName] = &packageInfo{
-			normalizedName: normalizedName,
-			version:        version,
-			nodeID:         nodeID,
-			item:           item,
 		}
 	}
 
-	// Collect direct dependencies
-	var directDeps []*packageInfo
-	for _, info := range packageByName {
-		if info.item.IsDirectDependency() {
-			directDeps = append(directDeps, info)
+	// Collect direct dependencies (just normalized names, no struct allocation)
+	var directDeps []string
+	for i := range r.Install {
+		item := &r.Install[i]
+		if item.IsDirectDependency() {
+			normalizedName := normalizePackageName(item.Metadata.Name)
+			directDeps = append(directDeps, normalizedName)
 		}
 	}
 
-	// Create virtual root package info for DFS starting point
-	rootPkg := &packageInfo{
-		normalizedName: "root",
-		version:        "0.0.0",
-		nodeID:         builder.GetRootNode().NodeID,
-		item: &InstallItem{
-			Metadata: PackageMetadata{
-				Name:    "root",
-				Version: "0.0.0",
-			},
-		},
-	}
+	// Sort direct dependencies for deterministic traversal order
+	sort.Strings(directDeps)
 
-	// Build dependency list for root (direct dependencies)
-	rootDeps := make([]string, 0, len(directDeps))
-	for _, dep := range directDeps {
-		rootDeps = append(rootDeps, dep.normalizedName)
-	}
-	// Sort for deterministic traversal order
-	sort.Strings(rootDeps)
-
-	// DFS traversal with pruning
+	// DFS traversal with pruning - process directly from lookup
 	// - visited: per-path set for cycle detection (nil = create fresh for each top-level)
 	// - processed: tracks nodes whose children have already been added (prevent duplicate edges)
 	processed := make(map[string]bool)
-	if err := dfsVisit(builder, packageByName, rootPkg, rootDeps, nil, processed); err != nil {
+	rootNodeID := builder.GetRootNode().NodeID
+	if err := dfsVisitDirect(builder, lookup, rootNodeID, directDeps, nil, processed); err != nil {
 		return nil, err
 	}
 
@@ -122,27 +117,26 @@ func (r *Report) ToDependencyGraph(ctx context.Context, log logger.Logger) (*dep
 	return builder.Build(), nil
 }
 
-// dfsVisit performs depth-first traversal to build the dependency graph.
+// dfsVisitDirect performs depth-first traversal to build the dependency graph using direct lookup.
 // Parameters:
 //   - visited: per-path set for cycle detection. When nil (root call), each top-level dep gets fresh set.
 //   - processed: tracks nodes whose children have already been added (prevents duplicate edges).
-func dfsVisit(
+func dfsVisitDirect(
 	builder *depgraph.Builder,
-	packageByName map[string]*packageInfo,
-	pkg *packageInfo,
+	lookup *packageLookup,
+	parentID string,
 	depNames []string,
 	visited map[string]bool,
 	processed map[string]bool,
 ) error {
-	parentID := pkg.nodeID
-
 	for _, depName := range depNames {
-		depInfo, found := packageByName[normalizePackageName(depName)]
-		if !found {
+		normalizedDepName := normalizePackageName(depName)
+		depItem := lookup.findPackage(normalizedDepName)
+		if depItem == nil {
 			continue
 		}
 
-		childID := depInfo.nodeID // e.g., "python-dateutil@2.8.2"
+		childID := getNodeID(depItem) // e.g., "python-dateutil@2.8.2"
 
 		// Create a new set for each top-level dep, or use the shared set for recursive calls
 		localVisited := visited
@@ -154,10 +148,15 @@ func dfsVisit(
 		if localVisited[childID] {
 			// Create pruned node with :pruned suffix (matches TypeScript pipenv-parser)
 			prunedNodeID := fmt.Sprintf("%s:pruned", childID)
+			normalizedName := normalizePackageName(depItem.Metadata.Name)
+			version := depItem.Metadata.Version
+			if version == "" {
+				version = "?"
+			}
 
 			builder.AddNode(prunedNodeID, &depgraph.PkgInfo{
-				Name:    depInfo.normalizedName,
-				Version: depInfo.version,
+				Name:    normalizedName,
+				Version: version,
 			}, depgraph.WithNodeInfo(&depgraph.NodeInfo{
 				Labels: map[string]string{"pruned": "true"},
 			}))
@@ -169,9 +168,15 @@ func dfsVisit(
 		}
 
 		// Add node and connect to parent
+		normalizedName := normalizePackageName(depItem.Metadata.Name)
+		version := depItem.Metadata.Version
+		if version == "" {
+			version = "?"
+		}
+
 		builder.AddNode(childID, &depgraph.PkgInfo{
-			Name:    depInfo.normalizedName,
-			Version: depInfo.version,
+			Name:    normalizedName,
+			Version: version,
 		})
 
 		if err := builder.ConnectNodes(parentID, childID); err != nil {
@@ -187,9 +192,9 @@ func dfsVisit(
 			processed[childID] = true
 
 			// Get dependencies for this package (sorted for deterministic order)
-			childDepNames := extractDepNamesWithExtras(depInfo.item.Metadata.RequiresDist, depInfo.item.RequestedExtras)
+			childDepNames := extractDepNamesWithExtras(depItem.Metadata.RequiresDist, depItem.RequestedExtras)
 			sort.Strings(childDepNames)
-			if err := dfsVisit(builder, packageByName, depInfo, childDepNames, localVisited, processed); err != nil {
+			if err := dfsVisitDirect(builder, lookup, childID, childDepNames, localVisited, processed); err != nil {
 				return err
 			}
 		}

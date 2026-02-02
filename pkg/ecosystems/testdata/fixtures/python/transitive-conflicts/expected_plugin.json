@@ -28,10 +28,10 @@
           }
         },
         {
-          "id": "jmespath@1.0.1",
+          "id": "jmespath@1.1.0",
           "info": {
             "name": "jmespath",
-            "version": "1.0.1"
+            "version": "1.1.0"
           }
         },
         {
@@ -70,10 +70,10 @@
           }
         },
         {
-          "id": "certifi@2025.11.12",
+          "id": "certifi@2026.1.4",
           "info": {
             "name": "certifi",
-            "version": "2025.11.12"
+            "version": "2026.1.4"
           }
         },
         {
@@ -114,7 +114,7 @@
                 "nodeId": "botocore@1.31.85"
               },
               {
-                "nodeId": "jmespath@1.0.1:pruned"
+                "nodeId": "jmespath@1.1.0:pruned"
               },
               {
                 "nodeId": "s3transfer@0.6.2"
@@ -126,7 +126,7 @@
             "pkgId": "botocore@1.31.85",
             "deps": [
               {
-                "nodeId": "jmespath@1.0.1"
+                "nodeId": "jmespath@1.1.0"
               },
               {
                 "nodeId": "python-dateutil@2.9.0.post0"
@@ -137,8 +137,8 @@
             ]
           },
           {
-            "nodeId": "jmespath@1.0.1",
-            "pkgId": "jmespath@1.0.1",
+            "nodeId": "jmespath@1.1.0",
+            "pkgId": "jmespath@1.1.0",
             "deps": []
           },
           {
@@ -161,8 +161,8 @@
             "deps": []
           },
           {
-            "nodeId": "jmespath@1.0.1:pruned",
-            "pkgId": "jmespath@1.0.1",
+            "nodeId": "jmespath@1.1.0:pruned",
+            "pkgId": "jmespath@1.1.0",
             "info": {
               "labels": {
                 "pruned": "true"
@@ -194,7 +194,7 @@
             "pkgId": "requests@2.31.0",
             "deps": [
               {
-                "nodeId": "certifi@2025.11.12"
+                "nodeId": "certifi@2026.1.4"
               },
               {
                 "nodeId": "charset-normalizer@3.4.4"
@@ -208,8 +208,8 @@
             ]
           },
           {
-            "nodeId": "certifi@2025.11.12",
-            "pkgId": "certifi@2025.11.12",
+            "nodeId": "certifi@2026.1.4",
+            "pkgId": "certifi@2026.1.4",
             "deps": []
           },
           {
