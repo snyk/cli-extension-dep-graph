@@ -35,10 +35,10 @@
           }
         },
         {
-          "id": "packaging@25.0",
+          "id": "packaging@26.0",
           "info": {
             "name": "packaging",
-            "version": "25.0"
+            "version": "26.0"
           }
         },
         {
@@ -56,10 +56,10 @@
           }
         },
         {
-          "id": "tomli@2.3.0",
+          "id": "tomli@2.4.0",
           "info": {
             "name": "tomli",
-            "version": "2.3.0"
+            "version": "2.4.0"
           }
         },
         {
@@ -77,10 +77,10 @@
           }
         },
         {
-          "id": "certifi@2025.11.12",
+          "id": "certifi@2026.1.4",
           "info": {
             "name": "certifi",
-            "version": "2025.11.12"
+            "version": "2026.1.4"
           }
         },
         {
@@ -131,7 +131,7 @@
                 "nodeId": "mypy-extensions@1.1.0"
               },
               {
-                "nodeId": "packaging@25.0"
+                "nodeId": "packaging@26.0"
               },
               {
                 "nodeId": "pathspec@0.12.1"
@@ -140,7 +140,7 @@
                 "nodeId": "platformdirs@4.3.6"
               },
               {
-                "nodeId": "tomli@2.3.0"
+                "nodeId": "tomli@2.4.0"
               },
               {
                 "nodeId": "typing-extensions@4.13.2"
@@ -158,8 +158,8 @@
             "deps": []
           },
           {
-            "nodeId": "packaging@25.0",
-            "pkgId": "packaging@25.0",
+            "nodeId": "packaging@26.0",
+            "pkgId": "packaging@26.0",
             "deps": []
           },
           {
@@ -173,8 +173,8 @@
             "deps": []
           },
           {
-            "nodeId": "tomli@2.3.0",
-            "pkgId": "tomli@2.3.0",
+            "nodeId": "tomli@2.4.0",
+            "pkgId": "tomli@2.4.0",
             "deps": []
           },
           {
@@ -187,7 +187,7 @@
             "pkgId": "requests@2.31.0",
             "deps": [
               {
-                "nodeId": "certifi@2025.11.12"
+                "nodeId": "certifi@2026.1.4"
               },
               {
                 "nodeId": "charset-normalizer@3.4.4"
@@ -201,8 +201,8 @@
             ]
           },
           {
-            "nodeId": "certifi@2025.11.12",
-            "pkgId": "certifi@2025.11.12",
+            "nodeId": "certifi@2026.1.4",
+            "pkgId": "certifi@2026.1.4",
             "deps": []
           },
           {

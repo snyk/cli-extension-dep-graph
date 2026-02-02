@@ -21,10 +21,10 @@
           }
         },
         {
-          "id": "certifi@2025.11.12",
+          "id": "certifi@2026.1.4",
           "info": {
             "name": "certifi",
-            "version": "2025.11.12"
+            "version": "2026.1.4"
           }
         },
         {
@@ -66,7 +66,7 @@
             "pkgId": "requests@2.31.0",
             "deps": [
               {
-                "nodeId": "certifi@2025.11.12"
+                "nodeId": "certifi@2026.1.4"
               },
               {
                 "nodeId": "charset-normalizer@3.4.4"
@@ -80,8 +80,8 @@
             ]
           },
           {
-            "nodeId": "certifi@2025.11.12",
-            "pkgId": "certifi@2025.11.12",
+            "nodeId": "certifi@2026.1.4",
+            "pkgId": "certifi@2026.1.4",
             "deps": []
           },
           {

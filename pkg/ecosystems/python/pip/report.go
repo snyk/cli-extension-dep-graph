@@ -42,6 +42,19 @@ type PackageMetadata struct {
 	RequiresDist []string `json:"requires_dist"` // List of dependencies (e.g., "urllib3 (<3,>=1.21.1)")
 }
 
+func (p *PackageMetadata) GetNormalizePackageName() string {
+	normalized := strings.ToLower(p.Name)
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	return normalized
+}
+
+func (p *PackageMetadata) GetNormalizeVersion() string {
+	if p.Version == "" {
+		return "?"
+	}
+	return p.Version
+}
+
 // GetInstallReport runs pip install with --dry-run and --report flags to get
 // a JSON report of what would be installed from a requirements file.
 // No files are written to disk; the report is captured from stdout.
