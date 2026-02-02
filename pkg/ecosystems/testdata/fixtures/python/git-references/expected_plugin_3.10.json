@@ -35,17 +35,17 @@
           }
         },
         {
-          "id": "packaging@25.0",
+          "id": "packaging@26.0",
           "info": {
             "name": "packaging",
-            "version": "25.0"
+            "version": "26.0"
           }
         },
         {
-          "id": "pathspec@0.12.1",
+          "id": "pathspec@1.0.4",
           "info": {
             "name": "pathspec",
-            "version": "0.12.1"
+            "version": "1.0.4"
           }
         },
         {
@@ -56,10 +56,10 @@
           }
         },
         {
-          "id": "tomli@2.3.0",
+          "id": "tomli@2.4.0",
           "info": {
             "name": "tomli",
-            "version": "2.3.0"
+            "version": "2.4.0"
           }
         },
         {
@@ -77,10 +77,10 @@
           }
         },
         {
-          "id": "certifi@2025.11.12",
+          "id": "certifi@2026.1.4",
           "info": {
             "name": "certifi",
-            "version": "2025.11.12"
+            "version": "2026.1.4"
           }
         },
         {
@@ -98,10 +98,10 @@
           }
         },
         {
-          "id": "urllib3@2.6.2",
+          "id": "urllib3@2.6.3",
           "info": {
             "name": "urllib3",
-            "version": "2.6.2"
+            "version": "2.6.3"
           }
         }
       ],
@@ -131,16 +131,16 @@
                 "nodeId": "mypy-extensions@1.1.0"
               },
               {
-                "nodeId": "packaging@25.0"
+                "nodeId": "packaging@26.0"
               },
               {
-                "nodeId": "pathspec@0.12.1"
+                "nodeId": "pathspec@1.0.4"
               },
               {
                 "nodeId": "platformdirs@4.5.1"
               },
               {
-                "nodeId": "tomli@2.3.0"
+                "nodeId": "tomli@2.4.0"
               },
               {
                 "nodeId": "typing-extensions@4.15.0"
@@ -158,13 +158,13 @@
             "deps": []
           },
           {
-            "nodeId": "packaging@25.0",
-            "pkgId": "packaging@25.0",
+            "nodeId": "packaging@26.0",
+            "pkgId": "packaging@26.0",
             "deps": []
           },
           {
-            "nodeId": "pathspec@0.12.1",
-            "pkgId": "pathspec@0.12.1",
+            "nodeId": "pathspec@1.0.4",
+            "pkgId": "pathspec@1.0.4",
             "deps": []
           },
           {
@@ -173,8 +173,8 @@
             "deps": []
           },
           {
-            "nodeId": "tomli@2.3.0",
-            "pkgId": "tomli@2.3.0",
+            "nodeId": "tomli@2.4.0",
+            "pkgId": "tomli@2.4.0",
             "deps": []
           },
           {
@@ -187,7 +187,7 @@
             "pkgId": "requests@2.31.0",
             "deps": [
               {
-                "nodeId": "certifi@2025.11.12"
+                "nodeId": "certifi@2026.1.4"
               },
               {
                 "nodeId": "charset-normalizer@3.4.4"
@@ -196,13 +196,13 @@
                 "nodeId": "idna@3.11"
               },
               {
-                "nodeId": "urllib3@2.6.2"
+                "nodeId": "urllib3@2.6.3"
               }
             ]
           },
           {
-            "nodeId": "certifi@2025.11.12",
-            "pkgId": "certifi@2025.11.12",
+            "nodeId": "certifi@2026.1.4",
+            "pkgId": "certifi@2026.1.4",
             "deps": []
           },
           {
@@ -216,8 +216,8 @@
             "deps": []
           },
           {
-            "nodeId": "urllib3@2.6.2",
-            "pkgId": "urllib3@2.6.2",
+            "nodeId": "urllib3@2.6.3",
+            "pkgId": "urllib3@2.6.3",
             "deps": []
           }
         ]

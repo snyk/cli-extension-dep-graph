@@ -29,13 +29,13 @@ func normalizePackageName(name string) string {
 	return normalized
 }
 
-// packageLookup provides fast access to packages by normalized name using indices
+// packageLookup provides fast access to packages by normalized name using indices.
 type packageLookup struct {
 	nameToIndex map[string]int
 	install     []InstallItem
 }
 
-// findPackage returns the install item for a normalized package name, or nil if not found
+// findPackage returns the install item for a normalized package name, or nil if not found.
 func (pl *packageLookup) findPackage(normalizedName string) *InstallItem {
 	if index, exists := pl.nameToIndex[normalizedName]; exists {
 		return &pl.install[index]
@@ -43,7 +43,7 @@ func (pl *packageLookup) findPackage(normalizedName string) *InstallItem {
 	return nil
 }
 
-// getNodeID generates the node ID for a package without storing it
+// getNodeID generates the node ID for a package without storing it.
 func getNodeID(item *InstallItem) string {
 	normalizedName := normalizePackageName(item.Metadata.Name)
 	version := item.Metadata.Version
