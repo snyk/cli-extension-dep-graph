@@ -45,12 +45,7 @@ func (pl *packageLookup) findPackage(normalizedName string) *InstallItem {
 
 // getNodeID generates the node ID for a package without storing it.
 func getNodeID(item *InstallItem) string {
-	normalizedName := normalizePackageName(item.Metadata.Name)
-	version := item.Metadata.Version
-	if version == "" {
-		version = "?"
-	}
-	return normalizedName + "@" + version
+	return item.Metadata.GetNormalizePackageName() + "@" + item.Metadata.GetNormalizeVersion()
 }
 
 // ToDependencyGraph converts a pip install Report into a DepGraph using the dep-graph builder.
@@ -79,7 +74,7 @@ func (r *Report) ToDependencyGraph(ctx context.Context, log logger.Logger) (*dep
 	}
 	for i := range r.Install {
 		item := &r.Install[i]
-		normalizedName := normalizePackageName(item.Metadata.Name)
+		normalizedName := item.Metadata.GetNormalizePackageName()
 		lookup.nameToIndex[normalizedName] = i
 
 		if item.Metadata.Version == "" {
@@ -93,7 +88,7 @@ func (r *Report) ToDependencyGraph(ctx context.Context, log logger.Logger) (*dep
 	for i := range r.Install {
 		item := &r.Install[i]
 		if item.IsDirectDependency() {
-			normalizedName := normalizePackageName(item.Metadata.Name)
+			normalizedName := item.Metadata.GetNormalizePackageName()
 			directDeps = append(directDeps, normalizedName)
 		}
 	}
@@ -148,11 +143,8 @@ func dfsVisitDirect(
 		if localVisited[childID] {
 			// Create pruned node with :pruned suffix (matches TypeScript pipenv-parser)
 			prunedNodeID := fmt.Sprintf("%s:pruned", childID)
-			normalizedName := normalizePackageName(depItem.Metadata.Name)
-			version := depItem.Metadata.Version
-			if version == "" {
-				version = "?"
-			}
+			normalizedName := depItem.Metadata.GetNormalizePackageName()
+			version := depItem.Metadata.GetNormalizeVersion()
 
 			builder.AddNode(prunedNodeID, &depgraph.PkgInfo{
 				Name:    normalizedName,
@@ -168,11 +160,8 @@ func dfsVisitDirect(
 		}
 
 		// Add node and connect to parent
-		normalizedName := normalizePackageName(depItem.Metadata.Name)
-		version := depItem.Metadata.Version
-		if version == "" {
-			version = "?"
-		}
+		normalizedName := depItem.Metadata.GetNormalizePackageName()
+		version := depItem.Metadata.GetNormalizeVersion()
 
 		builder.AddNode(childID, &depgraph.PkgInfo{
 			Name:    normalizedName,
