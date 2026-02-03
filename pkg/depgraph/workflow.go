@@ -3,7 +3,10 @@ package depgraph
 import (
 	"fmt"
 
+	"github.com/snyk/go-application-framework/pkg/local_workflows/config_utils"
 	"github.com/snyk/go-application-framework/pkg/workflow"
+
+	"github.com/snyk/cli-extension-dep-graph/internal/constants"
 )
 
 const (
@@ -31,6 +34,12 @@ func Init(engine workflow.Engine) error {
 	if err != nil {
 		return fmt.Errorf("failed to register workflow: %w", err)
 	}
+
+	// SBOM support FF.
+	config_utils.AddFeatureFlagsToConfig(engine, map[string]string{
+		constants.FeatureFlagShowMavenBuildScope: constants.ShowMavenBuildScope,
+		constants.FeatureFlagShowNpmScope:        constants.ShowNpmScope,
+	})
 
 	return nil
 }
