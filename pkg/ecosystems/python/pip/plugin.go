@@ -150,7 +150,7 @@ func (p Plugin) buildDepGraphFromFile(
 	}
 
 	// Convert report to dependency graph
-	depGraph, err := report.ToDependencyGraph(ctx, log, "pip")
+	depGraph, err := report.ToDependencyGraph(ctx, log, PkgManagerPip)
 	if err != nil {
 		return ecosystems.SCAResult{}, fmt.Errorf("failed to convert pip report to dependency graph for %s: %w", file.RelPath, err)
 	}

@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	snykecosystems "github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/prchecks"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 
@@ -159,9 +160,10 @@ func (p Plugin) buildDepGraphFromPipfile(
 	if _, statErr := os.Stat(lockfilePath); statErr == nil {
 		lockfile, err = ParsePipfileLock(lockfilePath)
 		if err != nil {
-			log.Error(ctx, "Failed to parse Pipfile.lock, proceeding without constraints",
-				logger.Attr(logFieldFile, lockfilePath),
-				logger.Err(err))
+			return ecosystems.SCAResult{}, snykecosystems.NewUnparseableLockFileError(
+				fmt.Sprintf("Failed to parse Pipfile.lock: %v", err),
+				snyk_errors.WithCause(err),
+			)
 		}
 	} else if os.IsNotExist(statErr) {
 		return ecosystems.SCAResult{}, prchecks.NewManifestNotFoundError(
@@ -177,7 +179,7 @@ func (p Plugin) buildDepGraphFromPipfile(
 	}
 
 	// Convert report to dependency graph
-	depGraph, err := report.ToDependencyGraph(ctx, log, "pipenv")
+	depGraph, err := report.ToDependencyGraph(ctx, log, pip.PkgManagerPipenv)
 	if err != nil {
 		return ecosystems.SCAResult{}, fmt.Errorf("failed to convert pip report to dependency graph: %w", err)
 	}
