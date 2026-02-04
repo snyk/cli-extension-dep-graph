@@ -73,7 +73,7 @@ func TestReport_ToDependencyGraph(t *testing.T) {
 			},
 		}
 
-		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop())
+		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop(), "pip")
 		require.NoError(t, err)
 		require.NotNil(t, dg)
 
@@ -137,7 +137,7 @@ func TestReport_ToDependencyGraph(t *testing.T) {
 			},
 		}
 
-		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop())
+		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop(), "pip")
 		require.NoError(t, err)
 		require.NotNil(t, dg)
 
@@ -183,7 +183,7 @@ func TestReport_ToDependencyGraph(t *testing.T) {
 			},
 		}
 
-		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop())
+		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop(), "pip")
 		require.NoError(t, err)
 		require.NotNil(t, dg)
 
@@ -199,7 +199,7 @@ func TestReport_ToDependencyGraph(t *testing.T) {
 			Install: []InstallItem{},
 		}
 
-		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop())
+		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop(), "pip")
 		require.NoError(t, err)
 		require.NotNil(t, dg)
 
@@ -210,7 +210,7 @@ func TestReport_ToDependencyGraph(t *testing.T) {
 
 	t.Run("nil report", func(t *testing.T) {
 		var report *Report
-		_, err := report.ToDependencyGraph(context.Background(), logger.Nop())
+		_, err := report.ToDependencyGraph(context.Background(), logger.Nop(), "pip")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot be nil")
 	})
@@ -268,7 +268,7 @@ func TestReport_ToDependencyGraph(t *testing.T) {
 			},
 		}
 
-		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop())
+		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop(), "pip")
 		require.NoError(t, err)
 		require.NotNil(t, dg)
 
@@ -330,7 +330,7 @@ func TestReport_ToDependencyGraph(t *testing.T) {
 			},
 		}
 
-		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop())
+		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop(), "pip")
 		require.NoError(t, err)
 		require.NotNil(t, dg)
 
@@ -388,7 +388,7 @@ func TestToDependencyGraph_PruningBehavior(t *testing.T) {
 			},
 		}
 
-		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop())
+		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop(), "pip")
 		require.NoError(t, err)
 
 		// Find pkg-a's deps
@@ -452,7 +452,7 @@ func TestToDependencyGraph_PruningBehavior(t *testing.T) {
 			},
 		}
 
-		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop())
+		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop(), "pip")
 		require.NoError(t, err)
 
 		// Find pkg-a and pkg-b deps
@@ -515,7 +515,7 @@ func TestToDependencyGraph_PruningBehavior(t *testing.T) {
 			},
 		}
 
-		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop())
+		dg, err := report.ToDependencyGraph(context.Background(), logger.Nop(), "pip")
 		require.NoError(t, err)
 
 		// Find pkg-c's deps - should only have ONE pkg-d, not duplicated

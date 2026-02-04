@@ -57,36 +57,62 @@ func (p *PackageMetadata) GetNormalizeVersion() string {
 
 // GetInstallReport runs pip install with --dry-run and --report flags to get
 // a JSON report of what would be installed from a requirements file.
-// No files are written to disk; the report is captured from stdout.
-//
-// This is a convenience wrapper around GetInstallReportWithExecutor that uses
-// the default executor. For testing, use GetInstallReportWithExecutor directly.
 func GetInstallReport(ctx context.Context, requirementsFile string, noBuildIsolation bool) (*Report, error) {
 	return GetInstallReportWithExecutor(ctx, requirementsFile, noBuildIsolation, &DefaultExecutor{})
 }
 
 // GetInstallReportWithExecutor is a testable version that accepts a CommandExecutor.
+func GetInstallReportWithExecutor(ctx context.Context, requirementsFile string, noBuildIsolation bool, executor CommandExecutor) (*Report, error) {
+	if requirementsFile == "" {
+		return nil, fmt.Errorf("requirements file path cannot be empty")
+	}
+	return runPipInstall(ctx, []string{"-r", requirementsFile}, nil, noBuildIsolation, executor)
+}
+
+// GetInstallReportFromPackages runs pip install with --dry-run and --report flags,
+// passing packages directly as command arguments instead of using a requirements file.
+// Constraints are passed via stdin using /dev/stdin as the constraint file path.
+func GetInstallReportFromPackages(ctx context.Context, packages, constraints []string, noBuildIsolation bool) (*Report, error) {
+	return GetInstallReportFromPackagesWithExecutor(ctx, packages, constraints, noBuildIsolation, &DefaultExecutor{})
+}
+
+// GetInstallReportFromPackagesWithExecutor is a testable version that accepts a CommandExecutor.
+func GetInstallReportFromPackagesWithExecutor(
+	ctx context.Context,
+	packages, constraints []string,
+	noBuildIsolation bool,
+	executor CommandExecutor,
+) (*Report, error) {
+	if len(packages) == 0 {
+		return nil, fmt.Errorf("packages list cannot be empty")
+	}
+	return runPipInstall(ctx, packages, constraints, noBuildIsolation, executor)
+}
+
+// runPipInstall executes pip install --dry-run and returns the parsed report.
 // It runs pip install with the following flags:
 //   - --dry-run: Don't actually install anything
 //   - --ignore-installed: Show all packages, not just new ones
 //   - --report -: Output JSON report to stdout (dash means stdout)
 //   - --quiet: Suppress non-error output (except the report)
-//   - -r: Read from requirements file
 //   - --no-build-isolation: Disable build isolation when noBuildIsolation is true
 //   - --index-url: Custom PyPI index (if PIP_TEST_INDEX_URL is set)
-func GetInstallReportWithExecutor(ctx context.Context, requirementsFile string, noBuildIsolation bool, executor CommandExecutor) (*Report, error) {
-	if requirementsFile == "" {
-		return nil, fmt.Errorf("requirements file path cannot be empty")
-	}
-
-	// Build pip command arguments
+func runPipInstall(ctx context.Context, packageArgs, constraints []string, noBuildIsolation bool, executor CommandExecutor) (*Report, error) {
 	args := []string{
 		"install",
 		"--dry-run",
 		"--ignore-installed",
 		"--report", "-",
 		"--quiet",
-		"-r", requirementsFile,
+	}
+
+	args = append(args, packageArgs...)
+
+	// Add constraints via /dev/stdin if we have any
+	var stdinData string
+	if len(constraints) > 0 {
+		args = append(args, "-c", "/dev/stdin")
+		stdinData = strings.Join(constraints, "\n")
 	}
 
 	if noBuildIsolation {
@@ -98,13 +124,11 @@ func GetInstallReportWithExecutor(ctx context.Context, requirementsFile string, 
 		args = append(args, "--index-url", indexURL)
 	}
 
-	// Execute the command
-	output, err := executor.Execute(ctx, "pip", args...)
+	output, err := executor.Execute(ctx, stdinData, "pip", args...)
 	if err != nil {
-		return nil, classifyPipError(err)
+		return nil, classifyPipError(ctx, err)
 	}
 
-	// Parse the JSON report
 	var report Report
 	if err := json.Unmarshal(output, &report); err != nil {
 		return nil, fmt.Errorf("failed to parse pip report: %w", err)
@@ -116,20 +140,24 @@ func GetInstallReportWithExecutor(ctx context.Context, requirementsFile string, 
 // CommandExecutor is an interface for executing commands.
 // This allows for dependency injection and easier testing.
 type CommandExecutor interface {
-	Execute(ctx context.Context, name string, args ...string) ([]byte, error)
+	Execute(ctx context.Context, stdin, name string, args ...string) ([]byte, error)
 }
 
 // DefaultExecutor uses os/exec to run commands.
 type DefaultExecutor struct{}
 
-// Execute runs a command and returns its stdout output.
-func (e *DefaultExecutor) Execute(ctx context.Context, name string, args ...string) ([]byte, error) {
+// Execute runs a command with optional stdin input and returns its stdout output.
+func (e *DefaultExecutor) Execute(ctx context.Context, stdin, name string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
+	}
 
 	if err := cmd.Run(); err != nil {
 		return nil, &pipError{
@@ -158,18 +186,19 @@ func (e *pipError) Unwrap() error {
 // classifyPipError analyzes pip error output and returns appropriate error catalog error.
 //
 //nolint:gocyclo // Error classification requires checking multiple patterns sequentially
-func classifyPipError(err error) error {
+func classifyPipError(ctx context.Context, err error) error {
+	// Check for context cancellation or timeout early
+	if ctx.Err() != nil && errors.Is(ctx.Err(), context.Canceled) {
+		// User-initiated cancellation (e.g., Ctrl+C) - not a catalog error
+		return fmt.Errorf("pip install canceled: %w", ctx.Err())
+	}
+
 	var pipErr *pipError
 	if !errors.As(err, &pipErr) {
 		// Not a pip error, return as-is
 		return fmt.Errorf("pip install failed: %w", err)
 	}
 
-	// Check for context cancellation or timeout early
-	if errors.Is(pipErr.err, context.Canceled) {
-		// User-initiated cancellation (e.g., Ctrl+C) - not a catalog error
-		return fmt.Errorf("pip install canceled: %w", pipErr.err)
-	}
 	if errors.Is(pipErr.err, context.DeadlineExceeded) {
 		// Timeout - use catalog timeout error
 		return snyk.NewTimeoutError(
