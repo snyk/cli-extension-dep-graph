@@ -48,7 +48,7 @@ func (p Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *
 	}
 
 	// Get Python runtime version
-	pythonVersion, err := getPythonVersion()
+	pythonVersion, err := GetPythonVersion()
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect Python version: %w", err)
 	}
@@ -150,7 +150,7 @@ func (p Plugin) buildDepGraphFromFile(
 	}
 
 	// Convert report to dependency graph
-	depGraph, err := report.ToDependencyGraph(ctx, log)
+	depGraph, err := report.ToDependencyGraph(ctx, log, PkgManagerPip)
 	if err != nil {
 		return ecosystems.SCAResult{}, fmt.Errorf("failed to convert pip report to dependency graph for %s: %w", file.RelPath, err)
 	}
@@ -167,8 +167,8 @@ func (p Plugin) buildDepGraphFromFile(
 	}, nil
 }
 
-// getPythonVersion detects the installed Python version.
-func getPythonVersion() (string, error) {
+// GetPythonVersion detects the installed Python version.
+func GetPythonVersion() (string, error) {
 	// Try python3 first (more common on Unix systems)
 	if version, err := execPythonVersion("python3"); err == nil {
 		return version, nil

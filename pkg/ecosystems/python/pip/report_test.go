@@ -20,7 +20,7 @@ type MockExecutor struct {
 	Err    error
 }
 
-func (m *MockExecutor) Execute(_ context.Context, _ string, _ ...string) ([]byte, error) {
+func (m *MockExecutor) Execute(_ context.Context, _, _ string, _ ...string) ([]byte, error) {
 	return m.Output, m.Err
 }
 
@@ -155,7 +155,7 @@ func TestClassifyPipError(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := classifyPipError(tt.err)
+			err := classifyPipError(context.Background(), tt.err)
 
 			// Check for context error
 			if tt.wantContextErr != nil {

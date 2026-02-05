@@ -1,7 +1,7 @@
 //go:build integration && python
 // +build integration,python
 
-package pip
+package pipenv
 
 import (
 	"context"
@@ -20,15 +20,16 @@ import (
 	snykerrors "github.com/snyk/error-catalog-golang-public/snyk_errors"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pip"
 )
 
-// PluginTestCase defines a test case for the plugin
+// PluginTestCase defines a test case for the plugin.
 type PluginTestCase struct {
 	Fixture string                       // Fixture directory name
 	Options *ecosystems.SCAPluginOptions // Plugin options
 }
 
-// TestPlugin_BuildDepGraphsFromDir tests the plugin with various fixtures
+// TestPlugin_BuildDepGraphsFromDir tests the plugin with various fixtures.
 func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 	// Get Python version once for all tests
 	pythonVersion, err := getPythonMajorMinorVersion()
@@ -39,16 +40,12 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 
 	tests := map[string]PluginTestCase{
 		"single_requirements_at_root":        {Fixture: "simple", Options: ecosystems.NewPluginOptions()},
-		"empty_requirements":                 {Fixture: "empty", Options: ecosystems.NewPluginOptions()},
-		"multiple_dependencies":              {Fixture: "multiple-deps", Options: ecosystems.NewPluginOptions()},
+		"dev_deps":                           {Fixture: "simple-with-dev-deps", Options: ecosystems.NewPluginOptions().WithPipenvIncludeDev(true)},
 		"with_version_specifiers":            {Fixture: "with-version-specifiers", Options: ecosystems.NewPluginOptions()},
 		"with_extras":                        {Fixture: "with-extras", Options: ecosystems.NewPluginOptions()},
 		"os_specific_requirements":           {Fixture: "os-specific", Options: ecosystems.NewPluginOptions()},
-		"environment_markers":                {Fixture: "env-markers", Options: ecosystems.NewPluginOptions()},
 		"git_references":                     {Fixture: "git-references", Options: ecosystems.NewPluginOptions()},
-		"url_references":                     {Fixture: "url-references", Options: ecosystems.NewPluginOptions()},
 		"multiple_requirements_all_projects": {Fixture: "multi-requirements", Options: ecosystems.NewPluginOptions().WithAllProjects(true)},
-		"transitive_conflicts":               {Fixture: "transitive-conflicts", Options: ecosystems.NewPluginOptions()},
 	}
 
 	for name, tc := range tests {
@@ -78,7 +75,7 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 	}
 }
 
-// TestPlugin_Concurrency tests that concurrent execution works correctly
+// TestPlugin_Concurrency tests that concurrent execution works correctly.
 func TestPlugin_Concurrency(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
@@ -131,10 +128,10 @@ func TestPlugin_BuildDepGraphsFromDir_PipErrors(t *testing.T) {
 			expectedCode:          "SNYK-OS-PYTHON-0005",
 			expectedDetailSnippet: "Invalid syntax in requirements file",
 		},
-		"nonexistent_package": {
-			fixture:               "nonexistent-package",
-			expectedCode:          "SNYK-OS-PYTHON-0004",
-			expectedDetailSnippet: "Package not found",
+		"missing_lock": {
+			fixture:               "empty",
+			expectedCode:          "SNYK-PR-CHECK-0002",
+			expectedDetailSnippet: "Pipfile.lock not found",
 		},
 	}
 
@@ -155,7 +152,7 @@ func TestPlugin_BuildDepGraphsFromDir_PipErrors(t *testing.T) {
 			result := results[0]
 
 			// Basic metadata expectations
-			assert.Equal(t, "requirements.txt", result.Metadata.TargetFile)
+			assert.Equal(t, "Pipfile", result.Metadata.TargetFile)
 			if pythonVersion != "" {
 				assert.Contains(t, result.Metadata.Runtime, fmt.Sprintf("python@%s", pythonVersion))
 			}
@@ -168,32 +165,6 @@ func TestPlugin_BuildDepGraphsFromDir_PipErrors(t *testing.T) {
 			assert.Equal(t, tc.expectedCode, catalogErr.ErrorCode)
 			assert.Contains(t, catalogErr.Detail, tc.expectedDetailSnippet)
 		})
-	}
-}
-
-// TestPlugin_ContextCancellation tests that context cancellation is respected
-func TestPlugin_ContextCancellation(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately
-
-	fixturePath := filepath.Join("..", "..", "testdata", "fixtures", "python", "simple")
-	absPath, err := filepath.Abs(fixturePath)
-	require.NoError(t, err)
-
-	plugin := Plugin{}
-	results, err := plugin.BuildDepGraphsFromDir(ctx, absPath, ecosystems.NewPluginOptions())
-
-	// Should handle cancellation gracefully
-	if err != nil {
-		// If error returned, should be context cancellation
-		assert.ErrorIs(t, err, context.Canceled)
-	} else {
-		// If results returned, they should contain error
-		assert.Len(t, results, 1)
-		if results[0].Error != nil {
-			// Error might be wrapped
-			assert.Contains(t, results[0].Error.Error(), "context canceled")
-		}
 	}
 }
 
@@ -228,22 +199,28 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 
 	require.Len(t, actual, len(expected), "[%s] result count mismatch", fixtureName)
 
-	// Sort both by TargetFile for consistent comparison
+	// Sort both by first direct dependency name for consistent comparison
+	// This is more reliable than TargetFile since pip uses requirements.txt paths
+	// while pipenv uses Pipfile paths
 	sortActual := make([]ecosystems.SCAResult, len(actual))
 	copy(sortActual, actual)
 	sort.Slice(sortActual, func(i, j int) bool {
-		return sortActual[i].Metadata.TargetFile < sortActual[j].Metadata.TargetFile
+		return getFirstDirectDep(sortActual[i]) < getFirstDirectDep(sortActual[j])
 	})
 
 	sortExpected := make([]ecosystems.SCAResult, len(expected))
 	copy(sortExpected, expected)
 	sort.Slice(sortExpected, func(i, j int) bool {
-		return sortExpected[i].Metadata.TargetFile < sortExpected[j].Metadata.TargetFile
+		return getFirstDirectDep(sortExpected[i]) < getFirstDirectDep(sortExpected[j])
 	})
 
-	// Sync runtime field (varies by Python version) and clear Error field (not in JSON)
+	// Sync fields that vary between pip and pipenv (allows sharing fixtures)
 	for i := range sortExpected {
 		sortExpected[i].Metadata.Runtime = sortActual[i].Metadata.Runtime
+		sortExpected[i].Metadata.TargetFile = sortActual[i].Metadata.TargetFile
+		if sortExpected[i].DepGraph != nil && sortActual[i].DepGraph != nil {
+			sortExpected[i].DepGraph.PkgManager = sortActual[i].DepGraph.PkgManager
+		}
 		sortActual[i].Error = nil // Error field isn't in expected JSON
 	}
 
@@ -255,6 +232,20 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 	require.NoError(t, err, "[%s] failed to marshal expected results", fixtureName)
 
 	assert.JSONEq(t, string(expectedJSON), string(actualJSON), "[%s] results mismatch", fixtureName)
+}
+
+// getFirstDirectDep returns the name of the first direct dependency in the graph for sorting purposes.
+// This provides a stable sort key that's consistent between pip and pipenv results.
+func getFirstDirectDep(result ecosystems.SCAResult) string {
+	if result.DepGraph == nil || len(result.DepGraph.Graph.Nodes) == 0 {
+		return ""
+	}
+	for _, node := range result.DepGraph.Graph.Nodes {
+		if node.NodeID == "root-node" && len(node.Deps) > 0 {
+			return node.Deps[0].NodeID
+		}
+	}
+	return ""
 }
 
 // loadExpectedResults loads expected SCA results from a JSON file
@@ -274,7 +265,7 @@ func loadExpectedResults(path string) ([]ecosystems.SCAResult, error) {
 
 // getPythonMajorMinorVersion returns the Python version as "X.Y" (e.g., "3.11")
 func getPythonMajorMinorVersion() (string, error) {
-	version, err := GetPythonVersion()
+	version, err := pip.GetPythonVersion()
 	if err != nil {
 		return "", err
 	}
