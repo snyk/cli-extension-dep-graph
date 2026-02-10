@@ -5,8 +5,8 @@ import "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 // SCAPluginOptions contains configuration options for SCA plugins,
 // including global settings and language-specific options.
 type SCAPluginOptions struct {
-	Global GlobalOptions
-	Python *PythonOptions
+	GlobalOptions
+	PythonOptions
 }
 
 // GlobalOptions contains options that apply globally across all SCA plugins.
@@ -14,6 +14,7 @@ type GlobalOptions struct {
 	TargetFile  *string
 	AllProjects bool
 	Logger      logger.Logger
+	RawFlags    []string
 }
 
 // PythonOptions contains Python-specific options for dependency graph generation.
@@ -24,34 +25,39 @@ type PythonOptions struct {
 
 func NewPluginOptions() *SCAPluginOptions {
 	return &SCAPluginOptions{
-		Global: GlobalOptions{
+		GlobalOptions: GlobalOptions{
 			Logger: logger.Nop(),
 		},
-		Python: &PythonOptions{},
+		PythonOptions: PythonOptions{},
 	}
 }
 
 func (o *SCAPluginOptions) WithTargetFile(targetFile string) *SCAPluginOptions {
-	o.Global.TargetFile = &targetFile
+	o.TargetFile = &targetFile
 	return o
 }
 
 func (o *SCAPluginOptions) WithAllProjects(allProjects bool) *SCAPluginOptions {
-	o.Global.AllProjects = allProjects
+	o.AllProjects = allProjects
 	return o
 }
 
 func (o *SCAPluginOptions) WithLogger(l logger.Logger) *SCAPluginOptions {
-	o.Global.Logger = l
+	o.Logger = l
 	return o
 }
 
 func (o *SCAPluginOptions) WithNoBuildIsolation(noBuildIsolation bool) *SCAPluginOptions {
-	o.Python.NoBuildIsolation = noBuildIsolation
+	o.NoBuildIsolation = noBuildIsolation
 	return o
 }
 
 func (o *SCAPluginOptions) WithPipenvIncludeDev(pipenvIncludeDev bool) *SCAPluginOptions {
-	o.Python.PipenvIncludeDev = pipenvIncludeDev
+	o.PipenvIncludeDev = pipenvIncludeDev
+	return o
+}
+
+func (o *SCAPluginOptions) WithRawFlags(rawFlags []string) *SCAPluginOptions {
+	o.RawFlags = rawFlags
 	return o
 }

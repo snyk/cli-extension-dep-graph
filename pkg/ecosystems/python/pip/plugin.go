@@ -31,7 +31,7 @@ var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
 // BuildDepGraphsFromDir discovers and builds dependency graphs for Python pip projects.
 func (p Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *ecosystems.SCAPluginOptions) ([]ecosystems.SCAResult, error) {
-	log := options.Global.Logger
+	log := options.GlobalOptions.Logger
 	if log == nil {
 		log = logger.Nop()
 	}
@@ -63,7 +63,7 @@ func (p Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *
 
 	for _, file := range files {
 		g.Go(func() error {
-			result, err := p.buildDepGraphFromFile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation)
+			result, err := p.buildDepGraphFromFile(ctx, log, file, pythonVersion, options.PythonOptions.NoBuildIsolation)
 			if err != nil {
 				attrs := []logger.Field{
 					logger.Attr(logFieldFile, file.RelPath),
@@ -105,12 +105,12 @@ func (p Plugin) discoverRequirementsFiles(ctx context.Context, dir string, optio
 	var findOpts []discovery.FindOption
 
 	switch {
-	case options.Global.TargetFile != nil:
+	case options.GlobalOptions.TargetFile != nil:
 		// Use specific target file if provided
 		findOpts = []discovery.FindOption{
-			discovery.WithTargetFile(*options.Global.TargetFile),
+			discovery.WithTargetFile(*options.GlobalOptions.TargetFile),
 		}
-	case options.Global.AllProjects:
+	case options.GlobalOptions.AllProjects:
 		// Find all requirements.txt files recursively
 		// Exclude common directories to avoid scanning unnecessary paths
 		findOpts = []discovery.FindOption{
