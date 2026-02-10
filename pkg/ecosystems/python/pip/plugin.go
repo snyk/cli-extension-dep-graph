@@ -30,8 +30,9 @@ type Plugin struct{}
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
 // BuildDepGraphsFromDir discovers and builds dependency graphs for Python pip projects.
-func (p Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *ecosystems.SCAPluginOptions) ([]ecosystems.SCAResult, error) {
-	log := options.Global.Logger
+func (p Plugin) BuildDepGraphsFromDir(
+	ctx context.Context, log logger.Logger, dir string, options *ecosystems.SCAPluginOptions,
+) ([]ecosystems.SCAResult, error) {
 	if log == nil {
 		log = logger.Nop()
 	}

@@ -34,8 +34,9 @@ type Plugin struct{}
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
 // BuildDepGraphsFromDir discovers and builds dependency graphs for Pipenv projects.
-func (p Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *ecosystems.SCAPluginOptions) ([]ecosystems.SCAResult, error) {
-	log := options.Global.Logger
+func (p Plugin) BuildDepGraphsFromDir(
+	ctx context.Context, log logger.Logger, dir string, options *ecosystems.SCAPluginOptions,
+) ([]ecosystems.SCAResult, error) {
 	if log == nil {
 		log = logger.Nop()
 	}
@@ -66,7 +67,7 @@ func (p Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *
 
 	for _, file := range files {
 		g.Go(func() error {
-			result, err := p.buildDepGraphFromPipfile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation, options.Python.PipenvIncludeDev)
+			result, err := p.buildDepGraphFromPipfile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation, options.Global.IncludeDev)
 			if err != nil {
 				attrs := []logger.Field{
 					logger.Attr(logFieldFile, file.RelPath),
