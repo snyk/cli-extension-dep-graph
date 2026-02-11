@@ -6,7 +6,7 @@ orbs:
 parameters:
   go_version:
     type: string
-    default: "1.24"
+    default: "1.25"
   run-python-tests:
     type: boolean
     default: false

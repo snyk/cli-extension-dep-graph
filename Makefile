@@ -5,7 +5,7 @@ GOMOD=$(GOCMD) mod
 GOBUILD=$(GOCMD) build
 GOTEST=$(GOCMD) test
 
-GOLANGCI_LINT_V=v1.64.6
+GOLANGCI_LINT_V=v2.9.0
 
 all:
 	$(info  "completed running make file for golang project")
@@ -16,7 +16,7 @@ fmt:
 install-tools:
 	@echo "Installing golangci-lint..."
 	@mkdir -p .bin
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b .bin $(GOLANGCI_LINT_V)
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_LINT_V)/install.sh | sh -s -- -b .bin $(GOLANGCI_LINT_V)
 
 lint:
 	$(if $(CI),golangci-lint,.bin/golangci-lint) run -v

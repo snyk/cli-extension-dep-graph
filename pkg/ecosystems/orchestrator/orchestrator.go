@@ -18,9 +18,9 @@ var legacyCLIWorkflowID = workflow.NewWorkflowIdentifier("legacycli")
 // ResolveDepgraphs resolves dependency graphs for a directory by invoking the legacy CLI workflow.
 // It accepts a workflow.InvocationContext to provide access to the engine, configuration, and logger.
 // Returns a channel of SCAResult structs containing dependency graphs and associated metadata.
-func ResolveDepgraphs(ictx workflow.InvocationContext, _ string, configuration ecosystems.SCAPluginOptions) (<-chan ecosystems.SCAResult, error) {
+func ResolveDepgraphs(ictx workflow.InvocationContext, _ string, opts ecosystems.SCAPluginOptions) (<-chan ecosystems.SCAResult, error) {
 	// Call legacy fallback to get results
-	results, err := LegacyFallback(ictx, configuration)
+	results, err := LegacyFallback(ictx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("legacy fallback failed: %w", err)
 	}

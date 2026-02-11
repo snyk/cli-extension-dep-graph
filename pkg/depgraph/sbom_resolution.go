@@ -239,7 +239,7 @@ func extractProblemFindings(logger *zerolog.Logger, data workflow.Data, errList 
 }
 
 func getExclusionsFromFindings(findings []scaplugin.Finding) []string {
-	exclusions := []string{}
+	exclusions := make([]string, 0, len(findings))
 	for i := range findings {
 		exclusions = append(exclusions, findings[i].FileExclusions...)
 	}
