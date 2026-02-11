@@ -1,96 +1,10 @@
+version: "2"
 run:
+  concurrency: 4
   build-tags:
     - integration
-  concurrency: 4
   issues-exit-code: 1
-  skip-dirs:
-    - internal/mocks
   tests: true
-  timeout: 5m
-
-linters-settings:
-  errcheck:
-    check-blank: true
-    check-type-assertions: true
-  exhaustive:
-    default-signifies-exhaustive: true
-  goconst:
-    ignore-calls: false
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-  gocyclo:
-    min-complexity: 15
-  gofumpt:
-    module-path: github.com/snyk/cli-extension-dep-graph
-    extra-rules: true
-  goimports:
-    local-prefixes: github.com/snyk/cli-extension-dep-graph
-  gosimple:
-    checks: ["all"]
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
-  lll:
-    line-length: 160
-  misspell:
-    locale: US
-  nolintlint:
-    allow-unused: false
-    require-explanation: true
-    require-specific: true
-  prealloc:
-    simple: true
-    range-loops: true
-    for-loops: true
-  promlinter:
-    strict: true
-  revive:
-    rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: exported
-      - name: if-return
-      - name: increment-decrement
-      - name: var-naming
-      - name: var-declaration
-      - name: package-comments
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: unexported-return
-      - name: indent-error-flow
-      - name: errorf
-      - name: empty-block
-      - name: superfluous-else
-      - name: unused-parameter
-      - name: unreachable-code
-      - name: redefines-builtin-id
-      - name: redundant-import-alias
-  staticcheck:
-    checks: ["all"]
-  stylecheck:
-    checks:
-      - all
-      - "-ST1003" # Allow underscores in package names
-    http-status-code-whitelist: []
-  varcheck:
-    exported-fields: true
-  wrapcheck:
-    ignoreSigs:
-      - .EntryPointLegacy(
-      - .Errorf(
-
 linters:
   enable:
     - asasalint
@@ -112,8 +26,6 @@ linters:
     - gocritic
     - gocyclo
     - godot
-    - gofumpt
-    - goimports
     - goprintffuncname
     - gosec
     - interfacebloat
@@ -133,10 +45,8 @@ linters:
     - revive
     - rowserrcheck
     - sqlclosecheck
-    - stylecheck
+    - staticcheck
     - tagliatelle
-    - tenv
-    # - testpackage
     - thelper
     - tparallel
     - unconvert
@@ -145,10 +55,109 @@ linters:
     - wastedassign
     - whitespace
     - wrapcheck
-
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - goconst
-        - wrapcheck
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    exhaustive:
+      default-signifies-exhaustive: true
+    goconst:
+      ignore-calls: false
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+    gocyclo:
+      min-complexity: 15
+    govet:
+      disable:
+        - fieldalignment
+      enable-all: true
+    lll:
+      line-length: 160
+    misspell:
+      locale: US
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+    prealloc:
+      simple: true
+      range-loops: true
+      for-loops: true
+    promlinter:
+      strict: true
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+        - name: if-return
+        - name: increment-decrement
+        - name: var-naming
+        - name: var-declaration
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unused-parameter
+        - name: unreachable-code
+        - name: redefines-builtin-id
+        - name: redundant-import-alias
+    staticcheck:
+      checks:
+        - all
+        - -ST1003
+    wrapcheck:
+      ignore-sigs:
+        - .EntryPointLegacy(
+        - .Errorf(
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - goconst
+          - wrapcheck
+          - gocritic
+          - noctx
+        path: _test\.go
+    paths:
+      - internal/mocks
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    gofumpt:
+      module-path: github.com/snyk/cli-extension-dep-graph
+      extra-rules: true
+    goimports:
+      local-prefixes:
+        - github.com/snyk/cli-extension-dep-graph
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
