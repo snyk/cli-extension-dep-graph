@@ -116,7 +116,7 @@ func (p Plugin) buildFindings(
 		var manifestFile string
 		switch {
 		case workspacePackage != nil:
-			manifestFile = filepath.Join(workspacePackage.Path, PyprojectTomlFileName)
+			manifestFile = filepath.Join(lockFileDir, workspacePackage.Path, PyprojectTomlFileName)
 		case lockFileDir == ".":
 			manifestFile = PyprojectTomlFileName
 		default:
