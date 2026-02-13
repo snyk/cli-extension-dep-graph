@@ -620,6 +620,40 @@ func TestBuildFindings_PathConstruction_NestedDir(t *testing.T) {
 	assert.Equal(t, "project1/uv.lock", findings[0].LockFile)
 }
 
+func TestBuildFindings_PathConstruction_NestedWorkspacePackage(t *testing.T) {
+	sbomJSON := `{
+		"metadata": {
+			"component": {
+				"name": "workspace-root",
+				"version": "1.0.0"
+			}
+		},
+		"components": [
+			{
+				"name": "workspace-package",
+				"version": "3.1.0",
+				"properties": [
+					{
+						"name": "uv:workspace:path",
+						"value": "packages/my-package"
+					}
+				]
+			}
+		]
+	}`
+	sbom := Sbom(sbomJSON)
+	mockResponseBody := singleDepGraphResponse("workspace-package", "3.1.0")
+	snykClient := setupMockSnykClient(t, mockResponseBody)
+	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+
+	findings, err := plugin.buildFindings(context.Background(), sbom, "workspace/uv.lock", "workspace", testLogger)
+
+	require.NoError(t, err)
+	require.Len(t, findings, 1)
+	assert.Equal(t, filepath.Join("workspace", "packages", "my-package", "pyproject.toml"), findings[0].ManifestFile)
+	assert.Equal(t, "workspace/uv.lock", findings[0].LockFile)
+}
+
 func TestFindWorkspacePackage_MatchFound(t *testing.T) {
 	depGraph := createTestDepGraph("workspace-package", "3.1.9")
 	workspacePackages := []WorkspacePackage{
