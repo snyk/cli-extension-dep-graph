@@ -24,5 +24,5 @@ func callback(ctx workflow.InvocationContext, _ []workflow.Data) ([]workflow.Dat
 		return handleSBOMResolution(ctx, config, logger)
 	}
 
-	return handleLegacyResolution(ctx, config, logger)
+	return ResolveDepgraphs(ctx, config, logger, handleLegacyResolution)
 }
