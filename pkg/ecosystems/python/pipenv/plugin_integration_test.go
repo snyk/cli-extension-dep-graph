@@ -30,7 +30,7 @@ type PluginTestCase struct {
 }
 
 // TestPlugin_BuildDepGraphsFromDir tests the plugin with various fixtures.
-func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
+func TestPipenvPlugin_BuildDepGraphsFromDir(t *testing.T) {
 	// Get Python version once for all tests
 	pythonVersion, err := getPythonMajorMinorVersion()
 	if err != nil {

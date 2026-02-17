@@ -96,8 +96,18 @@ func (l *PipfileLock) ToConstraints(includeDevDeps bool) []string {
 
 // formatConstraint converts a locked package to constraints format.
 func formatConstraint(name string, pkg *LockedPackage) string {
-	// Skip git/path dependencies - they can't be constrained by version
-	if pkg.Git != "" || pkg.Path != "" {
+	// Handle git dependencies with pip-compatible git URL format
+	if pkg.Git != "" {
+		// Format: package @ git+https://github.com/user/repo.git@ref
+		constraint := name + " @ git+" + pkg.Git
+		if pkg.Ref != "" {
+			constraint += "@" + pkg.Ref
+		}
+		return constraint
+	}
+
+	// Skip path dependencies - they reference local files
+	if pkg.Path != "" {
 		return ""
 	}
 

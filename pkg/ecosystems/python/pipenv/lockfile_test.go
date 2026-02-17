@@ -137,16 +137,30 @@ func TestPipfileLock_ToConstraints(t *testing.T) {
 			wantContains:   []string{"requests==2.28.0", "pytest==7.0.0"},
 		},
 		{
-			name: "skip git dependencies",
+			name: "git dependencies formatted as constraints",
 			lockfile: &PipfileLock{
 				Default: map[string]LockedPackage{
 					"requests":  {Version: "==2.28.0"},
 					"mypackage": {Git: "https://github.com/user/repo.git", Ref: "main"},
+					"black":     {Git: "https://github.com/psf/black.git", Ref: "23.12.1"},
 				},
 			},
 			includeDevDeps: false,
-			wantContains:   []string{"requests==2.28.0"},
-			wantNotContain: []string{"mypackage"},
+			wantContains: []string{
+				"requests==2.28.0",
+				"mypackage @ git+https://github.com/user/repo.git@main",
+				"black @ git+https://github.com/psf/black.git@23.12.1",
+			},
+		},
+		{
+			name: "git dependency without ref",
+			lockfile: &PipfileLock{
+				Default: map[string]LockedPackage{
+					"mypackage": {Git: "https://github.com/user/repo.git"},
+				},
+			},
+			includeDevDeps: false,
+			wantContains:   []string{"mypackage @ git+https://github.com/user/repo.git"},
 		},
 		{
 			name: "skip path dependencies",

@@ -197,6 +197,9 @@ func (p Plugin) buildDepGraphFromPipfile(
 }
 
 // getInstallReport runs pip install --dry-run with packages and constraints passed directly.
+// The lockfile is always present (either parsed or generated), so we pass only package names
+// and let the constraints file (from lockfile) control all version pinning. This avoids
+// conflicts where pip sees the same package specified twice with different version constraints.
 func (p Plugin) getInstallReport(
 	ctx context.Context,
 	pipfile *Pipfile,
@@ -204,17 +207,15 @@ func (p Plugin) getInstallReport(
 	noBuildIsolation bool,
 	includeDevDeps bool,
 ) (*pip.Report, error) {
-	// Get packages from Pipfile
-	packages := pipfile.ToRequirements(includeDevDeps)
+	// Get package names without version specifiers
+	packages := pipfile.ToPackageNames(includeDevDeps)
 	if len(packages) == 0 {
 		// Return empty report for empty Pipfile (creates depgraph with just root node)
 		return &pip.Report{}, nil
 	}
 
-	var constraints []string
-	if lockfile != nil {
-		constraints = lockfile.ToConstraints(includeDevDeps)
-	}
+	// Get constraints from lockfile (all packages with pinned versions)
+	constraints := lockfile.ToConstraints(includeDevDeps)
 
 	// Get pip install report passing packages and constraints directly
 	report, err := pip.GetInstallReportFromPackages(ctx, packages, constraints, noBuildIsolation)
