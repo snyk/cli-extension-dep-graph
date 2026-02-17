@@ -5,7 +5,7 @@ name = "pypi"
 
 [packages]
 requests = "==2.31.0"
-invalid = "===syntax!!!"
+"invalid-syntax[" = "*"
 click = ">=8.0"
 
 [dev-packages]

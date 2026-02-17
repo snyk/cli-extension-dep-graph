@@ -51,128 +51,6 @@ func ParsePipfile(path string) (*Pipfile, error) {
 	return &pipfile, nil
 }
 
-// ToRequirements converts Pipfile packages to requirements.txt format.
-// Each package is converted to a line like "package==version" or just "package"
-// depending on how it's specified in the Pipfile.
-func (p *Pipfile) ToRequirements(includeDevDeps bool) []string {
-	var requirements []string
-
-	// Process regular packages
-	for name, spec := range p.Packages {
-		req := formatRequirement(name, spec)
-		if req != "" {
-			requirements = append(requirements, req)
-		}
-	}
-
-	// Process dev packages if requested
-	if includeDevDeps {
-		for name, spec := range p.DevPkgs {
-			req := formatRequirement(name, spec)
-			if req != "" {
-				requirements = append(requirements, req)
-			}
-		}
-	}
-
-	return requirements
-}
-
-// formatRequirement converts a Pipfile package entry to requirements.txt format.
-func formatRequirement(name string, spec interface{}) string {
-	switch v := spec.(type) {
-	case string:
-		// Simple version specifier like "*" or ">=1.0"
-		if v == "*" {
-			return name
-		}
-		return name + v
-	case map[string]interface{}:
-		// Complex specifier with version, extras, git, etc.
-		return formatComplexRequirement(name, v)
-	default:
-		// Unknown format, just return the package name
-		return name
-	}
-}
-
-// formatComplexRequirement handles complex Pipfile package specifications.
-func formatComplexRequirement(name string, spec map[string]interface{}) string {
-	// Check for platform markers - skip packages that don't match current platform
-	if markers, ok := spec["markers"].(string); ok {
-		if !matchesPlatformMarker(markers) {
-			return ""
-		}
-	}
-
-	// Check for git/VCS dependencies
-	if git, ok := spec["git"].(string); ok {
-		return formatGitRequirement(name, git, spec)
-	}
-
-	// Check for path dependencies
-	if path, ok := spec["path"].(string); ok {
-		return formatPathRequirement(path, spec)
-	}
-
-	// Check for URL dependencies
-	if url, ok := spec["url"].(string); ok {
-		return url
-	}
-
-	// Standard package with version and possibly extras
-	var parts []string
-	parts = append(parts, name)
-
-	// Handle extras
-	if extras, ok := spec["extras"].([]interface{}); ok && len(extras) > 0 {
-		extraStrs := make([]string, len(extras))
-		for i, e := range extras {
-			extraStrs[i] = fmt.Sprintf("%v", e)
-		}
-		parts[0] = fmt.Sprintf("%s[%s]", name, strings.Join(extraStrs, ","))
-	}
-
-	// Handle version
-	if version, ok := spec["version"].(string); ok && version != "*" {
-		return parts[0] + version
-	}
-
-	return parts[0]
-}
-
-// formatGitRequirement formats a git-based dependency.
-func formatGitRequirement(name, gitURL string, spec map[string]interface{}) string {
-	var ref string
-	if r, ok := spec["ref"].(string); ok {
-		ref = r
-	} else if tag, ok := spec["tag"].(string); ok {
-		ref = tag
-	} else if branch, ok := spec["branch"].(string); ok {
-		ref = branch
-	}
-
-	// Format: package @ git+https://github.com/user/repo@ref
-	result := fmt.Sprintf("%s @ git+%s", name, gitURL)
-	if ref != "" {
-		result += "@" + ref
-	}
-	return result
-}
-
-// formatPathRequirement formats a path-based dependency.
-func formatPathRequirement(path string, spec map[string]interface{}) string {
-	editable := false
-	if e, ok := spec["editable"].(bool); ok {
-		editable = e
-	}
-
-	if editable {
-		return "-e " + path
-	}
-	return path
-}
-
 // matchesPlatformMarker checks if the current platform matches the given marker.
 // Supports common markers like sys_platform == 'win32', sys_platform == 'darwin', sys_platform == 'linux'.
 func matchesPlatformMarker(marker string) bool {
@@ -210,4 +88,79 @@ func getCurrentPlatform() string {
 	default:
 		return runtime.GOOS
 	}
+}
+
+// ToPackageNames converts Pipfile packages to just package names without version specifiers.
+// This is useful when using a lockfile to constrain versions via pip's -c flag.
+func (p *Pipfile) ToPackageNames(includeDevDeps bool) []string {
+	var names []string
+
+	// Process regular packages
+	for name, spec := range p.Packages {
+		pkgName := extractPackageName(name, spec)
+		if pkgName != "" {
+			names = append(names, pkgName)
+		}
+	}
+
+	// Process dev packages if requested
+	if includeDevDeps {
+		for name, spec := range p.DevPkgs {
+			pkgName := extractPackageName(name, spec)
+			if pkgName != "" {
+				names = append(names, pkgName)
+			}
+		}
+	}
+
+	return names
+}
+
+// extractPackageName extracts just the package name from a Pipfile entry,
+// handling platform markers, git dependencies, and extras.
+func extractPackageName(name string, spec interface{}) string {
+	switch v := spec.(type) {
+	case string:
+		// Simple version specifier - just return the name
+		return name
+	case map[string]interface{}:
+		// Complex specifier - check markers and return name with extras if present
+		return extractComplexPackageName(name, v)
+	default:
+		// Unknown format, just return the package name
+		return name
+	}
+}
+
+// extractComplexPackageName handles complex Pipfile package specifications.
+func extractComplexPackageName(name string, spec map[string]interface{}) string {
+	// Check for platform markers - skip packages that don't match current platform
+	if markers, ok := spec["markers"].(string); ok {
+		if !matchesPlatformMarker(markers) {
+			return ""
+		}
+	}
+
+	// For git/path/url dependencies, return the name as-is
+	// (these will be handled specially by pip)
+	if _, ok := spec["git"].(string); ok {
+		return name
+	}
+	if _, ok := spec["path"].(string); ok {
+		return name
+	}
+	if _, ok := spec["url"].(string); ok {
+		return name
+	}
+
+	// Handle extras - include them in the package name
+	if extras, ok := spec["extras"].([]interface{}); ok && len(extras) > 0 {
+		extraStrs := make([]string, len(extras))
+		for i, e := range extras {
+			extraStrs[i] = fmt.Sprintf("%v", e)
+		}
+		return fmt.Sprintf("%s[%s]", name, strings.Join(extraStrs, ","))
+	}
+
+	return name
 }

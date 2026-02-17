@@ -3,7 +3,6 @@ package pipenv
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -116,233 +115,6 @@ localpackage = {path = "./local", editable = true}
 	}
 }
 
-func TestPipfile_ToRequirements(t *testing.T) {
-	tests := []struct {
-		name           string
-		pipfile        *Pipfile
-		includeDevDeps bool
-		wantContains   []string
-		wantNotContain []string
-	}{
-		{
-			name: "simple packages",
-			pipfile: &Pipfile{
-				Packages: map[string]interface{}{
-					"requests": "*",
-					"flask":    ">=2.0",
-				},
-				DevPkgs: map[string]interface{}{
-					"pytest": "*",
-				},
-			},
-			includeDevDeps: false,
-			wantContains:   []string{"requests", "flask>=2.0"},
-			wantNotContain: []string{"pytest"},
-		},
-		{
-			name: "include dev deps",
-			pipfile: &Pipfile{
-				Packages: map[string]interface{}{
-					"requests": "*",
-				},
-				DevPkgs: map[string]interface{}{
-					"pytest": "*",
-				},
-			},
-			includeDevDeps: true,
-			wantContains:   []string{"requests", "pytest"},
-		},
-		{
-			name: "complex version spec",
-			pipfile: &Pipfile{
-				Packages: map[string]interface{}{
-					"requests": map[string]interface{}{
-						"version": ">=2.0",
-					},
-				},
-			},
-			includeDevDeps: false,
-			wantContains:   []string{"requests>=2.0"},
-		},
-		{
-			name: "package with extras",
-			pipfile: &Pipfile{
-				Packages: map[string]interface{}{
-					"requests": map[string]interface{}{
-						"version": ">=2.0",
-						"extras":  []interface{}{"security", "socks"},
-					},
-				},
-			},
-			includeDevDeps: false,
-			wantContains:   []string{"requests[security,socks]>=2.0"},
-		},
-		{
-			name: "git dependency",
-			pipfile: &Pipfile{
-				Packages: map[string]interface{}{
-					"mypackage": map[string]interface{}{
-						"git": "https://github.com/user/repo.git",
-						"ref": "main",
-					},
-				},
-			},
-			includeDevDeps: false,
-			wantContains:   []string{"mypackage @ git+https://github.com/user/repo.git@main"},
-		},
-		{
-			name: "editable path dependency",
-			pipfile: &Pipfile{
-				Packages: map[string]interface{}{
-					"localpackage": map[string]interface{}{
-						"path":     "./local",
-						"editable": true,
-					},
-				},
-			},
-			includeDevDeps: false,
-			wantContains:   []string{"-e ./local"},
-		},
-		{
-			name: "compound version constraints",
-			pipfile: &Pipfile{
-				Packages: map[string]interface{}{
-					"django":   ">=2.0,<=3.0",
-					"requests": ">=2.25.0,<3.0.0",
-					"flask":    "~=2.0",
-					"numpy":    "!=1.19.0",
-				},
-			},
-			includeDevDeps: false,
-			wantContains: []string{
-				"django>=2.0,<=3.0",
-				"requests>=2.25.0,<3.0.0",
-				"flask~=2.0",
-				"numpy!=1.19.0",
-			},
-		},
-		{
-			name: "complex spec with compound version constraints",
-			pipfile: &Pipfile{
-				Packages: map[string]interface{}{
-					"requests": map[string]interface{}{
-						"version": ">=2.0,<=3.0",
-						"extras":  []interface{}{"security"},
-					},
-				},
-			},
-			includeDevDeps: false,
-			wantContains:   []string{"requests[security]>=2.0,<=3.0"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			reqs := tt.pipfile.ToRequirements(tt.includeDevDeps)
-
-			for _, want := range tt.wantContains {
-				assert.Contains(t, reqs, want, "should contain %s", want)
-			}
-			for _, notWant := range tt.wantNotContain {
-				assert.NotContains(t, reqs, notWant, "should not contain %s", notWant)
-			}
-		})
-	}
-}
-
-func TestPipfile_ToRequirements_PlatformMarkers(t *testing.T) {
-	currentPlatform := getCurrentPlatform()
-
-	tests := []struct {
-		name           string
-		pipfile        *Pipfile
-		wantContains   []string
-		wantNotContain []string
-	}{
-		{
-			name: "skip windows package on non-windows",
-			pipfile: &Pipfile{
-				Packages: map[string]interface{}{
-					"requests": "*",
-					"pywin32": map[string]interface{}{
-						"version": "==306",
-						"markers": "sys_platform == 'win32'",
-					},
-				},
-			},
-			wantContains: []string{"requests"},
-			wantNotContain: func() []string {
-				if currentPlatform == "win32" {
-					return nil // On Windows, pywin32 should be included
-				}
-				return []string{"pywin32"}
-			}(),
-		},
-		{
-			name: "skip darwin package on non-darwin",
-			pipfile: &Pipfile{
-				Packages: map[string]interface{}{
-					"requests": "*",
-					"pyobjc": map[string]interface{}{
-						"version": ">=9.0",
-						"markers": "sys_platform == 'darwin'",
-					},
-				},
-			},
-			wantContains: []string{"requests"},
-			wantNotContain: func() []string {
-				if currentPlatform == "darwin" {
-					return nil // On macOS, pyobjc should be included
-				}
-				return []string{"pyobjc"}
-			}(),
-		},
-		{
-			name: "include package with != marker when not on that platform",
-			pipfile: &Pipfile{
-				Packages: map[string]interface{}{
-					"uvloop": map[string]interface{}{
-						"version": ">=0.17",
-						"markers": "sys_platform != 'win32'",
-					},
-				},
-			},
-			wantContains: func() []string {
-				if currentPlatform != "win32" {
-					return []string{"uvloop>=0.17"}
-				}
-				return nil
-			}(),
-			wantNotContain: func() []string {
-				if currentPlatform == "win32" {
-					return []string{"uvloop"}
-				}
-				return nil
-			}(),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			reqs := tt.pipfile.ToRequirements(false)
-
-			for _, want := range tt.wantContains {
-				assert.Contains(t, reqs, want, "should contain %s", want)
-			}
-			for _, notWant := range tt.wantNotContain {
-				found := false
-				for _, req := range reqs {
-					if strings.Contains(req, notWant) {
-						found = true
-						break
-					}
-				}
-				assert.False(t, found, "should not contain %s, got %v", notWant, reqs)
-			}
-		})
-	}
-}
-
 func TestMatchesPlatformMarker(t *testing.T) {
 	currentPlatform := getCurrentPlatform()
 
@@ -406,4 +178,131 @@ func TestParsePipfile_InvalidTOML(t *testing.T) {
 	_, err = ParsePipfile(pipfilePath)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse Pipfile")
+}
+
+func TestPipfile_ToPackageNames(t *testing.T) {
+	tests := []struct {
+		name           string
+		pipfile        *Pipfile
+		includeDevDeps bool
+		wantContains   []string
+		wantNotContain []string
+	}{
+		{
+			name: "simple packages without versions",
+			pipfile: &Pipfile{
+				Packages: map[string]interface{}{
+					"requests": "==2.31.0",
+					"flask":    ">=2.0",
+					"django":   "*",
+				},
+			},
+			includeDevDeps: false,
+			wantContains:   []string{"requests", "flask", "django"},
+		},
+		{
+			name: "packages with extras",
+			pipfile: &Pipfile{
+				Packages: map[string]interface{}{
+					"requests": map[string]interface{}{
+						"version": ">=2.0",
+						"extras":  []interface{}{"security", "socks"},
+					},
+				},
+			},
+			includeDevDeps: false,
+			wantContains:   []string{"requests[security,socks]"},
+		},
+		{
+			name: "dev packages excluded by default",
+			pipfile: &Pipfile{
+				Packages: map[string]interface{}{
+					"requests": "*",
+				},
+				DevPkgs: map[string]interface{}{
+					"pytest": "*",
+				},
+			},
+			includeDevDeps: false,
+			wantContains:   []string{"requests"},
+			wantNotContain: []string{"pytest"},
+		},
+		{
+			name: "dev packages included when requested",
+			pipfile: &Pipfile{
+				Packages: map[string]interface{}{
+					"requests": "*",
+				},
+				DevPkgs: map[string]interface{}{
+					"pytest": "*",
+				},
+			},
+			includeDevDeps: true,
+			wantContains:   []string{"requests", "pytest"},
+		},
+		{
+			name: "git dependencies return name only",
+			pipfile: &Pipfile{
+				Packages: map[string]interface{}{
+					"mypackage": map[string]interface{}{
+						"git": "https://github.com/user/repo.git",
+						"ref": "main",
+					},
+				},
+			},
+			includeDevDeps: false,
+			wantContains:   []string{"mypackage"},
+		},
+		{
+			name: "path dependencies return name only",
+			pipfile: &Pipfile{
+				Packages: map[string]interface{}{
+					"localpackage": map[string]interface{}{
+						"path":     "./local",
+						"editable": true,
+					},
+				},
+			},
+			includeDevDeps: false,
+			wantContains:   []string{"localpackage"},
+		},
+		{
+			name: "platform markers filter packages",
+			pipfile: &Pipfile{
+				Packages: map[string]interface{}{
+					"requests": "*",
+					"pywin32": map[string]interface{}{
+						"version": "==306",
+						"markers": "sys_platform == 'win32'",
+					},
+				},
+			},
+			includeDevDeps: false,
+			wantContains: func() []string {
+				if getCurrentPlatform() == "win32" {
+					return []string{"requests", "pywin32"}
+				}
+				return []string{"requests"}
+			}(),
+			wantNotContain: func() []string {
+				if getCurrentPlatform() == "win32" {
+					return nil
+				}
+				return []string{"pywin32"}
+			}(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			names := tt.pipfile.ToPackageNames(tt.includeDevDeps)
+
+			for _, want := range tt.wantContains {
+				assert.Contains(t, names, want, "should contain %s", want)
+			}
+			for _, notWant := range tt.wantNotContain {
+				assert.NotContains(t, names, notWant, "should not contain %s", notWant)
+			}
+		})
+	}
 }

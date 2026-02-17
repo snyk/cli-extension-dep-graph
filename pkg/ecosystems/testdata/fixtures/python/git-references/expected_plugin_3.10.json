@@ -49,10 +49,10 @@
           }
         },
         {
-          "id": "platformdirs@4.5.1",
+          "id": "platformdirs@4.9.2",
           "info": {
             "name": "platformdirs",
-            "version": "4.5.1"
+            "version": "4.9.2"
           }
         },
         {
@@ -137,7 +137,7 @@
                 "nodeId": "pathspec@1.0.4"
               },
               {
-                "nodeId": "platformdirs@4.5.1"
+                "nodeId": "platformdirs@4.9.2"
               },
               {
                 "nodeId": "tomli@2.4.0"
@@ -168,8 +168,8 @@
             "deps": []
           },
           {
-            "nodeId": "platformdirs@4.5.1",
-            "pkgId": "platformdirs@4.5.1",
+            "nodeId": "platformdirs@4.9.2",
+            "pkgId": "platformdirs@4.9.2",
             "deps": []
           },
           {
