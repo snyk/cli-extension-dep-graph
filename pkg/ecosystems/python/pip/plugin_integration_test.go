@@ -20,6 +20,7 @@ import (
 	snykerrors "github.com/snyk/error-catalog-golang-public/snyk_errors"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
 
 // PluginTestCase defines a test case for the plugin
@@ -63,7 +64,7 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 
 			// Run plugin
 			plugin := Plugin{}
-			results, err := plugin.BuildDepGraphsFromDir(ctx, absPath, tc.Options)
+			results, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, tc.Options)
 			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 
 			// Load and compare expected output
@@ -105,7 +106,7 @@ func TestPlugin_Concurrency(t *testing.T) {
 
 	// Run multiple times to test race conditions
 	for i := 0; i < 5; i++ {
-		results, err := plugin.BuildDepGraphsFromDir(ctx, absPath, options)
+		results, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, options)
 		require.NoError(t, err, "iteration %d failed", i)
 		assertResultsMatchExpected(t, results, expected, "multi-requirements")
 	}
@@ -148,7 +149,7 @@ func TestPlugin_BuildDepGraphsFromDir_PipErrors(t *testing.T) {
 			require.NoError(t, err, "failed to get absolute path for fixture")
 
 			plugin := Plugin{}
-			results, err := plugin.BuildDepGraphsFromDir(ctx, absPath, ecosystems.NewPluginOptions())
+			results, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, ecosystems.NewPluginOptions())
 			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 
 			require.Len(t, results, 1, "expected a single result for fixture %s", tc.fixture)
@@ -181,7 +182,7 @@ func TestPlugin_ContextCancellation(t *testing.T) {
 	require.NoError(t, err)
 
 	plugin := Plugin{}
-	results, err := plugin.BuildDepGraphsFromDir(ctx, absPath, ecosystems.NewPluginOptions())
+	results, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, ecosystems.NewPluginOptions())
 
 	// Should handle cancellation gracefully
 	if err != nil {

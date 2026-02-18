@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
+
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
 
 // Metadata contains contextual information about the dependency graph,
@@ -24,5 +26,5 @@ type SCAResult struct {
 // SCAPlugin defines the interface for SCA plugins that build dependency graphs
 // from a directory containing project files.
 type SCAPlugin interface {
-	BuildDepGraphsFromDir(ctx context.Context, dir string, options *SCAPluginOptions) ([]SCAResult, error)
+	BuildDepGraphsFromDir(ctx context.Context, log logger.Logger, dir string, options *SCAPluginOptions) ([]SCAResult, error)
 }
