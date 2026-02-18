@@ -111,7 +111,7 @@ func formatConstraint(name string, pkg *LockedPackage) string {
 		return ""
 	}
 
-	// Version in Pipfile.lock is always pinned in "==X.Y.Z" format
+	// Version in Pipfile.lock is usually pinned in "==X.Y.Z" format
 	version := pkg.Version
 	if version == "" {
 		return ""
@@ -120,8 +120,12 @@ func formatConstraint(name string, pkg *LockedPackage) string {
 	// Normalize package name (replace underscores with hyphens, lowercase)
 	normalizedName := strings.ToLower(strings.ReplaceAll(name, "_", "-"))
 
-	// Pipfile.lock versions are always pinned with ==
-	if strings.HasPrefix(version, "==") {
+	// Check if version already has an operator prefix (==, >=, <=, !=, ~=, <, >)
+	// If so, use it as-is; otherwise add ==
+	if strings.HasPrefix(version, "==") || strings.HasPrefix(version, ">=") ||
+		strings.HasPrefix(version, "<=") || strings.HasPrefix(version, "!=") ||
+		strings.HasPrefix(version, "~=") || strings.HasPrefix(version, "<") ||
+		strings.HasPrefix(version, ">") {
 		return normalizedName + version
 	}
 

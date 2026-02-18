@@ -184,6 +184,18 @@ func TestPipfileLock_ToConstraints(t *testing.T) {
 			includeDevDeps: false,
 			wantContains:   []string{"my-package==1.0.0"},
 		},
+		{
+			name: "version with operator prefix",
+			lockfile: &PipfileLock{
+				Default: map[string]LockedPackage{
+					"futures":  {Version: ">=2.0"},
+					"package2": {Version: "~=1.5"},
+					"package3": {Version: "!=2.0"},
+				},
+			},
+			includeDevDeps: false,
+			wantContains:   []string{"futures>=2.0", "package2~=1.5", "package3!=2.0"},
+		},
 	}
 
 	for _, tt := range tests {
