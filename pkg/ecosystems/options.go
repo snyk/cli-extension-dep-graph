@@ -12,6 +12,7 @@ type GlobalOptions struct {
 	TargetFile  *string
 	AllProjects bool
 	IncludeDev  bool
+	RawFlags    []string
 }
 
 // PythonOptions contains Python-specific options for dependency graph generation.
@@ -42,5 +43,10 @@ func (o *SCAPluginOptions) WithNoBuildIsolation(noBuildIsolation bool) *SCAPlugi
 
 func (o *SCAPluginOptions) WithIncludeDev(includeDev bool) *SCAPluginOptions {
 	o.Global.IncludeDev = includeDev
+	return o
+}
+
+func (o *SCAPluginOptions) WithRawFlags(rawflags string) *SCAPluginOptions {
+	o.Global.RawFlags = append(o.Global.RawFlags, rawflags)
 	return o
 }
