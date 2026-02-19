@@ -138,7 +138,7 @@ func TestClassifyPipError(t *testing.T) {
 				err:    context.DeadlineExceeded,
 				stderr: "some output",
 			},
-			wantErrCode: "SNYK-0004",
+			wantErrCode: "SNYK-OS-PYTHON-0009",
 		},
 		"generic_pip_error": {
 			err: &pipError{

@@ -165,8 +165,6 @@ github.com/snyk/code-client-go v1.24.3 h1:2TVOADxyNpdFQ79y25ci/RPw3KW28OmLFf9Xv5
 github.com/snyk/code-client-go v1.24.3/go.mod h1:uMlmMToe4uuNhNLs+yxjM3WFbytna+ytDWhpbnNwTSk=
 github.com/snyk/dep-graph/go v0.0.0-20251219134535-fcb262dc6d25 h1:dwJ4Kdp4c5aaWI+waHomarhouWF6BUYzfen0B6aqaNA=
 github.com/snyk/dep-graph/go v0.0.0-20251219134535-fcb262dc6d25/go.mod h1:hTr91da/4ze2nk9q6ZW1BmfM2Z8rLUZSEZ3kK+6WGpc=
-github.com/snyk/error-catalog-golang-public v0.0.0-20251029091002-52bc5ef82c45 h1:CN5E7U5U4oxrkGohSZLLUHbWwVEc1xkyWIoQyIKNMTU=
-github.com/snyk/error-catalog-golang-public v0.0.0-20251029091002-52bc5ef82c45/go.mod h1:Ytttq7Pw4vOCu9NtRQaOeDU2dhBYUyNBe6kX4+nIIQ4=
 github.com/snyk/error-catalog-golang-public v0.0.0-20260108110943-21ad0c940c14 h1:R74dgtKtcrIOG/349YDV8arH7D09pob3lAcJc290FqI=
 github.com/snyk/error-catalog-golang-public v0.0.0-20260108110943-21ad0c940c14/go.mod h1:Ytttq7Pw4vOCu9NtRQaOeDU2dhBYUyNBe6kX4+nIIQ4=
 github.com/snyk/go-application-framework v0.0.0-20251201143055-028dabb99a6d h1:hU+haVM8HI7S+7j8di8ChPTUHo+QTfrXflO2Nm8ShmE=

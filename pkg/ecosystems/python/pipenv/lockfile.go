@@ -96,12 +96,22 @@ func (l *PipfileLock) ToConstraints(includeDevDeps bool) []string {
 
 // formatConstraint converts a locked package to constraints format.
 func formatConstraint(name string, pkg *LockedPackage) string {
-	// Skip git/path dependencies - they can't be constrained by version
-	if pkg.Git != "" || pkg.Path != "" {
+	// Handle git dependencies with pip-compatible git URL format
+	if pkg.Git != "" {
+		// Format: package @ git+https://github.com/user/repo.git@ref
+		constraint := name + " @ git+" + pkg.Git
+		if pkg.Ref != "" {
+			constraint += "@" + pkg.Ref
+		}
+		return constraint
+	}
+
+	// Skip path dependencies - they reference local files
+	if pkg.Path != "" {
 		return ""
 	}
 
-	// Version in Pipfile.lock is always pinned in "==X.Y.Z" format
+	// Version in Pipfile.lock is usually pinned in "==X.Y.Z" format
 	version := pkg.Version
 	if version == "" {
 		return ""
@@ -110,8 +120,12 @@ func formatConstraint(name string, pkg *LockedPackage) string {
 	// Normalize package name (replace underscores with hyphens, lowercase)
 	normalizedName := strings.ToLower(strings.ReplaceAll(name, "_", "-"))
 
-	// Pipfile.lock versions are always pinned with ==
-	if strings.HasPrefix(version, "==") {
+	// Check if version already has an operator prefix (==, >=, <=, !=, ~=, <, >)
+	// If so, use it as-is; otherwise add ==
+	if strings.HasPrefix(version, "==") || strings.HasPrefix(version, ">=") ||
+		strings.HasPrefix(version, "<=") || strings.HasPrefix(version, "!=") ||
+		strings.HasPrefix(version, "~=") || strings.HasPrefix(version, "<") ||
+		strings.HasPrefix(version, ">") {
 		return normalizedName + version
 	}
 

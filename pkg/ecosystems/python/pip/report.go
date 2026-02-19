@@ -188,23 +188,21 @@ func (e *pipError) Unwrap() error {
 //nolint:gocyclo // Error classification requires checking multiple patterns sequentially
 func classifyPipError(ctx context.Context, err error) error {
 	// Check for context cancellation or timeout early
-	if ctx.Err() != nil && errors.Is(ctx.Err(), context.Canceled) {
+	if errors.Is(ctx.Err(), context.Canceled) {
 		// User-initiated cancellation (e.g., Ctrl+C) - not a catalog error
 		return fmt.Errorf("pip install canceled: %w", ctx.Err())
+	} else if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		// Timeout - use catalog timeout error
+		return snyk.NewTimeoutError(
+			"Pip install timed out",
+			snyk_errors.WithCause(ctx.Err()),
+		)
 	}
 
 	var pipErr *pipError
 	if !errors.As(err, &pipErr) {
 		// Not a pip error, return as-is
 		return fmt.Errorf("pip install failed: %w", err)
-	}
-
-	if errors.Is(pipErr.err, context.DeadlineExceeded) {
-		// Timeout - use catalog timeout error
-		return snyk.NewTimeoutError(
-			"Pip install timed out",
-			snyk_errors.WithCause(pipErr.err),
-		)
 	}
 
 	stderr := pipErr.stderr

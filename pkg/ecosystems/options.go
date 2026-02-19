@@ -1,63 +1,52 @@
 package ecosystems
 
-import "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-
 // SCAPluginOptions contains configuration options for SCA plugins,
 // including global settings and language-specific options.
 type SCAPluginOptions struct {
-	GlobalOptions
-	PythonOptions
+	Global GlobalOptions
+	Python PythonOptions
 }
 
 // GlobalOptions contains options that apply globally across all SCA plugins.
 type GlobalOptions struct {
 	TargetFile  *string
 	AllProjects bool
-	Logger      logger.Logger
+	IncludeDev  bool
 	RawFlags    []string
 }
 
 // PythonOptions contains Python-specific options for dependency graph generation.
 type PythonOptions struct {
 	NoBuildIsolation bool
-	PipenvIncludeDev bool
 }
 
 func NewPluginOptions() *SCAPluginOptions {
 	return &SCAPluginOptions{
-		GlobalOptions: GlobalOptions{
-			Logger: logger.Nop(),
-		},
-		PythonOptions: PythonOptions{},
+		Python: PythonOptions{},
 	}
 }
 
 func (o *SCAPluginOptions) WithTargetFile(targetFile string) *SCAPluginOptions {
-	o.TargetFile = &targetFile
+	o.Global.TargetFile = &targetFile
 	return o
 }
 
 func (o *SCAPluginOptions) WithAllProjects(allProjects bool) *SCAPluginOptions {
-	o.AllProjects = allProjects
-	return o
-}
-
-func (o *SCAPluginOptions) WithLogger(l logger.Logger) *SCAPluginOptions {
-	o.Logger = l
+	o.Global.AllProjects = allProjects
 	return o
 }
 
 func (o *SCAPluginOptions) WithNoBuildIsolation(noBuildIsolation bool) *SCAPluginOptions {
-	o.NoBuildIsolation = noBuildIsolation
+	o.Python.NoBuildIsolation = noBuildIsolation
 	return o
 }
 
-func (o *SCAPluginOptions) WithPipenvIncludeDev(pipenvIncludeDev bool) *SCAPluginOptions {
-	o.PipenvIncludeDev = pipenvIncludeDev
+func (o *SCAPluginOptions) WithIncludeDev(includeDev bool) *SCAPluginOptions {
+	o.Global.IncludeDev = includeDev
 	return o
 }
 
-func (o *SCAPluginOptions) WithRawFlags(rawFlags []string) *SCAPluginOptions {
-	o.RawFlags = rawFlags
+func (o *SCAPluginOptions) WithRawFlags(rawflags string) *SCAPluginOptions {
+	o.Global.RawFlags = append(o.Global.RawFlags, rawflags)
 	return o
 }

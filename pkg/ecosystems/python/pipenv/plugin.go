@@ -34,8 +34,9 @@ type Plugin struct{}
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
 // BuildDepGraphsFromDir discovers and builds dependency graphs for Pipenv projects.
-func (p Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *ecosystems.SCAPluginOptions) ([]ecosystems.SCAResult, error) {
-	log := options.GlobalOptions.Logger
+func (p Plugin) BuildDepGraphsFromDir(
+	ctx context.Context, log logger.Logger, dir string, options *ecosystems.SCAPluginOptions,
+) ([]ecosystems.SCAResult, error) {
 	if log == nil {
 		log = logger.Nop()
 	}
@@ -66,7 +67,7 @@ func (p Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *
 
 	for _, file := range files {
 		g.Go(func() error {
-			result, err := p.buildDepGraphFromPipfile(ctx, log, file, pythonVersion, options.PythonOptions.NoBuildIsolation, options.PythonOptions.PipenvIncludeDev)
+			result, err := p.buildDepGraphFromPipfile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation, options.Global.IncludeDev)
 			if err != nil {
 				attrs := []logger.Field{
 					logger.Attr(logFieldFile, file.RelPath),
@@ -108,12 +109,12 @@ func (p Plugin) discoverPipfiles(ctx context.Context, dir string, options *ecosy
 	var findOpts []discovery.FindOption
 
 	switch {
-	case options.GlobalOptions.TargetFile != nil:
+	case options.Global.TargetFile != nil:
 		// Use specific target file if provided
 		findOpts = []discovery.FindOption{
-			discovery.WithTargetFile(*options.GlobalOptions.TargetFile),
+			discovery.WithTargetFile(*options.Global.TargetFile),
 		}
-	case options.GlobalOptions.AllProjects:
+	case options.Global.AllProjects:
 		// Find all Pipfile files recursively
 		findOpts = []discovery.FindOption{
 			discovery.WithInclude(pipfileFile),
@@ -197,6 +198,9 @@ func (p Plugin) buildDepGraphFromPipfile(
 }
 
 // getInstallReport runs pip install --dry-run with packages and constraints passed directly.
+// The lockfile is always present (either parsed or generated), so we pass only package names
+// and let the constraints file (from lockfile) control all version pinning. This avoids
+// conflicts where pip sees the same package specified twice with different version constraints.
 func (p Plugin) getInstallReport(
 	ctx context.Context,
 	pipfile *Pipfile,
@@ -204,17 +208,15 @@ func (p Plugin) getInstallReport(
 	noBuildIsolation bool,
 	includeDevDeps bool,
 ) (*pip.Report, error) {
-	// Get packages from Pipfile
-	packages := pipfile.ToRequirements(includeDevDeps)
+	// Get package names without version specifiers
+	packages := pipfile.ToPackageNames(includeDevDeps)
 	if len(packages) == 0 {
 		// Return empty report for empty Pipfile (creates depgraph with just root node)
 		return &pip.Report{}, nil
 	}
 
-	var constraints []string
-	if lockfile != nil {
-		constraints = lockfile.ToConstraints(includeDevDeps)
-	}
+	// Get constraints from lockfile (all packages with pinned versions)
+	constraints := lockfile.ToConstraints(includeDevDeps)
 
 	// Get pip install report passing packages and constraints directly
 	report, err := pip.GetInstallReportFromPackages(ctx, packages, constraints, noBuildIsolation)
