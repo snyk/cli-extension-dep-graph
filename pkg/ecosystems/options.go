@@ -1,5 +1,11 @@
 package ecosystems
 
+import (
+	"fmt"
+
+	"github.com/alexflint/go-arg"
+)
+
 // SCAPluginOptions contains configuration options for SCA plugins,
 // including global settings and language-specific options.
 type SCAPluginOptions struct {
@@ -9,21 +15,45 @@ type SCAPluginOptions struct {
 
 // GlobalOptions contains options that apply globally across all SCA plugins.
 type GlobalOptions struct {
-	TargetFile  *string
-	AllProjects bool
-	IncludeDev  bool
+	TargetFile  *string `arg:"--target-file"`
+	AllProjects bool    `arg:"--all-projects"`
+	IncludeDev  bool    `arg:"--dev"`
 	RawFlags    []string
 }
 
 // PythonOptions contains Python-specific options for dependency graph generation.
 type PythonOptions struct {
-	NoBuildIsolation bool
+	NoBuildIsolation bool `arg:"--no-build-isolation"`
 }
 
 func NewPluginOptions() *SCAPluginOptions {
 	return &SCAPluginOptions{
 		Python: PythonOptions{},
 	}
+}
+
+func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) {
+	var args struct {
+		GlobalOptions
+		PythonOptions
+	}
+
+	parser, err := arg.NewParser(arg.Config{}, &args)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create argument parser: %w", err)
+	}
+
+	err = parser.Parse(rawFlags)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse raw flags: %w", err)
+	}
+
+	args.RawFlags = rawFlags
+
+	return &SCAPluginOptions{
+		Global: args.GlobalOptions,
+		Python: args.PythonOptions,
+	}, nil
 }
 
 func (o *SCAPluginOptions) WithTargetFile(targetFile string) *SCAPluginOptions {
