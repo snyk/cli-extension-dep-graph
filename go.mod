@@ -6,6 +6,7 @@ toolchain go1.24.10
 
 require (
 	github.com/BurntSushi/toml v1.6.0
+	github.com/alexflint/go-arg v1.6.1
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/golang/mock v1.6.0
 	github.com/rs/zerolog v1.34.0
@@ -22,6 +23,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
 	github.com/alexbrainman/sspi v0.0.0-20210105120005-909beea2cc74 // indirect
+	github.com/alexflint/go-scalar v1.2.0 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
