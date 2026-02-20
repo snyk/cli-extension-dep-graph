@@ -35,16 +35,52 @@ var _ interface { //nolint:errcheck // Compile-time interface assertion, no erro
 	Unwrap() error
 } = (*LegacyCLIJSONError)(nil)
 
-// extractLegacyCLIError extracts the error message from the legacy cli if possible.
-func extractLegacyCLIError(input error, data []workflow.Data) error {
-	output := input
+type jsonAPIErrorWrapper struct {
+	Error json.RawMessage `json:"error"`
+}
 
+// parseJSONAPIError parses bytes as a JSON:API error document. Returns the first error if present;
+// callers use a single error (e.g. ExtractLegacyCLIError returns error, SCAResult.Error is one per result).
+func parseJSONAPIError(bytes []byte) (snyk_errors.Error, bool) {
+	errs, err := snyk_errors.FromJSONAPIErrorBytes(bytes)
+	if err != nil || len(errs) == 0 {
+		return snyk_errors.Error{}, false
+	}
+	return errs[0], true
+}
+
+// tryParseErrorCatalogFromPayload attempts to parse ErrorCatalog (JSON:API) from workflow payload.
+// Tries raw payload first, then payload under an "error" key (e.g. one JSONL line).
+func tryParseErrorCatalogFromPayload(data []workflow.Data) (snyk_errors.Error, bool) {
+	if len(data) == 0 {
+		return snyk_errors.Error{}, false
+	}
+	bytes, ok := data[0].GetPayload().([]byte)
+	if !ok || len(bytes) == 0 {
+		return snyk_errors.Error{}, false
+	}
+	if err, ok := parseJSONAPIError(bytes); ok {
+		return err, true
+	}
+	var wrapper jsonAPIErrorWrapper
+	if json.Unmarshal(bytes, &wrapper) == nil && len(wrapper.Error) > 0 {
+		return parseJSONAPIError(wrapper.Error)
+	}
+	return snyk_errors.Error{}, false
+}
+
+// extractLegacyCLIError extracts the error message from the legacy cli if possible.
+func ExtractLegacyCLIError(input error, data []workflow.Data) error {
 	var errCatalogErr snyk_errors.Error
 	if errors.As(input, &errCatalogErr) {
 		return input
 	}
+	if err, ok := tryParseErrorCatalogFromPayload(data); ok {
+		return err
+	}
 
-	// extract error from legacy cli if possible and wrap it in an error instance
+	output := input
+
 	var xerr *exec.ExitError
 	if errors.As(input, &xerr) && len(data) > 0 {
 		bytes, ok := data[0].GetPayload().([]byte)

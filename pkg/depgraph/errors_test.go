@@ -14,7 +14,7 @@ const (
 	testDataTypeID = "something"
 )
 
-func Test_extractLegacyCLIError_ErrorFromLegacyCLI(t *testing.T) {
+func Test_ExtractLegacyCLIError_ErrorFromLegacyCLI(t *testing.T) {
 	expectedMsgJSON := `{
 		"ok": false,
 		"error": "Hello Error",
@@ -24,14 +24,14 @@ func Test_extractLegacyCLIError_ErrorFromLegacyCLI(t *testing.T) {
 	wrappedErr := fmt.Errorf("something bad happened: %w", &exec.ExitError{})
 	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, testDataTypeID), contentTypeJSON, []byte(expectedMsgJSON))
 
-	outputError := extractLegacyCLIError(wrappedErr, []workflow.Data{data})
+	outputError := ExtractLegacyCLIError(wrappedErr, []workflow.Data{data})
 
 	var snykErr snyk_errors.Error
 	assert.ErrorAs(t, outputError, &snykErr)
 	assert.Equal(t, "Hello Error", snykErr.Detail)
 }
 
-func Test_extractLegacyCLIError_ErrorCatalogFromLegacyCLI(t *testing.T) {
+func Test_ExtractLegacyCLIError_ErrorCatalogFromLegacyCLI(t *testing.T) {
 	err := snyk_errors.Error{
 		ID:     "SNYK-ID-FOO-BAR-123",
 		Title:  "Some error",
@@ -40,29 +40,29 @@ func Test_extractLegacyCLIError_ErrorCatalogFromLegacyCLI(t *testing.T) {
 
 	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, testDataTypeID), contentTypeJSON, nil)
 
-	outputError := extractLegacyCLIError(err, []workflow.Data{data})
+	outputError := ExtractLegacyCLIError(err, []workflow.Data{data})
 
 	var snykErr snyk_errors.Error
 	assert.ErrorAs(t, outputError, &snykErr)
 	assert.Equal(t, "Something bad happened", snykErr.Detail)
 }
 
-func Test_extractLegacyCLIError_InputSameAsOutput(t *testing.T) {
+func Test_ExtractLegacyCLIError_InputSameAsOutput(t *testing.T) {
 	inputError := fmt.Errorf("some other error")
 	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, "something"), "application/json", []byte{})
 
-	outputError := extractLegacyCLIError(inputError, []workflow.Data{data})
+	outputError := ExtractLegacyCLIError(inputError, []workflow.Data{data})
 
 	var snykErr snyk_errors.Error
 	assert.ErrorAs(t, outputError, &snykErr)
 	assert.Equal(t, inputError.Error(), snykErr.Detail)
 }
 
-func Test_extractLegacyCLIError_RetainExitError(t *testing.T) {
+func Test_ExtractLegacyCLIError_RetainExitError(t *testing.T) {
 	inputError := &exec.ExitError{}
 	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, "something"), "application/json", []byte{})
 
-	outputError := extractLegacyCLIError(inputError, []workflow.Data{data})
+	outputError := ExtractLegacyCLIError(inputError, []workflow.Data{data})
 
 	assert.ErrorIs(t, outputError, inputError)
 }
