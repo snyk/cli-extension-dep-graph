@@ -66,7 +66,7 @@ func TestClassifyPipError(t *testing.T) {
 		"syntax_error_invalid_requirement": {
 			err: &pipError{
 				err:    fmt.Errorf("exit status 1"),
-				stderr: "ERROR: Invalid requirement: 'invalid===syntax!!!'",
+				stderr: "ERROR: Invalid requirement: 'invalid-syntax['",
 			},
 			wantErrCode: "SNYK-OS-PYTHON-0005",
 		},

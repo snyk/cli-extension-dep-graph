@@ -38,7 +38,7 @@ func (e *uvCmdExecutor) Execute(binary, dir string, args ...string) ([]byte, err
 		return nil, err
 	}
 
-	cmd := exec.Command(resolvedBinary, args...)
+	cmd := exec.Command(resolvedBinary, args...) //nolint:noctx // No context available in this function
 	cmd.Dir = dir
 
 	var stdout, stderr bytes.Buffer
@@ -56,7 +56,7 @@ func (e *uvCmdExecutor) Execute(binary, dir string, args ...string) ([]byte, err
 }
 
 func checkVersion(binary string) error {
-	cmd := exec.Command(binary, "--version")
+	cmd := exec.Command(binary, "--version") //nolint:noctx // No context available in this function
 	output, err := cmd.Output()
 	if err != nil {
 		return clierrors.NewGeneralSCAFailureError(
@@ -122,7 +122,7 @@ func mustAtoi(s string) int {
 }
 
 func formatVersion(version Version) string {
-	versionStrs := []string{}
+	versionStrs := make([]string, 0, len(version))
 	for _, v := range version {
 		versionStrs = append(versionStrs, strconv.Itoa(v))
 	}

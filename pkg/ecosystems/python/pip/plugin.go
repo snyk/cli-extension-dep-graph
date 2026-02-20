@@ -188,7 +188,7 @@ func GetPythonVersion() (string, error) {
 
 // execPythonVersion executes python --version and parses the output.
 func execPythonVersion(pythonCmd string) (string, error) {
-	cmd := exec.Command(pythonCmd, "--version")
+	cmd := exec.Command(pythonCmd, "--version") //nolint:noctx // No context available in this function
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to execute %s --version: %w", pythonCmd, err)
