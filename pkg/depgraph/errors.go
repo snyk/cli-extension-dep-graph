@@ -35,16 +35,34 @@ var _ interface { //nolint:errcheck // Compile-time interface assertion, no erro
 	Unwrap() error
 } = (*LegacyCLIJSONError)(nil)
 
-// extractLegacyCLIError extracts the error message from the legacy cli if possible.
-func extractLegacyCLIError(input error, data []workflow.Data) error {
-	output := input
+type jsonAPIErrorWrapper struct {
+	Error json.RawMessage `json:"error"`
+}
 
+// extractLegacyCLIError extracts the error message from the legacy cli if possible.
+func ExtractLegacyCLIError(input error, data []workflow.Data) error {
 	var errCatalogErr snyk_errors.Error
 	if errors.As(input, &errCatalogErr) {
 		return input
 	}
 
-	// extract error from legacy cli if possible and wrap it in an error instance
+	if len(data) > 0 {
+		bytes, ok := data[0].GetPayload().([]byte)
+		if ok && len(bytes) > 0 {
+			if errs, err := snyk_errors.FromJSONAPIErrorBytes(bytes); err == nil && len(errs) > 0 {
+				return errs[0]
+			}
+			var wrapper jsonAPIErrorWrapper
+			if json.Unmarshal(bytes, &wrapper) == nil && len(wrapper.Error) > 0 {
+				if errs, err := snyk_errors.FromJSONAPIErrorBytes(wrapper.Error); err == nil && len(errs) > 0 {
+					return errs[0]
+				}
+			}
+		}
+	}
+
+	output := input
+
 	var xerr *exec.ExitError
 	if errors.As(input, &xerr) && len(data) > 0 {
 		bytes, ok := data[0].GetPayload().([]byte)
