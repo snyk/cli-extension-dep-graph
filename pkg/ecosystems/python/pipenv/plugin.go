@@ -33,6 +33,19 @@ type Plugin struct{}
 // Compile-time check to ensure Plugin implements SCAPlugin interface.
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
+// Name returns the unique name of the plugin.
+func (p *Plugin) Name() string {
+	return "pipenv"
+}
+
+// Capability returns the plugin's capability descriptor.
+func (p *Plugin) Capability() ecosystems.PluginCapability {
+	return ecosystems.PluginCapability{
+		PrimaryManifests:   []string{pipfileFile},
+		RequiredCompanions: []string{pipfileLockFile},
+	}
+}
+
 // BuildDepGraphsFromDir discovers and builds dependency graphs for Pipenv projects.
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context, log logger.Logger, dir string, options *ecosystems.SCAPluginOptions,
