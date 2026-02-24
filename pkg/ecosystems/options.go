@@ -17,7 +17,7 @@ type SCAPluginOptions struct {
 type GlobalOptions struct {
 	TargetFile  *string `arg:"--target-file"`
 	AllProjects bool    `arg:"--all-projects"`
-	IncludeDev  bool    `arg:"--dev"`
+	IncludeDev  bool    `arg:"--dev,-d"`
 	RawFlags    []string
 }
 

@@ -102,6 +102,23 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "only d",
+			rawFlags: []string{
+				"-d",
+			},
+			expected: &SCAPluginOptions{
+				Global: GlobalOptions{
+					TargetFile:  nil,
+					AllProjects: false,
+					IncludeDev:  true,
+				},
+				Python: PythonOptions{
+					NoBuildIsolation: false,
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "only no-build-isolation",
 			rawFlags: []string{
 				"--no-build-isolation",
