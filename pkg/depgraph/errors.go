@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 
+	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 	clierrors "github.com/snyk/error-catalog-golang-public/cli"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/snyk/go-application-framework/pkg/workflow"
@@ -39,8 +40,8 @@ type jsonAPIErrorWrapper struct {
 	Error json.RawMessage `json:"error"`
 }
 
-// parseJSONAPIError parses bytes as a JSON:API error document. Returns the first error if present;
-// callers use a single error (e.g. ExtractLegacyCLIError returns error, SCAResult.Error is one per result).
+// parseJSONAPIError returns the first error from the JSON API "errors" array if present.
+// The legacy CLI uses JSON API format where "error" contains "errors": [].
 func parseJSONAPIError(bytes []byte) (snyk_errors.Error, bool) {
 	errs, err := snyk_errors.FromJSONAPIErrorBytes(bytes)
 	if err != nil || len(errs) == 0 {
@@ -49,8 +50,11 @@ func parseJSONAPIError(bytes []byte) (snyk_errors.Error, bool) {
 	return errs[0], true
 }
 
-// tryParseErrorCatalogFromPayload attempts to parse ErrorCatalog (JSON:API) from workflow payload.
-// Tries raw payload first, then payload under an "error" key (e.g. one JSONL line).
+// tryParseErrorCatalogFromPayload extracts a single ErrorCatalog error from legacy workflow
+// data when the invocation fails. Used only in the fallback path where we return one error
+// (e.g. no parseable JSONL to build partial results). The payload may be single JSON or
+// JSONL; we return the first parseable error so os-flows can render it. The main path
+// (orchestrator) parses JSONL and returns full results (one SCAResult per line) instead.
 func tryParseErrorCatalogFromPayload(data []workflow.Data) (snyk_errors.Error, bool) {
 	if len(data) == 0 {
 		return snyk_errors.Error{}, false
@@ -59,12 +63,39 @@ func tryParseErrorCatalogFromPayload(data []workflow.Data) (snyk_errors.Error, b
 	if !ok || len(bytes) == 0 {
 		return snyk_errors.Error{}, false
 	}
+	// Try single JSON (e.g. legacy --json output).
 	if err, ok := parseJSONAPIError(bytes); ok {
 		return err, true
 	}
 	var wrapper jsonAPIErrorWrapper
 	if json.Unmarshal(bytes, &wrapper) == nil && len(wrapper.Error) > 0 {
-		return parseJSONAPIError(wrapper.Error)
+		if err, ok := parseJSONAPIError(wrapper.Error); ok {
+			return err, true
+		}
+	}
+	// Payload may be JSONL (e.g. --print-effective-graph-with-errors): one line per project,
+	// each line may have an "error" field with "errors": [].
+	if err, ok := tryParseFirstErrorFromJSONL(bytes); ok {
+		return err, true
+	}
+	return snyk_errors.Error{}, false
+}
+
+// tryParseFirstErrorFromJSONL parses payload as JSONL and returns the first parseable
+// ErrorCatalog error (used only when we need a single error for the fallback path, not
+// when building full partial results in the orchestrator).
+func tryParseFirstErrorFromJSONL(payload []byte) (snyk_errors.Error, bool) {
+	outputs, err := parsers.NewJSONL().ParseOutput(payload)
+	if err != nil || len(outputs) == 0 {
+		return snyk_errors.Error{}, false
+	}
+	for i := range outputs {
+		if len(outputs[i].Error) == 0 {
+			continue
+		}
+		if err, ok := parseJSONAPIError(outputs[i].Error); ok {
+			return err, true
+		}
 	}
 	return snyk_errors.Error{}, false
 }
