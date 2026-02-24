@@ -1,16 +1,21 @@
 package orchestrator
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pip"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pipenv"
 )
 
 var legacyCLIWorkflowID = workflow.NewWorkflowIdentifier("legacycli")
@@ -18,9 +23,18 @@ var legacyCLIWorkflowID = workflow.NewWorkflowIdentifier("legacycli")
 // ResolveDepgraphs resolves dependency graphs for a directory by invoking the legacy CLI workflow.
 // It accepts a workflow.InvocationContext to provide access to the engine, configuration, and logger.
 // Returns a channel of SCAResult structs containing dependency graphs and associated metadata.
-func ResolveDepgraphs(ictx workflow.InvocationContext, _ string, configuration ecosystems.SCAPluginOptions) (<-chan ecosystems.SCAResult, error) {
+func ResolveDepgraphs(ictx workflow.InvocationContext, dir string, configuration ecosystems.SCAPluginOptions) (<-chan ecosystems.SCAResult, error) {
+	enhancedLogger := ictx.GetEnhancedLogger()
+
+	pythonResults := resolvePython(ictx.Context(), enhancedLogger, dir, configuration)
+
+	processedFiles := make([]string, 0, len(pythonResults))
+	for _, result := range pythonResults {
+		processedFiles = append(processedFiles, result.Metadata.TargetFile)
+	}
+
 	// Call legacy fallback to get results
-	results, err := LegacyFallback(ictx, configuration)
+	results, err := LegacyFallback(ictx, configuration, processedFiles)
 	if err != nil {
 		return nil, fmt.Errorf("legacy fallback failed: %w", err)
 	}
@@ -30,13 +44,36 @@ func ResolveDepgraphs(ictx workflow.InvocationContext, _ string, configuration e
 	for _, result := range results {
 		resultsChan <- result
 	}
+	for _, result := range pythonResults {
+		resultsChan <- result
+	}
 	close(resultsChan)
 
 	return resultsChan, nil
 }
 
+func resolvePython(ctx context.Context, enhancedLogger *zerolog.Logger, dir string, configuration ecosystems.SCAPluginOptions) []ecosystems.SCAResult {
+	logger := logger.NewFromZerolog(enhancedLogger)
+
+	pipResults, err := pip.Plugin{}.BuildDepGraphsFromDir(ctx, logger, dir, &configuration)
+	if err != nil {
+		enhancedLogger.Warn().Err(err).Msg("pip plugin failed, continuing with other plugins")
+	}
+
+	pipenvResults, err := pipenv.Plugin{}.BuildDepGraphsFromDir(ctx, logger, dir, &configuration)
+	if err != nil {
+		enhancedLogger.Warn().Err(err).Msg("pipenv plugin failed, continuing with other plugins")
+	}
+
+	results := make([]ecosystems.SCAResult, 0, len(pipResults)+len(pipenvResults))
+	results = append(results, pipResults...)
+	results = append(results, pipenvResults...)
+
+	return results
+}
+
 // LegacyFallback invokes the legacy CLI workflow with the raw flags and returns parsed results.
-func LegacyFallback(ictx workflow.InvocationContext, options ecosystems.SCAPluginOptions) ([]ecosystems.SCAResult, error) {
+func LegacyFallback(ictx workflow.InvocationContext, options ecosystems.SCAPluginOptions, processedFiles []string) ([]ecosystems.SCAResult, error) {
 	logger := ictx.GetEnhancedLogger()
 	config := ictx.GetConfiguration()
 	engine := ictx.GetEngine()
@@ -44,6 +81,10 @@ func LegacyFallback(ictx workflow.InvocationContext, options ecosystems.SCAPlugi
 	// Add --print-effective-graph-with-errors for JSONL output with error handling
 	cmdArgs := append([]string(nil), options.Global.RawFlags...)
 	cmdArgs = append(cmdArgs, "--print-effective-graph-with-errors")
+
+	for _, file := range processedFiles {
+		cmdArgs = append(cmdArgs, "--exclude="+file)
+	}
 
 	// Clone config and set the command args
 	legacyConfig := config.Clone()
