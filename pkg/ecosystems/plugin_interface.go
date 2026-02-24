@@ -24,7 +24,22 @@ type SCAResult struct {
 }
 
 // SCAPlugin defines the interface for SCA plugins that build dependency graphs
-// from a directory containing project files.
+// from a directory containing project files. Plugins must also describe their
+// capabilities for the plugin registry system.
 type SCAPlugin interface {
+	// BuildDepGraphsFromDir builds dependency graphs from files in the given directory
 	BuildDepGraphsFromDir(ctx context.Context, log logger.Logger, dir string, options *SCAPluginOptions) ([]SCAResult, error)
+	// Name returns the unique name of the plugin
+	Name() string
+	// Capability returns the plugin's capability descriptor
+	Capability() PluginCapability
+}
+
+// PluginCapability describes what manifest files a plugin can handle
+type PluginCapability struct {
+	// PrimaryManifests are the main manifest files this plugin handles (e.g., "requirements.txt", "Pipfile")
+	PrimaryManifests []string
+
+	// RequiredCompanions are files that must exist alongside the primary manifest (e.g., "Pipfile.lock" for "Pipfile")
+	RequiredCompanions []string
 }

@@ -10,6 +10,17 @@ import (
 
 type Plugin struct{}
 
+func (p Plugin) Name() string {
+	return "uv"
+}
+
+func (p Plugin) Capability() ecosystems.PluginCapability {
+	return ecosystems.PluginCapability{
+		PrimaryManifests:   nil,
+		RequiredCompanions: nil,
+	}
+}
+
 // Compile-time check to ensure Plugin implements SCAPlugin interface.
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
