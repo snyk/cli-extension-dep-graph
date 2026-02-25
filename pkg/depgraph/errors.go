@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
+
 	clierrors "github.com/snyk/error-catalog-golang-public/cli"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/snyk/go-application-framework/pkg/workflow"
@@ -50,11 +51,7 @@ func parseJSONAPIError(bytes []byte) (snyk_errors.Error, bool) {
 	return errs[0], true
 }
 
-// tryParseErrorCatalogFromPayload extracts a single ErrorCatalog error from legacy workflow
-// data when the invocation fails. Used only in the fallback path where we return one error
-// (e.g. no parseable JSONL to build partial results). The payload may be single JSON or
-// JSONL; we return the first parseable error so os-flows can render it. The main path
-// (orchestrator) parses JSONL and returns full results (one SCAResult per line) instead.
+// tryParseErrorCatalogFromPayload returns the first ErrorCatalog error from legacy payload (JSON or JSONL). Fallback path only.
 func tryParseErrorCatalogFromPayload(data []workflow.Data) (snyk_errors.Error, bool) {
 	if len(data) == 0 {
 		return snyk_errors.Error{}, false
@@ -81,9 +78,7 @@ func tryParseErrorCatalogFromPayload(data []workflow.Data) (snyk_errors.Error, b
 	return snyk_errors.Error{}, false
 }
 
-// tryParseFirstErrorFromJSONL parses payload as JSONL and returns the first parseable
-// ErrorCatalog error (used only when we need a single error for the fallback path, not
-// when building full partial results in the orchestrator).
+// tryParseFirstErrorFromJSONL returns the first ErrorCatalog error from JSONL lines (fallback path only).
 func tryParseFirstErrorFromJSONL(payload []byte) (snyk_errors.Error, bool) {
 	outputs, err := parsers.NewJSONL().ParseOutput(payload)
 	if err != nil || len(outputs) == 0 {

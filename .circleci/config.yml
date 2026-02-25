@@ -12,4 +12,6 @@ workflows:
           base-revision: main
           mapping: |
             pkg/ecosystems/python/.* run-python-tests true
+            pkg/ecosystems/testdata/fixtures/python/.* run-python-tests true
+            .circleci/.* run-python-tests true
           config-path: .circleci/continue-config.yml

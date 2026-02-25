@@ -25,10 +25,10 @@ var legacyCLIWorkflowID = workflow.NewWorkflowIdentifier("legacycli")
 // ResolveDepgraphs resolves dependency graphs for a directory by invoking the legacy CLI workflow.
 // It accepts a workflow.InvocationContext to provide access to the engine, configuration, and logger.
 // Returns a channel of SCAResult structs containing dependency graphs and associated metadata.
-func ResolveDepgraphs(ictx workflow.InvocationContext, dir string, configuration ecosystems.SCAPluginOptions) (<-chan ecosystems.SCAResult, error) {
+func ResolveDepgraphs(ictx workflow.InvocationContext, dir string, opts ecosystems.SCAPluginOptions) (<-chan ecosystems.SCAResult, error) {
 	enhancedLogger := ictx.GetEnhancedLogger()
 
-	pythonResults := resolvePython(ictx.Context(), enhancedLogger, dir, configuration)
+	pythonResults := resolvePython(ictx.Context(), enhancedLogger, dir, opts)
 
 	processedFiles := make([]string, 0, len(pythonResults))
 	for _, result := range pythonResults {
@@ -36,7 +36,7 @@ func ResolveDepgraphs(ictx workflow.InvocationContext, dir string, configuration
 	}
 
 	// Call legacy fallback to get results
-	results, err := LegacyFallback(ictx, configuration, processedFiles)
+	results, err := LegacyFallback(ictx, opts, processedFiles)
 	if err != nil {
 		return nil, err
 	}
@@ -54,15 +54,15 @@ func ResolveDepgraphs(ictx workflow.InvocationContext, dir string, configuration
 	return resultsChan, nil
 }
 
-func resolvePython(ctx context.Context, enhancedLogger *zerolog.Logger, dir string, configuration ecosystems.SCAPluginOptions) []ecosystems.SCAResult {
-	logger := logger.NewFromZerolog(enhancedLogger)
+func resolvePython(ctx context.Context, enhancedLogger *zerolog.Logger, dir string, opts ecosystems.SCAPluginOptions) []ecosystems.SCAResult {
+	log := logger.NewFromZerolog(enhancedLogger)
 
-	pipResults, err := pip.Plugin{}.BuildDepGraphsFromDir(ctx, logger, dir, &configuration)
+	pipResults, err := pip.Plugin{}.BuildDepGraphsFromDir(ctx, log, dir, &opts)
 	if err != nil {
 		enhancedLogger.Warn().Err(err).Msg("pip plugin failed, continuing with other plugins")
 	}
 
-	pipenvResults, err := pipenv.Plugin{}.BuildDepGraphsFromDir(ctx, logger, dir, &configuration)
+	pipenvResults, err := pipenv.Plugin{}.BuildDepGraphsFromDir(ctx, log, dir, &opts)
 	if err != nil {
 		enhancedLogger.Warn().Err(err).Msg("pipenv plugin failed, continuing with other plugins")
 	}
@@ -76,7 +76,7 @@ func resolvePython(ctx context.Context, enhancedLogger *zerolog.Logger, dir stri
 
 // LegacyFallback invokes the legacy CLI workflow with the raw flags and returns parsed results.
 func LegacyFallback(ictx workflow.InvocationContext, options ecosystems.SCAPluginOptions, processedFiles []string) ([]ecosystems.SCAResult, error) {
-	logger := ictx.GetEnhancedLogger()
+	log := ictx.GetEnhancedLogger()
 	config := ictx.GetConfiguration()
 	engine := ictx.GetEngine()
 
@@ -92,15 +92,15 @@ func LegacyFallback(ictx workflow.InvocationContext, options ecosystems.SCAPlugi
 	legacyConfig := config.Clone()
 	legacyConfig.Set(configuration.RAW_CMD_ARGS, cmdArgs)
 
-	// Invoke legacy CLI workflow (stdout is captured even when the process exits with an error).
+	// Invoke legacy CLI workflow
 	legacyData, err := engine.InvokeWithConfig(legacyCLIWorkflowID, legacyConfig)
 	if err != nil {
-		logger.Error().Err(err).Msg("Legacy CLI workflow returned error")
+		log.Error().Err(err).Msg("Legacy CLI workflow returned error")
 	}
 
 	// UV-style: get payload once, then one loop over lines—append success or error result per line.
 	// Only return a single error when there is no parseable payload (or fatal parse/type failure).
-	results, fatalErr := tryBuildResultsFromLegacyPayload(legacyData, err, ictx, logger)
+	results, fatalErr := tryBuildResultsFromLegacyPayload(legacyData, err, ictx, log)
 	if fatalErr != nil {
 		return nil, fatalErr
 	}
@@ -115,8 +115,9 @@ func LegacyFallback(ictx workflow.InvocationContext, options ecosystems.SCAPlugi
 }
 
 // tryBuildResultsFromLegacyPayload extracts payload from legacyData, parses JSONL, and returns SCAResults.
-// Returns (nil, fatalErr) on payload type error or parse failure when invocation succeeded; (results, nil) when we have lines; (nil, nil) when no parseable output.
-func tryBuildResultsFromLegacyPayload(legacyData []workflow.Data, invokeErr error, ictx workflow.InvocationContext, logger *zerolog.Logger) ([]ecosystems.SCAResult, error) {
+func tryBuildResultsFromLegacyPayload(
+	legacyData []workflow.Data, invokeErr error, ictx workflow.InvocationContext, log *zerolog.Logger,
+) ([]ecosystems.SCAResult, error) {
 	var bytes []byte
 	if len(legacyData) > 0 {
 		payload := legacyData[0].GetPayload()
@@ -131,10 +132,10 @@ func tryBuildResultsFromLegacyPayload(legacyData []workflow.Data, invokeErr erro
 	if len(bytes) == 0 {
 		return nil, nil
 	}
-	results, parseErr := parseLegacyJSONLToResults(bytes, ictx)
+	results, parseErr := parseLegacyJSONLToResults(bytes, ictx, log)
 	if parseErr != nil {
 		if invokeErr == nil {
-			logger.Error().Err(parseErr).Msg("Failed to parse JSONL output")
+			log.Error().Err(parseErr).Msg("Failed to parse JSONL output")
 			return nil, fmt.Errorf("failed to parse legacy output: %w", parseErr)
 		}
 		return nil, nil
@@ -145,21 +146,26 @@ func tryBuildResultsFromLegacyPayload(legacyData []workflow.Data, invokeErr erro
 	return results, nil
 }
 
-// parseLegacyJSONLToResults parses JSONL payload and returns SCAResults (one per line). Returns (nil, err) on parse failure, (results, nil) on success, (nil, nil) when no lines.
-func parseLegacyJSONLToResults(bytes []byte, ictx workflow.InvocationContext) ([]ecosystems.SCAResult, error) {
+// parseLegacyJSONLToResults parses JSONL and returns one SCAResult per line. (nil, err) on parse failure; (nil, nil) when no lines.
+func parseLegacyJSONLToResults(bytes []byte, ictx workflow.InvocationContext, log *zerolog.Logger) ([]ecosystems.SCAResult, error) {
 	parser := parsers.NewJSONL()
 	depGraphOutputs, parseErr := parser.ParseOutput(bytes)
 	if parseErr != nil {
-		return nil, parseErr
+		return nil, fmt.Errorf("parse legacy JSONL: %w", parseErr)
 	}
 	if len(depGraphOutputs) == 0 {
 		return nil, nil
 	}
+	// Convert to SCAResults
 	results := make([]ecosystems.SCAResult, 0, len(depGraphOutputs))
 	for i := range depGraphOutputs {
 		output := &depGraphOutputs[i]
 		result, resErr := depGraphOutputToSCAResult(output, ictx)
 		if resErr != nil {
+			log.Error().
+				Str("targetFile", output.NormalisedTargetFile).
+				Err(resErr).
+				Msg("Failed to convert depgraph output")
 			results = append(results, ecosystems.SCAResult{
 				Metadata: ecosystems.Metadata{TargetFile: output.NormalisedTargetFile},
 				Error:    resErr,
@@ -173,7 +179,7 @@ func parseLegacyJSONLToResults(bytes []byte, ictx workflow.InvocationContext) ([
 
 // depGraphOutputToSCAResult converts a parser output to an SCA result.
 func depGraphOutputToSCAResult(output *parsers.DepGraphOutput, ictx workflow.InvocationContext) (ecosystems.SCAResult, error) {
-	logger := ictx.GetEnhancedLogger()
+	log := ictx.GetEnhancedLogger()
 	result := ecosystems.SCAResult{
 		Metadata: ecosystems.Metadata{
 			TargetFile: output.NormalisedTargetFile,
@@ -195,7 +201,7 @@ func depGraphOutputToSCAResult(output *parsers.DepGraphOutput, ictx workflow.Inv
 		var dg depgraph.DepGraph
 		if err := json.Unmarshal(output.DepGraph, &dg); err != nil {
 			// JSON parsing failed - this is a real error, not an expected CLI error
-			logger.Error().
+			log.Error().
 				Str("targetFile", output.NormalisedTargetFile).
 				Err(err).
 				Msg("Failed to unmarshal depgraph JSON")
