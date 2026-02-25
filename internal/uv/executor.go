@@ -13,7 +13,7 @@ import (
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 )
 
-var minVersion = Version{0, 9, 23}
+var minVersion = Version{0, 9, 29}
 
 // cmdExecutor interface for executing commands mockable.
 type cmdExecutor interface {
