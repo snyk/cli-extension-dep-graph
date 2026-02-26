@@ -21,6 +21,7 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 				"--target-file", targetFile,
 				"--all-projects",
 				"--dev",
+				"--exclude", "foo",
 				"--no-build-isolation",
 			},
 			expected: &SCAPluginOptions{
@@ -28,6 +29,7 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 					TargetFile:  &targetFile,
 					AllProjects: true,
 					IncludeDev:  true,
+					Exclude:     []string{"foo"},
 				},
 				Python: PythonOptions{
 					NoBuildIsolation: true,
@@ -114,6 +116,18 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 				},
 				Python: PythonOptions{
 					NoBuildIsolation: false,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "only exclude",
+			rawFlags: []string{
+				"--exclude", "foo,bar",
+			},
+			expected: &SCAPluginOptions{
+				Global: GlobalOptions{
+					Exclude: []string{"foo", "bar"},
 				},
 			},
 			wantErr: false,
