@@ -2,6 +2,7 @@ package ecosystems
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/alexflint/go-arg"
 )
@@ -15,10 +16,18 @@ type SCAPluginOptions struct {
 
 // GlobalOptions contains options that apply globally across all SCA plugins.
 type GlobalOptions struct {
-	TargetFile  *string `arg:"--target-file"`
-	AllProjects bool    `arg:"--all-projects"`
-	IncludeDev  bool    `arg:"--dev,-d"`
+	TargetFile  *string              `arg:"--target-file"`
+	AllProjects bool                 `arg:"--all-projects"`
+	IncludeDev  bool                 `arg:"--dev,-d"`
+	Exclude     CommaSeparatedString `arg:"--exclude"`
 	RawFlags    []string
+}
+
+type CommaSeparatedString []string
+
+func (c *CommaSeparatedString) UnmarshalText(text []byte) error {
+	*c = strings.Split(string(text), ",")
+	return nil
 }
 
 // PythonOptions contains Python-specific options for dependency graph generation.
@@ -43,8 +52,7 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 		return nil, fmt.Errorf("failed to create argument parser: %w", err)
 	}
 
-	err = parser.Parse(rawFlags)
-	if err != nil {
+	if err := parser.Parse(rawFlags); err != nil {
 		return nil, fmt.Errorf("failed to parse raw flags: %w", err)
 	}
 
@@ -78,5 +86,10 @@ func (o *SCAPluginOptions) WithIncludeDev(includeDev bool) *SCAPluginOptions {
 
 func (o *SCAPluginOptions) WithRawFlags(rawflags string) *SCAPluginOptions {
 	o.Global.RawFlags = append(o.Global.RawFlags, rawflags)
+	return o
+}
+
+func (o *SCAPluginOptions) WithExclude(exclude []string) *SCAPluginOptions {
+	o.Global.Exclude = append(o.Global.Exclude, exclude...)
 	return o
 }
