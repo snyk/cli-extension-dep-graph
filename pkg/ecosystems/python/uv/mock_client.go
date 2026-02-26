@@ -1,7 +1,7 @@
 package uv
 
 import (
-	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 )
 
 type MockClient struct {
@@ -10,7 +10,7 @@ type MockClient struct {
 	ErrorDirs  map[string]error
 }
 
-func (m *MockClient) ExportSBOM(inputDir string, _ *scaplugin.Options) (Sbom, error) {
+func (m *MockClient) ExportSBOM(inputDir string, _ *ecosystems.SCAPluginOptions) (SBOM, error) {
 	m.CalledDirs = append(m.CalledDirs, inputDir)
 
 	if m.ErrorDirs != nil {
@@ -24,7 +24,7 @@ func (m *MockClient) ExportSBOM(inputDir string, _ *scaplugin.Options) (Sbom, er
 	}
 
 	sbom := `{"bomFormat":"CycloneDX","specVersion":"1.5","metadata":{"component":{"name":"mock-project","version":"1.0.0"}}}`
-	return Sbom(sbom), nil
+	return SBOM(sbom), nil
 }
 
 var _ Client = (*MockClient)(nil)

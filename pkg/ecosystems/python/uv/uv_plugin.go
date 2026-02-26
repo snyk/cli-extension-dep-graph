@@ -11,9 +11,9 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/internal/conversion"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
 type Plugin struct {
@@ -21,6 +21,8 @@ type Plugin struct {
 	snykClient    *snykclient.SnykClient
 	remoteRepoURL string
 }
+
+var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
 func NewUvPlugin(client Client, snykClient *snykclient.SnykClient, remoteRepoURL string) Plugin {
 	return Plugin{
@@ -30,26 +32,29 @@ func NewUvPlugin(client Client, snykClient *snykclient.SnykClient, remoteRepoURL
 	}
 }
 
-func (p Plugin) BuildFindingsFromDir(
+func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context,
-	inputDir string,
-	options *scaplugin.Options,
 	log logger.Logger,
-) ([]scaplugin.Finding, error) {
-	if options.TargetFile != "" && filepath.Base(options.TargetFile) != UvLockFileName {
-		log.Info(ctx, "Skipping processing uv plugin", logger.Attr("targetFile", options.TargetFile), logger.Attr("reason", "not a 'uv.lock' file"))
-		return []scaplugin.Finding{}, nil
+	inputDir string,
+	options *ecosystems.SCAPluginOptions,
+) ([]ecosystems.SCAResult, error) {
+	targetFile := options.Global.TargetFile
+	if targetFile != nil && filepath.Base(*targetFile) != UvLockFileName {
+		log.Info(ctx, "Skipping processing uv plugin",
+			logger.Attr("targetFile", targetFile),
+			logger.Attr("reason", "not a 'uv.lock' file"))
+		return []ecosystems.SCAResult{}, nil
 	}
 
-	files, err := p.discoverLockFiles(ctx, inputDir, options.TargetFile, options)
+	files, err := p.discoverLockFiles(ctx, inputDir, options)
 	if err != nil {
 		return nil, err
 	}
 	if len(files) == 0 {
-		return []scaplugin.Finding{}, nil
+		return []ecosystems.SCAResult{}, nil
 	}
 
-	findings := []scaplugin.Finding{}
+	results := []ecosystems.SCAResult{}
 	for _, file := range files {
 		lockFilePath := file.RelPath // e.g., "uv.lock" or "project1/uv.lock"
 		lockFileDir := filepath.Dir(lockFilePath)
@@ -58,36 +63,35 @@ func (p Plugin) BuildFindingsFromDir(
 		sbom, err := p.client.ExportSBOM(lockFileDir, options)
 		if err != nil {
 			log.Error(ctx, "Failed to build dependency graph", logger.Attr("lockFile", lockFilePath), logger.Err(err))
-			wrappedErr := fmt.Errorf("failed to build dependency graph for %s: %w", lockFilePath, err)
 
-			errorFinding := scaplugin.Finding{
-				LockFile: lockFilePath,
-				Error:    wrappedErr,
-			}
-			findings = append(findings, errorFinding)
+			results = append(results, ecosystems.SCAResult{
+				Metadata: ecosystems.Metadata{TargetFile: lockFilePath},
+				Error:    fmt.Errorf("failed to build dependency graph for %s: %w", lockFilePath, err),
+			})
 			continue
 		}
+
 		fs, err := p.buildFindings(ctx, sbom, lockFilePath, lockFileDir, log)
 		if err != nil {
 			return nil, err
 		}
-		findings = append(findings, fs...)
+		results = append(results, fs...)
 
-		if !options.AllProjects {
+		if !options.Global.AllProjects {
 			// We don't want more than one project
 			break
 		}
 	}
-	return findings, nil
+	return results, nil
 }
 
 func (p Plugin) buildFindings(
 	ctx context.Context,
-	sbom Sbom,
+	sbom SBOM,
 	lockFilePath string,
 	lockFileDir string,
 	log logger.Logger,
-) ([]scaplugin.Finding, error) {
+) ([]ecosystems.SCAResult, error) {
 	parsedSbom, err := parseAndValidateSBOM(sbom)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse and validate sbom for %s: %w", lockFilePath, err)
@@ -108,7 +112,7 @@ func (p Plugin) buildFindings(
 		return nil, fmt.Errorf("failed to convert sbom to dep-graphs for %s: %w", lockFilePath, err)
 	}
 
-	findings := []scaplugin.Finding{}
+	findings := []ecosystems.SCAResult{}
 
 	for _, depGraph := range depGraphs {
 		workspacePackage := findWorkspacePackage(depGraph, workspacePackages)
@@ -138,13 +142,14 @@ func (p Plugin) buildFindings(
 			fileExclusions = []string{}
 		}
 
-		finding := scaplugin.Finding{
-			DepGraph:       depGraph,
-			FileExclusions: fileExclusions,
-			LockFile:       lockFilePath,
-			ManifestFile:   manifestFile,
-		}
-		findings = append(findings, finding)
+		findings = append(findings, ecosystems.SCAResult{
+			DepGraph: depGraph,
+			Metadata: ecosystems.Metadata{
+				LockFile:       lockFilePath,
+				ManifestFile:   manifestFile,
+				FileExclusions: fileExclusions,
+			},
+		})
 	}
 	return findings, nil
 }
@@ -165,23 +170,24 @@ func findWorkspacePackage(depGraph *depgraph.DepGraph, workspacePackages []Works
 func (p Plugin) discoverLockFiles(
 	ctx context.Context,
 	dir string,
-	targetFile string,
-	options *scaplugin.Options,
+	// targetFile string,
+	options *ecosystems.SCAPluginOptions,
 ) ([]discovery.FindResult, error) {
+	targetFile := options.Global.TargetFile
 	var findOpts []discovery.FindOption
 
 	switch {
-	case options.AllProjects:
+	case options.Global.AllProjects:
 		findOpts = []discovery.FindOption{
 			discovery.WithInclude(UvLockFileName),
 			discovery.WithCommonExcludes(),
 		}
-		if len(options.Exclude) > 0 {
-			findOpts = append(findOpts, discovery.WithExcludes(options.Exclude...))
+		if len(options.Global.Excludes) > 0 {
+			findOpts = append(findOpts, discovery.WithExcludes(options.Global.Excludes...))
 		}
 	default:
-		if targetFile != "" {
-			findOpts = append(findOpts, discovery.WithTargetFile(targetFile))
+		if targetFile != nil {
+			findOpts = append(findOpts, discovery.WithTargetFile(*targetFile))
 		} else {
 			rootLockPath := filepath.Join(dir, UvLockFileName)
 			// Default to root uv.lock file if it exists
@@ -212,5 +218,3 @@ func fileExists(path string) bool {
 	}
 	return !info.IsDir()
 }
-
-var _ scaplugin.SCAPlugin = (*Plugin)(nil)

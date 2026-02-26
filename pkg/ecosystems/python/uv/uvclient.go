@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
+	ecosystemerr "github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
@@ -18,7 +19,7 @@ const (
 )
 
 type Client interface {
-	ExportSBOM(inputDir string, opts *scaplugin.Options) (Sbom, error)
+	ExportSBOM(inputDir string, opts *ecosystems.SCAPluginOptions) (SBOM, error)
 }
 
 type client struct {
@@ -44,7 +45,7 @@ func NewUvClientWithExecutor(uvBinary string, executor cmdExecutor) Client {
 	}
 }
 
-type Sbom []byte
+type SBOM []byte
 
 type WorkspacePackage struct {
 	Name    string
@@ -53,12 +54,12 @@ type WorkspacePackage struct {
 }
 
 // exportSBOM exports an SBOM in CycloneDX format using uv.
-func (c client) ExportSBOM(inputDir string, opts *scaplugin.Options) (Sbom, error) {
+func (c client) ExportSBOM(inputDir string, opts *ecosystems.SCAPluginOptions) (SBOM, error) {
 	args := []string{"export", "--format", "cyclonedx1.5", "--locked", "--preview"}
-	if opts.AllProjects {
+	if opts.Global.AllProjects {
 		args = append(args, "--all-packages")
 	}
-	if !opts.Dev {
+	if !opts.Global.IncludeDev {
 		args = append(args, "--no-dev")
 	}
 	output, err := c.executor.Execute(c.uvBinary, inputDir, args...)
@@ -92,24 +93,24 @@ type cycloneDXComponent struct {
 
 // Parses and validates the SBOM JSON.
 // Returns the parsed struct or an error if parsing or validation fails.
-func parseAndValidateSBOM(sbomData Sbom) (*cycloneDXSBOM, error) {
+func parseAndValidateSBOM(sbomData SBOM) (*cycloneDXSBOM, error) {
 	var sbom cycloneDXSBOM
 
 	if err := json.Unmarshal(sbomData, &sbom); err != nil {
-		return nil, ecosystems.NewUnprocessableFileError(
+		return nil, ecosystemerr.NewUnprocessableFileError(
 			fmt.Sprintf("Failed to parse SBOM JSON: %v", err),
 			snyk_errors.WithCause(err),
 		)
 	}
 
 	if sbom.Metadata.Component == nil {
-		return nil, ecosystems.NewUnprocessableFileError(
+		return nil, ecosystemerr.NewUnprocessableFileError(
 			"SBOM missing root component at metadata.component - uv project may be missing a root package",
 		)
 	}
 
 	if sbom.Metadata.Component.Name == "" {
-		return nil, ecosystems.NewUnprocessableFileError(
+		return nil, ecosystemerr.NewUnprocessableFileError(
 			"SBOM root component missing name - invalid SBOM structure",
 		)
 	}

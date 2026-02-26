@@ -15,9 +15,10 @@ type SCAPluginOptions struct {
 
 // GlobalOptions contains options that apply globally across all SCA plugins.
 type GlobalOptions struct {
-	TargetFile  *string `arg:"--target-file"`
-	AllProjects bool    `arg:"--all-projects"`
-	IncludeDev  bool    `arg:"--dev,-d"`
+	TargetFile  *string  `arg:"--target-file"`
+	AllProjects bool     `arg:"--all-projects"`
+	IncludeDev  bool     `arg:"--dev,-d"`
+	Excludes    []string `arg:"--exclude"`
 	RawFlags    []string
 }
 
@@ -78,5 +79,10 @@ func (o *SCAPluginOptions) WithIncludeDev(includeDev bool) *SCAPluginOptions {
 
 func (o *SCAPluginOptions) WithRawFlags(rawflags string) *SCAPluginOptions {
 	o.Global.RawFlags = append(o.Global.RawFlags, rawflags)
+	return o
+}
+
+func (o *SCAPluginOptions) WithExcludes(excludes []string) *SCAPluginOptions {
+	o.Global.Excludes = append(o.Global.Excludes, excludes...)
 	return o
 }
