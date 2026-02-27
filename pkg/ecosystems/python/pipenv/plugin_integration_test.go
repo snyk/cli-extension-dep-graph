@@ -20,6 +20,7 @@ import (
 	snykerrors "github.com/snyk/error-catalog-golang-public/snyk_errors"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pip"
 )
 
@@ -40,7 +41,7 @@ func TestPipenvPlugin_BuildDepGraphsFromDir(t *testing.T) {
 
 	tests := map[string]PluginTestCase{
 		"single_requirements_at_root":        {Fixture: "simple", Options: ecosystems.NewPluginOptions()},
-		"dev_deps":                           {Fixture: "simple-with-dev-deps", Options: ecosystems.NewPluginOptions().WithPipenvIncludeDev(true)},
+		"dev_deps":                           {Fixture: "simple-with-dev-deps", Options: ecosystems.NewPluginOptions().WithIncludeDev(true)},
 		"with_version_specifiers":            {Fixture: "with-version-specifiers", Options: ecosystems.NewPluginOptions()},
 		"with_extras":                        {Fixture: "with-extras", Options: ecosystems.NewPluginOptions()},
 		"os_specific_requirements":           {Fixture: "os-specific", Options: ecosystems.NewPluginOptions()},
@@ -60,7 +61,7 @@ func TestPipenvPlugin_BuildDepGraphsFromDir(t *testing.T) {
 
 			// Run plugin
 			plugin := Plugin{}
-			results, err := plugin.BuildDepGraphsFromDir(ctx, absPath, tc.Options)
+			result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, tc.Options)
 			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 
 			// Load and compare expected output
@@ -70,7 +71,7 @@ func TestPipenvPlugin_BuildDepGraphsFromDir(t *testing.T) {
 			expected, err := loadExpectedResults(expectedPath)
 			require.NoError(t, err, "failed to load expected output from %s", expectedPath)
 
-			assertResultsMatchExpected(t, results, expected, tc.Fixture)
+			assertResultsMatchExpected(t, result.Results, expected, tc.Fixture)
 		})
 	}
 }
@@ -102,9 +103,9 @@ func TestPlugin_Concurrency(t *testing.T) {
 
 	// Run multiple times to test race conditions
 	for i := 0; i < 5; i++ {
-		results, err := plugin.BuildDepGraphsFromDir(ctx, absPath, options)
+		result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, options)
 		require.NoError(t, err, "iteration %d failed", i)
-		assertResultsMatchExpected(t, results, expected, "multi-requirements")
+		assertResultsMatchExpected(t, result.Results, expected, "multi-requirements")
 	}
 }
 
@@ -145,23 +146,24 @@ func TestPlugin_BuildDepGraphsFromDir_PipErrors(t *testing.T) {
 			require.NoError(t, err, "failed to get absolute path for fixture")
 
 			plugin := Plugin{}
-			results, err := plugin.BuildDepGraphsFromDir(ctx, absPath, ecosystems.NewPluginOptions())
+			result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, ecosystems.NewPluginOptions())
+			results := result.Results
 			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 
 			require.Len(t, results, 1, "expected a single result for fixture %s", tc.fixture)
-			result := results[0]
+			pipenvResult := results[0]
 
 			// Basic metadata expectations
-			assert.Equal(t, "Pipfile", result.Metadata.TargetFile)
+			assert.Equal(t, "Pipfile", pipenvResult.Metadata.TargetFile)
 			if pythonVersion != "" {
-				assert.Contains(t, result.Metadata.Runtime, fmt.Sprintf("python@%s", pythonVersion))
+				assert.Contains(t, pipenvResult.Metadata.Runtime, fmt.Sprintf("python@%s", pythonVersion))
 			}
 
-			assert.Nil(t, result.DepGraph, "dep graph should be nil for pip error fixture %s", tc.fixture)
-			require.Error(t, result.Error, "expected an error on the result for fixture %s", tc.fixture)
+			assert.Nil(t, pipenvResult.DepGraph, "dep graph should be nil for pip error fixture %s", tc.fixture)
+			require.Error(t, pipenvResult.Error, "expected an error on the result for fixture %s", tc.fixture)
 
 			var catalogErr snykerrors.Error
-			require.True(t, errors.As(result.Error, &catalogErr), "error should be a catalog error")
+			require.True(t, errors.As(pipenvResult.Error, &catalogErr), "error should be a catalog error")
 			assert.Equal(t, tc.expectedCode, catalogErr.ErrorCode)
 			assert.Contains(t, catalogErr.Detail, tc.expectedDetailSnippet)
 		})
