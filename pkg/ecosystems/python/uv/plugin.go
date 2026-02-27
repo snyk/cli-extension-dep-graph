@@ -13,6 +13,6 @@ type Plugin struct{}
 // Compile-time check to ensure Plugin implements SCAPlugin interface.
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
-func (p Plugin) BuildDepGraphsFromDir(_ context.Context, _ logger.Logger, _ string, _ *ecosystems.SCAPluginOptions) ([]ecosystems.SCAResult, error) {
+func (p Plugin) BuildDepGraphsFromDir(_ context.Context, _ logger.Logger, _ string, _ *ecosystems.SCAPluginOptions) (*ecosystems.PluginResult, error) {
 	return nil, fmt.Errorf("not yet implemented")
 }

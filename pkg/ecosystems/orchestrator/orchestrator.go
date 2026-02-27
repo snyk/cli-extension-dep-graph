@@ -29,25 +29,20 @@ var legacyCLIWorkflowID = workflow.NewWorkflowIdentifier("legacycli")
 func ResolveDepgraphs(ictx workflow.InvocationContext, dir string, opts ecosystems.SCAPluginOptions) (<-chan ecosystems.SCAResult, error) {
 	enhancedLogger := ictx.GetEnhancedLogger()
 
-	pythonResults := resolvePython(ictx.Context(), enhancedLogger, dir, opts)
-
-	processedFiles := make([]string, 0, len(pythonResults))
-	for _, result := range pythonResults {
-		processedFiles = append(processedFiles, result.Metadata.TargetFile)
-	}
+	pythonResult := resolvePython(ictx.Context(), enhancedLogger, dir, opts)
 
 	// Call legacy fallback to get results
-	results, err := LegacyFallback(ictx, opts, processedFiles)
+	results, err := LegacyFallback(ictx, opts, pythonResult.ProcessedFiles)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create channel and send all results
-	resultsChan := make(chan ecosystems.SCAResult, len(results)+len(pythonResults))
+	resultsChan := make(chan ecosystems.SCAResult, len(results)+len(pythonResult.Results))
 	for _, result := range results {
 		resultsChan <- result
 	}
-	for _, result := range pythonResults {
+	for _, result := range pythonResult.Results {
 		resultsChan <- result
 	}
 	close(resultsChan)
@@ -55,7 +50,7 @@ func ResolveDepgraphs(ictx workflow.InvocationContext, dir string, opts ecosyste
 	return resultsChan, nil
 }
 
-func resolvePython(ctx context.Context, enhancedLogger *zerolog.Logger, dir string, opts ecosystems.SCAPluginOptions) []ecosystems.SCAResult {
+func resolvePython(ctx context.Context, enhancedLogger *zerolog.Logger, dir string, opts ecosystems.SCAPluginOptions) ecosystems.PluginResult {
 	log := logger.NewFromZerolog(enhancedLogger)
 
 	pipResults, err := pip.Plugin{}.BuildDepGraphsFromDir(ctx, log, dir, &opts)
@@ -68,11 +63,14 @@ func resolvePython(ctx context.Context, enhancedLogger *zerolog.Logger, dir stri
 		enhancedLogger.Warn().Err(err).Msg("pipenv plugin failed, continuing with other plugins")
 	}
 
-	results := make([]ecosystems.SCAResult, 0, len(pipResults)+len(pipenvResults))
-	results = append(results, pipResults...)
-	results = append(results, pipenvResults...)
+	result := ecosystems.PluginResult{}
 
-	return results
+	result.Results = append(result.Results, pipResults.Results...)
+	result.Results = append(result.Results, pipenvResults.Results...)
+	result.ProcessedFiles = append(result.ProcessedFiles, pipenvResults.ProcessedFiles...)
+	result.ProcessedFiles = append(result.ProcessedFiles, pipenvResults.ProcessedFiles...)
+
+	return result
 }
 
 // LegacyFallback invokes the legacy CLI workflow with the raw flags and returns parsed results.

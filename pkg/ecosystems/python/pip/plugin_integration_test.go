@@ -62,19 +62,19 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 			absPath, err := filepath.Abs(fixturePath)
 			require.NoError(t, err, "failed to get absolute path for fixture")
 
-			// Run plugin
-			plugin := Plugin{}
-			results, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, tc.Options)
-			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
+		// Run plugin
+		plugin := Plugin{}
+		result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, tc.Options)
+		require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 
-			// Load and compare expected output
-			expectedPath := getExpectedOutputPath(t, fixturePath, pythonVersion)
-			require.NotEmpty(t, expectedPath, "no expected output file found for fixture %s", tc.Fixture)
+		// Load and compare expected output
+		expectedPath := getExpectedOutputPath(t, fixturePath, pythonVersion)
+		require.NotEmpty(t, expectedPath, "no expected output file found for fixture %s", tc.Fixture)
 
-			expected, err := loadExpectedResults(expectedPath)
-			require.NoError(t, err, "failed to load expected output from %s", expectedPath)
+		expected, err := loadExpectedResults(expectedPath)
+		require.NoError(t, err, "failed to load expected output from %s", expectedPath)
 
-			assertResultsMatchExpected(t, results, expected, tc.Fixture)
+		assertResultsMatchExpected(t, result.Results, expected, tc.Fixture)
 		})
 	}
 }
@@ -106,9 +106,9 @@ func TestPlugin_Concurrency(t *testing.T) {
 
 	// Run multiple times to test race conditions
 	for i := 0; i < 5; i++ {
-		results, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, options)
+		result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, options)
 		require.NoError(t, err, "iteration %d failed", i)
-		assertResultsMatchExpected(t, results, expected, "multi-requirements")
+		assertResultsMatchExpected(t, result.Results, expected, "multi-requirements")
 	}
 }
 
@@ -148,26 +148,26 @@ func TestPlugin_BuildDepGraphsFromDir_PipErrors(t *testing.T) {
 			absPath, err := filepath.Abs(fixturePath)
 			require.NoError(t, err, "failed to get absolute path for fixture")
 
-			plugin := Plugin{}
-			results, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, ecosystems.NewPluginOptions())
-			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
+		plugin := Plugin{}
+		result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, ecosystems.NewPluginOptions())
+		require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 
-			require.Len(t, results, 1, "expected a single result for fixture %s", tc.fixture)
-			result := results[0]
+		require.Len(t, result.Results, 1, "expected a single result for fixture %s", tc.fixture)
+		pipResult := result.Results[0]
 
-			// Basic metadata expectations
-			assert.Equal(t, "requirements.txt", result.Metadata.TargetFile)
-			if pythonVersion != "" {
-				assert.Contains(t, result.Metadata.Runtime, fmt.Sprintf("python@%s", pythonVersion))
-			}
+		// Basic metadata expectations
+		assert.Equal(t, "requirements.txt", pipResult.Metadata.TargetFile)
+		if pythonVersion != "" {
+			assert.Contains(t, pipResult.Metadata.Runtime, fmt.Sprintf("python@%s", pythonVersion))
+		}
 
-			assert.Nil(t, result.DepGraph, "dep graph should be nil for pip error fixture %s", tc.fixture)
-			require.Error(t, result.Error, "expected an error on the result for fixture %s", tc.fixture)
+		assert.Nil(t, pipResult.DepGraph, "dep graph should be nil for pip error fixture %s", tc.fixture)
+		require.Error(t, pipResult.Error, "expected an error on the result for fixture %s", tc.fixture)
 
-			var catalogErr snykerrors.Error
-			require.True(t, errors.As(result.Error, &catalogErr), "error should be a catalog error")
-			assert.Equal(t, tc.expectedCode, catalogErr.ErrorCode)
-			assert.Contains(t, catalogErr.Detail, tc.expectedDetailSnippet)
+		var catalogErr snykerrors.Error
+		require.True(t, errors.As(pipResult.Error, &catalogErr), "error should be a catalog error")
+		assert.Equal(t, tc.expectedCode, catalogErr.ErrorCode)
+		assert.Contains(t, catalogErr.Detail, tc.expectedDetailSnippet)
 		})
 	}
 }
@@ -182,7 +182,7 @@ func TestPlugin_ContextCancellation(t *testing.T) {
 	require.NoError(t, err)
 
 	plugin := Plugin{}
-	results, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, ecosystems.NewPluginOptions())
+	result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, ecosystems.NewPluginOptions())
 
 	// Should handle cancellation gracefully
 	if err != nil {
@@ -190,10 +190,10 @@ func TestPlugin_ContextCancellation(t *testing.T) {
 		assert.ErrorIs(t, err, context.Canceled)
 	} else {
 		// If results returned, they should contain error
-		assert.Len(t, results, 1)
-		if results[0].Error != nil {
+		assert.Len(t, result.Results, 1)
+		if result.Results[0].Error != nil {
 			// Error might be wrapped
-			assert.Contains(t, results[0].Error.Error(), "context canceled")
+			assert.Contains(t, result.Results[0].Error.Error(), "context canceled")
 		}
 	}
 }
