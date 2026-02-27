@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alexflint/go-arg"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/argparser"
 )
 
 // SCAPluginOptions contains configuration options for SCA plugins,
@@ -23,8 +23,10 @@ type GlobalOptions struct {
 	RawFlags    []string
 }
 
+// CommaSeparatedString is a custom type that parses comma-separated values.
 type CommaSeparatedString []string
 
+// UnmarshalText implements encoding.TextUnmarshaler.
 func (c *CommaSeparatedString) UnmarshalText(text []byte) error {
 	*c = strings.Split(string(text), ",")
 	return nil
@@ -47,12 +49,7 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 		PythonOptions
 	}
 
-	parser, err := arg.NewParser(arg.Config{}, &args)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create argument parser: %w", err)
-	}
-
-	if err := parser.Parse(rawFlags); err != nil {
+	if err := argparser.Parse(rawFlags, &args); err != nil {
 		return nil, fmt.Errorf("failed to parse raw flags: %w", err)
 	}
 

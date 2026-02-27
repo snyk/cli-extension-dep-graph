@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	extensionDepgraph "github.com/snyk/cli-extension-dep-graph/pkg/depgraph"
 	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
@@ -42,7 +43,7 @@ func ResolveDepgraphs(ictx workflow.InvocationContext, dir string, opts ecosyste
 	}
 
 	// Create channel and send all results
-	resultsChan := make(chan ecosystems.SCAResult, len(results))
+	resultsChan := make(chan ecosystems.SCAResult, len(results)+len(pythonResults))
 	for _, result := range results {
 		resultsChan <- result
 	}
@@ -84,8 +85,8 @@ func LegacyFallback(ictx workflow.InvocationContext, options ecosystems.SCAPlugi
 	cmdArgs := append([]string(nil), options.Global.RawFlags...)
 	cmdArgs = append(cmdArgs, "--print-effective-graph-with-errors")
 
-	for _, file := range processedFiles {
-		cmdArgs = append(cmdArgs, "--exclude="+file)
+	if len(processedFiles) > 0 {
+		cmdArgs = append(cmdArgs, "--exclude="+strings.Join(processedFiles, ","))
 	}
 
 	// Clone config and set the command args
@@ -95,6 +96,9 @@ func LegacyFallback(ictx workflow.InvocationContext, options ecosystems.SCAPlugi
 	// Invoke legacy CLI workflow
 	legacyData, err := engine.InvokeWithConfig(legacyCLIWorkflowID, legacyConfig)
 	if err != nil {
+		if strings.Contains(err.Error(), "No supported files found") && len(processedFiles) > 0 {
+			return nil, nil
+		}
 		log.Error().Err(err).Msg("Legacy CLI workflow returned error")
 	}
 

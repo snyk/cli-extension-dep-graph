@@ -184,3 +184,18 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 		})
 	}
 }
+
+func TestNewPluginOptionsFromRawFlags_UnknownFlags(t *testing.T) {
+	rawFlags := []string{
+		"--unknown-flag", "value",
+		"--target-file", "package.json",
+		"--dev",
+		"--another-unknown",
+	}
+
+	got, err := NewPluginOptionsFromRawFlags(rawFlags)
+	assert.NoError(t, err)
+	assert.NotNil(t, got.Global.TargetFile)
+	assert.Equal(t, "package.json", *got.Global.TargetFile)
+	assert.True(t, got.Global.IncludeDev)
+}
