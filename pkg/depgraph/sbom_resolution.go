@@ -1,6 +1,7 @@
 package depgraph
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rs/zerolog"
+	"github.com/snyk/dep-graph/go/pkg/depgraph"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
@@ -67,12 +69,9 @@ func handleSBOMResolutionDI(
 		return nil, snykclient.NewEmptyOrgError()
 	}
 
-	// TODO(uv):
-	// - validate options - we can't have both all-projects and file args
-	// - handle various options, including --all-projects, --file and --exclude
-	// - check which other flags we need to handle
-
 	allProjects := config.GetBool(FlagAllProjects)
+	uvWorkspacePackages := config.GetBool(FlagUvWorkspacePackages)
+
 	targetFile := config.GetString(FlagFile)
 	dev := config.GetBool(FlagDev)
 	strictOutOfSync := true
@@ -83,12 +82,13 @@ func handleSBOMResolutionDI(
 	exclude := parseExcludeFlag(config.GetString(FlagExclude))
 	failFast := config.GetBool(FlagFailFast)
 	pluginOptions := scaplugin.Options{
-		AllProjects:    allProjects,
-		TargetFile:     targetFile,
-		Dev:            dev,
-		Exclude:        exclude,
-		FailFast:       failFast,
-		AllowOutOfSync: allowOutOfSync,
+		AllProjects:         allProjects,
+		UvWorkspacePackages: uvWorkspacePackages,
+		TargetFile:          targetFile,
+		Dev:                 dev,
+		Exclude:             exclude,
+		FailFast:            failFast,
+		AllowOutOfSync:      allowOutOfSync,
 	}
 
 	// Generate Findings
@@ -122,32 +122,30 @@ func handleSBOMResolutionDI(
 	}
 
 	// Convert Findings to workflow.Data
-	workflowData := []workflow.Data{}
-	problemFindings := make([]scaplugin.Finding, 0)
-	for i := range findings { // Could be parallelised in future
-		finding := &findings[i]
+	var workflowData []workflow.Data
+	var problemFindings []scaplugin.Finding
+	var err error
 
-		if finding.Error != nil {
-			logFindingError(logger, finding.LockFile, finding.Error)
-			problemFindings = append(problemFindings, *finding)
-
-			if !allProjects {
-				return nil, finding.Error
-			}
-
-			continue
-		}
-
-		data, err := workflowDataFromDepGraph(finding)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create workflow data: %w", err)
-		}
-		workflowData = append(workflowData, data)
+	if targetFile != "" && uvWorkspacePackages {
+		// TODO: Using JSONL to output multiple dep graphs in a single workflow.Data object is a workaround
+		// to fix outputting the JSON for multiple workflow.Data objects.
+		// Currently only the first workflow.Data object is output.
+		// This has been reported to the CLI Team and shown in the following test
+		// https://github.com/snyk/go-application-framework/pull/559
+		workflowData, problemFindings, err = combineWorkspaceFindingsAsJSONL(logger, findings)
+	} else {
+		workflowData, problemFindings, err = processFindingsIndividually(logger, findings, allProjects)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if workflowData == nil {
+		workflowData = []workflow.Data{}
 	}
 
 	totalFindings := len(findings)
 
-	if len(findings) == 0 || allProjects {
+	if totalFindings == 0 || allProjects {
 		applyFindingsExclusions(config, findings)
 
 		legacyData, err := executeLegacyWorkflow(ctx, config, logger, depGraphWorkflowFunc, findings)
@@ -186,7 +184,7 @@ func outputAnyWarnings(ctx workflow.InvocationContext, logger *zerolog.Logger, p
 	if len(problemFindings) > 0 {
 		message := renderWarningForProblemFindings(problemFindings, totalFindings)
 
-		err := ctx.GetUserInterface().Output(message + "\n")
+		err := ctx.GetUserInterface().OutputError(fmt.Errorf("%s", message))
 		if err != nil {
 			logger.Printf("Failed to output warning message: %v", err)
 		}
@@ -313,6 +311,91 @@ func executeLegacyWorkflow(
 	}
 
 	return nil, fmt.Errorf("error handling legacy workflow: %w", err)
+}
+
+func combineWorkspaceFindingsAsJSONL(logger *zerolog.Logger, findings []scaplugin.Finding) ([]workflow.Data, []scaplugin.Finding, error) {
+	if len(findings) == 0 {
+		return []workflow.Data{}, []scaplugin.Finding{}, nil
+	}
+
+	var problemFindings []scaplugin.Finding
+	for i := range findings {
+		if findings[i].Error != nil {
+			logFindingError(logger, findings[i].LockFile, findings[i].Error)
+			problemFindings = append(problemFindings, findings[i])
+			return nil, problemFindings, findings[i].Error
+		}
+	}
+
+	data, err := combineWorkspaceDepGraphsAsJSONL(findings)
+	if err != nil {
+		return nil, problemFindings, fmt.Errorf("failed to combine dep graphs: %w", err)
+	}
+
+	// All dep-graphs are returned as a single workflow.Data item using JSONL because
+	// the CLI only returns the first workflow.Data when invoked directly (e.g. `snyk depgraph`).
+	// Ideally we would return multiple workflow.Data items, but this is a workaround until
+	// the CLI team addresses the underlying issue.
+	// Example failing test: https://github.com/snyk/go-application-framework/pull/559
+	workflowData := workflow.NewData(DataTypeID, contentTypeJSONL, data)
+
+	targetFile := findings[0].ManifestFile
+	workflowData.SetMetaData(contentLocationKey, targetFile)
+	workflowData.SetMetaData(MetaKeyNormalisedTargetFile, targetFile)
+	workflowData.SetMetaData(MetaKeyTargetFileFromPlugin, targetFile)
+
+	return []workflow.Data{workflowData}, problemFindings, nil
+}
+
+func processFindingsIndividually(logger *zerolog.Logger, findings []scaplugin.Finding, allProjects bool) ([]workflow.Data, []scaplugin.Finding, error) {
+	var workflowData []workflow.Data
+	var problemFindings []scaplugin.Finding
+	for i := range findings {
+		finding := &findings[i]
+
+		if finding.Error != nil {
+			logFindingError(logger, finding.LockFile, finding.Error)
+			problemFindings = append(problemFindings, *finding)
+
+			if !allProjects {
+				return nil, problemFindings, finding.Error
+			}
+
+			continue
+		}
+
+		data, err := workflowDataFromDepGraph(finding)
+		if err != nil {
+			return nil, problemFindings, fmt.Errorf("failed to create workflow data: %w", err)
+		}
+		workflowData = append(workflowData, data)
+	}
+	return workflowData, problemFindings, nil
+}
+
+type jsonlOutputLine struct {
+	DepGraph   *depgraph.DepGraph `json:"depGraph"`
+	TargetFile string             `json:"targetFile"`
+}
+
+func combineWorkspaceDepGraphsAsJSONL(findings []scaplugin.Finding) ([]byte, error) {
+	var lines [][]byte
+	for i := range findings {
+		if findings[i].Error != nil {
+			continue
+		}
+		line := jsonlOutputLine{
+			DepGraph:   findings[i].DepGraph,
+			TargetFile: findings[i].ManifestFile,
+		}
+		b, err := json.Marshal(line)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal depgraph: %w", err)
+		}
+		lines = append(lines, b)
+	}
+	combined := bytes.Join(lines, []byte("\n"))
+	return combined, nil
 }
 
 func workflowDataFromDepGraph(finding *scaplugin.Finding) (workflow.Data, error) {
