@@ -186,7 +186,11 @@ func validateInputs(rootDir string, opts *findOptions) error {
 // Returns an error if the file is not found or is a directory.
 // Returns nil error with empty result if the file is excluded.
 func findTargetFile(absRoot, targetFile string, excludePatterns []string) (FindResult, error) {
-	targetPath := filepath.Join(absRoot, targetFile)
+	targetPath := targetFile
+	if !filepath.IsAbs(targetPath) {
+		targetPath = filepath.Join(absRoot, targetPath)
+	}
+	targetPath = filepath.Clean(targetPath)
 
 	info, err := os.Stat(targetPath)
 	if err != nil {
@@ -196,8 +200,16 @@ func findTargetFile(absRoot, targetFile string, excludePatterns []string) (FindR
 		return FindResult{}, fmt.Errorf("target file %s is a directory", targetFile)
 	}
 
+	relPath, err := filepath.Rel(absRoot, targetPath)
+	if err != nil {
+		slog.Debug("Failed to compute relative path for target file",
+			slog.String(logKeyFile, targetPath),
+			slog.Any(logKeyError, err))
+		relPath = targetPath
+	}
+
 	// Check if excluded - return empty result but no error
-	if isExcluded(targetFile, targetFile, excludePatterns) {
+	if isExcluded(filepath.Base(relPath), relPath, excludePatterns) {
 		slog.Debug("Target file excluded by pattern", slog.String(logKeyFile, targetFile))
 		return FindResult{}, nil
 	}
@@ -205,7 +217,7 @@ func findTargetFile(absRoot, targetFile string, excludePatterns []string) (FindR
 	slog.Debug("Found target file", slog.String(logKeyFile, targetPath))
 	return FindResult{
 		Path:    targetPath,
-		RelPath: targetFile,
+		RelPath: relPath,
 	}, nil
 }
 

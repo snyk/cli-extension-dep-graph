@@ -31,6 +31,16 @@ func TestFindFiles_TargetFile(t *testing.T) {
 	require.NoError(t, os.Mkdir(filepath.Join(tmpDir, "subdir"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "subdir", "sub-requirements.txt"), []byte("test"), 0644))
 
+	absoluteRootFile := filepath.Join(tmpDir, "requirements.txt")
+	absoluteSubdirFile := filepath.Join(tmpDir, "subdir", "sub-requirements.txt")
+
+	outsideDir := t.TempDir()
+	outsideFile := filepath.Join(outsideDir, "outside-requirements.txt")
+	require.NoError(t, os.WriteFile(outsideFile, []byte("test"), 0644))
+
+	outsideRelPath, err := filepath.Rel(tmpDir, outsideFile)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name        string
 		targetFile  string
@@ -43,6 +53,9 @@ func TestFindFiles_TargetFile(t *testing.T) {
 		{"errors when not found", "missing.txt", "", 0, "", true},
 		{"excludes when pattern matches", "requirements.txt", "*.txt", 0, "", false},
 		{"finds in subdirectory", "subdir/sub-requirements.txt", "", 1, "subdir/sub-requirements.txt", false},
+		{"finds absolute target file at root", absoluteRootFile, "", 1, "requirements.txt", false},
+		{"finds absolute target file in subdirectory", absoluteSubdirFile, "", 1, "subdir/sub-requirements.txt", false},
+		{"finds absolute target file outside root", outsideFile, "", 1, outsideRelPath, false},
 	}
 
 	for _, tt := range tests {
