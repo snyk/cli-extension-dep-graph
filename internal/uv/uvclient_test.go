@@ -77,7 +77,44 @@ func TestUVClient_ExportSBOM_AllProjects(t *testing.T) {
 	}
 
 	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{AllProjects: true})
+	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{
+		AllProjects:         true,
+		UvWorkspacePackages: false,
+	})
+
+	assert.NoError(t, err)
+	require.NotNil(t, result)
+	assert.JSONEq(t, validSBOM, string(result))
+}
+
+func TestUVClient_ExportSBOM_UvWorkspacePackages(t *testing.T) {
+	validSBOM := `{
+		"bomFormat": "CycloneDX",
+		"specVersion": "1.5",
+		"metadata": {
+			"component": {
+				"type": "library",
+				"bom-ref": "test-project-1",
+				"name": "test-project",
+				"version": "1.2.3"
+			}
+		}
+	}`
+
+	mockExecutor := &mockCmdExecutor{
+		executeFunc: func(binary, dir string, args ...string) ([]byte, error) {
+			assert.Equal(t, "/path/to/uv", binary)
+			assert.Equal(t, "/test/dir", dir)
+			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--locked", "--preview", "--all-packages", "--no-dev"}, args)
+			return []byte(validSBOM), nil
+		},
+	}
+
+	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
+	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{
+		AllProjects:         false,
+		UvWorkspacePackages: true,
+	})
 
 	assert.NoError(t, err)
 	require.NotNil(t, result)
