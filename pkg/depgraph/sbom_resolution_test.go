@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -1469,4 +1470,94 @@ func Test_getExclusionsFromFindings(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_uvWorkspacePackages_passesOptionToPlugin(t *testing.T) {
+	ctx := setupTestContext(t, true)
+	resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+	ctx.config.Set(FlagUvWorkspacePackages, true)
+	ctx.config.Set(FlagFile, "uv.lock")
+
+	mockPlugin := &mockScaPlugin{
+		findings: []scaplugin.Finding{
+			{
+				DepGraph:     createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
+				LockFile:     "uv.lock",
+				ManifestFile: "pyproject.toml",
+			},
+		},
+	}
+
+	_, err := handleSBOMResolutionDI(
+		ctx.invocationContext,
+		ctx.config,
+		&nopLogger,
+		[]scaplugin.SCAPlugin{mockPlugin},
+		resolutionHandler.Func(),
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, mockPlugin.options)
+	assert.True(t, mockPlugin.options.UvWorkspacePackages, "UvWorkspacePackages should be passed to the plugin")
+	assert.False(t, mockPlugin.options.AllProjects, "AllProjects should remain false")
+	assert.False(t, resolutionHandler.Called, "legacy workflow should not be called when UvWorkspacePackages is set")
+	assert.Equal(t, "uv.lock", mockPlugin.options.TargetFile)
+}
+
+func Test_uvWorkspacePackages_combinesMultipleDepGraphsAsJSONL(t *testing.T) {
+	ctx := setupTestContext(t, true)
+	resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+	ctx.config.Set(FlagFile, "uv.lock")
+	ctx.config.Set(FlagUvWorkspacePackages, true)
+
+	mockPlugin := &mockScaPlugin{
+		findings: []scaplugin.Finding{
+			{
+				DepGraph:     createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
+				LockFile:     "uv.lock",
+				ManifestFile: "pyproject.toml",
+			},
+			{
+				DepGraph:     createTestDepGraph(t, "uv", "pkg-b", "2.0.0"),
+				LockFile:     "uv.lock",
+				ManifestFile: "packages/pkg-b/pyproject.toml",
+			},
+		},
+	}
+
+	workflowDataResult, err := handleSBOMResolutionDI(
+		ctx.invocationContext,
+		ctx.config,
+		&nopLogger,
+		[]scaplugin.SCAPlugin{mockPlugin},
+		resolutionHandler.Func(),
+	)
+
+	require.NoError(t, err)
+	require.Len(t, workflowDataResult, 1, "multiple findings should be combined into a single workflow.Data")
+	assert.False(t, resolutionHandler.Called, "legacy workflow should not be called")
+
+	workflowData := workflowDataResult[0]
+	payload, ok := workflowData.GetPayload().([]byte)
+	require.True(t, ok)
+
+	lines := bytes.Split(payload, []byte("\n"))
+	require.Len(t, lines, 2, "JSONL should contain two lines")
+	for _, line := range lines {
+		var dg json.RawMessage
+		require.NoError(t, json.Unmarshal(line, &dg), "each line should be valid JSON")
+	}
+
+	// check metadata is set correctly
+	contentLocation, err := workflowData.GetMetaData(contentLocationKey)
+	require.NoError(t, err)
+	assert.Equal(t, "pyproject.toml", contentLocation, "Content-Location should be set to the first finding's ManifestFile")
+
+	normalisedTargetFile, err := workflowData.GetMetaData(MetaKeyNormalisedTargetFile)
+	require.NoError(t, err)
+	assert.Equal(t, "pyproject.toml", normalisedTargetFile, "normalisedTargetFile should be set to the first finding's ManifestFile")
+
+	targetFileFromPlugin, err := workflowData.GetMetaData(MetaKeyTargetFileFromPlugin)
+	require.NoError(t, err)
+	assert.Equal(t, "pyproject.toml", targetFileFromPlugin, "targetFileFromPlugin should be set to the first finding's ManifestFile")
 }

@@ -8,6 +8,7 @@ import (
 
 const (
 	contentTypeJSON        = "application/json"
+	contentTypeJSONL       = "application/jsonl"
 	legacyCLIWorkflowIDStr = "legacycli"
 	contentLocationKey     = "Content-Location"
 )
