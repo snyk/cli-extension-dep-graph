@@ -23,7 +23,7 @@ func handleLegacyResolution(ctx workflow.InvocationContext, config configuration
 
 	legacyData, legacyCLIError := engine.InvokeWithConfig(legacyWorkflowID, config)
 	if legacyCLIError != nil {
-		return nil, extractLegacyCLIError(legacyCLIError, legacyData)
+		return nil, ExtractLegacyCLIError(legacyCLIError, legacyData)
 	}
 
 	snykOutput, ok := legacyData[0].GetPayload().([]byte)

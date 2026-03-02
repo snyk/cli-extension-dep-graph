@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os/exec"
 
+	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
+
 	clierrors "github.com/snyk/error-catalog-golang-public/cli"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/snyk/go-application-framework/pkg/workflow"
@@ -35,16 +37,76 @@ var _ interface { //nolint:errcheck // Compile-time interface assertion, no erro
 	Unwrap() error
 } = (*LegacyCLIJSONError)(nil)
 
-// extractLegacyCLIError extracts the error message from the legacy cli if possible.
-func extractLegacyCLIError(input error, data []workflow.Data) error {
-	output := input
+type jsonAPIErrorWrapper struct {
+	Error json.RawMessage `json:"error"`
+}
 
+// parseJSONAPIError returns the first error from the JSON API "errors" array if present.
+// The legacy CLI uses JSON API format where "error" contains "errors": [].
+func parseJSONAPIError(bytes []byte) (snyk_errors.Error, bool) {
+	errs, err := snyk_errors.FromJSONAPIErrorBytes(bytes)
+	if err != nil || len(errs) == 0 {
+		return snyk_errors.Error{}, false
+	}
+	return errs[0], true
+}
+
+// tryParseErrorCatalogFromPayload returns the first ErrorCatalog error from legacy payload (JSON or JSONL). Fallback path only.
+func tryParseErrorCatalogFromPayload(data []workflow.Data) (snyk_errors.Error, bool) {
+	if len(data) == 0 {
+		return snyk_errors.Error{}, false
+	}
+	bytes, ok := data[0].GetPayload().([]byte)
+	if !ok || len(bytes) == 0 {
+		return snyk_errors.Error{}, false
+	}
+	// Try single JSON (e.g. legacy --json output).
+	if err, ok := parseJSONAPIError(bytes); ok {
+		return err, true
+	}
+	var wrapper jsonAPIErrorWrapper
+	if json.Unmarshal(bytes, &wrapper) == nil && len(wrapper.Error) > 0 {
+		if err, ok := parseJSONAPIError(wrapper.Error); ok {
+			return err, true
+		}
+	}
+	// Payload may be JSONL (e.g. --print-effective-graph-with-errors): one line per project,
+	// each line may have an "error" field with "errors": [].
+	if err, ok := tryParseFirstErrorFromJSONL(bytes); ok {
+		return err, true
+	}
+	return snyk_errors.Error{}, false
+}
+
+// tryParseFirstErrorFromJSONL returns the first ErrorCatalog error from JSONL lines (fallback path only).
+func tryParseFirstErrorFromJSONL(payload []byte) (snyk_errors.Error, bool) {
+	outputs, err := parsers.NewJSONL().ParseOutput(payload)
+	if err != nil || len(outputs) == 0 {
+		return snyk_errors.Error{}, false
+	}
+	for i := range outputs {
+		if len(outputs[i].Error) == 0 {
+			continue
+		}
+		if err, ok := parseJSONAPIError(outputs[i].Error); ok {
+			return err, true
+		}
+	}
+	return snyk_errors.Error{}, false
+}
+
+// extractLegacyCLIError extracts the error message from the legacy cli if possible.
+func ExtractLegacyCLIError(input error, data []workflow.Data) error {
 	var errCatalogErr snyk_errors.Error
 	if errors.As(input, &errCatalogErr) {
 		return input
 	}
+	if err, ok := tryParseErrorCatalogFromPayload(data); ok {
+		return err
+	}
 
-	// extract error from legacy cli if possible and wrap it in an error instance
+	output := input
+
 	var xerr *exec.ExitError
 	if errors.As(input, &xerr) && len(data) > 0 {
 		bytes, ok := data[0].GetPayload().([]byte)

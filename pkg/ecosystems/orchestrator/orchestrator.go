@@ -6,16 +6,18 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/rs/zerolog"
-	"github.com/snyk/dep-graph/go/pkg/depgraph"
-	"github.com/snyk/go-application-framework/pkg/configuration"
-	"github.com/snyk/go-application-framework/pkg/workflow"
-
+	extensionDepgraph "github.com/snyk/cli-extension-dep-graph/pkg/depgraph"
 	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pip"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pipenv"
+
+	"github.com/rs/zerolog"
+	"github.com/snyk/dep-graph/go/pkg/depgraph"
+	"github.com/snyk/error-catalog-golang-public/snyk_errors"
+	"github.com/snyk/go-application-framework/pkg/configuration"
+	"github.com/snyk/go-application-framework/pkg/workflow"
 )
 
 var legacyCLIWorkflowID = workflow.NewWorkflowIdentifier("legacycli")
@@ -36,7 +38,7 @@ func ResolveDepgraphs(ictx workflow.InvocationContext, dir string, opts ecosyste
 	// Call legacy fallback to get results
 	results, err := LegacyFallback(ictx, opts, processedFiles)
 	if err != nil {
-		return nil, fmt.Errorf("legacy fallback failed: %w", err)
+		return nil, err
 	}
 
 	// Create channel and send all results
@@ -94,49 +96,84 @@ func LegacyFallback(ictx workflow.InvocationContext, options ecosystems.SCAPlugi
 	legacyData, err := engine.InvokeWithConfig(legacyCLIWorkflowID, legacyConfig)
 	if err != nil {
 		log.Error().Err(err).Msg("Legacy CLI workflow returned error")
-		return nil, fmt.Errorf("legacy CLI workflow error: %w", err)
 	}
 
-	if len(legacyData) == 0 {
-		log.Warn().Msg("No data returned from legacy workflow")
+	// UV-style: get payload once, then one loop over lines—append success or error result per line.
+	// Only return a single error when there is no parseable payload (or fatal parse/type failure).
+	results, fatalErr := tryBuildResultsFromLegacyPayload(legacyData, err, ictx, log)
+	if fatalErr != nil {
+		return nil, fatalErr
+	}
+	if len(results) > 0 {
+		return results, nil
+	}
+	if err == nil {
 		return []ecosystems.SCAResult{}, nil
 	}
+	//nolint:wrapcheck // must return unwrapped so os-flows can detect and render ErrorCatalog
+	return nil, extensionDepgraph.ExtractLegacyCLIError(err, legacyData)
+}
 
-	// Get the payload bytes from the first workflow data
-	payload := legacyData[0].GetPayload()
-	bytes, ok := payload.([]byte)
-	if !ok {
-		return nil, fmt.Errorf("expected []byte payload, got %T", payload)
+// tryBuildResultsFromLegacyPayload extracts payload from legacyData, parses JSONL, and returns SCAResults.
+func tryBuildResultsFromLegacyPayload(
+	legacyData []workflow.Data, invokeErr error, ictx workflow.InvocationContext, log *zerolog.Logger,
+) ([]ecosystems.SCAResult, error) {
+	var bytes []byte
+	if len(legacyData) > 0 {
+		payload := legacyData[0].GetPayload()
+		if payload != nil {
+			var ok bool
+			bytes, ok = payload.([]byte)
+			if !ok && invokeErr == nil {
+				return nil, fmt.Errorf("expected []byte payload, got %T", payload)
+			}
+		}
 	}
+	if len(bytes) == 0 {
+		return nil, nil
+	}
+	results, parseErr := parseLegacyJSONLToResults(bytes, ictx, log)
+	if parseErr != nil {
+		if invokeErr == nil {
+			log.Error().Err(parseErr).Msg("Failed to parse JSONL output")
+			return nil, fmt.Errorf("failed to parse legacy output: %w", parseErr)
+		}
+		return nil, nil
+	}
+	if len(results) == 0 {
+		return nil, nil
+	}
+	return results, nil
+}
 
-	// Parse the JSONL output
+// parseLegacyJSONLToResults parses JSONL and returns one SCAResult per line. (nil, err) on parse failure; (nil, nil) when no lines.
+func parseLegacyJSONLToResults(bytes []byte, ictx workflow.InvocationContext, log *zerolog.Logger) ([]ecosystems.SCAResult, error) {
 	parser := parsers.NewJSONL()
-	depGraphOutputs, err := parser.ParseOutput(bytes)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to parse JSONL output")
-		return nil, fmt.Errorf("failed to parse legacy output: %w", err)
+	depGraphOutputs, parseErr := parser.ParseOutput(bytes)
+	if parseErr != nil {
+		return nil, fmt.Errorf("parse legacy JSONL: %w", parseErr)
 	}
-
+	if len(depGraphOutputs) == 0 {
+		return nil, nil
+	}
 	// Convert to SCAResults
 	results := make([]ecosystems.SCAResult, 0, len(depGraphOutputs))
 	for i := range depGraphOutputs {
 		output := &depGraphOutputs[i]
-		result, err := depGraphOutputToSCAResult(output, ictx)
-		if err != nil {
+		result, resErr := depGraphOutputToSCAResult(output, ictx)
+		if resErr != nil {
 			log.Error().
 				Str("targetFile", output.NormalisedTargetFile).
-				Err(err).
+				Err(resErr).
 				Msg("Failed to convert depgraph output")
-			// Continue with error in result
 			results = append(results, ecosystems.SCAResult{
 				Metadata: ecosystems.Metadata{TargetFile: output.NormalisedTargetFile},
-				Error:    err,
+				Error:    resErr,
 			})
 		} else {
 			results = append(results, result)
 		}
 	}
-
 	return results, nil
 }
 
@@ -149,9 +186,14 @@ func depGraphOutputToSCAResult(output *parsers.DepGraphOutput, ictx workflow.Inv
 		},
 	}
 
-	// If there's an error in the output, include it (expected with --print-effective-graph-with-errors)
+	// If there's an error in the output, parse as ErrorCatalog so os-flows can render it (expected with --print-effective-graph-with-errors).
+	// UV-style: one error per result (use first when the JSON API provides multiple).
 	if len(output.Error) > 0 {
-		result.Error = errors.New(string(output.Error))
+		if errs, err := snyk_errors.FromJSONAPIErrorBytes(output.Error); err == nil && len(errs) > 0 {
+			result.Error = errs[0]
+		} else {
+			result.Error = errors.New(string(output.Error))
+		}
 	}
 
 	// Parse the depgraph JSON if present (may be partial even with errors)
