@@ -7,6 +7,48 @@ import (
 	"strings"
 )
 
+// Package argparser provides a reflection-based command-line argument parser that maps
+// flags to struct fields using struct tags.
+//
+// HOW IT WORKS:
+//
+// 1. Tag-based mapping: Struct fields are annotated with `arg` tags that specify the
+//    flag names they correspond to. Multiple flag names (including aliases) can be
+//    specified as comma-separated values, e.g., `arg:"--flag,--alias,-f"`.
+//
+// 2. Reflection-based discovery: The parser uses Go's reflection API to introspect
+//    the destination struct at runtime, building a map of flag names to field paths.
+//    This allows it to handle nested and embedded structs automatically.
+//
+// 3. Field path navigation: Since structs can be nested or embedded, the parser stores
+//    field paths as slices of indices ([]int). When a flag is encountered, the parser
+//    navigates through the struct hierarchy using these indices to reach the target field.
+//
+// 4. Type-aware parsing: The parser handles different field types:
+//    - bool: Presence of flag sets to true (no value required)
+//    - string: Next argument is used as the value
+//    - *string: Next argument is used to create a pointer to string
+//    - []string: Collects all following non-flag arguments into a slice
+//    - encoding.TextUnmarshaler: Delegates parsing to the type's UnmarshalText method
+//
+// 5. Unknown flag handling: Flags not found in the tag map are silently ignored,
+//    along with their potential values. This allows the parser to be used in contexts
+//    where multiple parsers handle different subsets of flags.
+//
+// EXAMPLE USAGE:
+//
+//   type Config struct {
+//       Verbose bool     `arg:"--verbose,-v"`
+//       Output  string   `arg:"--output,-o"`
+//       Files   []string `arg:"--files,-f"`
+//   }
+//
+//   var cfg Config
+//   err := Parse([]string{"--verbose", "--output", "result.txt", "-f", "a.go", "b.go"}, &cfg)
+//   // cfg.Verbose == true
+//   // cfg.Output == "result.txt"
+//   // cfg.Files == []string{"a.go", "b.go"}
+
 const errRequiresValue = "%s requires a value"
 
 // Parse parses command line flags into a struct using arg tags.

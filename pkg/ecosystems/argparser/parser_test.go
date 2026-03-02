@@ -304,35 +304,27 @@ func TestParse_EmbeddedStructs(t *testing.T) {
 
 func TestParse_InvalidInput(t *testing.T) {
 	tests := []struct {
-		name    string
-		dest    interface{}
-		wantErr bool
+		name string
+		dest interface{}
 	}{
 		{
-			name:    "nil pointer",
-			dest:    nil,
-			wantErr: true,
+			name: "nil pointer",
+			dest: nil,
 		},
 		{
-			name:    "not a pointer",
-			dest:    TestOptions{},
-			wantErr: true,
+			name: "not a pointer",
+			dest: TestOptions{},
 		},
 		{
-			name:    "pointer to non-struct",
-			dest:    new(string),
-			wantErr: true,
+			name: "pointer to non-struct",
+			dest: new(string),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := Parse([]string{}, tt.dest)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			assert.Error(t, err)
 		})
 	}
 }
