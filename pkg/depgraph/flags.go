@@ -28,7 +28,7 @@ const (
 	FlagPythonCommand                 = "command"
 	FlagPythonSkipUnresolved          = "skip-unresolved"
 	FlagPythonPackageManager          = "package-manager"
-	FlagNPMStrictOutOfSync            = "strict-out-of-sync"
+	FlagStrictOutOfSync               = "strict-out-of-sync"
 	FlagNugetAssetsProjectName        = "assets-project-name"
 	FlagNugetPkgsFolder               = "packages-folder"
 	FlagUnmanagedMaxDepth             = "max-depth"
@@ -63,7 +63,7 @@ func getFlagSet() *pflag.FlagSet {
 	flagSet.String(FlagPythonCommand, "", "Indicate which specific Python commands to use based on the Python version.")
 	flagSet.String(FlagPythonSkipUnresolved, "", "Skip Python packages that cannot be found in the environment.")
 	flagSet.String(FlagPythonPackageManager, "", `Add --package-manager=pip to your command if the file name is not "requirements.txt".`)
-	flagSet.String(FlagNPMStrictOutOfSync, "true", "Prevent testing out-of-sync NPM lockfiles.")
+	flagSet.String(FlagStrictOutOfSync, "true", "Prevent testing out-of-sync lockfiles.")
 	flagSet.Bool(FlagNugetAssetsProjectName, false,
 		"When you are monitoring a .NET project using NuGet PackageReference uses the project name in project.assets.json if found.")
 	flagSet.String(FlagNugetPkgsFolder, "", "Specify a custom path to the packages folder when using NuGet.")

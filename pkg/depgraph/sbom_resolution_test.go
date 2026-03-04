@@ -781,6 +781,100 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			"Log should contain the error context")
 	})
 
+	t.Run("should pass strict-out-of-sync=false to plugin options", func(t *testing.T) {
+		ctx := setupTestContext(t, true)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagStrictOutOfSync, "false")
+
+		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse)
+		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
+
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+					FileExclusions: []string{},
+					LockFile:       "uv.lock",
+					ManifestFile:   "pyproject.toml",
+				},
+			},
+		}
+
+		_, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.SCAPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, mockPlugin.options, "plugin should have been called with options")
+		assert.True(t, mockPlugin.options.AllowOutOfSync)
+	})
+
+	t.Run("should default to strict-out-of-sync=true in plugin options", func(t *testing.T) {
+		ctx := setupTestContext(t, true)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+
+		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse)
+		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
+
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+					FileExclusions: []string{},
+					LockFile:       "uv.lock",
+					ManifestFile:   "pyproject.toml",
+				},
+			},
+		}
+
+		_, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.SCAPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, mockPlugin.options, "plugin should have been called with options")
+		assert.False(t, mockPlugin.options.AllowOutOfSync)
+	})
+
+	t.Run("should return an error for invalid strict-out-of-sync values", func(t *testing.T) {
+		ctx := setupTestContext(t, true)
+		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		ctx.config.Set(FlagStrictOutOfSync, "invalid")
+
+		mockPlugin := &mockScaPlugin{
+			findings: []scaplugin.Finding{
+				{
+					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+					FileExclusions: []string{},
+					LockFile:       "uv.lock",
+					ManifestFile:   "pyproject.toml",
+				},
+			},
+		}
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]scaplugin.SCAPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		require.Error(t, err)
+		assert.Nil(t, workflowData)
+		assert.Contains(t, err.Error(), `invalid value for --strict-out-of-sync: "invalid"`)
+		assert.Nil(t, mockPlugin.options, "plugin should not be called when strict-out-of-sync is invalid")
+		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called when strict-out-of-sync is invalid")
+	})
+
 	t.Run("should pass exclude flag to plugin options", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)

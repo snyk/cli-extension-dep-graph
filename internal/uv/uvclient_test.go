@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	clierrors "github.com/snyk/error-catalog-golang-public/cli"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,11 +37,13 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 		}
 	}`
 
+	callCount := 0
 	mockExecutor := &mockCmdExecutor{
 		executeFunc: func(binary, dir string, args ...string) ([]byte, error) {
+			callCount++
 			assert.Equal(t, "/path/to/uv", binary)
 			assert.Equal(t, "/test/dir", dir)
-			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--locked", "--preview", "--no-dev"}, args)
+			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--preview", "--locked", "--no-dev"}, args)
 			return []byte(validSBOM), nil
 		},
 	}
@@ -51,6 +54,7 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 	assert.NoError(t, err)
 	require.NotNil(t, result)
 	assert.JSONEq(t, validSBOM, string(result))
+	assert.Equal(t, 1, callCount)
 }
 
 func TestUVClient_ExportSBOM_AllProjects(t *testing.T) {
@@ -67,11 +71,13 @@ func TestUVClient_ExportSBOM_AllProjects(t *testing.T) {
 		}
 	}`
 
+	callCount := 0
 	mockExecutor := &mockCmdExecutor{
 		executeFunc: func(binary, dir string, args ...string) ([]byte, error) {
+			callCount++
 			assert.Equal(t, "/path/to/uv", binary)
 			assert.Equal(t, "/test/dir", dir)
-			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--locked", "--preview", "--all-packages", "--no-dev"}, args)
+			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--preview", "--locked", "--all-packages", "--no-dev"}, args)
 			return []byte(validSBOM), nil
 		},
 	}
@@ -82,6 +88,7 @@ func TestUVClient_ExportSBOM_AllProjects(t *testing.T) {
 	assert.NoError(t, err)
 	require.NotNil(t, result)
 	assert.JSONEq(t, validSBOM, string(result))
+	assert.Equal(t, 1, callCount)
 }
 
 func TestUVClient_ExportSBOM_DevTrue_OmitsNoDevFlag(t *testing.T) {
@@ -100,6 +107,70 @@ func TestUVClient_ExportSBOM_DevTrue_OmitsNoDevFlag(t *testing.T) {
 	_, err := client.ExportSBOM("/test/dir", &scaplugin.Options{Dev: true})
 
 	assert.NoError(t, err)
+}
+
+func TestUVClient_ExportSBOM_AllowOutOfSync_UsesFrozenFlag(t *testing.T) {
+	validSBOM := `{"metadata": {"component": {"name": "test", "version": "1.0.0"}}}`
+
+	mockExecutor := &mockCmdExecutor{
+		executeFunc: func(_, _ string, args ...string) ([]byte, error) {
+			for _, arg := range args {
+				assert.NotEqual(t, "--locked", arg, "args should not contain --locked when allow out of sync is enabled")
+			}
+			assert.Contains(t, args, "--preview")
+			assert.Contains(t, args, "--frozen")
+			return []byte(validSBOM), nil
+		},
+	}
+
+	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
+	_, err := client.ExportSBOM("/test/dir", &scaplugin.Options{AllowOutOfSync: true})
+
+	assert.NoError(t, err)
+}
+
+func TestUVClient_ExportSBOM_OutOfSyncLockfile_ReturnsFriendlyError(t *testing.T) {
+	callCount := 0
+	mockExecutor := &mockCmdExecutor{
+		executeFunc: func(_, _ string, args ...string) ([]byte, error) {
+			callCount++
+			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--preview", "--locked", "--no-dev"}, args)
+			return nil, clierrors.NewGeneralSCAFailureError(
+				"failed to execute uv export command: exit status 2\nstdout: \nstderr: error: the lockfile at `uv.lock` needs to be updated, but `--locked` was provided",
+			)
+		},
+	}
+
+	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
+	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{})
+
+	require.Error(t, err)
+	assert.Nil(t, result)
+	var catalogErr snyk_errors.Error
+	require.True(t, errors.As(err, &catalogErr), "error should be a catalog error")
+	assert.Contains(t, catalogErr.Detail, "uv.lock is out of sync with pyproject.toml")
+	assert.Contains(t, catalogErr.Detail, "uv lock")
+	assert.Equal(t, 1, callCount)
+}
+
+func TestUVClient_ExportSBOM_NonOutOfSyncExportError_ReturnsOriginalError(t *testing.T) {
+	expectedErr := errors.New("uv binary not found in PATH")
+	callCount := 0
+	mockExecutor := &mockCmdExecutor{
+		executeFunc: func(_, _ string, args ...string) ([]byte, error) {
+			callCount++
+			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--preview", "--locked", "--no-dev"}, args)
+			return nil, expectedErr
+		},
+	}
+
+	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
+	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{})
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, expectedErr)
+	assert.Nil(t, result)
+	assert.Equal(t, 1, callCount)
 }
 
 func TestUVClient_ExportSBOM_Error(t *testing.T) {
