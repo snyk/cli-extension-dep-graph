@@ -3,7 +3,7 @@
     {
       "name": "test-scan",
       "identity": {
-        "type": "pip"
+        "type": "uv"
       },
       "target": {
         "remoteUrl": ""
@@ -14,7 +14,7 @@
           "data": {
             "schemaVersion": "1.2.0",
             "pkgManager": {
-              "name": "pip"
+              "name": "uv"
             },
             "pkgs": [
               {
@@ -42,4 +42,3 @@
   ],
   "warnings": []
 }
-

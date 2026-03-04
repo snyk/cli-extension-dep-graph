@@ -119,7 +119,7 @@ func parseAndValidateSBOM(sbomData Sbom) (*cycloneDXSBOM, error) {
 
 func extractMetadata(sbom *cycloneDXSBOM) *scaplugin.Metadata {
 	return &scaplugin.Metadata{
-		PackageManager: "pip",
+		PackageManager: "uv",
 		Name:           sbom.Metadata.Component.Name,
 		Version:        sbom.Metadata.Component.Version,
 	}
