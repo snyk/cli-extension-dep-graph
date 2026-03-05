@@ -233,7 +233,7 @@ func TestExtractMetadata_Success(t *testing.T) {
 			require.NotNil(t, sbom)
 
 			metadata := extractMetadata(sbom)
-			assert.Equal(t, "pip", metadata.PackageManager)
+			assert.Equal(t, "uv", metadata.PackageManager)
 			assert.Equal(t, tt.expectedName, metadata.Name)
 			assert.Equal(t, tt.expectedVersion, metadata.Version)
 		})

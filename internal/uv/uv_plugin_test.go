@@ -38,7 +38,7 @@ func singleDepGraphResponse(name, version string) string {
 				"type": "depGraph",
 				"data": {
 					"schemaVersion": "1.3.0",
-					"pkgManager": {"name": "pip"},
+					"pkgManager": {"name": "uv"},
 					"pkgs": [{"id": "` + name + `@` + version + `", "info": {"name": "` + name + `", "version": "` + version + `"}}],
 					"graph": {
 						"rootNodeId": "root-node",
@@ -59,7 +59,7 @@ func multipleDepGraphsResponse() string {
 					"type": "depGraph",
 					"data": {
 						"schemaVersion": "1.3.0",
-						"pkgManager": {"name": "pip"},
+						"pkgManager": {"name": "uv"},
 						"pkgs": [{"id": "package1@1.0.0", "info": {"name": "package1", "version": "1.0.0"}}],
 						"graph": {
 							"rootNodeId": "root-node-1",
@@ -73,7 +73,7 @@ func multipleDepGraphsResponse() string {
 					"type": "depGraph",
 					"data": {
 						"schemaVersion": "1.3.0",
-						"pkgManager": {"name": "pip"},
+						"pkgManager": {"name": "uv"},
 						"pkgs": [{"id": "package2@2.0.0", "info": {"name": "package2", "version": "2.0.0"}}],
 						"graph": {
 							"rootNodeId": "root-node-2",
@@ -89,7 +89,7 @@ func multipleDepGraphsResponse() string {
 
 func createTestDepGraph(name, version string) *depgraph.DepGraph {
 	builder, err := depgraph.NewBuilder(
-		&depgraph.PkgManager{Name: "pip"},
+		&depgraph.PkgManager{Name: "uv"},
 		&depgraph.PkgInfo{Name: name, Version: version},
 	)
 	if err != nil {
@@ -243,7 +243,7 @@ func TestPlugin_BuildFindingsFromDir(t *testing.T) {
 			expectedCount := len(tt.expectedDirs)
 			mockResponses := make([]mocks.MockResponse, expectedCount)
 			//nolint:lll // Long JSON string for mock response
-			mockResponseBody := `{"scanResults":[{"facts":[{"type":"depGraph","data":{"schemaVersion":"1.3.0","pkgManager":{"name":"pip"},"pkgs":[{"id":"mock-project@1.0.0","info":{"name":"mock-project","version":"1.0.0"}}],"graph":{"rootNodeId":"root-node","nodes":[{"nodeId":"root-node","pkgId":"mock-project@1.0.0","deps":[]}]}}}]}],"warnings":[]}`
+			mockResponseBody := `{"scanResults":[{"facts":[{"type":"depGraph","data":{"schemaVersion":"1.3.0","pkgManager":{"name":"uv"},"pkgs":[{"id":"mock-project@1.0.0","info":{"name":"mock-project","version":"1.0.0"}}],"graph":{"rootNodeId":"root-node","nodes":[{"nodeId":"root-node","pkgId":"mock-project@1.0.0","deps":[]}]}}}]}],"warnings":[]}`
 			for i := range expectedCount {
 				mockResponses[i] = mocks.NewMockResponse(
 					"application/json",
@@ -454,7 +454,7 @@ func TestPlugin_BuildFindingsFromDir_MixedSuccessAndFailure(t *testing.T) {
 	options := &scaplugin.Options{AllProjects: true}
 	// Mock SBOM service: project1 fails at ExportSBOM (before conversion), so only "." and "project2" need conversion responses
 	//nolint:lll // Long JSON string for mock response
-	mockResponseBody := `{"scanResults":[{"facts":[{"type":"depGraph","data":{"schemaVersion":"1.3.0","pkgManager":{"name":"pip"},"pkgs":[{"id":"mock-project@1.0.0","info":{"name":"mock-project","version":"1.0.0"}}],"graph":{"rootNodeId":"root-node","nodes":[{"nodeId":"root-node","pkgId":"mock-project@1.0.0","deps":[]}]}}}]}],"warnings":[]}`
+	mockResponseBody := `{"scanResults":[{"facts":[{"type":"depGraph","data":{"schemaVersion":"1.3.0","pkgManager":{"name":"uv"},"pkgs":[{"id":"mock-project@1.0.0","info":{"name":"mock-project","version":"1.0.0"}}],"graph":{"rootNodeId":"root-node","nodes":[{"nodeId":"root-node","pkgId":"mock-project@1.0.0","deps":[]}]}}}]}],"warnings":[]}`
 	mockResponses := []mocks.MockResponse{
 		mocks.NewMockResponse("application/json", []byte(mockResponseBody), http.StatusOK),
 		mocks.NewMockResponse("application/json", []byte(mockResponseBody), http.StatusOK),

@@ -166,7 +166,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		builder, err := dg.NewBuilder(
-			&dg.PkgManager{Name: "pip"},
+			&dg.PkgManager{Name: "uv"},
 			&dg.PkgInfo{Name: "test-pkg", Version: "1.0.0"},
 		)
 		require.NoError(t, err)
