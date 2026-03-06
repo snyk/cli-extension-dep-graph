@@ -164,7 +164,7 @@ func Test_LegacyResolution(t *testing.T) {
 			expected: "--package-manager=pip",
 		},
 		{
-			key:      FlagNPMStrictOutOfSync,
+			key:      FlagStrictOutOfSync,
 			value:    "false",
 			expected: "--strict-out-of-sync=false",
 		},

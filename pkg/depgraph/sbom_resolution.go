@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -74,14 +75,25 @@ func handleSBOMResolutionDI(
 	allProjects := config.GetBool(FlagAllProjects)
 	targetFile := config.GetString(FlagFile)
 	dev := config.GetBool(FlagDev)
+	strictOutOfSyncFlagValue := config.GetString(FlagStrictOutOfSync)
+	strictOutOfSync := true
+	if strictOutOfSyncFlagValue != "" {
+		parsedStrictOutOfSync, err := strconv.ParseBool(strictOutOfSyncFlagValue)
+		if err != nil {
+			return nil, fmt.Errorf("invalid value for --%s: %q (expected true or false)", FlagStrictOutOfSync, strictOutOfSyncFlagValue)
+		}
+		strictOutOfSync = parsedStrictOutOfSync
+	}
+	allowOutOfSync := !strictOutOfSync
 	exclude := parseExcludeFlag(config.GetString(FlagExclude))
 	failFast := config.GetBool(FlagFailFast)
 	pluginOptions := scaplugin.Options{
-		AllProjects: allProjects,
-		TargetFile:  targetFile,
-		Dev:         dev,
-		Exclude:     exclude,
-		FailFast:    failFast,
+		AllProjects:    allProjects,
+		TargetFile:     targetFile,
+		Dev:            dev,
+		Exclude:        exclude,
+		FailFast:       failFast,
+		AllowOutOfSync: allowOutOfSync,
 	}
 
 	// Generate Findings

@@ -9,11 +9,12 @@ import (
 )
 
 type Options struct {
-	AllProjects bool
-	TargetFile  string
-	Dev         bool
-	Exclude     []string
-	FailFast    bool
+	AllProjects    bool
+	TargetFile     string
+	Dev            bool
+	Exclude        []string
+	FailFast       bool
+	AllowOutOfSync bool
 }
 
 type Metadata struct {

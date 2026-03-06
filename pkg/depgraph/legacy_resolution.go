@@ -186,9 +186,13 @@ func prepareLegacyFlags(argument string, cfg configuration.Configuration, logger
 		logger.Print("Init script:", initScript)
 	}
 
-	if cfg.GetString(FlagNPMStrictOutOfSync) == "false" {
+	strictOutOfSync := true
+	if parsedStrictOutOfSync, err := strconv.ParseBool(cfg.GetString(FlagStrictOutOfSync)); err == nil {
+		strictOutOfSync = parsedStrictOutOfSync
+	}
+	if !strictOutOfSync {
 		cmdArgs = append(cmdArgs, "--strict-out-of-sync=false")
-		logger.Print("NPM strict-out-of-sync: false")
+		logger.Print("strict-out-of-sync: false")
 	}
 
 	if cfg.GetBool(FlagNugetAssetsProjectName) {

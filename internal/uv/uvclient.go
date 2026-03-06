@@ -2,8 +2,11 @@ package uv
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 
+	clierrors "github.com/snyk/error-catalog-golang-public/cli"
 	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 
@@ -52,9 +55,14 @@ type WorkspacePackage struct {
 	Path    string // Relative path to the workspace package directory
 }
 
-// exportSBOM exports an SBOM in CycloneDX format using uv.
+// ExportSBOM exports an SBOM in CycloneDX format using uv.
 func (c client) ExportSBOM(inputDir string, opts *scaplugin.Options) (Sbom, error) {
-	args := []string{"export", "--format", "cyclonedx1.5", "--locked", "--preview"}
+	args := []string{"export", "--format", "cyclonedx1.5", "--preview"}
+	if opts.AllowOutOfSync {
+		args = append(args, "--frozen")
+	} else {
+		args = append(args, "--locked")
+	}
 	if opts.AllProjects {
 		args = append(args, "--all-packages")
 	}
@@ -63,6 +71,13 @@ func (c client) ExportSBOM(inputDir string, opts *scaplugin.Options) (Sbom, erro
 	}
 	output, err := c.executor.Execute(c.uvBinary, inputDir, args...)
 	if err != nil {
+		if !opts.AllowOutOfSync && isOutOfSyncLockfileError(err) {
+			return nil, clierrors.NewGeneralSCAFailureError(
+				"uv.lock is out of sync with pyproject.toml. Run `uv lock` to update the lockfile, "+
+					"or re-run with `--strict-out-of-sync=false` to test the outdated lockfile regardless.",
+				snyk_errors.WithCause(err),
+			)
+		}
 		return nil, fmt.Errorf("failed to execute uv export: %w", err)
 	}
 
@@ -141,4 +156,22 @@ func extractWorkspacePackages(sbom *cycloneDXSBOM) []WorkspacePackage {
 	}
 
 	return workspacePackages
+}
+
+// Matches uv's error message when the lockfile is out of date.
+// Needed to distinguish sync failures from unrelated executor errors (e.g. binary not found).
+func isOutOfSyncLockfileError(err error) bool {
+	var catalogErr snyk_errors.Error
+	if errors.As(err, &catalogErr) {
+		if isOutOfSyncLockfileMessage(catalogErr.Detail) {
+			return true
+		}
+	}
+
+	return isOutOfSyncLockfileMessage(err.Error())
+}
+
+func isOutOfSyncLockfileMessage(errMsg string) bool {
+	errMsg = strings.ToLower(errMsg)
+	return strings.Contains(errMsg, "lockfile") && strings.Contains(errMsg, "needs to be updated")
 }
