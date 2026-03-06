@@ -9,11 +9,43 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/snyk"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 )
+
+const (
+	pip3Command = "pip3"
+	pipCommand  = "pip"
+)
+
+var (
+	detectedPipCommand     string
+	detectedPipCommandOnce sync.Once
+)
+
+// getPipCommand returns the pip command to use ("pip3" or "pip").
+// It tries to find "pip3" first, then falls back to "pip".
+// The result is cached after the first call.
+func getPipCommand() string {
+	detectedPipCommandOnce.Do(func() {
+		// Try pip3 first (more common on modern systems)
+		if _, err := exec.LookPath(pip3Command); err == nil {
+			detectedPipCommand = pip3Command
+			return
+		}
+		// Fall back to pip
+		if _, err := exec.LookPath(pipCommand); err == nil {
+			detectedPipCommand = pipCommand
+			return
+		}
+		// If neither exists, default to pip3 (will fail later with clear error)
+		detectedPipCommand = pip3Command
+	})
+	return detectedPipCommand
+}
 
 // Report represents the minimal JSON output from pip install --report
 // needed to build a dependency graph.
@@ -124,7 +156,8 @@ func runPipInstall(ctx context.Context, packageArgs, constraints []string, noBui
 		args = append(args, "--index-url", indexURL)
 	}
 
-	output, err := executor.Execute(ctx, stdinData, "pip", args...)
+	pipCmd := getPipCommand()
+	output, err := executor.Execute(ctx, stdinData, pipCmd, args...)
 	if err != nil {
 		return nil, classifyPipError(ctx, err)
 	}
