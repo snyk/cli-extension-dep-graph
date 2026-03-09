@@ -444,6 +444,222 @@ func TestExtractMetadata_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestHasProjectRoot(t *testing.T) {
+	tests := []struct {
+		name     string
+		sbom     string
+		expected bool
+	}{
+		{
+			name: "root component has is_project_root property (single project)",
+			sbom: `{
+				"bomFormat": "CycloneDX",
+				"specVersion": "1.5",
+				"version": 1,
+				"metadata": {
+					"tools": [{"vendor": "Astral Software Inc.", "name": "uv", "version": "0.10.9"}],
+					"component": {
+						"type": "library",
+						"bom-ref": "seeds-1@1.0.0",
+						"name": "seeds",
+						"version": "1.0.0",
+						"properties": [
+							{"name": "uv:package:is_project_root", "value": "true"}
+						]
+					}
+				},
+				"components": [
+					{
+						"type": "library",
+						"bom-ref": "django-2@3.1",
+						"name": "django",
+						"version": "3.1",
+						"purl": "pkg:pypi/django@3.1"
+					}
+				]
+			}`,
+			expected: true,
+		},
+		{
+			name: "non-root component has is_project_root property (workspace member)",
+			sbom: `{
+				"bomFormat": "CycloneDX",
+				"specVersion": "1.5",
+				"version": 1,
+				"metadata": {
+					"tools": [{"vendor": "Astral Software Inc.", "name": "uv", "version": "0.10.9"}],
+					"component": {
+						"type": "library",
+						"bom-ref": "uv-workspace-3",
+						"name": "uv-workspace",
+						"properties": [
+							{"name": "uv:package:is_synthetic_root", "value": "true"}
+						]
+					}
+				},
+				"components": [
+					{
+						"type": "library",
+						"bom-ref": "albatross-1@0.1.0",
+						"name": "albatross",
+						"version": "0.1.0",
+						"properties": [
+							{"name": "uv:package:is_project_root", "value": "true"},
+							{"name": "uv:workspace:path", "value": "packages/albatross"}
+						]
+					}
+				]
+			}`,
+			expected: true,
+		},
+		{
+			name: "no component has is_project_root property (virtual workspace)",
+			sbom: `{
+				"bomFormat": "CycloneDX",
+				"specVersion": "1.5",
+				"version": 1,
+				"metadata": {
+					"tools": [{"vendor": "Astral Software Inc.", "name": "uv", "version": "0.10.9"}],
+					"component": {
+						"type": "library",
+						"bom-ref": "uv-workspace-3",
+						"name": "uv-workspace",
+						"properties": [
+							{"name": "uv:package:is_synthetic_root", "value": "true"}
+						]
+					}
+				},
+				"components": [
+					{
+						"type": "library",
+						"bom-ref": "albatross-1@0.1.0",
+						"name": "albatross",
+						"version": "0.1.0",
+						"properties": [
+							{"name": "uv:workspace:path", "value": "packages/albatross"}
+						]
+					}
+				]
+			}`,
+			expected: false,
+		},
+		{
+			name: "is_project_root property with value false",
+			sbom: `{
+				"bomFormat": "CycloneDX",
+				"specVersion": "1.5",
+				"version": 1,
+				"metadata": {
+					"tools": [{"vendor": "Astral Software Inc.", "name": "uv", "version": "0.10.9"}],
+					"component": {
+						"type": "library",
+						"bom-ref": "seeds-1@1.0.0",
+						"name": "seeds",
+						"version": "1.0.0",
+						"properties": [
+							{"name": "uv:package:is_project_root", "value": "false"}
+						]
+					}
+				},
+				"components": []
+			}`,
+			expected: false,
+		},
+		{
+			name: "no properties at all",
+			sbom: `{
+				"bomFormat": "CycloneDX",
+				"specVersion": "1.5",
+				"version": 1,
+				"metadata": {
+					"tools": [{"vendor": "Astral Software Inc.", "name": "uv", "version": "0.10.9"}],
+					"component": {
+						"type": "library",
+						"bom-ref": "seeds-1@1.0.0",
+						"name": "seeds",
+						"version": "1.0.0"
+					}
+				},
+				"components": []
+			}`,
+			expected: false,
+		},
+		{
+			name: "empty components list with root having is_project_root",
+			sbom: `{
+				"bomFormat": "CycloneDX",
+				"specVersion": "1.5",
+				"version": 1,
+				"metadata": {
+					"tools": [{"vendor": "Astral Software Inc.", "name": "uv", "version": "0.10.9"}],
+					"component": {
+						"type": "library",
+						"bom-ref": "seeds-1@1.0.0",
+						"name": "seeds",
+						"version": "1.0.0",
+						"properties": [
+							{"name": "uv:package:is_project_root", "value": "true"}
+						]
+					}
+				}
+			}`,
+			expected: true,
+		},
+		{
+			name: "multiple components, one has is_project_root",
+			sbom: `{
+				"bomFormat": "CycloneDX",
+				"specVersion": "1.5",
+				"version": 1,
+				"metadata": {
+					"tools": [{"vendor": "Astral Software Inc.", "name": "uv", "version": "0.10.9"}],
+					"component": {
+						"type": "library",
+						"bom-ref": "uv-workspace-4",
+						"name": "uv-workspace",
+						"properties": [
+							{"name": "uv:package:is_synthetic_root", "value": "true"}
+						]
+					}
+				},
+				"components": [
+					{
+						"type": "library",
+						"bom-ref": "albatross-1@0.1.0",
+						"name": "albatross",
+						"version": "0.1.0",
+						"properties": [
+							{"name": "uv:workspace:path", "value": "packages/albatross"}
+						]
+					},
+					{
+						"type": "library",
+						"bom-ref": "seeds-2@1.0.0",
+						"name": "seeds",
+						"version": "1.0.0",
+						"properties": [
+							{"name": "uv:package:is_project_root", "value": "true"},
+							{"name": "uv:workspace:path", "value": "packages/seeds"}
+						]
+					}
+				]
+			}`,
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sbom, err := parseAndValidateSBOM([]byte(tt.sbom))
+			require.NoError(t, err)
+			require.NotNil(t, sbom)
+
+			result := hasProjectRoot(sbom)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestExtractWorkspacePackages(t *testing.T) {
 	tests := []struct {
 		name     string

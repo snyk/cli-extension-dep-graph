@@ -9,6 +9,8 @@ import (
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
+	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
+
 	"github.com/snyk/cli-extension-dep-graph/internal/conversion"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
@@ -53,7 +55,7 @@ func (p Plugin) BuildFindingsFromDir(
 	for _, file := range files {
 		lockFilePath := file.RelPath // e.g., "uv.lock" or "project1/uv.lock"
 		lockFileDir := filepath.Dir(lockFilePath)
-		log.Info(ctx, "Building dependency graph", logger.Attr("lockFile", lockFilePath))
+		log.Info(ctx, "Building dependency graph", logger.Attr("lockFile", lockFilePath)) //nolint:goconst // logger key, not worth a constant
 
 		sbom, err := p.client.ExportSBOM(lockFileDir, options)
 		if err != nil {
@@ -67,7 +69,7 @@ func (p Plugin) BuildFindingsFromDir(
 			findings = append(findings, errorFinding)
 			continue
 		}
-		fs, err := p.buildFindings(ctx, sbom, lockFilePath, lockFileDir, log)
+		fs, err := p.buildFindings(ctx, sbom, lockFilePath, lockFileDir, options, log)
 		if err != nil {
 			return nil, err
 		}
@@ -86,11 +88,23 @@ func (p Plugin) buildFindings(
 	sbom Sbom,
 	lockFilePath string,
 	lockFileDir string,
+	options *scaplugin.Options,
 	log logger.Logger,
 ) ([]scaplugin.Finding, error) {
 	parsedSbom, err := parseAndValidateSBOM(sbom)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse and validate sbom for %s: %w", lockFilePath, err)
+	}
+
+	if !options.AllProjects && !options.UvWorkspacePackages && !hasProjectRoot(parsedSbom) {
+		log.Info(ctx, "No root project found in SBOM", logger.Attr("lockFile", lockFilePath))
+		noRootErr := ecosystems.NewUvNoProjectRootError(
+			"Found uv workspace with no root project. To scan all workspace members use the --all-projects flag.",
+		)
+		return []scaplugin.Finding{{
+			LockFile: lockFilePath,
+			Error:    noRootErr,
+		}}, nil
 	}
 
 	metadata := extractMetadata(parsedSbom)
