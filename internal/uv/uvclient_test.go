@@ -404,6 +404,158 @@ func TestExtractMetadata_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestHasProjectRoot(t *testing.T) {
+	tests := []struct {
+		name     string
+		sbom     string
+		expected bool
+	}{
+		{
+			name: "root component has is_project_root property",
+			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "my-project",
+						"version": "1.0.0",
+						"properties": [
+							{"name": "uv:package:is_project_root", "value": "true"}
+						]
+					}
+				},
+				"components": []
+			}`,
+			expected: true,
+		},
+		{
+			name: "non-root component has is_project_root property",
+			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "workspace-root",
+						"version": "1.0.0"
+					}
+				},
+				"components": [
+					{
+						"name": "workspace-member",
+						"version": "0.1.0",
+						"properties": [
+							{"name": "uv:package:is_project_root", "value": "true"},
+							{"name": "uv:workspace:path", "value": "packages/member"}
+						]
+					}
+				]
+			}`,
+			expected: true,
+		},
+		{
+			name: "no component has is_project_root property (virtual workspace)",
+			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "virtual-workspace",
+						"version": "0.0.0"
+					}
+				},
+				"components": [
+					{
+						"name": "member-a",
+						"version": "0.1.0",
+						"properties": [
+							{"name": "uv:workspace:path", "value": "packages/a"}
+						]
+					}
+				]
+			}`,
+			expected: false,
+		},
+		{
+			name: "is_project_root property with value false",
+			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "my-project",
+						"version": "1.0.0",
+						"properties": [
+							{"name": "uv:package:is_project_root", "value": "false"}
+						]
+					}
+				},
+				"components": []
+			}`,
+			expected: false,
+		},
+		{
+			name: "no properties at all",
+			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "my-project",
+						"version": "1.0.0"
+					}
+				},
+				"components": []
+			}`,
+			expected: false,
+		},
+		{
+			name: "empty components list with root having is_project_root",
+			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "standalone-project",
+						"version": "1.0.0",
+						"properties": [
+							{"name": "uv:package:is_project_root", "value": "true"}
+						]
+					}
+				}
+			}`,
+			expected: true,
+		},
+		{
+			name: "multiple components, one has is_project_root",
+			sbom: `{
+				"metadata": {
+					"component": {
+						"name": "workspace-root",
+						"version": "1.0.0"
+					}
+				},
+				"components": [
+					{
+						"name": "member-a",
+						"version": "0.1.0",
+						"properties": [
+							{"name": "uv:workspace:path", "value": "packages/a"}
+						]
+					},
+					{
+						"name": "member-b",
+						"version": "0.2.0",
+						"properties": [
+							{"name": "uv:package:is_project_root", "value": "true"},
+							{"name": "uv:workspace:path", "value": "packages/b"}
+						]
+					}
+				]
+			}`,
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sbom, err := parseAndValidateSBOM([]byte(tt.sbom))
+			require.NoError(t, err)
+			require.NotNil(t, sbom)
+
+			result := hasProjectRoot(sbom)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestExtractWorkspacePackages(t *testing.T) {
 	tests := []struct {
 		name     string

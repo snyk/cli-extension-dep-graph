@@ -23,7 +23,7 @@ func (m *MockClient) ExportSBOM(inputDir string, _ *scaplugin.Options) (Sbom, er
 		return nil, m.ReturnErr
 	}
 
-	sbom := `{"bomFormat":"CycloneDX","specVersion":"1.5","metadata":{"component":{"name":"mock-project","version":"1.0.0"}}}`
+	sbom := `{"bomFormat":"CycloneDX","specVersion":"1.5","metadata":{"component":{"name":"mock-project","version":"1.0.0","properties":[{"name":"uv:package:is_project_root","value":"true"}]}}}`
 	return Sbom(sbom), nil
 }
 

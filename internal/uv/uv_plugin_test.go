@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
+	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -25,7 +26,10 @@ const validSBOMJSON = `{
 	"metadata": {
 		"component": {
 			"name": "test-package",
-			"version": "1.0.0"
+			"version": "1.0.0",
+			"properties": [
+				{"name": "uv:package:is_project_root", "value": "true"}
+			]
 		}
 	},
 	"components": []
@@ -493,7 +497,7 @@ func TestBuildFindings_Success(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
@@ -503,12 +507,80 @@ func TestBuildFindings_Success(t *testing.T) {
 	assert.Nil(t, findings[0].Error)
 }
 
+func TestBuildFindings_NoProjectRoot_ReturnsErrorFinding(t *testing.T) {
+	sbomJSON := `{
+		"metadata": {
+			"component": {
+				"name": "virtual-workspace",
+				"version": "0.0.0"
+			}
+		},
+		"components": [
+			{
+				"name": "member-a",
+				"version": "0.1.0",
+				"properties": [
+					{"name": "uv:workspace:path", "value": "packages/a"}
+				]
+			}
+		]
+	}`
+	sbom := Sbom(sbomJSON)
+	snykClient := setupMockSnykClient(t, `{}`)
+	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
+
+	require.NoError(t, err, "should not return an error, but rather an error finding")
+	require.Len(t, findings, 1)
+	require.NotNil(t, findings[0].Error)
+	assert.Contains(t, findings[0].Error.Error(), "Files cannot be processed")
+	assert.Nil(t, findings[0].DepGraph)
+	assert.Equal(t, "uv.lock", findings[0].LockFile)
+
+	var catalogErr snyk_errors.Error
+	require.True(t, errors.As(findings[0].Error, &catalogErr), "error should be a catalog error")
+	assert.Contains(t, catalogErr.Detail, "no root")
+	assert.Contains(t, catalogErr.Detail, "--all-projects")
+}
+
+func TestBuildFindings_NoProjectRoot_AllProjects_Succeeds(t *testing.T) {
+	sbomJSON := `{
+		"metadata": {
+			"component": {
+				"name": "virtual-workspace",
+				"version": "0.0.0"
+			}
+		},
+		"components": [
+			{
+				"name": "member-a",
+				"version": "0.1.0",
+				"properties": [
+					{"name": "uv:workspace:path", "value": "packages/a"}
+				]
+			}
+		]
+	}`
+	sbom := Sbom(sbomJSON)
+	mockResponseBody := singleDepGraphResponse("member-a", "0.1.0")
+	snykClient := setupMockSnykClient(t, mockResponseBody)
+	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{AllProjects: true}, testLogger)
+
+	require.NoError(t, err)
+	require.Len(t, findings, 1)
+	assert.NotNil(t, findings[0].DepGraph)
+	assert.Nil(t, findings[0].Error)
+}
+
 func TestBuildFindings_InvalidSBOM(t *testing.T) {
 	sbom := Sbom(`{"invalid": "json"}`)
 	snykClient := setupMockSnykClient(t, `{}`)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
 
 	assert.Error(t, err)
 	assert.Nil(t, findings)
@@ -524,7 +596,7 @@ func TestBuildFindings_MissingRootComponent(t *testing.T) {
 	snykClient := setupMockSnykClient(t, `{}`)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
 
 	assert.Error(t, err)
 	assert.Nil(t, findings)
@@ -537,7 +609,7 @@ func TestBuildFindings_ConversionError(t *testing.T) {
 	snykClient := setupMockSnykClientMultiResponse(t, []mocks.MockResponse{mockResponse})
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
 
 	assert.Error(t, err)
 	assert.Nil(t, findings)
@@ -550,7 +622,7 @@ func TestBuildFindings_MultipleDepGraphs(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 2)
@@ -563,7 +635,10 @@ func TestBuildFindings_WorkspacePackage(t *testing.T) {
 		"metadata": {
 			"component": {
 				"name": "workspace-root",
-				"version": "1.0.0"
+				"version": "1.0.0",
+				"properties": [
+					{"name": "uv:package:is_project_root", "value": "true"}
+				]
 			}
 		},
 		"components": [
@@ -584,7 +659,7 @@ func TestBuildFindings_WorkspacePackage(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
@@ -598,7 +673,7 @@ func TestBuildFindings_PathConstruction_RootDir(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
@@ -612,7 +687,7 @@ func TestBuildFindings_PathConstruction_NestedDir(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "project1/uv.lock", "project1", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "project1/uv.lock", "project1", &scaplugin.Options{}, testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
@@ -625,7 +700,10 @@ func TestBuildFindings_PathConstruction_NestedWorkspacePackage(t *testing.T) {
 		"metadata": {
 			"component": {
 				"name": "workspace-root",
-				"version": "1.0.0"
+				"version": "1.0.0",
+				"properties": [
+					{"name": "uv:package:is_project_root", "value": "true"}
+				]
 			}
 		},
 		"components": [
@@ -646,7 +724,7 @@ func TestBuildFindings_PathConstruction_NestedWorkspacePackage(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "workspace/uv.lock", "workspace", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "workspace/uv.lock", "workspace", &scaplugin.Options{}, testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
