@@ -75,13 +75,8 @@ func handleSBOMResolutionDI(
 	allProjects := config.GetBool(FlagAllProjects)
 	targetFile := config.GetString(FlagFile)
 	dev := config.GetBool(FlagDev)
-	strictOutOfSyncFlagValue := config.GetString(FlagStrictOutOfSync)
 	strictOutOfSync := true
-	if strictOutOfSyncFlagValue != "" {
-		parsedStrictOutOfSync, err := strconv.ParseBool(strictOutOfSyncFlagValue)
-		if err != nil {
-			return nil, fmt.Errorf("invalid value for --%s: %q (expected true or false)", FlagStrictOutOfSync, strictOutOfSyncFlagValue)
-		}
+	if parsedStrictOutOfSync, err := strconv.ParseBool(config.GetString(FlagStrictOutOfSync)); err == nil {
 		strictOutOfSync = parsedStrictOutOfSync
 	}
 	allowOutOfSync := !strictOutOfSync
