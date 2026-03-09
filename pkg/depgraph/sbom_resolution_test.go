@@ -844,7 +844,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.False(t, mockPlugin.options.AllowOutOfSync)
 	})
 
-	t.Run("should return an error for invalid strict-out-of-sync values", func(t *testing.T) {
+	t.Run("should ignore invalid strict-out-of-sync values and default to true", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 		ctx.config.Set(FlagStrictOutOfSync, "invalid")
@@ -868,11 +868,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			resolutionHandler.Func(),
 		)
 
-		require.Error(t, err)
-		assert.Nil(t, workflowData)
-		assert.Contains(t, err.Error(), `invalid value for --strict-out-of-sync: "invalid"`)
-		assert.Nil(t, mockPlugin.options, "plugin should not be called when strict-out-of-sync is invalid")
-		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called when strict-out-of-sync is invalid")
+		require.NoError(t, err)
+		assert.NotNil(t, workflowData)
+		require.NotNil(t, mockPlugin.options, "plugin should be called when strict-out-of-sync is invalid")
+		assert.False(t, mockPlugin.options.AllowOutOfSync, "invalid strict-out-of-sync should default to strict mode")
+		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called when a plugin finding is returned")
 	})
 
 	t.Run("should pass exclude flag to plugin options", func(t *testing.T) {
