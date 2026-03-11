@@ -20,6 +20,7 @@ import (
 	snykerrors "github.com/snyk/error-catalog-golang-public/snyk_errors"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pip"
 )
 
@@ -40,7 +41,7 @@ func TestPipenvPlugin_BuildDepGraphsFromDir(t *testing.T) {
 
 	tests := map[string]PluginTestCase{
 		"single_requirements_at_root":        {Fixture: "simple", Options: ecosystems.NewPluginOptions()},
-		"dev_deps":                           {Fixture: "simple-with-dev-deps", Options: ecosystems.NewPluginOptions().WithPipenvIncludeDev(true)},
+		"dev_deps":                           {Fixture: "simple-with-dev-deps", Options: ecosystems.NewPluginOptions().WithIncludeDev(true)},
 		"with_version_specifiers":            {Fixture: "with-version-specifiers", Options: ecosystems.NewPluginOptions()},
 		"with_extras":                        {Fixture: "with-extras", Options: ecosystems.NewPluginOptions()},
 		"os_specific_requirements":           {Fixture: "os-specific", Options: ecosystems.NewPluginOptions()},
@@ -60,7 +61,7 @@ func TestPipenvPlugin_BuildDepGraphsFromDir(t *testing.T) {
 
 			// Run plugin
 			plugin := Plugin{}
-			results, err := plugin.BuildDepGraphsFromDir(ctx, absPath, tc.Options)
+			results, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, tc.Options)
 			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 
 			// Load and compare expected output
@@ -102,7 +103,7 @@ func TestPlugin_Concurrency(t *testing.T) {
 
 	// Run multiple times to test race conditions
 	for i := 0; i < 5; i++ {
-		results, err := plugin.BuildDepGraphsFromDir(ctx, absPath, options)
+		results, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, options)
 		require.NoError(t, err, "iteration %d failed", i)
 		assertResultsMatchExpected(t, results, expected, "multi-requirements")
 	}
@@ -145,7 +146,7 @@ func TestPlugin_BuildDepGraphsFromDir_PipErrors(t *testing.T) {
 			require.NoError(t, err, "failed to get absolute path for fixture")
 
 			plugin := Plugin{}
-			results, err := plugin.BuildDepGraphsFromDir(ctx, absPath, ecosystems.NewPluginOptions())
+			results, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, ecosystems.NewPluginOptions())
 			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 
 			require.Len(t, results, 1, "expected a single result for fixture %s", tc.fixture)
