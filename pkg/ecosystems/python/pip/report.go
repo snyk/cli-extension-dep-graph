@@ -13,6 +13,8 @@ import (
 	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/snyk"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
+
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
 
 // Report represents the minimal JSON output from pip install --report
@@ -57,28 +59,35 @@ func (p *PackageMetadata) GetNormalizeVersion() string {
 
 // GetInstallReport runs pip install with --dry-run and --report flags to get
 // a JSON report of what would be installed from a requirements file.
-func GetInstallReport(ctx context.Context, requirementsFile string, noBuildIsolation bool) (*Report, error) {
-	return GetInstallReportWithExecutor(ctx, requirementsFile, noBuildIsolation, &DefaultExecutor{})
+func GetInstallReport(ctx context.Context, log logger.Logger, requirementsFile string, noBuildIsolation bool) (*Report, error) {
+	return GetInstallReportWithExecutor(ctx, log, requirementsFile, noBuildIsolation, &DefaultExecutor{})
 }
 
 // GetInstallReportWithExecutor is a testable version that accepts a CommandExecutor.
-func GetInstallReportWithExecutor(ctx context.Context, requirementsFile string, noBuildIsolation bool, executor CommandExecutor) (*Report, error) {
+func GetInstallReportWithExecutor(
+	ctx context.Context,
+	log logger.Logger,
+	requirementsFile string,
+	noBuildIsolation bool,
+	executor CommandExecutor,
+) (*Report, error) {
 	if requirementsFile == "" {
 		return nil, fmt.Errorf("requirements file path cannot be empty")
 	}
-	return runPipInstall(ctx, []string{"-r", requirementsFile}, nil, noBuildIsolation, executor)
+	return runPipInstall(ctx, log, []string{"-r", requirementsFile}, nil, noBuildIsolation, executor)
 }
 
 // GetInstallReportFromPackages runs pip install with --dry-run and --report flags,
 // passing packages directly as command arguments instead of using a requirements file.
 // Constraints are passed via stdin using /dev/stdin as the constraint file path.
-func GetInstallReportFromPackages(ctx context.Context, packages, constraints []string, noBuildIsolation bool) (*Report, error) {
-	return GetInstallReportFromPackagesWithExecutor(ctx, packages, constraints, noBuildIsolation, &DefaultExecutor{})
+func GetInstallReportFromPackages(ctx context.Context, log logger.Logger, packages, constraints []string, noBuildIsolation bool) (*Report, error) {
+	return GetInstallReportFromPackagesWithExecutor(ctx, log, packages, constraints, noBuildIsolation, &DefaultExecutor{})
 }
 
 // GetInstallReportFromPackagesWithExecutor is a testable version that accepts a CommandExecutor.
 func GetInstallReportFromPackagesWithExecutor(
 	ctx context.Context,
+	log logger.Logger,
 	packages, constraints []string,
 	noBuildIsolation bool,
 	executor CommandExecutor,
@@ -86,7 +95,7 @@ func GetInstallReportFromPackagesWithExecutor(
 	if len(packages) == 0 {
 		return nil, fmt.Errorf("packages list cannot be empty")
 	}
-	return runPipInstall(ctx, packages, constraints, noBuildIsolation, executor)
+	return runPipInstall(ctx, log, packages, constraints, noBuildIsolation, executor)
 }
 
 // runPipInstall executes pip install --dry-run and returns the parsed report.
@@ -97,7 +106,13 @@ func GetInstallReportFromPackagesWithExecutor(
 //   - --quiet: Suppress non-error output (except the report)
 //   - --no-build-isolation: Disable build isolation when noBuildIsolation is true
 //   - --index-url: Custom PyPI index (if PIP_TEST_INDEX_URL is set)
-func runPipInstall(ctx context.Context, packageArgs, constraints []string, noBuildIsolation bool, executor CommandExecutor) (*Report, error) {
+func runPipInstall(
+	ctx context.Context,
+	log logger.Logger,
+	packageArgs, constraints []string,
+	noBuildIsolation bool,
+	executor CommandExecutor,
+) (*Report, error) {
 	args := []string{
 		"install",
 		"--dry-run",
@@ -126,7 +141,7 @@ func runPipInstall(ctx context.Context, packageArgs, constraints []string, noBui
 
 	output, err := executor.Execute(ctx, stdinData, "pip", args...)
 	if err != nil {
-		return nil, classifyPipError(ctx, err)
+		return nil, classifyPipError(ctx, err, log)
 	}
 
 	var report Report
@@ -186,7 +201,7 @@ func (e *pipError) Unwrap() error {
 // classifyPipError analyzes pip error output and returns appropriate error catalog error.
 //
 //nolint:gocyclo // Error classification requires checking multiple patterns sequentially
-func classifyPipError(ctx context.Context, err error) error {
+func classifyPipError(ctx context.Context, err error, log logger.Logger) error {
 	// Check for context cancellation or timeout early
 	if errors.Is(ctx.Err(), context.Canceled) {
 		// User-initiated cancellation (e.g., Ctrl+C) - not a catalog error
@@ -248,9 +263,74 @@ func classifyPipError(ctx context.Context, err error) error {
 		)
 	}
 
-	// Generic installation failure
+	// Generic installation failure - try to extract package name for cleaner error message
+	if pkgName := extractFailedPackageName(stderr); pkgName != "" {
+		// Log full error details before returning shortened error
+		if log != nil {
+			log.Error(ctx, "Pip install failed - full error output",
+				logger.Attr("package", pkgName),
+				logger.Attr("full_stderr", stderr))
+		}
+		return ecosystems.NewInstallationFailureError(
+			fmt.Sprintf("Failed to install package '%s'. Check that the package version is compatible with your current Python version.", pkgName),
+			snyk_errors.WithCause(pipErr.err),
+		)
+	}
+
 	return ecosystems.NewInstallationFailureError(
 		fmt.Sprintf("Pip install failed: %s", stderr),
 		snyk_errors.WithCause(pipErr.err),
 	)
+}
+
+// extractFailedPackageName attempts to extract the package name from pip error output.
+// It looks for common error patterns like:
+// - "ERROR: Failed to build 'package' when..."
+// - "ERROR: Failed building wheel for package"
+// - "ERROR: Could not build wheels for package"
+// - "╰─> package" (metadata-generation-failed errors).
+func extractFailedPackageName(stderr string) string {
+	// Pattern: "╰─> package" (appears in metadata-generation-failed errors)
+	// This pattern is checked first as it's the most specific and cleanest
+	if idx := strings.Index(stderr, "╰─> "); idx != -1 {
+		start := idx + len("╰─> ")
+		// Find the end of the package name (whitespace or newline)
+		end := strings.IndexAny(stderr[start:], " \n\r\t")
+		var pkgName string
+		if end == -1 {
+			// Package name goes to end of string
+			pkgName = strings.TrimSpace(stderr[start:])
+		} else {
+			pkgName = strings.TrimSpace(stderr[start : start+end])
+		}
+		if pkgName != "" {
+			return pkgName
+		}
+	}
+
+	// Pattern: "Failed to build 'package' when"
+	if idx := strings.Index(stderr, "Failed to build '"); idx != -1 {
+		start := idx + len("Failed to build '")
+		if end := strings.Index(stderr[start:], "'"); end != -1 {
+			return stderr[start : start+end]
+		}
+	}
+
+	// Pattern: "Failed building wheel for package"
+	if idx := strings.Index(stderr, "Failed building wheel for "); idx != -1 {
+		start := idx + len("Failed building wheel for ")
+		if end := strings.IndexAny(stderr[start:], " \n,"); end != -1 {
+			return stderr[start : start+end]
+		}
+	}
+
+	// Pattern: "Could not build wheels for package"
+	if idx := strings.Index(stderr, "Could not build wheels for "); idx != -1 {
+		start := idx + len("Could not build wheels for ")
+		if end := strings.IndexAny(stderr[start:], " \n,"); end != -1 {
+			return stderr[start : start+end]
+		}
+	}
+
+	return ""
 }

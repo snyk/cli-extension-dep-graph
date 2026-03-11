@@ -28,7 +28,7 @@ func TestGetInstallReportWithExecutor_EmptyRequirementsFile(t *testing.T) {
 	executor := &MockExecutor{}
 	ctx := context.Background()
 
-	_, err := GetInstallReportWithExecutor(ctx, "", false, executor)
+	_, err := GetInstallReportWithExecutor(ctx, nil, "", false, executor)
 
 	if err == nil {
 		t.Fatal("expected error for empty requirements file")
@@ -46,7 +46,7 @@ func TestGetInstallReportWithExecutor_InvalidJSON(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, err := GetInstallReportWithExecutor(ctx, "requirements.txt", false, executor)
+	_, err := GetInstallReportWithExecutor(ctx, nil, "requirements.txt", false, executor)
 
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
@@ -155,7 +155,7 @@ func TestClassifyPipError(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := classifyPipError(context.Background(), tt.err)
+			err := classifyPipError(context.Background(), tt.err, nil)
 
 			// Check for context error
 			if tt.wantContextErr != nil {

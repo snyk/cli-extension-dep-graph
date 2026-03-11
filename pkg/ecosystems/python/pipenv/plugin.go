@@ -174,7 +174,7 @@ func (p Plugin) buildDepGraphFromPipfile(
 	}
 
 	// Get pip install report with packages and constraints passed directly
-	report, err := p.getInstallReport(ctx, pipfile, lockfile, noBuildIsolation, includeDevDeps)
+	report, err := p.getInstallReport(ctx, log, pipfile, lockfile, noBuildIsolation, includeDevDeps)
 	if err != nil {
 		return ecosystems.SCAResult{}, fmt.Errorf("failed to get pip install report: %w", err)
 	}
@@ -203,6 +203,7 @@ func (p Plugin) buildDepGraphFromPipfile(
 // conflicts where pip sees the same package specified twice with different version constraints.
 func (p Plugin) getInstallReport(
 	ctx context.Context,
+	log logger.Logger,
 	pipfile *Pipfile,
 	lockfile *PipfileLock,
 	noBuildIsolation bool,
@@ -219,7 +220,7 @@ func (p Plugin) getInstallReport(
 	constraints := lockfile.ToConstraints(includeDevDeps)
 
 	// Get pip install report passing packages and constraints directly
-	report, err := pip.GetInstallReportFromPackages(ctx, packages, constraints, noBuildIsolation)
+	report, err := pip.GetInstallReportFromPackages(ctx, log, packages, constraints, noBuildIsolation)
 	if err != nil {
 		return nil, fmt.Errorf("pip install report failed: %w", err)
 	}
