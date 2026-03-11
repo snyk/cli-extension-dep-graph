@@ -145,7 +145,7 @@ func (p Plugin) buildDepGraphFromFile(
 		logger.Attr("python_version", pythonVersion))
 
 	// Get pip install report (dry-run, no actual installation)
-	report, err := GetInstallReport(ctx, file.Path, noBuildIsolation)
+	report, err := GetInstallReport(ctx, log, file.Path, noBuildIsolation)
 	if err != nil {
 		return ecosystems.SCAResult{}, fmt.Errorf("failed to get pip install report for %s: %w", file.RelPath, err)
 	}
