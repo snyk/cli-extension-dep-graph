@@ -26,6 +26,9 @@ jobs:
     steps:
       - checkout
       - run:
+          name: run make install-tools
+          command: make install-tools
+      - run:
           name: run lint check
           command: make lint
   unit_test:
