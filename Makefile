@@ -18,8 +18,8 @@ install-tools:
 	@mkdir -p .bin
 	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_LINT_V)/install.sh | sh -s -- -b .bin $(GOLANGCI_LINT_V)
 
-lint:
-	$(if $(CI),golangci-lint,.bin/golangci-lint) run -v
+lint: install-tools
+	.bin/golangci-lint run -v
 
 tidy:
 	$(GOMOD) tidy -v

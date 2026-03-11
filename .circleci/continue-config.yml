@@ -26,6 +26,9 @@ jobs:
     steps:
       - checkout
       - run:
+          name: run make install-tools
+          command: make install-tools
+      - run:
           name: run lint check
           command: make lint
   unit_test:
@@ -115,14 +118,22 @@ jobs:
             echo "Verifying index configuration..."
             devpi getjson /root/stable
             
-            # Test package lookup
+            # Test package lookup (devpi fetches from PyPI lazily on first request, so retry)
             echo "Testing package lookup (requests)..."
-            if curl -s "http://localhost:3141/root/stable/+simple/requests/" | grep -q "requests-"; then
-              echo "✓ devpi can proxy to PyPI successfully"
-            else
-              echo "✗ devpi failed to fetch package list from PyPI"
-              exit 1
-            fi
+            for attempt in {1..5}; do
+              if curl -s --max-time 30 "http://localhost:3141/root/stable/+simple/requests/" | grep -q "requests-"; then
+                echo "✓ devpi can proxy to PyPI successfully"
+                break
+              fi
+              if [ "$attempt" -eq 5 ]; then
+                echo "✗ devpi failed to fetch package list from PyPI after 5 attempts"
+                echo "Last response:"
+                curl -s --max-time 10 "http://localhost:3141/root/stable/+simple/requests/"
+                exit 1
+              fi
+              echo "Attempt $attempt/5: waiting for devpi to fetch from PyPI..."
+              sleep 3
+            done
             
             # Export for tests
             echo 'export PIP_TEST_INDEX_URL="http://localhost:3141/root/stable/+simple/"' >> $BASH_ENV
