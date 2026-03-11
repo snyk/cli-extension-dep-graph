@@ -27,7 +27,7 @@
                 "sha256:ac726dd470482006e014ad384921ed6438c457018f4b3d204aea4281258b2120"
             ],
             "markers": "python_version >= '3.7'",
-            "version": "==2026.1.4"
+            "version": "==2026.2.25"
         },
         "charset-normalizer": {
             "hashes": [
@@ -146,7 +146,7 @@
                 "sha256:fd44c878ea55ba351104cb93cc85e74916eb8fa440ca7903e57575e97394f608"
             ],
             "markers": "python_version >= '3.7'",
-            "version": "==3.4.4"
+            "version": "==3.4.5"
         },
         "click": {
             "hashes": [
@@ -194,7 +194,7 @@
                 "sha256:9a33809944b9db043ad67ca0db94b14bf452cc6aeaac46a88ea55b26e2e9d291"
             ],
             "markers": "python_version >= '3.10'",
-            "version": "==4.9.2"
+            "version": "==4.9.4"
         },
         "requests": {
             "hashes": [

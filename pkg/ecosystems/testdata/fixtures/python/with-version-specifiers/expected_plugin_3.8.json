@@ -28,17 +28,17 @@
           }
         },
         {
-          "id": "certifi@2026.1.4",
+          "id": "certifi@2026.2.25",
           "info": {
             "name": "certifi",
-            "version": "2026.1.4"
+            "version": "2026.2.25"
           }
         },
         {
-          "id": "charset-normalizer@3.4.4",
+          "id": "charset-normalizer@3.4.5",
           "info": {
             "name": "charset-normalizer",
-            "version": "3.4.4"
+            "version": "3.4.5"
           }
         },
         {
@@ -84,10 +84,10 @@
             "pkgId": "requests@2.32.4",
             "deps": [
               {
-                "nodeId": "certifi@2026.1.4"
+                "nodeId": "certifi@2026.2.25"
               },
               {
-                "nodeId": "charset-normalizer@3.4.4"
+                "nodeId": "charset-normalizer@3.4.5"
               },
               {
                 "nodeId": "idna@3.11"
@@ -98,13 +98,13 @@
             ]
           },
           {
-            "nodeId": "certifi@2026.1.4",
-            "pkgId": "certifi@2026.1.4",
+            "nodeId": "certifi@2026.2.25",
+            "pkgId": "certifi@2026.2.25",
             "deps": []
           },
           {
-            "nodeId": "charset-normalizer@3.4.4",
-            "pkgId": "charset-normalizer@3.4.4",
+            "nodeId": "charset-normalizer@3.4.5",
+            "pkgId": "charset-normalizer@3.4.5",
             "deps": []
           },
           {
