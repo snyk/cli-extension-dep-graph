@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	frameworkmocks "github.com/snyk/go-application-framework/pkg/mocks"
 	"github.com/snyk/go-application-framework/pkg/networking"
+	"github.com/snyk/go-application-framework/pkg/ui"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -126,7 +128,7 @@ func setupTestContext(t *testing.T, withDefaultUI bool) *testContext {
 	mockUI := frameworkmocks.NewMockUserInterface(ctrl)
 	invocationContext.EXPECT().GetUserInterface().Return(mockUI).AnyTimes()
 	if withDefaultUI {
-		mockUI.EXPECT().Output(gomock.Any()).Return(nil).AnyTimes()
+		mockUI.EXPECT().OutputError(gomock.Any()).Return(nil).AnyTimes()
 	}
 
 	return &testContext{
@@ -1009,8 +1011,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		// Capture the output to verify it contains expected error messages
 		var capturedOutput string
-		ctx.userInterface.EXPECT().Output(gomock.Any()).DoAndReturn(func(msg string) error {
-			capturedOutput = msg
+		ctx.userInterface.EXPECT().OutputError(gomock.Any()).DoAndReturn(func(err error, _ ...ui.Opts) error {
+			capturedOutput = err.Error()
 			return nil
 		}).Times(1)
 
@@ -1208,8 +1210,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		resolutionHandler.ReturnData = mockWorkflowData
 
 		var capturedOutput string
-		ctx.userInterface.EXPECT().Output(gomock.Any()).DoAndReturn(func(msg string) error {
-			capturedOutput = msg
+		ctx.userInterface.EXPECT().OutputError(gomock.Any()).DoAndReturn(func(err error, _ ...ui.Opts) error {
+			capturedOutput = err.Error()
 			return nil
 		}).Times(1)
 
@@ -1346,8 +1348,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		// Capture the output to verify it contains expected error messages
 		var capturedOutput string
-		ctx.userInterface.EXPECT().Output(gomock.Any()).DoAndReturn(func(msg string) error {
-			capturedOutput = msg
+		ctx.userInterface.EXPECT().OutputError(gomock.Any()).DoAndReturn(func(err error, _ ...ui.Opts) error {
+			capturedOutput = err.Error()
 			return nil
 		}).Times(1)
 
@@ -1563,4 +1565,145 @@ func Test_getExclusionsFromFindings(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_uvWorkspacePackages_passesOptionToPlugin(t *testing.T) {
+	ctx := setupTestContext(t, true)
+	resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+	ctx.config.Set(FlagUvWorkspacePackages, true)
+	ctx.config.Set(FlagFile, "uv.lock")
+
+	mockPlugin := &mockScaPlugin{
+		findings: []scaplugin.Finding{
+			{
+				DepGraph:     createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
+				LockFile:     "uv.lock",
+				ManifestFile: "pyproject.toml",
+			},
+		},
+	}
+
+	_, err := handleSBOMResolutionDI(
+		ctx.invocationContext,
+		ctx.config,
+		&nopLogger,
+		[]scaplugin.SCAPlugin{mockPlugin},
+		resolutionHandler.Func(),
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, mockPlugin.options)
+	assert.True(t, mockPlugin.options.UvWorkspacePackages, "UvWorkspacePackages should be passed to the plugin")
+	assert.False(t, mockPlugin.options.AllProjects, "AllProjects should remain false")
+	assert.False(t, resolutionHandler.Called, "legacy workflow should not be called when UvWorkspacePackages is set")
+	assert.Equal(t, "uv.lock", mockPlugin.options.TargetFile)
+}
+
+func Test_uvWorkspacePackages_combinesMultipleDepGraphsAsJSONL(t *testing.T) {
+	ctx := setupTestContext(t, true)
+	resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+	ctx.config.Set(FlagFile, "uv.lock")
+	ctx.config.Set(FlagUvWorkspacePackages, true)
+
+	mockPlugin := &mockScaPlugin{
+		findings: []scaplugin.Finding{
+			{
+				DepGraph:     createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
+				LockFile:     "uv.lock",
+				ManifestFile: "pyproject.toml",
+			},
+			{
+				DepGraph:     createTestDepGraph(t, "uv", "pkg-b", "2.0.0"),
+				LockFile:     "uv.lock",
+				ManifestFile: "packages/pkg-b/pyproject.toml",
+			},
+		},
+	}
+
+	workflowDataResult, err := handleSBOMResolutionDI(
+		ctx.invocationContext,
+		ctx.config,
+		&nopLogger,
+		[]scaplugin.SCAPlugin{mockPlugin},
+		resolutionHandler.Func(),
+	)
+
+	require.NoError(t, err)
+	require.Len(t, workflowDataResult, 1, "multiple findings should be combined into a single workflow.Data")
+	assert.False(t, resolutionHandler.Called, "legacy workflow should not be called")
+
+	workflowData := workflowDataResult[0]
+	payload, ok := workflowData.GetPayload().([]byte)
+	require.True(t, ok)
+
+	type jsonlLine struct {
+		DepGraph   json.RawMessage `json:"depGraph"`
+		TargetFile string          `json:"targetFile"`
+	}
+
+	lines := bytes.Split(payload, []byte("\n"))
+	require.Len(t, lines, 2, "JSONL should contain two lines")
+
+	var line1, line2 jsonlLine
+	require.NoError(t, json.Unmarshal(lines[0], &line1), "line 1 should be valid JSON")
+	require.NoError(t, json.Unmarshal(lines[1], &line2), "line 2 should be valid JSON")
+
+	assert.Equal(t, "pyproject.toml", line1.TargetFile)
+	assert.NotEmpty(t, line1.DepGraph, "line 1 should have a depGraph")
+
+	assert.Equal(t, "packages/pkg-b/pyproject.toml", line2.TargetFile)
+	assert.NotEmpty(t, line2.DepGraph, "line 2 should have a depGraph")
+
+	// check metadata is set correctly
+	contentLocation, err := workflowData.GetMetaData(contentLocationKey)
+	require.NoError(t, err)
+	assert.Equal(t, "pyproject.toml", contentLocation, "Content-Location should be set to the first finding's ManifestFile")
+
+	normalisedTargetFile, err := workflowData.GetMetaData(MetaKeyNormalisedTargetFile)
+	require.NoError(t, err)
+	assert.Equal(t, "pyproject.toml", normalisedTargetFile, "normalisedTargetFile should be set to the first finding's ManifestFile")
+
+	targetFileFromPlugin, err := workflowData.GetMetaData(MetaKeyTargetFileFromPlugin)
+	require.NoError(t, err)
+	assert.Equal(t, "pyproject.toml", targetFileFromPlugin, "targetFileFromPlugin should be set to the first finding's ManifestFile")
+}
+
+func Test_uvWorkspacePackages_returnsErrorWhenFindingHasError(t *testing.T) {
+	ctx := setupTestContext(t, true)
+	resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+	ctx.config.Set(FlagUvWorkspacePackages, true)
+	ctx.config.Set(FlagFile, "uv.lock")
+
+	snykErr := snyk_errors.Error{
+		ID:     "SNYK-TEST-001",
+		Title:  "Test Error Title",
+		Detail: "Detailed error information for support debugging",
+	}
+
+	mockPlugin := &mockScaPlugin{
+		findings: []scaplugin.Finding{
+			{
+				LockFile: "uv.lock",
+				Error:    snykErr,
+			},
+		},
+	}
+
+	workflowData, err := handleSBOMResolutionDI(
+		ctx.invocationContext,
+		ctx.config,
+		&nopLogger,
+		[]scaplugin.SCAPlugin{mockPlugin},
+		resolutionHandler.Func(),
+	)
+
+	require.Error(t, err)
+	assert.Nil(t, workflowData)
+	assert.False(t, resolutionHandler.Called, "legacy workflow should not be called when error is returned early")
+
+	var returnedSnykErr snyk_errors.Error
+	require.True(t, errors.As(err, &returnedSnykErr), "returned error should be a snyk_errors.Error")
+	assert.Equal(t, "SNYK-TEST-001", returnedSnykErr.ID)
+	assert.Equal(t, "Test Error Title", returnedSnykErr.Title)
+	assert.Equal(t, "Detailed error information for support debugging", returnedSnykErr.Detail)
 }

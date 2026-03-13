@@ -9,12 +9,13 @@ import (
 )
 
 type Options struct {
-	AllProjects    bool
-	TargetFile     string
-	Dev            bool
-	Exclude        []string
-	FailFast       bool
-	AllowOutOfSync bool
+	AllProjects         bool
+	UvWorkspacePackages bool // This is a temporary flag while uv monitor is written in TypeScript. This will be removed when uv monitor is migrated to Go.
+	TargetFile          string
+	Dev                 bool
+	Exclude             []string
+	FailFast            bool
+	AllowOutOfSync      bool
 }
 
 type Metadata struct {

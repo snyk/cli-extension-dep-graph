@@ -63,7 +63,7 @@ func (c client) ExportSBOM(inputDir string, opts *scaplugin.Options) (Sbom, erro
 	} else {
 		args = append(args, "--locked")
 	}
-	if opts.AllProjects {
+	if opts.AllProjects || opts.UvWorkspacePackages {
 		args = append(args, "--all-packages")
 	}
 	if !opts.Dev {
