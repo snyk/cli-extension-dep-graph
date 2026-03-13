@@ -9,6 +9,8 @@ import (
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
+	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
+
 	"github.com/snyk/cli-extension-dep-graph/internal/conversion"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
@@ -67,7 +69,7 @@ func (p Plugin) BuildFindingsFromDir(
 			findings = append(findings, errorFinding)
 			continue
 		}
-		fs, err := p.buildFindings(ctx, sbom, lockFilePath, lockFileDir, log)
+		fs, err := p.buildFindings(ctx, sbom, lockFilePath, lockFileDir, options, log)
 		if err != nil {
 			return nil, err
 		}
@@ -86,11 +88,25 @@ func (p Plugin) buildFindings(
 	sbom Sbom,
 	lockFilePath string,
 	lockFileDir string,
+	options *scaplugin.Options,
 	log logger.Logger,
 ) ([]scaplugin.Finding, error) {
 	parsedSbom, err := parseAndValidateSBOM(sbom)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse and validate sbom for %s: %w", lockFilePath, err)
+	}
+
+	if !options.AllProjects && !hasProjectRoot(parsedSbom) {
+		log.Info(ctx, "No root project found in SBOM", logger.Attr("lockFile", lockFilePath))
+		// TODO: replace with the generated uv-specific error constructor (SNYK-OS-UV-0001)
+		// once it is published in the error-catalog-golang-public module.
+		noRootErr := ecosystems.NewUnprocessableFileError(
+			"Found project with no root. To scan non-root projects use the --all-projects flag.",
+		)
+		return []scaplugin.Finding{{
+			LockFile: lockFilePath,
+			Error:    noRootErr,
+		}}, nil
 	}
 
 	metadata := extractMetadata(parsedSbom)
