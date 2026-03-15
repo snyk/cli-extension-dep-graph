@@ -36,7 +36,7 @@ var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 // BuildDepGraphsFromDir discovers and builds dependency graphs for Pipenv projects.
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context, log logger.Logger, dir string, options *ecosystems.SCAPluginOptions,
-) ([]ecosystems.SCAResult, error) {
+) (*ecosystems.PluginResult, error) {
 	if log == nil {
 		log = logger.Nop()
 	}
@@ -49,7 +49,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	if len(files) == 0 {
 		log.Info(ctx, "No Pipfile files found", logger.Attr("dir", dir))
-		return []ecosystems.SCAResult{}, nil
+		return &ecosystems.PluginResult{}, nil
 	}
 
 	// Get Python runtime version
@@ -101,7 +101,15 @@ func (p Plugin) BuildDepGraphsFromDir(
 		return nil, fmt.Errorf("error building dependency graphs: %w", err)
 	}
 
-	return results, nil
+	processedFiles := make([]string, 0, len(results))
+	for _, result := range results {
+		processedFiles = append(processedFiles, result.Metadata.TargetFile)
+	}
+
+	return &ecosystems.PluginResult{
+		Results:        results,
+		ProcessedFiles: processedFiles,
+	}, nil
 }
 
 // discoverPipfiles finds Pipfile files based on the provided options.
