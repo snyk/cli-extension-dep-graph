@@ -17,12 +17,26 @@ var legacyWorkflowID = workflow.NewWorkflowIdentifier(legacyCLIWorkflowIDStr)
 func handleLegacyResolution(ctx workflow.InvocationContext, config configuration.Configuration, logger *zerolog.Logger) ([]workflow.Data, error) {
 	engine := ctx.GetEngine()
 	argument, outputParser := chooseGraphArgument(config)
-
 	// prepare invocation of the legacy cli
 	prepareLegacyFlags(argument, config, logger)
 
+	allowIncomplete := config.GetBool(FlagPrintEffectiveGraphWithErrors) && !config.GetBool(FlagFailFast)
+
 	legacyData, legacyCLIError := engine.InvokeWithConfig(legacyWorkflowID, config)
 	if legacyCLIError != nil {
+		if !allowIncomplete {
+			return nil, extractLegacyCLIError(legacyCLIError, legacyData)
+		}
+
+		if len(legacyData) > 0 {
+			if snykOutput, ok := legacyData[0].GetPayload().([]byte); ok {
+				if depGraphs, err := outputParser.ParseOutput(snykOutput); err == nil && len(depGraphs) > 0 {
+					logger.Printf("Legacy CLI exited non-zero but produced %d JSONL entries, using those", len(depGraphs))
+					return mapToWorkflowData(depGraphs, logger), nil
+				}
+			}
+		}
+		logger.Printf("Legacy CLI failed with no parseable output, converting to generic scan failure: %v", legacyCLIError)
 		return nil, extractLegacyCLIError(legacyCLIError, legacyData)
 	}
 
@@ -32,6 +46,7 @@ func handleLegacyResolution(ctx workflow.InvocationContext, config configuration
 	}
 
 	depGraphs, err := outputParser.ParseOutput(snykOutput)
+
 	if err != nil {
 		return nil, fmt.Errorf("error parsing dep graphs: %w", err)
 	}

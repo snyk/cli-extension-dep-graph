@@ -124,7 +124,7 @@ func handleSBOMResolutionDI(
 			logFindingError(logger, finding.LockFile, finding.Error)
 			problemFindings = append(problemFindings, *finding)
 
-			if !allProjects {
+			if !allProjects && !config.GetBool(FlagPrintEffectiveGraphWithErrors) {
 				return nil, finding.Error
 			}
 
