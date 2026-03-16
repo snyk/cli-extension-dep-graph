@@ -292,7 +292,9 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 func extractFailedPackageName(stderr string) string {
 	// Pattern: "╰─> package" (appears in metadata-generation-failed errors)
 	// This pattern is checked first as it's the most specific and cleanest
-	if idx := strings.Index(stderr, "╰─> "); idx != -1 {
+	// Use LastIndex to get the last occurrence, as the pattern may appear multiple times
+	// (e.g., "╰─> [10 lines of output]" followed by "╰─> pandas")
+	if idx := strings.LastIndex(stderr, "╰─> "); idx != -1 {
 		start := idx + len("╰─> ")
 		// Find the end of the package name (whitespace or newline)
 		end := strings.IndexAny(stderr[start:], " \n\r\t")
@@ -303,7 +305,8 @@ func extractFailedPackageName(stderr string) string {
 		} else {
 			pkgName = strings.TrimSpace(stderr[start : start+end])
 		}
-		if pkgName != "" {
+		// Filter out patterns like "[10 lines of output]"
+		if pkgName != "" && !strings.HasPrefix(pkgName, "[") {
 			return pkgName
 		}
 	}
@@ -319,17 +322,23 @@ func extractFailedPackageName(stderr string) string {
 	// Pattern: "Failed building wheel for package"
 	if idx := strings.Index(stderr, "Failed building wheel for "); idx != -1 {
 		start := idx + len("Failed building wheel for ")
-		if end := strings.IndexAny(stderr[start:], " \n,"); end != -1 {
-			return stderr[start : start+end]
+		end := strings.IndexAny(stderr[start:], " \n,")
+		if end == -1 {
+			// Package name goes to end of string
+			return strings.TrimSpace(stderr[start:])
 		}
+		return stderr[start : start+end]
 	}
 
 	// Pattern: "Could not build wheels for package"
 	if idx := strings.Index(stderr, "Could not build wheels for "); idx != -1 {
 		start := idx + len("Could not build wheels for ")
-		if end := strings.IndexAny(stderr[start:], " \n,"); end != -1 {
-			return stderr[start : start+end]
+		end := strings.IndexAny(stderr[start:], " \n,")
+		if end == -1 {
+			// Package name goes to end of string
+			return strings.TrimSpace(stderr[start:])
 		}
+		return stderr[start : start+end]
 	}
 
 	return ""
