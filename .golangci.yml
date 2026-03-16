@@ -144,6 +144,7 @@ linters:
       - third_party$
       - builtin$
       - examples$
+      - tools/
 formatters:
   enable:
     - gofumpt
@@ -161,3 +162,4 @@ formatters:
       - third_party$
       - builtin$
       - examples$
+      - tools/

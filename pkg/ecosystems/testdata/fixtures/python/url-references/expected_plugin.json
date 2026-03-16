@@ -28,10 +28,10 @@
           }
         },
         {
-          "id": "charset-normalizer@3.4.5",
+          "id": "charset-normalizer@3.4.6",
           "info": {
             "name": "charset-normalizer",
-            "version": "3.4.5"
+            "version": "3.4.6"
           }
         },
         {
@@ -77,7 +77,7 @@
                 "nodeId": "certifi@2023.7.22"
               },
               {
-                "nodeId": "charset-normalizer@3.4.5"
+                "nodeId": "charset-normalizer@3.4.6"
               },
               {
                 "nodeId": "idna@3.11"
@@ -88,8 +88,8 @@
             ]
           },
           {
-            "nodeId": "charset-normalizer@3.4.5",
-            "pkgId": "charset-normalizer@3.4.5",
+            "nodeId": "charset-normalizer@3.4.6",
+            "pkgId": "charset-normalizer@3.4.6",
             "deps": []
           },
           {
