@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
+	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,10 +23,19 @@ import (
 var testLogger = logger.Nop()
 
 const validSBOMJSON = `{
+	"bomFormat": "CycloneDX",
+	"specVersion": "1.5",
+	"version": 1,
 	"metadata": {
+		"tools": [{"vendor": "Astral Software Inc.", "name": "uv", "version": "0.10.9"}],
 		"component": {
+			"type": "library",
+			"bom-ref": "test-package-1@1.0.0",
 			"name": "test-package",
-			"version": "1.0.0"
+			"version": "1.0.0",
+			"properties": [
+				{"name": "uv:package:is_project_root", "value": "true"}
+			]
 		}
 	},
 	"components": []
@@ -493,7 +503,7 @@ func TestBuildFindings_Success(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
@@ -503,12 +513,159 @@ func TestBuildFindings_Success(t *testing.T) {
 	assert.Nil(t, findings[0].Error)
 }
 
+func TestBuildFindings_NoProjectRoot_ReturnsErrorFinding(t *testing.T) {
+	sbomJSON := `{
+		"bomFormat": "CycloneDX",
+		"specVersion": "1.5",
+		"version": 1,
+		"metadata": {
+			"tools": [{"vendor": "Astral Software Inc.", "name": "uv", "version": "0.10.9"}],
+			"component": {
+				"type": "library",
+				"bom-ref": "uv-workspace-3",
+				"name": "uv-workspace",
+				"properties": [
+					{"name": "uv:package:is_synthetic_root", "value": "true"}
+				]
+			}
+		},
+		"components": [
+			{
+				"type": "library",
+				"bom-ref": "albatross-1@0.1.0",
+				"name": "albatross",
+				"version": "0.1.0",
+				"properties": [
+					{"name": "uv:workspace:path", "value": "packages/albatross"}
+				]
+			},
+			{
+				"type": "library",
+				"bom-ref": "seeds-2@1.0.0",
+				"name": "seeds",
+				"version": "1.0.0",
+				"properties": [
+					{"name": "uv:workspace:path", "value": "packages/seeds"}
+				]
+			}
+		]
+	}`
+	sbom := Sbom(sbomJSON)
+	snykClient := setupMockSnykClient(t, `{}`)
+	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
+
+	require.NoError(t, err, "should not return an error, but rather an error finding")
+	require.Len(t, findings, 1)
+	require.NotNil(t, findings[0].Error)
+	assert.Contains(t, findings[0].Error.Error(), "No root project found")
+	assert.Nil(t, findings[0].DepGraph)
+	assert.Equal(t, "uv.lock", findings[0].LockFile)
+
+	var catalogErr snyk_errors.Error
+	require.True(t, errors.As(findings[0].Error, &catalogErr), "error should be a catalog error")
+	assert.Equal(t, "SNYK-OS-UV-0001", catalogErr.ErrorCode)
+	assert.Contains(t, catalogErr.Detail, "no root")
+	assert.Contains(t, catalogErr.Detail, "--all-projects")
+}
+
+func TestBuildFindings_NoProjectRoot_AllProjects_Succeeds(t *testing.T) {
+	sbomJSON := `{
+		"bomFormat": "CycloneDX",
+		"specVersion": "1.5",
+		"version": 1,
+		"metadata": {
+			"tools": [{"vendor": "Astral Software Inc.", "name": "uv", "version": "0.10.9"}],
+			"component": {
+				"type": "library",
+				"bom-ref": "uv-workspace-3",
+				"name": "uv-workspace",
+				"properties": [
+					{"name": "uv:package:is_synthetic_root", "value": "true"}
+				]
+			}
+		},
+		"components": [
+			{
+				"type": "library",
+				"bom-ref": "albatross-1@0.1.0",
+				"name": "albatross",
+				"version": "0.1.0",
+				"properties": [
+					{"name": "uv:workspace:path", "value": "packages/albatross"}
+				]
+			}
+		]
+	}`
+	sbom := Sbom(sbomJSON)
+	mockResponseBody := singleDepGraphResponse("albatross", "0.1.0")
+	snykClient := setupMockSnykClient(t, mockResponseBody)
+	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{AllProjects: true}, testLogger)
+
+	require.NoError(t, err)
+	require.Len(t, findings, 1)
+	assert.NotNil(t, findings[0].DepGraph)
+	assert.Nil(t, findings[0].Error)
+}
+
+func TestBuildFindings_NoProjectRoot_UvWorkspacePackages_Succeeds(t *testing.T) {
+	sbomJSON := `{
+		"bomFormat": "CycloneDX",
+		"specVersion": "1.5",
+		"version": 1,
+		"metadata": {
+			"tools": [{"vendor": "Astral Software Inc.", "name": "uv", "version": "0.10.9"}],
+			"component": {
+				"type": "library",
+				"bom-ref": "uv-workspace-3",
+				"name": "uv-workspace",
+				"properties": [
+					{"name": "uv:package:is_synthetic_root", "value": "true"}
+				]
+			}
+		},
+		"components": [
+			{
+				"type": "library",
+				"bom-ref": "albatross-1@0.1.0",
+				"name": "albatross",
+				"version": "0.1.0",
+				"properties": [
+					{"name": "uv:workspace:path", "value": "packages/albatross"}
+				]
+			}
+		]
+	}`
+	sbom := Sbom(sbomJSON)
+	mockResponseBody := singleDepGraphResponse("albatross", "0.1.0")
+	snykClient := setupMockSnykClient(t, mockResponseBody)
+	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+
+	findings, err := plugin.buildFindings(
+		context.Background(),
+		sbom,
+		"uv.lock",
+		".",
+		&scaplugin.Options{UvWorkspacePackages: true},
+		testLogger,
+	)
+
+	require.NoError(t, err)
+	require.Len(t, findings, 1)
+	assert.NotNil(t, findings[0].DepGraph)
+	assert.Nil(t, findings[0].Error)
+	assert.Equal(t, filepath.Join("packages", "albatross", "pyproject.toml"), findings[0].ManifestFile)
+}
+
 func TestBuildFindings_InvalidSBOM(t *testing.T) {
 	sbom := Sbom(`{"invalid": "json"}`)
 	snykClient := setupMockSnykClient(t, `{}`)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
 
 	assert.Error(t, err)
 	assert.Nil(t, findings)
@@ -524,7 +681,7 @@ func TestBuildFindings_MissingRootComponent(t *testing.T) {
 	snykClient := setupMockSnykClient(t, `{}`)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
 
 	assert.Error(t, err)
 	assert.Nil(t, findings)
@@ -537,7 +694,7 @@ func TestBuildFindings_ConversionError(t *testing.T) {
 	snykClient := setupMockSnykClientMultiResponse(t, []mocks.MockResponse{mockResponse})
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
 
 	assert.Error(t, err)
 	assert.Nil(t, findings)
@@ -550,7 +707,7 @@ func TestBuildFindings_MultipleDepGraphs(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 2)
@@ -560,14 +717,25 @@ func TestBuildFindings_MultipleDepGraphs(t *testing.T) {
 
 func TestBuildFindings_WorkspacePackage(t *testing.T) {
 	sbomJSON := `{
+		"bomFormat": "CycloneDX",
+		"specVersion": "1.5",
+		"version": 1,
 		"metadata": {
+			"tools": [{"vendor": "Astral Software Inc.", "name": "uv", "version": "0.10.9"}],
 			"component": {
+				"type": "library",
+				"bom-ref": "workspace-root-1@1.0.0",
 				"name": "workspace-root",
-				"version": "1.0.0"
+				"version": "1.0.0",
+				"properties": [
+					{"name": "uv:package:is_project_root", "value": "true"}
+				]
 			}
 		},
 		"components": [
 			{
+				"type": "library",
+				"bom-ref": "workspace-package-2@3.1.0",
 				"name": "workspace-package",
 				"version": "3.1.0",
 				"properties": [
@@ -584,7 +752,7 @@ func TestBuildFindings_WorkspacePackage(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
@@ -598,7 +766,7 @@ func TestBuildFindings_PathConstruction_RootDir(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
@@ -612,7 +780,7 @@ func TestBuildFindings_PathConstruction_NestedDir(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "project1/uv.lock", "project1", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "project1/uv.lock", "project1", &scaplugin.Options{}, testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
@@ -622,14 +790,25 @@ func TestBuildFindings_PathConstruction_NestedDir(t *testing.T) {
 
 func TestBuildFindings_PathConstruction_NestedWorkspacePackage(t *testing.T) {
 	sbomJSON := `{
+		"bomFormat": "CycloneDX",
+		"specVersion": "1.5",
+		"version": 1,
 		"metadata": {
+			"tools": [{"vendor": "Astral Software Inc.", "name": "uv", "version": "0.10.9"}],
 			"component": {
+				"type": "library",
+				"bom-ref": "workspace-root-1@1.0.0",
 				"name": "workspace-root",
-				"version": "1.0.0"
+				"version": "1.0.0",
+				"properties": [
+					{"name": "uv:package:is_project_root", "value": "true"}
+				]
 			}
 		},
 		"components": [
 			{
+				"type": "library",
+				"bom-ref": "workspace-package-2@3.1.0",
 				"name": "workspace-package",
 				"version": "3.1.0",
 				"properties": [
@@ -646,7 +825,7 @@ func TestBuildFindings_PathConstruction_NestedWorkspacePackage(t *testing.T) {
 	snykClient := setupMockSnykClient(t, mockResponseBody)
 	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "workspace/uv.lock", "workspace", testLogger)
+	findings, err := plugin.buildFindings(context.Background(), sbom, "workspace/uv.lock", "workspace", &scaplugin.Options{}, testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)

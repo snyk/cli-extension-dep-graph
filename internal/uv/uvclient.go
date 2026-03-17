@@ -18,6 +18,7 @@ const (
 	RequirementsTxtFileName = "requirements.txt"
 	PyprojectTomlFileName   = "pyproject.toml"
 	UvWorkspacePathProperty = "uv:workspace:path"
+	UvIsProjectRootProperty = "uv:package:is_project_root"
 )
 
 type Client interface {
@@ -87,10 +88,7 @@ func (c client) ExportSBOM(inputDir string, opts *scaplugin.Options) (Sbom, erro
 // Minimal representation of a CycloneDX SBOM.
 type cycloneDXSBOM struct {
 	Metadata struct {
-		Component *struct {
-			Name    string `json:"name"`
-			Version string `json:"version"`
-		} `json:"component"`
+		Component *cycloneDXComponent `json:"component"`
 	} `json:"metadata"`
 	Components []cycloneDXComponent `json:"components"`
 }
@@ -156,6 +154,33 @@ func extractWorkspacePackages(sbom *cycloneDXSBOM) []WorkspacePackage {
 	}
 
 	return workspacePackages
+}
+
+// hasProjectRoot checks whether any component (including the root metadata component) in the SBOM
+// has the property indicating it is a project root. In a virtual uv workspace there is no root
+// project, so this returns false.
+func hasProjectRoot(sbom *cycloneDXSBOM) bool {
+	if componentIsProjectRoot(sbom.Metadata.Component) {
+		return true
+	}
+	for i := range sbom.Components {
+		if componentIsProjectRoot(&sbom.Components[i]) {
+			return true
+		}
+	}
+	return false
+}
+
+func componentIsProjectRoot(component *cycloneDXComponent) bool {
+	if component == nil {
+		return false
+	}
+	for _, prop := range component.Properties {
+		if prop.Name == UvIsProjectRootProperty && prop.Value == "true" {
+			return true
+		}
+	}
+	return false
 }
 
 // Matches uv's error message when the lockfile is out of date.
