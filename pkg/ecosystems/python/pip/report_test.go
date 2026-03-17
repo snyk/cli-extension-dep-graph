@@ -155,7 +155,11 @@ func TestClassifyPipError(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := classifyPipError(context.Background(), nil, tt.err)
+			ctx, cancel := context.WithCancel(context.Background())
+			if errors.Is(tt.err, context.Canceled) {
+				cancel()
+			}
+			err := classifyPipError(ctx, nil, tt.err)
 
 			// Check for context error
 			if tt.wantContextErr != nil {
