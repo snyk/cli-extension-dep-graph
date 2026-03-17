@@ -230,7 +230,7 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 		strings.Contains(stderr, "Invalid version") {
 		return ecosystems.NewSyntaxIssuesError(
 			fmt.Sprintf("Invalid syntax in requirements file: %s", stderr),
-			snyk_errors.WithCause(pipErr.err),
+			snyk_errors.WithCause(errors.New(stderr)),
 		)
 	}
 
@@ -240,7 +240,7 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 		strings.Contains(stderr, "Could not find a version that satisfies") {
 		return ecosystems.NewPythonPackageNotFoundError(
 			fmt.Sprintf("Package not found: %s", stderr),
-			snyk_errors.WithCause(pipErr.err),
+			snyk_errors.WithCause(errors.New(stderr)),
 		)
 	}
 
@@ -249,7 +249,7 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 		strings.Contains(stderr, "Requires-Python") {
 		return ecosystems.NewPipUnsupportedPythonVersionError(
 			fmt.Sprintf("Python version mismatch: %s", stderr),
-			snyk_errors.WithCause(pipErr.err),
+			snyk_errors.WithCause(errors.New(stderr)),
 		)
 	}
 
@@ -259,7 +259,7 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 		strings.Contains(stderr, "incompatible") {
 		return ecosystems.NewPythonVersionConfictError(
 			fmt.Sprintf("Conflicting package requirements: %s", stderr),
-			snyk_errors.WithCause(pipErr.err),
+			snyk_errors.WithCause(errors.New(stderr)),
 		)
 	}
 
@@ -273,13 +273,13 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 		}
 		return ecosystems.NewInstallationFailureError(
 			fmt.Sprintf("Failed to install package '%s'. Check that the package version is compatible with your current Python version.", pkgName),
-			snyk_errors.WithCause(pipErr.err),
+			snyk_errors.WithCause(errors.New(stderr)),
 		)
 	}
 
 	return ecosystems.NewInstallationFailureError(
 		fmt.Sprintf("Pip install failed: %s", stderr),
-		snyk_errors.WithCause(pipErr.err),
+		snyk_errors.WithCause(errors.New(stderr)),
 	)
 }
 
