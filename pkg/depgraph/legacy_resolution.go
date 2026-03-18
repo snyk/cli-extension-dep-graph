@@ -141,6 +141,11 @@ func prepareLegacyFlags(argument string, cfg configuration.Configuration, logger
 		logger.Print("Ensure all modules are resolvable by the Maven reactor: true")
 	}
 
+	if cfg.GetBool(FlagMavenSkipWrapper) {
+		cmdArgs = append(cmdArgs, "--maven-skip-wrapper")
+		logger.Print("Use system Maven instead of the Maven wrapper: true")
+	}
+
 	if cfg.GetBool(FlagScanUnmanaged) {
 		cmdArgs = append(cmdArgs, "--scan-unmanaged")
 		logger.Print("Specify an individual JAR, WAR, or AAR file: true")
