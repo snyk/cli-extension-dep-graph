@@ -15,6 +15,7 @@ const (
 	FlagDetectionDepth                = "detection-depth"
 	FlagPruneRepeatedSubdependencies  = "prune-repeated-subdependencies"
 	FlagMavenAggregateProject         = "maven-aggregate-project"
+	FlagMavenSkipWrapper              = "maven-skip-wrapper" //nolint:gosec // Not a credential, this is a CLI flag name
 	FlagScanUnmanaged                 = "scan-unmanaged"
 	FlagScanAllUnmanaged              = "scan-all-unmanaged"
 	FlagSubProject                    = "sub-project"
@@ -51,6 +52,7 @@ func getFlagSet() *pflag.FlagSet {
 	flagSet.String(FlagDetectionDepth, "", "Detection depth")
 	flagSet.BoolP(FlagPruneRepeatedSubdependencies, "p", false, "Prune repeated sub-dependencies")
 	flagSet.Bool(FlagMavenAggregateProject, false, "Ensure all modules are resolvable by the Maven reactor.")
+	flagSet.Bool(FlagMavenSkipWrapper, false, "Use system Maven instead of the Maven wrapper.")
 	flagSet.Bool(FlagScanUnmanaged, false, "Specify an individual JAR, WAR, or AAR file.")
 	flagSet.Bool(FlagScanAllUnmanaged, false, "Auto-detect Maven, JAR, WAR, and AAR files recursively from the current folder.")
 	flagSet.String(FlagSubProject, "", "Name of Gradle sub-project to test.")
