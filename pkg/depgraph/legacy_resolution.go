@@ -23,18 +23,15 @@ func handleLegacyResolution(ctx workflow.InvocationContext, config configuration
 	allowIncomplete := config.GetBool(FlagPrintEffectiveGraphWithErrors) && !config.GetBool(FlagFailFast)
 
 	legacyData, legacyCLIError := engine.InvokeWithConfig(legacyWorkflowID, config)
-	if legacyCLIError != nil {
-		if !allowIncomplete {
-			return nil, extractLegacyCLIError(legacyCLIError, legacyData)
-		}
+	if legacyCLIError != nil && !allowIncomplete {
+		return nil, extractLegacyCLIError(legacyCLIError, legacyData)
+	}
 
-		if len(legacyData) > 0 {
-			if snykOutput, ok := legacyData[0].GetPayload().([]byte); ok {
-				if depGraphs, err := outputParser.ParseOutput(snykOutput); err == nil && len(depGraphs) > 0 {
-					logger.Printf("Legacy CLI exited non-zero but produced %d JSONL entries, using those", len(depGraphs))
-					return mapToWorkflowData(depGraphs, logger), nil
-				}
-			}
+	if legacyCLIError != nil {
+		depGraphs, ok := tryParseLegacyOutput(legacyData, outputParser)
+		if ok {
+			logger.Printf("Legacy CLI exited non-zero but produced %d JSONL entries, using those", len(depGraphs))
+			return mapToWorkflowData(depGraphs, logger), nil
 		}
 		logger.Printf("Legacy CLI failed with no parseable output, converting to generic scan failure: %v", legacyCLIError)
 		return nil, extractLegacyCLIError(legacyCLIError, legacyData)
@@ -46,7 +43,6 @@ func handleLegacyResolution(ctx workflow.InvocationContext, config configuration
 	}
 
 	depGraphs, err := outputParser.ParseOutput(snykOutput)
-
 	if err != nil {
 		return nil, fmt.Errorf("error parsing dep graphs: %w", err)
 	}
@@ -57,6 +53,21 @@ func handleLegacyResolution(ctx workflow.InvocationContext, config configuration
 	workflowOutputData := mapToWorkflowData(depGraphs, logger)
 	logger.Printf("DepGraph workflow done (extracted %d dependency graphs)", len(workflowOutputData))
 	return workflowOutputData, nil
+}
+
+func tryParseLegacyOutput(legacyData []workflow.Data, outputParser parsers.OutputParser) ([]parsers.DepGraphOutput, bool) {
+	if len(legacyData) == 0 {
+		return nil, false
+	}
+	snykOutput, ok := legacyData[0].GetPayload().([]byte)
+	if !ok {
+		return nil, false
+	}
+	depGraphs, err := outputParser.ParseOutput(snykOutput)
+	if err != nil || len(depGraphs) == 0 {
+		return nil, false
+	}
+	return depGraphs, true
 }
 
 func chooseGraphArgument(config configuration.Configuration) (string, parsers.OutputParser) {
