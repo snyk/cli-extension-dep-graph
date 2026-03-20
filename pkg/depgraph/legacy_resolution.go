@@ -234,9 +234,10 @@ func prepareLegacyFlags(argument string, cfg configuration.Configuration, logger
 		logger.Print("Include provenance: true")
 	}
 
-	if cfg.GetBool(FlagDotnetRuntimeResolution) {
-		cmdArgs = append(cmdArgs, "--dotnet-runtime-resolution")
-		logger.Print("Dotnet runtime resolution: true")
+	if cfg.IsSet(FlagDotnetRuntimeResolution) {
+		dotnetRuntimeResolution := cfg.GetBool(FlagDotnetRuntimeResolution)
+		cmdArgs = append(cmdArgs, fmt.Sprintf("--dotnet-runtime-resolution=%t", dotnetRuntimeResolution))
+		logger.Print("Dotnet runtime resolution: ", dotnetRuntimeResolution)
 	}
 
 	if tf := cfg.GetString(FlagDotnetTargetFramework); tf != "" {
