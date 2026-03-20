@@ -186,7 +186,12 @@ func Test_LegacyResolution(t *testing.T) {
 		{
 			key:      FlagDotnetRuntimeResolution,
 			value:    true,
-			expected: "--dotnet-runtime-resolution",
+			expected: "--dotnet-runtime-resolution=true",
+		},
+		{
+			key:      FlagDotnetRuntimeResolution,
+			value:    false,
+			expected: "--dotnet-runtime-resolution=false",
 		},
 		{
 			key:      FlagDotnetTargetFramework,
