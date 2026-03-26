@@ -15,6 +15,7 @@ import (
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 
+	"github.com/snyk/cli-extension-dep-graph/internal/bun"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/internal/uv"
 	ecosystemslogger "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
@@ -45,6 +46,7 @@ func handleSBOMResolution(
 		logger,
 		[]scaplugin.SCAPlugin{
 			uv.NewUvPlugin(uv.NewUvClient(), snykClient, remoteRepoURL),
+			bun.NewBunPlugin(),
 		},
 		handleLegacyResolution,
 	)
@@ -71,6 +73,7 @@ func handleSBOMResolutionDI(
 
 	allProjects := config.GetBool(FlagAllProjects)
 	uvWorkspacePackages := config.GetBool(FlagUvWorkspacePackages)
+	bunWorkspacePackages := config.GetBool(FlagBunWorkspacePackages)
 
 	targetFile := config.GetString(FlagFile)
 	dev := config.GetBool(FlagDev)
@@ -82,13 +85,14 @@ func handleSBOMResolutionDI(
 	exclude := parseExcludeFlag(config.GetString(FlagExclude))
 	failFast := config.GetBool(FlagFailFast)
 	pluginOptions := scaplugin.Options{
-		AllProjects:         allProjects,
-		UvWorkspacePackages: uvWorkspacePackages,
-		TargetFile:          targetFile,
-		Dev:                 dev,
-		Exclude:             exclude,
-		FailFast:            failFast,
-		AllowOutOfSync:      allowOutOfSync,
+		AllProjects:          allProjects,
+		UvWorkspacePackages:  uvWorkspacePackages,
+		BunWorkspacePackages: bunWorkspacePackages,
+		TargetFile:           targetFile,
+		Dev:                  dev,
+		Exclude:              exclude,
+		FailFast:             failFast,
+		AllowOutOfSync:       allowOutOfSync,
 	}
 
 	// Generate Findings
@@ -126,7 +130,7 @@ func handleSBOMResolutionDI(
 	var problemFindings []scaplugin.Finding
 	var err error
 
-	if targetFile != "" && uvWorkspacePackages {
+	if targetFile != "" && (uvWorkspacePackages || bunWorkspacePackages) {
 		// TODO: Using JSONL to output multiple dep graphs in a single workflow.Data object is a workaround
 		// to fix outputting the JSON for multiple workflow.Data objects.
 		// Currently only the first workflow.Data object is output.

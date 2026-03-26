@@ -9,9 +9,10 @@ import (
 )
 
 type Options struct {
-	AllProjects         bool
-	UvWorkspacePackages bool // This is a temporary flag while uv monitor is written in TypeScript. This will be removed when uv monitor is migrated to Go.
-	TargetFile          string
+	AllProjects          bool
+	UvWorkspacePackages  bool // This is a temporary flag while uv monitor is written in TypeScript. This will be removed when uv monitor is migrated to Go.
+	BunWorkspacePackages bool // This is a temporary flag while bun monitor is written in TypeScript. This will be removed when bun monitor is migrated to Go.
+	TargetFile           string
 	Dev                 bool
 	Exclude             []string
 	FailFast            bool
