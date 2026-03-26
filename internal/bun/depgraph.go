@@ -13,12 +13,10 @@ const packageManager = "bun"
 // rootName/rootVersion identify the root package.
 // directDeps is the map of alias → version-range for the root's direct dependencies.
 // pkgMap is the full resolved package map from BuildPackageMap.
-// includeDev controls whether devDependencies of the root workspace are included.
 func BuildDepGraph(
 	rootName, rootVersion string,
 	directDeps map[string]string,
 	pkgMap map[string]*ResolvedPackage,
-	includeDev bool,
 ) (*godepgraph.DepGraph, error) {
 	builder, err := godepgraph.NewBuilder(
 		&godepgraph.PkgManager{Name: packageManager},

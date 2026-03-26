@@ -93,7 +93,7 @@ func (p Plugin) buildFinding(
 
 // buildSingleFinding produces one finding for the root workspace.
 func (p Plugin) buildSingleFinding(
-	lock *BunLockV1,
+	lock *LockV1,
 	pkgMap map[string]*ResolvedPackage,
 	lockFileAbsDir, lockFileRelPath string,
 	options *scaplugin.Options,
@@ -104,7 +104,7 @@ func (p Plugin) buildSingleFinding(
 	directDeps := mergeDirectDeps(rootWs, options.Dev)
 	directDeps = FilterWorkspaceDeps(directDeps)
 
-	depGraph, err := BuildDepGraph(rootInfo.Name, rootInfo.Version, directDeps, pkgMap, options.Dev)
+	depGraph, err := BuildDepGraph(rootInfo.Name, rootInfo.Version, directDeps, pkgMap)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (p Plugin) buildSingleFinding(
 // buildWorkspaceFindings produces one finding per workspace entry.
 func (p Plugin) buildWorkspaceFindings(
 	ctx context.Context,
-	lock *BunLockV1,
+	lock *LockV1,
 	pkgMap map[string]*ResolvedPackage,
 	lockFileAbsDir, lockFileRelPath string,
 	options *scaplugin.Options,
@@ -146,7 +146,7 @@ func (p Plugin) buildWorkspaceFindings(
 
 		log.Info(ctx, "Building bun workspace dep graph", logger.Attr("workspace", wsPath), logger.Attr("name", rootInfo.Name))
 
-		depGraph, err := BuildDepGraph(rootInfo.Name, rootInfo.Version, directDeps, pkgMap, options.Dev)
+		depGraph, err := BuildDepGraph(rootInfo.Name, rootInfo.Version, directDeps, pkgMap)
 		if err != nil {
 			findings = append(findings, scaplugin.Finding{
 				LockFile: lockFileRelPath,
@@ -212,7 +212,7 @@ func (p Plugin) discoverLockFiles(
 }
 
 // rootPackageInfo returns name/version for a workspace, falling back to package.json.
-func rootPackageInfo(ws BunWorkspace, absDir string) PackageJSON {
+func rootPackageInfo(ws Workspace, absDir string) PackageJSON {
 	if ws.Name != "" {
 		version := ws.Version
 		if version == "" {
@@ -224,7 +224,7 @@ func rootPackageInfo(ws BunWorkspace, absDir string) PackageJSON {
 }
 
 // mergeDirectDeps combines production + optional deps, and dev deps when includeDev is true.
-func mergeDirectDeps(ws BunWorkspace, includeDev bool) map[string]string {
+func mergeDirectDeps(ws Workspace, includeDev bool) map[string]string {
 	merged := make(map[string]string)
 	for k, v := range ws.Dependencies {
 		merged[k] = v
