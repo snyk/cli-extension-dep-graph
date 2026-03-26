@@ -16,6 +16,7 @@ type Options struct {
 	Exclude             []string
 	FailFast            bool
 	AllowOutOfSync      bool
+	ForceSingleGraph    bool
 }
 
 type Metadata struct {

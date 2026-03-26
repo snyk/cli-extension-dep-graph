@@ -19,8 +19,9 @@ func SbomToDepGraphs(
 	snykClient *snykclient.SnykClient,
 	log logger.Logger,
 	remoteRepoURL string,
+	forceSingleGraph bool,
 ) ([]*depgraph.DepGraph, error) {
-	scans, warnings, err := snykClient.SBOMConvert(ctx, log, sbom, remoteRepoURL)
+	scans, warnings, err := snykClient.SBOMConvert(ctx, log, sbom, remoteRepoURL, forceSingleGraph)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert SBOM: %w", err)
 	}

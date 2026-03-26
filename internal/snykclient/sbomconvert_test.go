@@ -39,7 +39,9 @@ func Test_SBOMConvert(t *testing.T) {
 		context.Background(),
 		logger,
 		bytes.NewBuffer([]byte(sbomContent)),
-		"github.com/snyk/cli-extension-dep-graph")
+		"github.com/snyk/cli-extension-dep-graph",
+		false,
+	)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(depsResp))
@@ -50,6 +52,52 @@ func Test_SBOMConvert(t *testing.T) {
 	assert.Equal(t, "warning", warnResp[0].Type)
 	assert.Equal(t, "pkg:maven/org.example/artifact@1.0.0", warnResp[0].BOMRef)
 	assert.Equal(t, "This is a warning", warnResp[0].Msg)
+}
+
+func Test_SBOMConvert_ForceSingleGraph_True(t *testing.T) {
+	response := mocks.NewMockResponse(
+		"application/json; charset=utf-8",
+		[]byte(`{"scanResults":[],"warnings":[]}`),
+		http.StatusOK,
+	)
+
+	mockHTTPClient := mocks.NewMockSBOMService(response, func(r *http.Request) {
+		assert.Contains(t, r.RequestURI, "force_single_graph=true")
+	})
+
+	client := snykclient.NewSnykClient(mockHTTPClient.Client(), mockHTTPClient.URL, "org1")
+	_, _, err := client.SBOMConvert(
+		context.Background(),
+		logger,
+		bytes.NewBufferString(`{"foo":"bar"}`),
+		"github.com/snyk/cli-extension-dep-graph",
+		true,
+	)
+
+	assert.NoError(t, err)
+}
+
+func Test_SBOMConvert_ForceSingleGraph_False(t *testing.T) {
+	response := mocks.NewMockResponse(
+		"application/json; charset=utf-8",
+		[]byte(`{"scanResults":[],"warnings":[]}`),
+		http.StatusOK,
+	)
+
+	mockHTTPClient := mocks.NewMockSBOMService(response, func(r *http.Request) {
+		assert.NotContains(t, r.RequestURI, "force_single_graph")
+	})
+
+	client := snykclient.NewSnykClient(mockHTTPClient.Client(), mockHTTPClient.URL, "org1")
+	_, _, err := client.SBOMConvert(
+		context.Background(),
+		logger,
+		bytes.NewBufferString(`{"foo":"bar"}`),
+		"github.com/snyk/cli-extension-dep-graph",
+		false,
+	)
+
+	assert.NoError(t, err)
 }
 
 func Test_SBOMConvert_InvalidJSONReturned(t *testing.T) {
@@ -66,7 +114,9 @@ func Test_SBOMConvert_InvalidJSONReturned(t *testing.T) {
 		context.Background(),
 		logger,
 		strings.NewReader(`{"foo":"bar"}`),
-		"github.com/snyk/cli-extension-dep-graph")
+		"github.com/snyk/cli-extension-dep-graph",
+		false,
+	)
 
 	assert.ErrorContains(t, err, "unexpected EOF")
 }
@@ -111,7 +161,9 @@ func Test_SBOMConvert_ServerErrors(t *testing.T) {
 				context.Background(),
 				logger,
 				bytes.NewBufferString(sbomContent),
-				"github.com/snyk/cli-extension-dep-graph")
+				"github.com/snyk/cli-extension-dep-graph",
+				false,
+			)
 
 			assert.ErrorContainsf(
 				t,

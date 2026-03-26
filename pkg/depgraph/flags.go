@@ -40,6 +40,7 @@ const (
 	FlagDotnetRuntimeResolution       = "dotnet-runtime-resolution"
 	FlagDotnetTargetFramework         = "dotnet-target-framework"
 	FlagUvWorkspacePackages           = "internal-uv-workspace-packages"
+	FlagForceSingleGraph              = "force-single-graph"
 )
 
 func getFlagSet() *pflag.FlagSet {
@@ -80,6 +81,7 @@ func getFlagSet() *pflag.FlagSet {
 		"Optional. You may use this option if your solution contains multiple <TargetFramework> directives. "+
 			"If you do not specify the option --dotnet-target-framework, all supported Target Frameworks will be scanned.")
 	flagSet.Bool(FlagUvWorkspacePackages, false, "Include all uv workspace packages in the dependency graph output")
+	flagSet.Bool(FlagForceSingleGraph, false, "Prevent splitting the dependency graph within an ecosystem.")
 
 	return flagSet
 }
