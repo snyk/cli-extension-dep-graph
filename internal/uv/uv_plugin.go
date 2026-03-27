@@ -117,6 +117,7 @@ func (p Plugin) buildFindings(
 		p.snykClient,
 		log,
 		p.remoteRepoURL,
+		options.ForceSingleGraph,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert sbom to dep-graphs for %s: %w", lockFilePath, err)

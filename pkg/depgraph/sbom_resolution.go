@@ -81,6 +81,7 @@ func handleSBOMResolutionDI(
 	allowOutOfSync := !strictOutOfSync
 	exclude := parseExcludeFlag(config.GetString(FlagExclude))
 	failFast := config.GetBool(FlagFailFast)
+	forceSingleGraph := config.GetBool(FlagForceSingleGraph)
 	pluginOptions := scaplugin.Options{
 		AllProjects:         allProjects,
 		UvWorkspacePackages: uvWorkspacePackages,
@@ -89,6 +90,7 @@ func handleSBOMResolutionDI(
 		Exclude:             exclude,
 		FailFast:            failFast,
 		AllowOutOfSync:      allowOutOfSync,
+		ForceSingleGraph:    forceSingleGraph,
 	}
 
 	// Generate Findings

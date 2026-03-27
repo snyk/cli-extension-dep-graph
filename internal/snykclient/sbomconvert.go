@@ -25,8 +25,9 @@ func (t *SnykClient) SBOMConvert(
 	log logger.Logger,
 	sbom io.Reader,
 	remoteRepoURL string,
+	forceSingleGraph bool,
 ) ([]*ScanResult, []*ConversionWarning, error) {
-	u, err := buildSBOMConvertAPIURL(t.apiBaseURL, sbomConvertAPIVersion, t.orgID, remoteRepoURL)
+	u, err := buildSBOMConvertAPIURL(t.apiBaseURL, sbomConvertAPIVersion, t.orgID, remoteRepoURL, forceSingleGraph)
 	if err != nil {
 		log.Error(ctx, "Failed to build SBOM convert API URL", logger.Err(err))
 		return nil, nil, NewSCAError(err)
@@ -90,7 +91,7 @@ func (t *SnykClient) SBOMConvert(
 	return convertResp.ScanResults, convertResp.ConversionWarning, nil
 }
 
-func buildSBOMConvertAPIURL(apiBaseURL, apiVersion, orgID, remoteRepoURL string) (*url.URL, error) {
+func buildSBOMConvertAPIURL(apiBaseURL, apiVersion, orgID, remoteRepoURL string, forceSingleGraph bool) (*url.URL, error) {
 	u, err := url.Parse(apiBaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse API base URL: %w", err)
@@ -101,6 +102,9 @@ func buildSBOMConvertAPIURL(apiBaseURL, apiVersion, orgID, remoteRepoURL string)
 	query := url.Values{
 		"version":         []string{apiVersion},
 		"remote_repo_url": []string{remoteRepoURL},
+	}
+	if forceSingleGraph {
+		query.Set("force_single_graph", "true")
 	}
 	u.RawQuery = query.Encode()
 
