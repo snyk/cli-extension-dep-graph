@@ -16,6 +16,7 @@ const (
 	BunLockFileName     = "bun.lock"
 	PackageJSONFileName = "package.json"
 	defaultVersion      = "0.0.0"
+	workspaceProtocol   = "workspace:"
 )
 
 // LockV1 represents the bun.lock v1 JSON format.

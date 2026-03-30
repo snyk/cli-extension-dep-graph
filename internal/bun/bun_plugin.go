@@ -2,9 +2,11 @@ package bun
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
@@ -12,7 +14,9 @@ import (
 )
 
 // Plugin implements scaplugin.SCAPlugin for bun.lock v1.
-type Plugin struct{}
+type Plugin struct {
+	executor cmdExecutor
+}
 
 // NewBunPlugin creates a new bun plugin instance.
 func NewBunPlugin() Plugin {
@@ -21,7 +25,19 @@ func NewBunPlugin() Plugin {
 
 var _ scaplugin.SCAPlugin = (*Plugin)(nil)
 
+func (p Plugin) getExecutor() cmdExecutor {
+	if p.executor != nil {
+		return p.executor
+	}
+
+	return &bunCmdExecutor{}
+}
+
 // BuildFindingsFromDir discovers bun.lock files under dir and returns findings.
+//
+// When the bun binary is available (≥ 1.1.0), `bun why "*"` is used for
+// accurate transitive resolution. Otherwise, the plugin falls back to direct
+// bun.lock parsing.
 func (p Plugin) BuildFindingsFromDir(
 	ctx context.Context,
 	inputDir string,
@@ -37,11 +53,13 @@ func (p Plugin) BuildFindingsFromDir(
 	if err != nil {
 		return nil, err
 	}
+
 	if len(files) == 0 {
 		return []scaplugin.Finding{}, nil
 	}
 
 	findings := []scaplugin.Finding{}
+
 	for _, file := range files {
 		lockFilePath := file.RelPath
 		lockFileAbsDir := filepath.Dir(filepath.Join(inputDir, lockFilePath))
@@ -56,8 +74,10 @@ func (p Plugin) BuildFindingsFromDir(
 				LockFile: lockFilePath,
 				Error:    fmt.Errorf("failed to build dependency graph for %s: %w", lockFilePath, err),
 			})
+
 			continue
 		}
+
 		findings = append(findings, finding...)
 
 		if !options.AllProjects {
@@ -69,6 +89,135 @@ func (p Plugin) BuildFindingsFromDir(
 }
 
 func (p Plugin) buildFinding(
+	ctx context.Context,
+	lockFileAbsPath, lockFileAbsDir, lockFileRelPath string,
+	options *scaplugin.Options,
+	log logger.Logger,
+) ([]scaplugin.Finding, error) {
+	exec := p.getExecutor()
+
+	output, err := exec.Execute("bun", lockFileAbsDir, "why", "*")
+	if err != nil {
+		if errors.Is(err, ErrBunNotFound) {
+			log.Info(ctx, "bun binary not found; falling back to bun.lock parsing")
+			return p.buildFindingFromLockfile(ctx, lockFileAbsPath, lockFileAbsDir, lockFileRelPath, options, log)
+		}
+
+		return nil, fmt.Errorf("bun why failed: %w", err)
+	}
+
+	log.Info(ctx, "Using bun why for dependency resolution")
+
+	return p.buildFindingFromWhyOutput(ctx, output, lockFileAbsPath, lockFileAbsDir, lockFileRelPath, options, log)
+}
+
+// buildFindingFromWhyOutput parses bun why output and builds findings.
+func (p Plugin) buildFindingFromWhyOutput(
+	ctx context.Context,
+	output []byte,
+	lockFileAbsPath, lockFileAbsDir, lockFileRelPath string,
+	options *scaplugin.Options,
+	log logger.Logger,
+) ([]scaplugin.Finding, error) {
+	graph, err := ParseWhyOutput(output)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse bun why output: %w", err)
+	}
+
+	if options.AllProjects || options.BunWorkspacePackages {
+		return p.buildWhyWorkspaceFindings(ctx, graph, lockFileAbsPath, lockFileAbsDir, lockFileRelPath, options, log)
+	}
+
+	return p.buildWhySingleFinding(graph, lockFileAbsPath, lockFileAbsDir, lockFileRelPath, options)
+}
+
+// buildWhySingleFinding produces one finding for the root workspace using bun why data.
+func (p Plugin) buildWhySingleFinding(
+	graph *WhyGraph,
+	lockFileAbsPath, lockFileAbsDir, lockFileRelPath string,
+	options *scaplugin.Options,
+) ([]scaplugin.Finding, error) {
+	lock, err := ParseLockfile(lockFileAbsPath)
+	if err != nil {
+		return nil, err
+	}
+
+	rootWs := lock.Workspaces[""]
+	rootInfo := rootPackageInfo(rootWs, lockFileAbsDir)
+	directDeps := mergeDirectDepsAsBool(rootWs, options.Dev)
+
+	depGraph, err := BuildDepGraphFromWhyGraph(rootInfo.Name, rootInfo.Version, directDeps, graph)
+	if err != nil {
+		return nil, err
+	}
+
+	lockFileDir := filepath.Dir(lockFileRelPath)
+
+	return []scaplugin.Finding{{
+		DepGraph:     depGraph,
+		LockFile:     lockFileRelPath,
+		ManifestFile: manifestFilePath(lockFileDir),
+	}}, nil
+}
+
+// buildWhyWorkspaceFindings produces one finding per workspace using bun why data.
+func (p Plugin) buildWhyWorkspaceFindings(
+	ctx context.Context,
+	graph *WhyGraph,
+	lockFileAbsPath, lockFileAbsDir, lockFileRelPath string,
+	options *scaplugin.Options,
+	log logger.Logger,
+) ([]scaplugin.Finding, error) {
+	lock, err := ParseLockfile(lockFileAbsPath)
+	if err != nil {
+		return nil, err
+	}
+
+	findings := []scaplugin.Finding{}
+	lockFileDir := filepath.Dir(lockFileRelPath)
+
+	for wsPath, ws := range lock.Workspaces {
+		var wsAbsDir string
+		if wsPath == "" {
+			wsAbsDir = lockFileAbsDir
+		} else {
+			wsAbsDir = filepath.Join(lockFileAbsDir, wsPath)
+		}
+
+		rootInfo := rootPackageInfo(ws, wsAbsDir)
+		directDeps := mergeDirectDepsAsBool(ws, options.Dev)
+
+		log.Info(ctx, "Building bun workspace dep graph", logger.Attr("workspace", wsPath), logger.Attr("name", rootInfo.Name))
+
+		depGraph, buildErr := BuildDepGraphFromWhyGraph(rootInfo.Name, rootInfo.Version, directDeps, graph)
+		if buildErr != nil {
+			findings = append(findings, scaplugin.Finding{
+				LockFile: lockFileRelPath,
+				Error:    fmt.Errorf("failed to build dep graph for workspace %q: %w", wsPath, buildErr),
+			})
+
+			continue
+		}
+
+		var manifestFile string
+		if wsPath == "" {
+			manifestFile = manifestFilePath(lockFileDir)
+		} else {
+			manifestFile = filepath.Join(lockFileDir, wsPath, PackageJSONFileName)
+		}
+
+		findings = append(findings, scaplugin.Finding{
+			DepGraph:     depGraph,
+			LockFile:     lockFileRelPath,
+			ManifestFile: manifestFile,
+		})
+	}
+
+	return findings, nil
+}
+
+// buildFindingFromLockfile is the fallback path that parses bun.lock directly.
+func (p Plugin) buildFindingFromLockfile(
 	ctx context.Context,
 	lockFileAbsPath, lockFileAbsDir, lockFileRelPath string,
 	options *scaplugin.Options,
@@ -152,6 +301,7 @@ func (p Plugin) buildWorkspaceFindings(
 				LockFile: lockFileRelPath,
 				Error:    fmt.Errorf("failed to build dep graph for workspace %q: %w", wsPath, err),
 			})
+
 			continue
 		}
 
@@ -192,7 +342,7 @@ func (p Plugin) discoverLockFiles(
 		if options.TargetFile != "" {
 			findOpts = append(findOpts, discovery.WithTargetFile(options.TargetFile))
 		} else {
-			// Default to root bun.lock if present
+			// Default to root bun.lock if present.
 			rootLockPath := filepath.Join(dir, BunLockFileName)
 			if fileExists(rootLockPath) {
 				return []discovery.FindResult{{
@@ -200,6 +350,7 @@ func (p Plugin) discoverLockFiles(
 					RelPath: BunLockFileName,
 				}}, nil
 			}
+
 			return []discovery.FindResult{}, nil
 		}
 	}
@@ -208,6 +359,7 @@ func (p Plugin) discoverLockFiles(
 	if err != nil {
 		return nil, fmt.Errorf("failed to find bun.lock files: %w", err)
 	}
+
 	return files, nil
 }
 
@@ -216,34 +368,68 @@ func rootPackageInfo(ws Workspace, absDir string) PackageJSON {
 	if ws.Name != "" {
 		version := ws.Version
 		if version == "" {
-			version = "0.0.0"
+			version = defaultVersion
 		}
+
 		return PackageJSON{Name: ws.Name, Version: version}
 	}
+
 	return ReadPackageJSON(absDir)
 }
 
 // mergeDirectDeps combines production + optional deps, and dev deps when includeDev is true.
 func mergeDirectDeps(ws Workspace, includeDev bool) map[string]string {
 	merged := make(map[string]string)
+
 	for k, v := range ws.Dependencies {
 		merged[k] = v
 	}
+
 	for k, v := range ws.OptionalDependencies {
 		merged[k] = v
 	}
+
 	if includeDev {
 		for k, v := range ws.DevDependencies {
 			merged[k] = v
 		}
 	}
+
 	return merged
+}
+
+// mergeDirectDepsAsBool returns the set of direct dep names, excluding workspace: protocol refs.
+func mergeDirectDepsAsBool(ws Workspace, includeDev bool) map[string]bool {
+	names := make(map[string]bool)
+
+	for name, ver := range ws.Dependencies {
+		if !strings.HasPrefix(ver, workspaceProtocol) {
+			names[name] = true
+		}
+	}
+
+	for name, ver := range ws.OptionalDependencies {
+		if !strings.HasPrefix(ver, workspaceProtocol) {
+			names[name] = true
+		}
+	}
+
+	if includeDev {
+		for name, ver := range ws.DevDependencies {
+			if !strings.HasPrefix(ver, workspaceProtocol) {
+				names[name] = true
+			}
+		}
+	}
+
+	return names
 }
 
 func manifestFilePath(lockFileDir string) string {
 	if lockFileDir == "." || lockFileDir == "" {
 		return PackageJSONFileName
 	}
+
 	return filepath.Join(lockFileDir, PackageJSONFileName)
 }
 
@@ -252,5 +438,6 @@ func fileExists(path string) bool {
 	if err != nil {
 		return false
 	}
+
 	return !info.IsDir()
 }

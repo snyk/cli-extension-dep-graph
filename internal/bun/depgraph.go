@@ -73,12 +73,88 @@ func nodeIDFor(name, version string) string {
 	return fmt.Sprintf("%s@%s", name, version)
 }
 
+// BuildDepGraphFromWhyGraph constructs a dep graph using bun why output for
+// accurate transitive resolution.
+//
+// directDeps is the set of package names that are direct dependencies of the root
+// (workspace: protocol entries are silently skipped as they are absent from AllPkgs).
+func BuildDepGraphFromWhyGraph(
+	rootName, rootVersion string,
+	directDeps map[string]bool,
+	graph *WhyGraph,
+) (*godepgraph.DepGraph, error) {
+	// Invert the reverse adjacency to obtain the forward adjacency:
+	// forwardAdj["pkg@ver"] = set of "dep@ver" that pkg directly depends on.
+	forwardAdj := make(map[string]map[string]struct{}, len(graph.ReverseAdj))
+	for pkg, dependents := range graph.ReverseAdj {
+		for dep := range dependents {
+			if forwardAdj[dep] == nil {
+				forwardAdj[dep] = make(map[string]struct{})
+			}
+
+			forwardAdj[dep][pkg] = struct{}{}
+		}
+	}
+
+	builder, err := godepgraph.NewBuilder(
+		&godepgraph.PkgManager{Name: packageManager},
+		&godepgraph.PkgInfo{Name: rootName, Version: rootVersion},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create dep graph builder: %w", err)
+	}
+
+	visited := make(map[string]bool)
+	rootNodeID := builder.GetRootNode().NodeID
+
+	for name := range directDeps {
+		version, ok := graph.AllPkgs[name]
+		if !ok {
+			continue
+		}
+
+		nodeID := nodeIDFor(name, version)
+
+		if err := addFromWhyGraph(builder, rootNodeID, nodeID, forwardAdj, visited); err != nil {
+			return nil, err
+		}
+	}
+
+	return builder.Build(), nil
+}
+
+func addFromWhyGraph(
+	builder *godepgraph.Builder,
+	parentNodeID, nodeID string,
+	forwardAdj map[string]map[string]struct{},
+	visited map[string]bool,
+) error {
+	if !visited[nodeID] {
+		visited[nodeID] = true
+
+		name, version := parseNameVersion(nodeID)
+		builder.AddNode(nodeID, &godepgraph.PkgInfo{Name: name, Version: version})
+
+		for depNodeID := range forwardAdj[nodeID] {
+			if err := addFromWhyGraph(builder, nodeID, depNodeID, forwardAdj, visited); err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := builder.ConnectNodes(parentNodeID, nodeID); err != nil {
+		return fmt.Errorf("failed to connect %s → %s: %w", parentNodeID, nodeID, err)
+	}
+
+	return nil
+}
+
 // FilterWorkspaceDeps removes workspace: protocol references from a dep map so
 // they are not looked up in pkgMap (they have no entry there).
 func FilterWorkspaceDeps(deps map[string]string) map[string]string {
 	filtered := make(map[string]string, len(deps))
 	for k, v := range deps {
-		if !strings.HasPrefix(v, "workspace:") {
+		if !strings.HasPrefix(v, workspaceProtocol) {
 			filtered[k] = v
 		}
 	}
