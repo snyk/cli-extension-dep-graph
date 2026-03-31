@@ -67,7 +67,7 @@ func resolvePython(ctx context.Context, enhancedLogger *zerolog.Logger, dir stri
 
 	result.Results = append(result.Results, pipResults.Results...)
 	result.Results = append(result.Results, pipenvResults.Results...)
-	result.ProcessedFiles = append(result.ProcessedFiles, pipenvResults.ProcessedFiles...)
+	result.ProcessedFiles = append(result.ProcessedFiles, pipResults.ProcessedFiles...)
 	result.ProcessedFiles = append(result.ProcessedFiles, pipenvResults.ProcessedFiles...)
 
 	return result
