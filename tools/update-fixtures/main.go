@@ -188,12 +188,12 @@ func generateExpectedOutput(fixturePath, pythonVersion string) error {
 		return fmt.Errorf("failed to build dependency graph: %w", err)
 	}
 
-	if len(results) == 0 {
+	if len(results.Results) == 0 {
 		return fmt.Errorf("no results generated")
 	}
 
-	fmt.Printf("    Generated %d dependency graph(s)\n", len(results))
-	for i, result := range results {
+	fmt.Printf("    Generated %d dependency graph(s)\n", len(results.Results))
+	for i, result := range results.Results {
 		if result.Error != nil {
 			fmt.Printf("      [%d] %s - ERROR: %v\n", i, result.Metadata.TargetFile, result.Error)
 		} else {
@@ -203,26 +203,26 @@ func generateExpectedOutput(fixturePath, pythonVersion string) error {
 
 	// Check if all results have errors
 	allHaveErrors := true
-	for _, result := range results {
+	for _, result := range results.Results {
 		if result.Error == nil {
 			allHaveErrors = false
 			break
 		}
 	}
-	
+
 	if allHaveErrors {
-		return fmt.Errorf("all results contain errors: %w", results[0].Error)
+		return fmt.Errorf("all results contain errors: %w", results.Results[0].Error)
 	}
 
 	// Preserve runtime from existing results if available
-	for i := range results {
-		results[i].Error = nil
+	for i := range results.Results {
+		results.Results[i].Error = nil
 		if i < len(existingResults) && existingResults[i].Metadata.Runtime != "" {
-			results[i].Metadata.Runtime = existingResults[i].Metadata.Runtime
+			results.Results[i].Metadata.Runtime = existingResults[i].Metadata.Runtime
 		}
 	}
 
-	data, err := json.MarshalIndent(results, "", "  ")
+	data, err := json.MarshalIndent(results.Results, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal results: %w", err)
 	}
