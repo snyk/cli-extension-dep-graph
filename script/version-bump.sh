@@ -23,10 +23,10 @@ elif [[ "$PR_TITLE" =~ ^feat(\(.*\))?:|^feature: ]]; then
     BUMP_TYPE="minor"
     MINOR=$((MINOR + 1))
     PATCH=0
-elif [[ "$PR_TITLE" =~ ^(fix|perf|revert)(\(.*\))?: ]]; then
+elif [[ "$PR_TITLE" =~ ^(fix|perf|revert|refactor|chore)(\(.*\))?: ]]; then
     BUMP_TYPE="patch"
     PATCH=$((PATCH + 1))
-elif [[ "$PR_TITLE" =~ ^(chore|docs|style|refactor|test|ci|build)(\(.*\))?: ]]; then
+elif [[ "$PR_TITLE" =~ ^(docs|style|test|ci|build)(\(.*\))?: ]]; then
     BUMP_TYPE="none"
 else
     echo "Warning: No recognized commit type, defaulting to NONE (no release)"
