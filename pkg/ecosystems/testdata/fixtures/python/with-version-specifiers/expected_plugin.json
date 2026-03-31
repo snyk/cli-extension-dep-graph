@@ -21,10 +21,10 @@
           }
         },
         {
-          "id": "requests@2.32.5",
+          "id": "requests@2.33.1",
           "info": {
             "name": "requests",
-            "version": "2.32.5"
+            "version": "2.33.1"
           }
         },
         {
@@ -67,7 +67,7 @@
                 "nodeId": "click@8.1.8"
               },
               {
-                "nodeId": "requests@2.32.5"
+                "nodeId": "requests@2.33.1"
               },
               {
                 "nodeId": "urllib3@2.6.3"
@@ -80,8 +80,8 @@
             "deps": []
           },
           {
-            "nodeId": "requests@2.32.5",
-            "pkgId": "requests@2.32.5",
+            "nodeId": "requests@2.33.1",
+            "pkgId": "requests@2.33.1",
             "deps": [
               {
                 "nodeId": "certifi@2026.2.25"

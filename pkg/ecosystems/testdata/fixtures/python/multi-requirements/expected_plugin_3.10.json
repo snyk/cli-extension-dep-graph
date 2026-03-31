@@ -77,6 +77,159 @@
           }
         },
         {
+          "id": "flask@3.0.0",
+          "info": {
+            "name": "flask",
+            "version": "3.0.0"
+          }
+        },
+        {
+          "id": "jinja2@3.1.6",
+          "info": {
+            "name": "jinja2",
+            "version": "3.1.6"
+          }
+        },
+        {
+          "id": "markupsafe@3.0.3",
+          "info": {
+            "name": "markupsafe",
+            "version": "3.0.3"
+          }
+        },
+        {
+          "id": "werkzeug@3.1.7",
+          "info": {
+            "name": "werkzeug",
+            "version": "3.1.7"
+          }
+        },
+        {
+          "id": "blinker@1.9.0",
+          "info": {
+            "name": "blinker",
+            "version": "1.9.0"
+          }
+        },
+        {
+          "id": "click@8.3.1",
+          "info": {
+            "name": "click",
+            "version": "8.3.1"
+          }
+        },
+        {
+          "id": "itsdangerous@2.2.0",
+          "info": {
+            "name": "itsdangerous",
+            "version": "2.2.0"
+          }
+        }
+      ],
+      "graph": {
+        "rootNodeId": "root-node",
+        "nodes": [
+          {
+            "nodeId": "root-node",
+            "pkgId": "root@0.0.0",
+            "deps": [
+              {
+                "nodeId": "flask@3.0.0"
+              }
+            ]
+          },
+          {
+            "nodeId": "flask@3.0.0",
+            "pkgId": "flask@3.0.0",
+            "deps": [
+              {
+                "nodeId": "jinja2@3.1.6"
+              },
+              {
+                "nodeId": "werkzeug@3.1.7"
+              },
+              {
+                "nodeId": "blinker@1.9.0"
+              },
+              {
+                "nodeId": "click@8.3.1"
+              },
+              {
+                "nodeId": "itsdangerous@2.2.0"
+              }
+            ]
+          },
+          {
+            "nodeId": "jinja2@3.1.6",
+            "pkgId": "jinja2@3.1.6",
+            "deps": [
+              {
+                "nodeId": "markupsafe@3.0.3"
+              }
+            ]
+          },
+          {
+            "nodeId": "markupsafe@3.0.3",
+            "pkgId": "markupsafe@3.0.3",
+            "deps": []
+          },
+          {
+            "nodeId": "werkzeug@3.1.7",
+            "pkgId": "werkzeug@3.1.7",
+            "deps": [
+              {
+                "nodeId": "markupsafe@3.0.3:pruned"
+              }
+            ]
+          },
+          {
+            "nodeId": "markupsafe@3.0.3:pruned",
+            "pkgId": "markupsafe@3.0.3",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "blinker@1.9.0",
+            "pkgId": "blinker@1.9.0",
+            "deps": []
+          },
+          {
+            "nodeId": "click@8.3.1",
+            "pkgId": "click@8.3.1",
+            "deps": []
+          },
+          {
+            "nodeId": "itsdangerous@2.2.0",
+            "pkgId": "itsdangerous@2.2.0",
+            "deps": []
+          }
+        ]
+      }
+    },
+    "metadata": {
+      "targetFile": "backend/requirements.txt",
+      "runtime": "python@3.10.19"
+    }
+  },
+  {
+    "depGraph": {
+      "schemaVersion": "1.3.0",
+      "pkgManager": {
+        "name": "pip"
+      },
+      "pkgs": [
+        {
+          "id": "root@0.0.0",
+          "info": {
+            "name": "root",
+            "version": "0.0.0"
+          }
+        },
+        {
           "id": "requests@2.31.0",
           "info": {
             "name": "requests",
@@ -167,159 +320,6 @@
     },
     "metadata": {
       "targetFile": "requirements.txt",
-      "runtime": "python@3.10.19"
-    }
-  },
-  {
-    "depGraph": {
-      "schemaVersion": "1.3.0",
-      "pkgManager": {
-        "name": "pip"
-      },
-      "pkgs": [
-        {
-          "id": "root@0.0.0",
-          "info": {
-            "name": "root",
-            "version": "0.0.0"
-          }
-        },
-        {
-          "id": "flask@3.0.0",
-          "info": {
-            "name": "flask",
-            "version": "3.0.0"
-          }
-        },
-        {
-          "id": "jinja2@3.1.6",
-          "info": {
-            "name": "jinja2",
-            "version": "3.1.6"
-          }
-        },
-        {
-          "id": "markupsafe@3.0.3",
-          "info": {
-            "name": "markupsafe",
-            "version": "3.0.3"
-          }
-        },
-        {
-          "id": "werkzeug@3.1.6",
-          "info": {
-            "name": "werkzeug",
-            "version": "3.1.6"
-          }
-        },
-        {
-          "id": "blinker@1.9.0",
-          "info": {
-            "name": "blinker",
-            "version": "1.9.0"
-          }
-        },
-        {
-          "id": "click@8.3.1",
-          "info": {
-            "name": "click",
-            "version": "8.3.1"
-          }
-        },
-        {
-          "id": "itsdangerous@2.2.0",
-          "info": {
-            "name": "itsdangerous",
-            "version": "2.2.0"
-          }
-        }
-      ],
-      "graph": {
-        "rootNodeId": "root-node",
-        "nodes": [
-          {
-            "nodeId": "root-node",
-            "pkgId": "root@0.0.0",
-            "deps": [
-              {
-                "nodeId": "flask@3.0.0"
-              }
-            ]
-          },
-          {
-            "nodeId": "flask@3.0.0",
-            "pkgId": "flask@3.0.0",
-            "deps": [
-              {
-                "nodeId": "jinja2@3.1.6"
-              },
-              {
-                "nodeId": "werkzeug@3.1.6"
-              },
-              {
-                "nodeId": "blinker@1.9.0"
-              },
-              {
-                "nodeId": "click@8.3.1"
-              },
-              {
-                "nodeId": "itsdangerous@2.2.0"
-              }
-            ]
-          },
-          {
-            "nodeId": "jinja2@3.1.6",
-            "pkgId": "jinja2@3.1.6",
-            "deps": [
-              {
-                "nodeId": "markupsafe@3.0.3"
-              }
-            ]
-          },
-          {
-            "nodeId": "markupsafe@3.0.3",
-            "pkgId": "markupsafe@3.0.3",
-            "deps": []
-          },
-          {
-            "nodeId": "werkzeug@3.1.6",
-            "pkgId": "werkzeug@3.1.6",
-            "deps": [
-              {
-                "nodeId": "markupsafe@3.0.3:pruned"
-              }
-            ]
-          },
-          {
-            "nodeId": "markupsafe@3.0.3:pruned",
-            "pkgId": "markupsafe@3.0.3",
-            "info": {
-              "labels": {
-                "pruned": "true"
-              }
-            },
-            "deps": []
-          },
-          {
-            "nodeId": "blinker@1.9.0",
-            "pkgId": "blinker@1.9.0",
-            "deps": []
-          },
-          {
-            "nodeId": "click@8.3.1",
-            "pkgId": "click@8.3.1",
-            "deps": []
-          },
-          {
-            "nodeId": "itsdangerous@2.2.0",
-            "pkgId": "itsdangerous@2.2.0",
-            "deps": []
-          }
-        ]
-      }
-    },
-    "metadata": {
-      "targetFile": "backend/requirements.txt",
       "runtime": "python@3.10.19"
     }
   }

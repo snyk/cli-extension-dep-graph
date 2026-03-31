@@ -56,10 +56,10 @@
           }
         },
         {
-          "id": "tomli@2.4.0",
+          "id": "tomli@2.4.1",
           "info": {
             "name": "tomli",
-            "version": "2.4.0"
+            "version": "2.4.1"
           }
         },
         {
@@ -140,7 +140,7 @@
                 "nodeId": "platformdirs@4.3.6"
               },
               {
-                "nodeId": "tomli@2.4.0"
+                "nodeId": "tomli@2.4.1"
               },
               {
                 "nodeId": "typing-extensions@4.13.2"
@@ -173,8 +173,8 @@
             "deps": []
           },
           {
-            "nodeId": "tomli@2.4.0",
-            "pkgId": "tomli@2.4.0",
+            "nodeId": "tomli@2.4.1",
+            "pkgId": "tomli@2.4.1",
             "deps": []
           },
           {

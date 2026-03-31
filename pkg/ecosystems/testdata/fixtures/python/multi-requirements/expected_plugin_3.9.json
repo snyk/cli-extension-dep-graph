@@ -206,10 +206,10 @@
           }
         },
         {
-          "id": "werkzeug@3.1.6",
+          "id": "werkzeug@3.1.7",
           "info": {
             "name": "werkzeug",
-            "version": "3.1.6"
+            "version": "3.1.7"
           }
         },
         {
@@ -268,7 +268,7 @@
                 "nodeId": "jinja2@3.1.6"
               },
               {
-                "nodeId": "werkzeug@3.1.6"
+                "nodeId": "werkzeug@3.1.7"
               },
               {
                 "nodeId": "blinker@1.9.0"
@@ -299,8 +299,8 @@
             "deps": []
           },
           {
-            "nodeId": "werkzeug@3.1.6",
-            "pkgId": "werkzeug@3.1.6",
+            "nodeId": "werkzeug@3.1.7",
+            "pkgId": "werkzeug@3.1.7",
             "deps": [
               {
                 "nodeId": "markupsafe@3.0.3:pruned"
