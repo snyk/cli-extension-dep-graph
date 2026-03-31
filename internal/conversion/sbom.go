@@ -9,13 +9,20 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
+
+// Data used to construct an empty dep-graph, in the case where we have a valid SBOM but no dep-graphs are returned from
+// the conversion endpoint. This can occur, for instance, in a workspace with no dependencies.
+type Metadata struct {
+	PackageManager string
+	Name           string // Project root name
+	Version        string // Project root version
+}
 
 func SbomToDepGraphs(
 	ctx context.Context,
 	sbom io.Reader,
-	metadata *scaplugin.Metadata,
+	metadata *Metadata,
 	snykClient *snykclient.SnykClient,
 	log logger.Logger,
 	remoteRepoURL string,
@@ -43,7 +50,7 @@ func SbomToDepGraphs(
 	return depGraphsData, nil
 }
 
-func emptyDepGraph(metadata *scaplugin.Metadata) (*depgraph.DepGraph, error) {
+func emptyDepGraph(metadata *Metadata) (*depgraph.DepGraph, error) {
 	if metadata.PackageManager == "" {
 		return nil, fmt.Errorf("found empty PackageManager on metadata")
 	}

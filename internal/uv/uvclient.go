@@ -10,7 +10,8 @@ import (
 	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
+	"github.com/snyk/cli-extension-dep-graph/internal/conversion"
+	scaecosystems "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 )
 
 const (
@@ -22,7 +23,7 @@ const (
 )
 
 type Client interface {
-	ExportSBOM(inputDir string, opts *scaplugin.Options) (Sbom, error)
+	ExportSBOM(inputDir string, opts *scaecosystems.SCAPluginOptions) (Sbom, error)
 }
 
 type client struct {
@@ -57,22 +58,22 @@ type WorkspacePackage struct {
 }
 
 // ExportSBOM exports an SBOM in CycloneDX format using uv.
-func (c client) ExportSBOM(inputDir string, opts *scaplugin.Options) (Sbom, error) {
+func (c client) ExportSBOM(inputDir string, opts *scaecosystems.SCAPluginOptions) (Sbom, error) {
 	args := []string{"export", "--format", "cyclonedx1.5", "--preview"}
-	if opts.AllowOutOfSync {
+	if opts.Global.AllowOutOfSync {
 		args = append(args, "--frozen")
 	} else {
 		args = append(args, "--locked")
 	}
-	if opts.AllProjects || opts.UvWorkspacePackages {
+	if opts.Global.AllProjects || opts.Global.ForceIncludeWorkspacePackages {
 		args = append(args, "--all-packages")
 	}
-	if !opts.Dev {
+	if !opts.Global.IncludeDev {
 		args = append(args, "--no-dev")
 	}
 	output, err := c.executor.Execute(c.uvBinary, inputDir, args...)
 	if err != nil {
-		if !opts.AllowOutOfSync && isOutOfSyncLockfileError(err) {
+		if !opts.Global.AllowOutOfSync && isOutOfSyncLockfileError(err) {
 			return nil, clierrors.NewGeneralSCAFailureError(
 				"uv.lock is out of sync with pyproject.toml. Run `uv lock` to update the lockfile, "+
 					"or re-run with `--strict-out-of-sync=false` to test the outdated lockfile regardless.",
@@ -130,8 +131,8 @@ func parseAndValidateSBOM(sbomData Sbom) (*cycloneDXSBOM, error) {
 	return &sbom, nil
 }
 
-func extractMetadata(sbom *cycloneDXSBOM) *scaplugin.Metadata {
-	return &scaplugin.Metadata{
+func extractMetadata(sbom *cycloneDXSBOM) *conversion.Metadata {
+	return &conversion.Metadata{
 		PackageManager: "uv",
 		Name:           sbom.Metadata.Component.Name,
 		Version:        sbom.Metadata.Component.Version,

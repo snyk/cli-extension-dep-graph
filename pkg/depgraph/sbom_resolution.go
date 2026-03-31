@@ -16,9 +16,9 @@ import (
 	"github.com/snyk/go-application-framework/pkg/workflow"
 
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
-	"github.com/snyk/cli-extension-dep-graph/internal/uv"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	ecosystemslogger "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/uv"
 )
 
 func handleSBOMResolution(
@@ -43,7 +43,7 @@ func handleSBOMResolution(
 		ctx,
 		config,
 		logger,
-		[]scaplugin.SCAPlugin{
+		[]ecosystems.SCAPlugin{
 			uv.NewUvPlugin(uv.NewUvClient(), snykClient, remoteRepoURL),
 		},
 		handleLegacyResolution,
@@ -55,7 +55,7 @@ func handleSBOMResolutionDI(
 	ctx workflow.InvocationContext,
 	config configuration.Configuration,
 	logger *zerolog.Logger,
-	scaPlugins []scaplugin.SCAPlugin,
+	scaPlugins []ecosystems.SCAPlugin,
 	depGraphWorkflowFunc ResolutionHandlerFunc,
 ) ([]workflow.Data, error) {
 	inputDir := config.GetString(configuration.INPUT_DIRECTORY)
@@ -70,7 +70,7 @@ func handleSBOMResolutionDI(
 	}
 
 	allProjects := config.GetBool(FlagAllProjects)
-	uvWorkspacePackages := config.GetBool(FlagUvWorkspacePackages)
+	forceIncludeWorkspacePackages := config.GetBool(FlagUvWorkspacePackages)
 
 	targetFile := config.GetString(FlagFile)
 	dev := config.GetBool(FlagDev)
@@ -82,61 +82,65 @@ func handleSBOMResolutionDI(
 	exclude := parseExcludeFlag(config.GetString(FlagExclude))
 	failFast := config.GetBool(FlagFailFast)
 	forceSingleGraph := config.GetBool(FlagForceSingleGraph)
-	pluginOptions := scaplugin.Options{
-		AllProjects:         allProjects,
-		UvWorkspacePackages: uvWorkspacePackages,
-		TargetFile:          targetFile,
-		Dev:                 dev,
-		Exclude:             exclude,
-		FailFast:            failFast,
-		AllowOutOfSync:      allowOutOfSync,
-		ForceSingleGraph:    forceSingleGraph,
+
+	pluginOptions := ecosystems.NewPluginOptions().
+		WithAllProjects(allProjects).
+		WithForceIncludeWorkspacePackages(forceIncludeWorkspacePackages).
+		WithIncludeDev(dev).
+		WithAllowOutOfSync(allowOutOfSync).
+		WithExclude(exclude).
+		WithFailFast(failFast).
+		WithForceSingleGraph(forceSingleGraph)
+	if targetFile != "" {
+		pluginOptions = pluginOptions.WithTargetFile(targetFile)
 	}
 
-	// Generate Findings
+	// Generate Results
 	pluginLogger := ecosystemslogger.NewFromZerolog(logger)
-	findings := []scaplugin.Finding{}
+	results := []ecosystems.SCAResult{}
+	var processedFiles []string
 	for _, sp := range scaPlugins {
-		f, err := sp.BuildFindingsFromDir(
+		pluginResult, err := sp.BuildDepGraphsFromDir(
 			ctx.Context(),
-			inputDir,
-			&pluginOptions,
 			pluginLogger,
+			inputDir,
+			pluginOptions,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("error building findings: %w", err)
+			return nil, fmt.Errorf("error building results: %w", err)
 		}
 
 		if failFast && allProjects {
-			for _, finding := range f {
-				if finding.Error != nil {
-					logFindingError(logger, finding.LockFile, finding.Error)
-					return nil, createFailFastError(finding.LockFile, finding.Error)
+			for _, result := range pluginResult.Results {
+				if result.Error != nil {
+					logResultError(logger, result.Metadata.TargetFile, result.Error)
+					return nil, createFailFastError(result.Metadata.TargetFile, result.Error)
 				}
 			}
 		}
 
-		findings = append(findings, f...)
-		if !allProjects && len(f) > 0 {
+		results = append(results, pluginResult.Results...)
+		processedFiles = append(processedFiles, pluginResult.ProcessedFiles...)
+		if !allProjects && len(pluginResult.Results) > 0 {
 			// If `allProjects` is false we don't want more than one project
 			break
 		}
 	}
 
-	// Convert Findings to workflow.Data
+	// Convert Results to workflow.Data
 	var workflowData []workflow.Data
-	var problemFindings []scaplugin.Finding
+	var problemResults []ecosystems.SCAResult
 	var err error
 
-	if targetFile != "" && uvWorkspacePackages {
+	if targetFile != "" && forceIncludeWorkspacePackages {
 		// TODO: Using JSONL to output multiple dep graphs in a single workflow.Data object is a workaround
 		// to fix outputting the JSON for multiple workflow.Data objects.
 		// Currently only the first workflow.Data object is output.
 		// This has been reported to the CLI Team and shown in the following test
 		// https://github.com/snyk/go-application-framework/pull/559
-		workflowData, problemFindings, err = combineWorkspaceFindingsAsJSONL(logger, findings)
+		workflowData, problemResults, err = combineWorkspaceResultsAsJSONL(logger, results)
 	} else {
-		workflowData, problemFindings, err = processFindingsIndividually(logger, findings, allProjects)
+		workflowData, problemResults, err = processResultsIndividually(logger, results, allProjects)
 	}
 	if err != nil {
 		return nil, err
@@ -145,21 +149,21 @@ func handleSBOMResolutionDI(
 		workflowData = []workflow.Data{}
 	}
 
-	totalFindings := len(findings)
+	totalResults := len(results)
 
-	if totalFindings == 0 || allProjects {
-		applyFindingsExclusions(config, findings)
+	if totalResults == 0 || allProjects {
+		applyProcessedFilesExclusions(config, processedFiles)
 
-		legacyData, err := executeLegacyWorkflow(ctx, config, logger, depGraphWorkflowFunc, findings)
+		legacyData, err := executeLegacyWorkflow(ctx, config, logger, depGraphWorkflowFunc, results)
 		if err != nil {
 			return nil, err
 		}
 
-		legacyWorkflowData, legacyProblemFindings := processLegacyData(logger, legacyData)
+		legacyWorkflowData, legacyProblemResults := processLegacyData(logger, legacyData)
 		workflowData = append(workflowData, legacyWorkflowData...)
-		problemFindings = append(problemFindings, legacyProblemFindings...)
+		problemResults = append(problemResults, legacyProblemResults...)
 
-		totalFindings += len(legacyData)
+		totalResults += len(legacyData)
 	}
 
 	// TODO: This is a temporary implementation for rendering warnings.
@@ -168,23 +172,23 @@ func handleSBOMResolutionDI(
 	// errors and propagate them upstream rather than rendering them directly.
 	// This change will require coordinated updates across extensions to
 	// ensure backwards compatibility and avoid breakages.
-	outputAnyWarnings(ctx, logger, problemFindings, totalFindings)
+	outputAnyWarnings(ctx, logger, problemResults, totalResults)
 
 	return workflowData, nil
 }
 
-func logFindingError(logger *zerolog.Logger, lockFile string, err error) {
+func logResultError(logger *zerolog.Logger, targetFile string, err error) {
 	var snykErr snyk_errors.Error
 	if errors.As(err, &snykErr) && snykErr.Detail != "" {
-		logger.Printf("Skipping finding for %s which errored with: %v (details: %s)", lockFile, err, snykErr.Detail)
+		logger.Printf("Skipping result for %s which errored with: %v (details: %s)", targetFile, err, snykErr.Detail)
 	} else {
-		logger.Printf("Skipping finding for %s which errored with: %v", lockFile, err)
+		logger.Printf("Skipping result for %s which errored with: %v", targetFile, err)
 	}
 }
 
-func outputAnyWarnings(ctx workflow.InvocationContext, logger *zerolog.Logger, problemFindings []scaplugin.Finding, totalFindings int) {
-	if len(problemFindings) > 0 {
-		message := renderWarningForProblemFindings(problemFindings, totalFindings)
+func outputAnyWarnings(ctx workflow.InvocationContext, logger *zerolog.Logger, problemResults []ecosystems.SCAResult, totalResults int) {
+	if len(problemResults) > 0 {
+		message := renderWarningForProblemResults(problemResults, totalResults)
 
 		err := ctx.GetUserInterface().OutputError(fmt.Errorf("%s", message))
 		if err != nil {
@@ -193,18 +197,18 @@ func outputAnyWarnings(ctx workflow.InvocationContext, logger *zerolog.Logger, p
 	}
 }
 
-func renderWarningForProblemFindings(problemFindings []scaplugin.Finding, totalFindings int) string {
+func renderWarningForProblemResults(problemResults []ecosystems.SCAResult, totalResults int) string {
 	outputMessage := ""
-	for _, finding := range problemFindings {
-		outputMessage += fmt.Sprintf("\n%s:", finding.LockFile)
+	for _, result := range problemResults {
+		outputMessage += fmt.Sprintf("\n%s:", result.Metadata.TargetFile)
 		var snykErr snyk_errors.Error
-		if errors.As(finding.Error, &snykErr) && snykErr.Detail != "" {
+		if errors.As(result.Error, &snykErr) && snykErr.Detail != "" {
 			outputMessage += fmt.Sprintf("\n  %s", snykErr.Detail)
 		} else {
 			outputMessage += "\n  could not process manifest file"
 		}
 	}
-	outputMessage += fmt.Sprintf("\n✗ %d/%d potential projects failed to get dependencies.", len(problemFindings), totalFindings)
+	outputMessage += fmt.Sprintf("\n✗ %d/%d potential projects failed to get dependencies.", len(problemResults), totalResults)
 
 	redStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "9", Dark: "1"})
 	return redStyle.Render(outputMessage)
@@ -212,45 +216,37 @@ func renderWarningForProblemFindings(problemFindings []scaplugin.Finding, totalF
 
 // processLegacyData separates successful dependency graphs from errors in the legacy data.
 // It returns workflow data containing only valid dependency graphs, while converting
-// any errors into problem findings that can be reported as warnings.
-func processLegacyData(logger *zerolog.Logger, legacyData []workflow.Data) ([]workflow.Data, []scaplugin.Finding) {
+// any errors into problem results that can be reported as warnings.
+func processLegacyData(logger *zerolog.Logger, legacyData []workflow.Data) ([]workflow.Data, []ecosystems.SCAResult) {
 	workflowData := make([]workflow.Data, 0, len(legacyData))
-	problemFindings := make([]scaplugin.Finding, 0)
+	problemResults := make([]ecosystems.SCAResult, 0)
 
 	for _, data := range legacyData {
 		errList := data.GetErrorList()
 		if len(errList) > 0 {
-			problemFindings = append(problemFindings, extractProblemFindings(logger, data, errList)...)
+			problemResults = append(problemResults, extractProblemResults(logger, data, errList)...)
 			continue
 		}
 		workflowData = append(workflowData, data)
 	}
 
-	return workflowData, problemFindings
+	return workflowData, problemResults
 }
 
-func extractProblemFindings(logger *zerolog.Logger, data workflow.Data, errList []snyk_errors.Error) []scaplugin.Finding {
-	findings := make([]scaplugin.Finding, 0, len(errList))
-	lockFile, metaErr := data.GetMetaData(contentLocationKey)
+func extractProblemResults(logger *zerolog.Logger, data workflow.Data, errList []snyk_errors.Error) []ecosystems.SCAResult {
+	results := make([]ecosystems.SCAResult, 0, len(errList))
+	targetFile, metaErr := data.GetMetaData(contentLocationKey)
 	if metaErr != nil {
 		logger.Printf("Failed to get metadata %s for workflow data: %v", contentLocationKey, metaErr)
-		lockFile = "unknown"
+		targetFile = "unknown"
 	}
 	for i := range errList {
-		findings = append(findings, scaplugin.Finding{
-			LockFile: lockFile,
+		results = append(results, ecosystems.SCAResult{
+			Metadata: ecosystems.Metadata{TargetFile: targetFile},
 			Error:    errList[i],
 		})
 	}
-	return findings
-}
-
-func getExclusionsFromFindings(findings []scaplugin.Finding) []string {
-	exclusions := make([]string, 0, len(findings))
-	for i := range findings {
-		exclusions = append(exclusions, findings[i].FileExclusions...)
-	}
-	return exclusions
+	return results
 }
 
 // parseExcludeFlag parses a comma-separated exclude flag value into a slice of strings.
@@ -272,9 +268,8 @@ func parseExcludeFlag(excludeFlag string) []string {
 	return result
 }
 
-func applyFindingsExclusions(config configuration.Configuration, findings []scaplugin.Finding) {
-	findingsExclusions := getExclusionsFromFindings(findings)
-	if len(findingsExclusions) == 0 {
+func applyProcessedFilesExclusions(config configuration.Configuration, processedFiles []string) {
+	if len(processedFiles) == 0 {
 		return
 	}
 
@@ -282,7 +277,7 @@ func applyFindingsExclusions(config configuration.Configuration, findings []scap
 	if exclude != "" {
 		exclude = fmt.Sprintf("%s,", exclude)
 	}
-	exclude = fmt.Sprintf("%s%s", exclude, strings.Join(findingsExclusions, ","))
+	exclude = fmt.Sprintf("%s%s", exclude, strings.Join(processedFiles, ","))
 	config.Set(FlagExclude, exclude)
 }
 
@@ -291,7 +286,7 @@ func executeLegacyWorkflow(
 	config configuration.Configuration,
 	logger *zerolog.Logger,
 	depGraphWorkflowFunc ResolutionHandlerFunc,
-	findings []scaplugin.Finding,
+	results []ecosystems.SCAResult,
 ) ([]workflow.Data, error) {
 	legacyConfig := config.Clone()
 	legacyConfig.Unset(FlagPrintEffectiveGraph)
@@ -304,34 +299,34 @@ func executeLegacyWorkflow(
 
 	// Handle exit code 3 (no projects found to test)
 	if isExitCode3(err) {
-		if len(findings) > 0 {
+		if len(results) > 0 {
 			logger.Printf("No projects found in legacy workflow (exit code 3), continuing with SBOM data only")
 			return nil, nil
 		}
-		// No SBOM findings and no legacy projects found, return the error
+		// No SBOM results and no legacy projects found, return the error
 		return nil, fmt.Errorf("no supported projects detected: %w", err)
 	}
 
 	return nil, fmt.Errorf("error handling legacy workflow: %w", err)
 }
 
-func combineWorkspaceFindingsAsJSONL(logger *zerolog.Logger, findings []scaplugin.Finding) ([]workflow.Data, []scaplugin.Finding, error) {
-	if len(findings) == 0 {
-		return []workflow.Data{}, []scaplugin.Finding{}, nil
+func combineWorkspaceResultsAsJSONL(logger *zerolog.Logger, results []ecosystems.SCAResult) ([]workflow.Data, []ecosystems.SCAResult, error) {
+	if len(results) == 0 {
+		return []workflow.Data{}, []ecosystems.SCAResult{}, nil
 	}
 
-	var problemFindings []scaplugin.Finding
-	for i := range findings {
-		if findings[i].Error != nil {
-			logFindingError(logger, findings[i].LockFile, findings[i].Error)
-			problemFindings = append(problemFindings, findings[i])
-			return nil, problemFindings, findings[i].Error
+	var problemResults []ecosystems.SCAResult
+	for _, result := range results {
+		if result.Error != nil {
+			logResultError(logger, result.Metadata.TargetFile, result.Error)
+			problemResults = append(problemResults, result)
+			return nil, problemResults, result.Error
 		}
 	}
 
-	data, err := combineWorkspaceDepGraphsAsJSONL(findings)
+	data, err := combineWorkspaceDepGraphsAsJSONL(results)
 	if err != nil {
-		return nil, problemFindings, fmt.Errorf("failed to combine dep graphs: %w", err)
+		return nil, problemResults, fmt.Errorf("failed to combine dep graphs: %w", err)
 	}
 
 	// All dep-graphs are returned as a single workflow.Data item using JSONL because
@@ -341,38 +336,38 @@ func combineWorkspaceFindingsAsJSONL(logger *zerolog.Logger, findings []scaplugi
 	// Example failing test: https://github.com/snyk/go-application-framework/pull/559
 	workflowData := workflow.NewData(DataTypeID, contentTypeJSONL, data)
 
-	targetFile := findings[0].ManifestFile
+	targetFile := results[0].Metadata.TargetFile
 	workflowData.SetMetaData(contentLocationKey, targetFile)
 	workflowData.SetMetaData(MetaKeyNormalisedTargetFile, targetFile)
 	workflowData.SetMetaData(MetaKeyTargetFileFromPlugin, targetFile)
 
-	return []workflow.Data{workflowData}, problemFindings, nil
+	return []workflow.Data{workflowData}, problemResults, nil
 }
 
-func processFindingsIndividually(logger *zerolog.Logger, findings []scaplugin.Finding, allProjects bool) ([]workflow.Data, []scaplugin.Finding, error) {
+func processResultsIndividually(logger *zerolog.Logger, results []ecosystems.SCAResult, allProjects bool) ([]workflow.Data, []ecosystems.SCAResult, error) {
 	var workflowData []workflow.Data
-	var problemFindings []scaplugin.Finding
-	for i := range findings {
-		finding := &findings[i]
+	var problemResults []ecosystems.SCAResult
+	for i := range results {
+		result := &results[i]
 
-		if finding.Error != nil {
-			logFindingError(logger, finding.LockFile, finding.Error)
-			problemFindings = append(problemFindings, *finding)
+		if result.Error != nil {
+			logResultError(logger, result.Metadata.TargetFile, result.Error)
+			problemResults = append(problemResults, *result)
 
 			if !allProjects {
-				return nil, problemFindings, finding.Error
+				return nil, problemResults, result.Error
 			}
 
 			continue
 		}
 
-		data, err := workflowDataFromDepGraph(finding)
+		data, err := workflowDataFromDepGraph(result)
 		if err != nil {
-			return nil, problemFindings, fmt.Errorf("failed to create workflow data: %w", err)
+			return nil, problemResults, fmt.Errorf("failed to create workflow data: %w", err)
 		}
 		workflowData = append(workflowData, data)
 	}
-	return workflowData, problemFindings, nil
+	return workflowData, problemResults, nil
 }
 
 type jsonlOutputLine struct {
@@ -380,15 +375,15 @@ type jsonlOutputLine struct {
 	TargetFile string             `json:"targetFile"`
 }
 
-func combineWorkspaceDepGraphsAsJSONL(findings []scaplugin.Finding) ([]byte, error) {
+func combineWorkspaceDepGraphsAsJSONL(results []ecosystems.SCAResult) ([]byte, error) {
 	var lines [][]byte
-	for i := range findings {
-		if findings[i].Error != nil {
+	for i := range results {
+		if results[i].Error != nil {
 			continue
 		}
 		line := jsonlOutputLine{
-			DepGraph:   findings[i].DepGraph,
-			TargetFile: findings[i].ManifestFile,
+			DepGraph:   results[i].DepGraph,
+			TargetFile: results[i].Metadata.TargetFile,
 		}
 		b, err := json.Marshal(line)
 		if err != nil {
@@ -400,15 +395,15 @@ func combineWorkspaceDepGraphsAsJSONL(findings []scaplugin.Finding) ([]byte, err
 	return combined, nil
 }
 
-func workflowDataFromDepGraph(finding *scaplugin.Finding) (workflow.Data, error) {
-	depGraphBytes, err := json.Marshal(finding.DepGraph)
+func workflowDataFromDepGraph(result *ecosystems.SCAResult) (workflow.Data, error) {
+	depGraphBytes, err := json.Marshal(result.DepGraph)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal depgraph data: %w", err)
 	}
 
 	data := workflow.NewData(DataTypeID, contentTypeJSON, depGraphBytes)
 
-	targetFile := finding.ManifestFile
+	targetFile := result.Metadata.TargetFile
 	data.SetMetaData(contentLocationKey, targetFile)
 	data.SetMetaData(MetaKeyNormalisedTargetFile, targetFile)
 	data.SetMetaData(MetaKeyTargetFileFromPlugin, targetFile)

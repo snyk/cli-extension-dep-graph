@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
 //go:embed testdata/uv-sbom-convert-expected-dep-graph.json
@@ -35,22 +35,25 @@ var uvSBOMConvertExpectedDepGraph string
 var uvSBOMConvertResponse string
 
 type mockScaPlugin struct {
-	findings []scaplugin.Finding
-	err      error
-	options  *scaplugin.Options
+	result  *ecosystems.PluginResult
+	err     error
+	options *ecosystems.SCAPluginOptions
 }
 
-func (m *mockScaPlugin) BuildFindingsFromDir(
+func (m *mockScaPlugin) BuildDepGraphsFromDir(
 	_ context.Context,
-	_ string,
-	options *scaplugin.Options,
 	_ logger.Logger,
-) ([]scaplugin.Finding, error) {
+	_ string,
+	options *ecosystems.SCAPluginOptions,
+) (*ecosystems.PluginResult, error) {
 	m.options = options
 	if m.err != nil {
 		return nil, m.err
 	}
-	return m.findings, nil
+	if m.result == nil {
+		return &ecosystems.PluginResult{}, nil
+	}
+	return m.result, nil
 }
 
 // CalledResolutionHandlerFunc is a test helper structure to track calls to the mock ResolutionHandlerFunc.
@@ -175,12 +178,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		expectedDepGraph := builder.Build()
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       expectedDepGraph,
-					FileExclusions: []string{},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: expectedDepGraph,
+						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+					},
 				},
 			},
 		}
@@ -189,7 +192,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -215,7 +218,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -237,7 +240,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -254,16 +257,16 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(FlagAllProjects, true)
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-					FileExclusions: []string{},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
-				},
-				{
-					Error:    fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
-					LockFile: "uv.lock",
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
+						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+					},
+					{
+						Error:    fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
+						Metadata: ecosystems.Metadata{TargetFile: "uv.lock"},
+					},
 				},
 			},
 		}
@@ -282,7 +285,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -299,14 +302,16 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		// Create mock plugin that returns multiple findings, all with conversion errors
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					Error:    fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
-					LockFile: "project1/uv.lock",
-				},
-				{
-					Error:    fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
-					LockFile: "project2/uv.lock",
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						Error:    fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
+						Metadata: ecosystems.Metadata{TargetFile: "project1/uv.lock"},
+					},
+					{
+						Error:    fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
+						Metadata: ecosystems.Metadata{TargetFile: "project2/uv.lock"},
+					},
 				},
 			},
 		}
@@ -319,7 +324,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -342,12 +347,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-					FileExclusions: []string{},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+					},
 				},
 			},
 		}
@@ -356,7 +361,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -368,49 +373,44 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 
 	t.Run("handleSBOMResolution with FlagAllProjects", func(t *testing.T) {
-		finding1 := scaplugin.Finding{
-			DepGraph:       createTestDepGraph(t, "pip", "project-1", "1.0.0"),
-			FileExclusions: []string{"uv.lock", "pyproject.toml"},
-			LockFile:       "uv.lock",
-			ManifestFile:   "pyproject.toml",
+		finding1 := ecosystems.SCAResult{
+			DepGraph: createTestDepGraph(t, "pip", "project-1", "1.0.0"),
+			Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
 		}
-		finding2 := scaplugin.Finding{
-			DepGraph:       createTestDepGraph(t, "pip", "project-2", "2.0.0"),
-			FileExclusions: []string{"requirements.txt", "setup.py"},
-			LockFile:       "uv.lock",
-			ManifestFile:   "pyproject.toml",
+		finding2 := ecosystems.SCAResult{
+			DepGraph: createTestDepGraph(t, "pip", "project-2", "2.0.0"),
+			Metadata: ecosystems.Metadata{TargetFile: "subproject/pyproject.toml"},
 		}
-		finding3 := scaplugin.Finding{
-			DepGraph:       createTestDepGraph(t, "npm", "project-3", "3.0.0"),
-			FileExclusions: []string{"package.json"},
-			LockFile:       "package-lock.json",
-			ManifestFile:   "package.json",
+		finding3 := ecosystems.SCAResult{
+			DepGraph: createTestDepGraph(t, "npm", "project-3", "3.0.0"),
+			Metadata: ecosystems.Metadata{TargetFile: "package.json"},
 		}
-		finding4 := scaplugin.Finding{
-			DepGraph:       createTestDepGraph(t, "gomod", "project-4", "4.0.0"),
-			FileExclusions: []string{"go.mod"},
-			LockFile:       "go.sum",
-			ManifestFile:   "go.mod",
+		finding4 := ecosystems.SCAResult{
+			DepGraph: createTestDepGraph(t, "gomod", "project-4", "4.0.0"),
+			Metadata: ecosystems.Metadata{TargetFile: "go.mod"},
 		}
 
 		tc := []struct {
 			name                             string
 			allProjects                      bool
 			initialExclude                   string
-			plugins                          []scaplugin.SCAPlugin
+			plugins                          []ecosystems.SCAPlugin
 			expectedWorkflowDataLen          int
 			expectLegacyResolutionToBeCalled bool
 			expectedExclude                  string
+			pluginsShouldNotBeCalled         []int
 		}{
 			{
 				name:           "should return all findings from single plugin when FlagAllProjects is false (e.g. single workspace project with multiple findings)",
 				allProjects:    false,
 				initialExclude: "",
-				plugins: []scaplugin.SCAPlugin{
+				plugins: []ecosystems.SCAPlugin{
 					&mockScaPlugin{
-						findings: []scaplugin.Finding{
-							finding1,
-							finding2,
+						result: &ecosystems.PluginResult{
+							Results: []ecosystems.SCAResult{
+								finding1,
+								finding2,
+							},
 						},
 					},
 				},
@@ -422,11 +422,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				name:           "should return all findings when FlagAllProjects is true",
 				allProjects:    true,
 				initialExclude: "",
-				plugins: []scaplugin.SCAPlugin{
+				plugins: []ecosystems.SCAPlugin{
 					&mockScaPlugin{
-						findings: []scaplugin.Finding{
-							finding1,
-							finding2,
+						result: &ecosystems.PluginResult{
+							Results:        []ecosystems.SCAResult{finding1, finding2},
+							ProcessedFiles: []string{"uv.lock", "pyproject.toml", "requirements.txt", "setup.py"},
 						},
 					},
 				},
@@ -439,13 +439,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				name:           "should continue to next plugin when first plugin returns zero findings and FlagAllProjects is false",
 				allProjects:    false,
 				initialExclude: "",
-				plugins: []scaplugin.SCAPlugin{
+				plugins: []ecosystems.SCAPlugin{
+					&mockScaPlugin{},
 					&mockScaPlugin{
-						findings: []scaplugin.Finding{},
-					},
-					&mockScaPlugin{
-						findings: []scaplugin.Finding{
-							finding1,
+						result: &ecosystems.PluginResult{
+							Results: []ecosystems.SCAResult{finding1},
 						},
 					},
 				},
@@ -457,39 +455,38 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				name:           "should stop at first plugin and return its findings when FlagAllProjects is false",
 				allProjects:    false,
 				initialExclude: "",
-				plugins: []scaplugin.SCAPlugin{
+				plugins: []ecosystems.SCAPlugin{
 					&mockScaPlugin{
-						findings: []scaplugin.Finding{
-							finding1,
-							finding2,
+						result: &ecosystems.PluginResult{
+							Results: []ecosystems.SCAResult{finding1, finding2},
 						},
 					},
 					&mockScaPlugin{
-						findings: []scaplugin.Finding{
-							finding3,
-							finding4,
+						result: &ecosystems.PluginResult{
+							Results: []ecosystems.SCAResult{finding3, finding4},
 						},
 					},
 				},
 				expectedWorkflowDataLen:          2,
 				expectLegacyResolutionToBeCalled: false,
 				expectedExclude:                  "",
+				pluginsShouldNotBeCalled:         []int{1},
 			},
 			{
 				name:           "should return all findings when FlagAllProjects is true and multiple plugins return multiple findings",
 				allProjects:    true,
 				initialExclude: "",
-				plugins: []scaplugin.SCAPlugin{
+				plugins: []ecosystems.SCAPlugin{
 					&mockScaPlugin{
-						findings: []scaplugin.Finding{
-							finding1,
-							finding2,
+						result: &ecosystems.PluginResult{
+							Results:        []ecosystems.SCAResult{finding1, finding2},
+							ProcessedFiles: []string{"uv.lock", "pyproject.toml", "requirements.txt", "setup.py"},
 						},
 					},
 					&mockScaPlugin{
-						findings: []scaplugin.Finding{
-							finding3,
-							finding4,
+						result: &ecosystems.PluginResult{
+							Results:        []ecosystems.SCAResult{finding3, finding4},
+							ProcessedFiles: []string{"package.json", "go.mod"},
 						},
 					},
 				},
@@ -502,27 +499,23 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				name:           "should call legacy resolution workflow when no SBOM findings are found and FlagAllProjects is false",
 				allProjects:    false,
 				initialExclude: "",
-				plugins: []scaplugin.SCAPlugin{
-					&mockScaPlugin{
-						findings: []scaplugin.Finding{},
-					},
-					&mockScaPlugin{
-						findings: []scaplugin.Finding{},
-					},
+				plugins: []ecosystems.SCAPlugin{
+					&mockScaPlugin{},
+					&mockScaPlugin{},
 				},
 				expectedWorkflowDataLen:          1,
 				expectLegacyResolutionToBeCalled: true,
 				expectedExclude:                  "",
 			},
 			{
-				name:           "should append FilesProcessed to existing FlagExclude when FlagAllProjects is true",
+				name:           "should append ProcessedFiles to existing FlagExclude when FlagAllProjects is true",
 				allProjects:    true,
 				initialExclude: "existing-file.txt,another-file.py",
-				plugins: []scaplugin.SCAPlugin{
+				plugins: []ecosystems.SCAPlugin{
 					&mockScaPlugin{
-						findings: []scaplugin.Finding{
-							finding1,
-							finding2,
+						result: &ecosystems.PluginResult{
+							Results:        []ecosystems.SCAResult{finding1, finding2},
+							ProcessedFiles: []string{"uv.lock", "pyproject.toml", "requirements.txt", "setup.py"},
 						},
 					},
 				},
@@ -581,7 +574,13 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 				if tc.expectLegacyResolutionToBeCalled {
 					actualExclude := resolutionHandler.Config.GetString(FlagExclude)
-					assert.Equal(t, tc.expectedExclude, actualExclude, "FlagExclude should contain FilesProcessed from findings")
+					assert.Equal(t, tc.expectedExclude, actualExclude, "FlagExclude should contain ProcessedFiles from plugins")
+				}
+
+				for _, idx := range tc.pluginsShouldNotBeCalled {
+					plugin, ok := tc.plugins[idx].(*mockScaPlugin)
+					require.True(t, ok, "expected plugin at index %d to be *mockScaPlugin", idx)
+					assert.Nil(t, plugin.options, "plugin at index %d should not have been called", idx)
 				}
 			})
 		}
@@ -597,13 +596,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		// Create mock plugin that returns a finding
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-					FileExclusions: []string{"uv.lock"},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+					},
 				},
+				ProcessedFiles: []string{"uv.lock"},
 			},
 		}
 
@@ -615,7 +615,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -626,6 +626,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Len(t, workflowData, 1)
 		// Legacy resolution should have been called
 		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
+		assert.Equal(t, "uv.lock", resolutionHandler.Config.GetString(FlagExclude), "ProcessedFiles should be excluded from legacy resolution")
 	})
 
 	t.Run("should handle exit code 3 when no SBOM findings are found", func(t *testing.T) {
@@ -634,9 +635,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(FlagAllProjects, false)
 
 		// Create mock plugin that returns no findings
-		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{},
-		}
+		mockPlugin := &mockScaPlugin{}
 
 		// Create an error with exit code 3 (no projects found)
 		exitError3 := mockExitError{code: 3}
@@ -646,7 +645,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -668,13 +667,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		// Create mock plugin that returns a finding
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-					FileExclusions: []string{"uv.lock"},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+					},
 				},
+				ProcessedFiles: []string{"uv.lock"},
 			},
 		}
 
@@ -686,7 +686,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -696,6 +696,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Nil(t, workflowData)
 		// Legacy resolution should have been called
 		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
+		assert.Equal(t, "uv.lock", resolutionHandler.Config.GetString(FlagExclude), "ProcessedFiles should be excluded from legacy resolution")
 	})
 
 	t.Run("should skip findings with errors when legacy workflow returns no data", func(t *testing.T) {
@@ -708,19 +709,19 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-					FileExclusions: []string{"project1/uv.lock"},
-					LockFile:       "project1/uv.lock",
-					ManifestFile:   "project1/pyproject.toml",
-					Error:          nil,
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
+						Metadata: ecosystems.Metadata{TargetFile: "project1/pyproject.toml"},
+						Error:    nil,
+					},
+					{
+						Metadata: ecosystems.Metadata{TargetFile: "project2/uv.lock"},
+						Error:    fmt.Errorf("failed to generate SBOM"),
+					},
 				},
-				{
-					FileExclusions: []string{"project2/uv.lock"},
-					LockFile:       "project2/uv.lock",
-					Error:          fmt.Errorf("failed to generate SBOM"),
-				},
+				ProcessedFiles: []string{"project1/uv.lock", "project2/uv.lock"},
 			},
 		}
 
@@ -728,7 +729,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -736,6 +737,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.NotNil(t, workflowData)
 		assert.Len(t, workflowData, 1, "Should return only the valid finding since legacy workflow returns nil")
 		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
+		assert.Equal(t, "project1/uv.lock,project2/uv.lock", resolutionHandler.Config.GetString(FlagExclude),
+			"ProcessedFiles should be excluded from legacy resolution")
 	})
 
 	t.Run("should log snyk_errors.Error details for support debugging", func(t *testing.T) {
@@ -749,12 +752,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		}
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					FileExclusions: []string{"uv.lock"},
-					LockFile:       "uv.lock",
-					Error:          snykErr,
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						Metadata: ecosystems.Metadata{TargetFile: "uv.lock"},
+						Error:    snykErr,
+					},
 				},
+				ProcessedFiles: []string{"uv.lock"},
 			},
 		}
 
@@ -767,7 +772,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&testLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -779,7 +784,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		logOutput := logBuffer.String()
 		assert.Contains(t, logOutput, "Detailed error information for support debugging",
 			"Log should contain snyk_errors.Error Detail field for support debugging")
-		assert.Contains(t, logOutput, "Skipping finding for",
+		assert.Contains(t, logOutput, "Skipping result for",
 			"Log should contain the error context")
 	})
 
@@ -792,12 +797,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-					FileExclusions: []string{},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+					},
 				},
 			},
 		}
@@ -806,13 +811,13 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
 		require.NoError(t, err)
 		require.NotNil(t, mockPlugin.options, "plugin should have been called with options")
-		assert.True(t, mockPlugin.options.AllowOutOfSync)
+		assert.True(t, mockPlugin.options.Global.AllowOutOfSync)
 	})
 
 	t.Run("should default to strict-out-of-sync=true in plugin options", func(t *testing.T) {
@@ -823,12 +828,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-					FileExclusions: []string{},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+					},
 				},
 			},
 		}
@@ -837,13 +842,13 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
 		require.NoError(t, err)
 		require.NotNil(t, mockPlugin.options, "plugin should have been called with options")
-		assert.False(t, mockPlugin.options.AllowOutOfSync)
+		assert.False(t, mockPlugin.options.Global.AllowOutOfSync)
 	})
 
 	t.Run("should ignore invalid strict-out-of-sync values and default to true", func(t *testing.T) {
@@ -852,12 +857,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(FlagStrictOutOfSync, "invalid")
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-					FileExclusions: []string{},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+					},
 				},
 			},
 		}
@@ -866,14 +871,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 		require.NotNil(t, mockPlugin.options, "plugin should be called when strict-out-of-sync is invalid")
-		assert.False(t, mockPlugin.options.AllowOutOfSync, "invalid strict-out-of-sync should default to strict mode")
+		assert.False(t, mockPlugin.options.Global.AllowOutOfSync, "invalid strict-out-of-sync should default to strict mode")
 		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called when a plugin finding is returned")
 	})
 
@@ -888,12 +893,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-					FileExclusions: []string{},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+					},
 				},
 			},
 		}
@@ -902,14 +907,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
 		require.NoError(t, err)
 		require.NotNil(t, mockPlugin.options, "plugin should have been called with options")
-		assert.Equal(t, []string{"dir1", "dir2", "dir3"}, mockPlugin.options.Exclude)
-		assert.True(t, mockPlugin.options.AllProjects)
+		assert.Equal(t, []string{"dir1", "dir2", "dir3"}, []string(mockPlugin.options.Global.Exclude))
+		assert.True(t, mockPlugin.options.Global.AllProjects)
 	})
 
 	t.Run("should pass file flag to plugin options", func(t *testing.T) {
@@ -922,12 +927,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-					FileExclusions: []string{},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+					},
 				},
 			},
 		}
@@ -936,13 +941,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
 		require.NoError(t, err)
 		require.NotNil(t, mockPlugin.options, "plugin should have been called with options")
-		assert.Equal(t, "Gemfile", mockPlugin.options.TargetFile)
+		require.NotNil(t, mockPlugin.options.Global.TargetFile)
+		assert.Equal(t, "Gemfile", *mockPlugin.options.Global.TargetFile)
 	})
 
 	t.Run("should handle empty exclude flag", func(t *testing.T) {
@@ -955,12 +961,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-					FileExclusions: []string{},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+					},
 				},
 			},
 		}
@@ -969,13 +975,13 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
 		require.NoError(t, err)
 		require.NotNil(t, mockPlugin.options, "plugin should have been called with options")
-		assert.Nil(t, mockPlugin.options.Exclude)
+		assert.Nil(t, mockPlugin.options.Global.Exclude)
 	})
 
 	t.Run("should handle legacy workflow data with errors attached and output warnings", func(t *testing.T) {
@@ -983,9 +989,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(FlagAllProjects, true)
 
 		// Create mock plugin that returns no findings to trigger legacy workflow
-		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{},
-		}
+		mockPlugin := &mockScaPlugin{}
 
 		// Create workflow data with an error attached
 		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
@@ -1020,7 +1024,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -1049,12 +1053,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		}
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					FileExclusions: []string{"uv.lock"},
-					LockFile:       "uv.lock",
-					Error:          snykErr,
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						Metadata: ecosystems.Metadata{TargetFile: "uv.lock"},
+						Error:    snykErr,
+					},
 				},
+				ProcessedFiles: []string{"uv.lock"},
 			},
 		}
 
@@ -1062,7 +1068,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -1091,24 +1097,23 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		}
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-					FileExclusions: []string{},
-					LockFile:       "valid-project/uv.lock",
-					ManifestFile:   "valid-project/pyproject.toml",
-					Error:          nil,
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
+						Metadata: ecosystems.Metadata{TargetFile: "valid-project/pyproject.toml"},
+						Error:    nil,
+					},
+					{
+						Metadata: ecosystems.Metadata{TargetFile: "project1/uv.lock"},
+						Error:    snykErr,
+					},
+					{
+						Metadata: ecosystems.Metadata{TargetFile: "project2/uv.lock"},
+						Error:    fmt.Errorf("This should not be processed"),
+					},
 				},
-				{
-					FileExclusions: []string{"project1/uv.lock"},
-					LockFile:       "project1/uv.lock",
-					Error:          snykErr,
-				},
-				{
-					FileExclusions: []string{"project2/uv.lock"},
-					LockFile:       "project2/uv.lock",
-					Error:          fmt.Errorf("This should not be processed"),
-				},
+				ProcessedFiles: []string{"project1/uv.lock", "project2/uv.lock"},
 			},
 		}
 
@@ -1116,7 +1121,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -1143,12 +1148,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		}
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					FileExclusions: []string{"project1/uv.lock"},
-					LockFile:       "project1/uv.lock",
-					Error:          snykErr,
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						Metadata: ecosystems.Metadata{TargetFile: "project1/uv.lock"},
+						Error:    snykErr,
+					},
 				},
+				ProcessedFiles: []string{"project1/uv.lock"},
 			},
 		}
 
@@ -1156,7 +1163,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -1183,19 +1190,19 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		}
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-					FileExclusions: []string{},
-					LockFile:       "valid-project/uv.lock",
-					ManifestFile:   "valid-project/pyproject.toml",
-					Error:          nil,
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
+						Metadata: ecosystems.Metadata{TargetFile: "valid-project/pyproject.toml"},
+						Error:    nil,
+					},
+					{
+						Metadata: ecosystems.Metadata{TargetFile: "project1/uv.lock"},
+						Error:    snykErr,
+					},
 				},
-				{
-					FileExclusions: []string{"project1/uv.lock"},
-					LockFile:       "project1/uv.lock",
-					Error:          snykErr,
-				},
+				ProcessedFiles: []string{"project1/uv.lock"},
 			},
 		}
 
@@ -1219,13 +1226,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
+		assert.Equal(t, "project1/uv.lock", resolutionHandler.Config.GetString(FlagExclude), "ProcessedFiles should be excluded from legacy resolution")
 		assert.Contains(t, capturedOutput, "project1/uv.lock")
 	})
 
@@ -1242,12 +1250,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		}
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					FileExclusions: []string{"uv.lock"},
-					LockFile:       "uv.lock",
-					Error:          snykErr,
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						Metadata: ecosystems.Metadata{TargetFile: "uv.lock"},
+						Error:    snykErr,
+					},
 				},
+				ProcessedFiles: []string{"uv.lock"},
 			},
 		}
 
@@ -1255,7 +1265,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
@@ -1275,12 +1285,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(FlagFailFast, true)
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-					FileExclusions: []string{},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+					},
 				},
 			},
 		}
@@ -1292,13 +1302,13 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
 		require.NoError(t, err)
 		require.NotNil(t, mockPlugin.options, "plugin should have been called with options")
-		assert.True(t, mockPlugin.options.FailFast, "FailFast should be true in plugin options")
+		assert.True(t, mockPlugin.options.Global.FailFast, "FailFast should be true in plugin options")
 	})
 
 	t.Run("should output problem findings through UI when allProjects is true", func(t *testing.T) {
@@ -1315,24 +1325,23 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		regularErr := fmt.Errorf("Failure message should not be shown to the user")
 
 		mockPlugin := &mockScaPlugin{
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-					FileExclusions: []string{},
-					LockFile:       "valid-project/uv.lock",
-					ManifestFile:   "valid-project/pyproject.toml",
-					Error:          nil,
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
+						Metadata: ecosystems.Metadata{TargetFile: "valid-project/pyproject.toml"},
+						Error:    nil,
+					},
+					{
+						Metadata: ecosystems.Metadata{TargetFile: "project1/uv.lock"},
+						Error:    snykErr,
+					},
+					{
+						Metadata: ecosystems.Metadata{TargetFile: "project2/uv.lock"},
+						Error:    regularErr,
+					},
 				},
-				{
-					FileExclusions: []string{"project1/uv.lock"},
-					LockFile:       "project1/uv.lock",
-					Error:          snykErr,
-				},
-				{
-					FileExclusions: []string{"project2/uv.lock"},
-					LockFile:       "project2/uv.lock",
-					Error:          regularErr,
-				},
+				ProcessedFiles: []string{"project1/uv.lock", "project2/uv.lock"},
 			},
 		}
 
@@ -1357,13 +1366,15 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]scaplugin.SCAPlugin{mockPlugin},
+			[]ecosystems.SCAPlugin{mockPlugin},
 			resolutionHandler.Func(),
 		)
 
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 
+		assert.Equal(t, "project1/uv.lock,project2/uv.lock", resolutionHandler.Config.GetString(FlagExclude),
+			"ProcessedFiles should be excluded from legacy resolution")
 		assert.Contains(t, capturedOutput, "project1/uv.lock", "Output should mention the first problem file")
 		assert.Contains(t, capturedOutput, "project2/uv.lock", "Output should mention the second problem file")
 		assert.Contains(t, capturedOutput, "Detailed error to help the customer debug the issue",
@@ -1426,7 +1437,7 @@ func Test_parseExcludeFlag(t *testing.T) {
 	}
 }
 
-func Test_extractProblemFindings(t *testing.T) {
+func Test_extractProblemResults(t *testing.T) {
 	t.Run("should return findings with lockFile from metadata", func(t *testing.T) {
 		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
 		data := workflow.NewData(dataIdentifier, "application/json", []byte(`{}`))
@@ -1437,11 +1448,11 @@ func Test_extractProblemFindings(t *testing.T) {
 			{ID: "SNYK-002", Title: "Error 2"},
 		}
 
-		findings := extractProblemFindings(&nopLogger, data, errList)
+		findings := extractProblemResults(&nopLogger, data, errList)
 
 		require.Len(t, findings, 2)
-		assert.Equal(t, "project/requirements.txt", findings[0].LockFile)
-		assert.Equal(t, "project/requirements.txt", findings[1].LockFile)
+		assert.Equal(t, "project/requirements.txt", findings[0].Metadata.TargetFile)
+		assert.Equal(t, "project/requirements.txt", findings[1].Metadata.TargetFile)
 		assert.Equal(t, errList[0], findings[0].Error)
 		assert.Equal(t, errList[1], findings[1].Error)
 	})
@@ -1455,10 +1466,10 @@ func Test_extractProblemFindings(t *testing.T) {
 			{ID: "SNYK-001", Title: "Error 1"},
 		}
 
-		findings := extractProblemFindings(&nopLogger, data, errList)
+		findings := extractProblemResults(&nopLogger, data, errList)
 
 		require.Len(t, findings, 1)
-		assert.Equal(t, "unknown", findings[0].LockFile)
+		assert.Equal(t, "unknown", findings[0].Metadata.TargetFile)
 		assert.Equal(t, errList[0], findings[0].Error)
 	})
 
@@ -1469,102 +1480,106 @@ func Test_extractProblemFindings(t *testing.T) {
 
 		errList := []snyk_errors.Error{}
 
-		findings := extractProblemFindings(&nopLogger, data, errList)
+		findings := extractProblemResults(&nopLogger, data, errList)
 
 		assert.Len(t, findings, 0)
 		assert.NotNil(t, findings)
 	})
 }
 
-func Test_getExclusionsFromFindings(t *testing.T) {
+func Test_applyProcessedFilesExclusions(t *testing.T) {
 	testCases := []struct {
-		name     string
-		findings []scaplugin.Finding
-		expected []string
+		name            string
+		initialExclude  string
+		processedFiles  []string
+		expectedExclude string
 	}{
 		{
-			name:     "should return empty slice when findings is empty",
-			findings: []scaplugin.Finding{},
-			expected: []string{},
+			name:            "no processed files does not modify config",
+			initialExclude:  "",
+			processedFiles:  []string{},
+			expectedExclude: "",
 		},
 		{
-			name: "should return empty slice when finding has no files processed",
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-					FileExclusions: []string{},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
-				},
-			},
-			expected: []string{},
+			name:            "nil processed files does not modify config",
+			initialExclude:  "",
+			processedFiles:  nil,
+			expectedExclude: "",
 		},
 		{
-			name: "should return files from single finding",
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-					FileExclusions: []string{"file1.py", "file2.py"},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
-				},
-			},
-			expected: []string{"file1.py", "file2.py"},
+			name:            "single processed file",
+			processedFiles:  []string{"file1.py"},
+			expectedExclude: "file1.py",
 		},
 		{
-			name: "should return all files from multiple findings",
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-					FileExclusions: []string{"file1.py", "file2.py"},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
-				},
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project-2", "2.0.0"),
-					FileExclusions: []string{"file3.py", "file4.py", "file5.py"},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
-				},
-			},
-			expected: []string{"file1.py", "file2.py", "file3.py", "file4.py", "file5.py"},
+			name:            "multiple processed files",
+			processedFiles:  []string{"file1.py", "file2.py", "file3.py"},
+			expectedExclude: "file1.py,file2.py,file3.py",
 		},
 		{
-			name: "should handle mixed findings with and without files processed",
-			findings: []scaplugin.Finding{
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-					FileExclusions: []string{},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
-				},
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project-2", "2.0.0"),
-					FileExclusions: []string{"file1.py"},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
-				},
-				{
-					DepGraph:       createTestDepGraph(t, "pip", "test-project-3", "3.0.0"),
-					FileExclusions: []string{"file2.py", "file3.py"},
-					LockFile:       "uv.lock",
-					ManifestFile:   "pyproject.toml",
-				},
-			},
-			expected: []string{"file1.py", "file2.py", "file3.py"},
+			name:            "appends to existing exclude",
+			initialExclude:  "existing.txt",
+			processedFiles:  []string{"file1.py", "file2.py"},
+			expectedExclude: "existing.txt,file1.py,file2.py",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			exclusions := getExclusionsFromFindings(tc.findings)
-			assert.Equal(t, tc.expected, exclusions)
-			// Ensure that even empty results return a non-nil slice
-			if len(tc.findings) == 0 {
-				assert.NotNil(t, exclusions)
+			config := configuration.New()
+			if tc.initialExclude != "" {
+				config.Set(FlagExclude, tc.initialExclude)
 			}
+
+			applyProcessedFilesExclusions(config, tc.processedFiles)
+
+			assert.Equal(t, tc.expectedExclude, config.GetString(FlagExclude))
 		})
 	}
+}
+
+func Test_processedFilesFlowFromPluginsToExcludeConfig(t *testing.T) {
+	ctx := setupTestContext(t, true)
+	resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+	ctx.config.Set(FlagAllProjects, true)
+
+	dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+	resolutionHandler.ReturnData = []workflow.Data{
+		workflow.NewData(dataIdentifier, "application/json", []byte(`{"mock":"data"}`)),
+	}
+
+	mockPlugin1 := &mockScaPlugin{
+		result: &ecosystems.PluginResult{
+			Results: []ecosystems.SCAResult{{
+				DepGraph: createTestDepGraph(t, "pip", "project-1", "1.0.0"),
+				Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+			}},
+			ProcessedFiles: []string{"file1.py", "file2.py"},
+		},
+	}
+	mockPlugin2 := &mockScaPlugin{
+		result: &ecosystems.PluginResult{
+			Results: []ecosystems.SCAResult{{
+				DepGraph: createTestDepGraph(t, "pip", "project-2", "2.0.0"),
+				Metadata: ecosystems.Metadata{TargetFile: "package.json"},
+			}},
+			ProcessedFiles: []string{"file3.py"},
+		},
+	}
+
+	_, err := handleSBOMResolutionDI(
+		ctx.invocationContext,
+		ctx.config,
+		&nopLogger,
+		[]ecosystems.SCAPlugin{mockPlugin1, mockPlugin2},
+		resolutionHandler.Func(),
+	)
+
+	require.NoError(t, err)
+	require.True(t, resolutionHandler.Called)
+	actualExclude := resolutionHandler.Config.GetString(FlagExclude)
+	assert.Equal(t, "file1.py,file2.py,file3.py", actualExclude,
+		"ProcessedFiles from all plugins should be combined into FlagExclude")
 }
 
 func Test_uvWorkspacePackages_passesOptionToPlugin(t *testing.T) {
@@ -1574,11 +1589,12 @@ func Test_uvWorkspacePackages_passesOptionToPlugin(t *testing.T) {
 	ctx.config.Set(FlagFile, "uv.lock")
 
 	mockPlugin := &mockScaPlugin{
-		findings: []scaplugin.Finding{
-			{
-				DepGraph:     createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
-				LockFile:     "uv.lock",
-				ManifestFile: "pyproject.toml",
+		result: &ecosystems.PluginResult{
+			Results: []ecosystems.SCAResult{
+				{
+					DepGraph: createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
+					Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+				},
 			},
 		},
 	}
@@ -1587,16 +1603,17 @@ func Test_uvWorkspacePackages_passesOptionToPlugin(t *testing.T) {
 		ctx.invocationContext,
 		ctx.config,
 		&nopLogger,
-		[]scaplugin.SCAPlugin{mockPlugin},
+		[]ecosystems.SCAPlugin{mockPlugin},
 		resolutionHandler.Func(),
 	)
 
 	require.NoError(t, err)
 	require.NotNil(t, mockPlugin.options)
-	assert.True(t, mockPlugin.options.UvWorkspacePackages, "UvWorkspacePackages should be passed to the plugin")
-	assert.False(t, mockPlugin.options.AllProjects, "AllProjects should remain false")
+	assert.True(t, mockPlugin.options.Global.ForceIncludeWorkspacePackages, "ForceIncludeWorkspacePackages should be passed to the plugin")
+	assert.False(t, mockPlugin.options.Global.AllProjects, "AllProjects should remain false")
 	assert.False(t, resolutionHandler.Called, "legacy workflow should not be called when UvWorkspacePackages is set")
-	assert.Equal(t, "uv.lock", mockPlugin.options.TargetFile)
+	require.NotNil(t, mockPlugin.options.Global.TargetFile)
+	assert.Equal(t, "uv.lock", *mockPlugin.options.Global.TargetFile)
 }
 
 func Test_uvWorkspacePackages_combinesMultipleDepGraphsAsJSONL(t *testing.T) {
@@ -1606,16 +1623,16 @@ func Test_uvWorkspacePackages_combinesMultipleDepGraphsAsJSONL(t *testing.T) {
 	ctx.config.Set(FlagUvWorkspacePackages, true)
 
 	mockPlugin := &mockScaPlugin{
-		findings: []scaplugin.Finding{
-			{
-				DepGraph:     createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
-				LockFile:     "uv.lock",
-				ManifestFile: "pyproject.toml",
-			},
-			{
-				DepGraph:     createTestDepGraph(t, "uv", "pkg-b", "2.0.0"),
-				LockFile:     "uv.lock",
-				ManifestFile: "packages/pkg-b/pyproject.toml",
+		result: &ecosystems.PluginResult{
+			Results: []ecosystems.SCAResult{
+				{
+					DepGraph: createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
+					Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+				},
+				{
+					DepGraph: createTestDepGraph(t, "uv", "pkg-b", "2.0.0"),
+					Metadata: ecosystems.Metadata{TargetFile: "packages/pkg-b/pyproject.toml"},
+				},
 			},
 		},
 	}
@@ -1624,7 +1641,7 @@ func Test_uvWorkspacePackages_combinesMultipleDepGraphsAsJSONL(t *testing.T) {
 		ctx.invocationContext,
 		ctx.config,
 		&nopLogger,
-		[]scaplugin.SCAPlugin{mockPlugin},
+		[]ecosystems.SCAPlugin{mockPlugin},
 		resolutionHandler.Func(),
 	)
 
@@ -1657,15 +1674,15 @@ func Test_uvWorkspacePackages_combinesMultipleDepGraphsAsJSONL(t *testing.T) {
 	// check metadata is set correctly
 	contentLocation, err := workflowData.GetMetaData(contentLocationKey)
 	require.NoError(t, err)
-	assert.Equal(t, "pyproject.toml", contentLocation, "Content-Location should be set to the first finding's ManifestFile")
+	assert.Equal(t, "pyproject.toml", contentLocation, "Content-Location should be set to the first result's TargetFile")
 
 	normalisedTargetFile, err := workflowData.GetMetaData(MetaKeyNormalisedTargetFile)
 	require.NoError(t, err)
-	assert.Equal(t, "pyproject.toml", normalisedTargetFile, "normalisedTargetFile should be set to the first finding's ManifestFile")
+	assert.Equal(t, "pyproject.toml", normalisedTargetFile, "normalisedTargetFile should be set to the first result's TargetFile")
 
 	targetFileFromPlugin, err := workflowData.GetMetaData(MetaKeyTargetFileFromPlugin)
 	require.NoError(t, err)
-	assert.Equal(t, "pyproject.toml", targetFileFromPlugin, "targetFileFromPlugin should be set to the first finding's ManifestFile")
+	assert.Equal(t, "pyproject.toml", targetFileFromPlugin, "targetFileFromPlugin should be set to the first result's TargetFile")
 }
 
 func Test_uvWorkspacePackages_returnsErrorWhenFindingHasError(t *testing.T) {
@@ -1681,10 +1698,12 @@ func Test_uvWorkspacePackages_returnsErrorWhenFindingHasError(t *testing.T) {
 	}
 
 	mockPlugin := &mockScaPlugin{
-		findings: []scaplugin.Finding{
-			{
-				LockFile: "uv.lock",
-				Error:    snykErr,
+		result: &ecosystems.PluginResult{
+			Results: []ecosystems.SCAResult{
+				{
+					Metadata: ecosystems.Metadata{TargetFile: "uv.lock"},
+					Error:    snykErr,
+				},
 			},
 		},
 	}
@@ -1693,7 +1712,7 @@ func Test_uvWorkspacePackages_returnsErrorWhenFindingHasError(t *testing.T) {
 		ctx.invocationContext,
 		ctx.config,
 		&nopLogger,
-		[]scaplugin.SCAPlugin{mockPlugin},
+		[]ecosystems.SCAPlugin{mockPlugin},
 		resolutionHandler.Func(),
 	)
 

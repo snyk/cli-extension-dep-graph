@@ -14,13 +14,12 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
 func TestSbomToDepGraphs_Success(t *testing.T) {
 	logger := logger.Nop()
 	sbom := bytes.NewReader([]byte(`{"test": "sbom"}`))
-	metadata := &scaplugin.Metadata{
+	metadata := &Metadata{
 		PackageManager: "pip",
 		Name:           "test-package",
 		Version:        "1.0.0",
@@ -43,7 +42,7 @@ func TestSbomToDepGraphs_Success(t *testing.T) {
 func TestSbomToDepGraphs_EmptyScans_CreatesEmptyDepGraph(t *testing.T) {
 	logger := logger.Nop()
 	sbom := bytes.NewReader([]byte(`{"test": "sbom"}`))
-	metadata := &scaplugin.Metadata{
+	metadata := &Metadata{
 		PackageManager: "pip",
 		Name:           "test-package",
 		Version:        "3.1.9",
@@ -66,7 +65,7 @@ func TestSbomToDepGraphs_EmptyScans_CreatesEmptyDepGraph(t *testing.T) {
 func TestSbomToDepGraphs_MultipleDepGraphs(t *testing.T) {
 	logger := logger.Nop()
 	sbom := bytes.NewReader([]byte(`{"test": "sbom"}`))
-	metadata := &scaplugin.Metadata{
+	metadata := &Metadata{
 		PackageManager: "pip",
 		Name:           "test-package",
 		Version:        "1.0.0",
@@ -87,7 +86,7 @@ func TestSbomToDepGraphs_MultipleDepGraphs(t *testing.T) {
 func TestSbomToDepGraphs_ConversionError(t *testing.T) {
 	logger := logger.Nop()
 	sbom := bytes.NewReader([]byte(`{"test": "sbom"}`))
-	metadata := &scaplugin.Metadata{
+	metadata := &Metadata{
 		PackageManager: "pip",
 		Name:           "test-package",
 		Version:        "1.0.0",
@@ -106,7 +105,7 @@ func TestSbomToDepGraphs_ConversionError(t *testing.T) {
 func TestSbomToDepGraphs_EmptyDepGraphCreationError_EmptyName(t *testing.T) {
 	logger := logger.Nop()
 	sbom := bytes.NewReader([]byte(`{"test": "sbom"}`))
-	metadata := &scaplugin.Metadata{
+	metadata := &Metadata{
 		PackageManager: "uv",
 		Name:           "",
 		Version:        "1.0.0",
@@ -124,7 +123,7 @@ func TestSbomToDepGraphs_EmptyDepGraphCreationError_EmptyName(t *testing.T) {
 }
 
 func TestEmptyDepGraph_Success(t *testing.T) {
-	metadata := &scaplugin.Metadata{
+	metadata := &Metadata{
 		PackageManager: "pip",
 		Name:           "test-package",
 		Version:        "1.0.0",
@@ -140,7 +139,7 @@ func TestEmptyDepGraph_Success(t *testing.T) {
 }
 
 func TestEmptyDepGraph_EmptyPackageManager(t *testing.T) {
-	metadata := &scaplugin.Metadata{
+	metadata := &Metadata{
 		PackageManager: "",
 		Name:           "test-package",
 		Version:        "3.1.9",
@@ -154,7 +153,7 @@ func TestEmptyDepGraph_EmptyPackageManager(t *testing.T) {
 }
 
 func TestEmptyDepGraph_EmptyName(t *testing.T) {
-	metadata := &scaplugin.Metadata{
+	metadata := &Metadata{
 		PackageManager: "pip",
 		Name:           "",
 		Version:        "1.0.0",
@@ -168,7 +167,7 @@ func TestEmptyDepGraph_EmptyName(t *testing.T) {
 }
 
 func TestEmptyDepGraph_EmptyVersion(t *testing.T) {
-	metadata := &scaplugin.Metadata{
+	metadata := &Metadata{
 		PackageManager: "pip",
 		Name:           "test-package",
 		Version:        "",

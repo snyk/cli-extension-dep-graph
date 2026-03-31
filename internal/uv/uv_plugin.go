@@ -13,9 +13,9 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/internal/conversion"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	scaecosystems "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
 type Plugin struct {
@@ -32,26 +32,31 @@ func NewUvPlugin(client Client, snykClient *snykclient.SnykClient, remoteRepoURL
 	}
 }
 
-func (p Plugin) BuildFindingsFromDir(
+func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context,
-	inputDir string,
-	options *scaplugin.Options,
 	log logger.Logger,
-) ([]scaplugin.Finding, error) {
-	if options.TargetFile != "" && filepath.Base(options.TargetFile) != UvLockFileName {
-		log.Info(ctx, "Skipping processing uv plugin", logger.Attr("targetFile", options.TargetFile), logger.Attr("reason", "not a 'uv.lock' file"))
-		return []scaplugin.Finding{}, nil
+	inputDir string,
+	options *scaecosystems.SCAPluginOptions,
+) (*scaecosystems.PluginResult, error) {
+	var targetFile string
+	if options.Global.TargetFile != nil {
+		targetFile = *options.Global.TargetFile
 	}
 
-	files, err := p.discoverLockFiles(ctx, inputDir, options.TargetFile, options)
+	if targetFile != "" && filepath.Base(targetFile) != UvLockFileName {
+		log.Info(ctx, "Skipping processing uv plugin", logger.Attr("targetFile", targetFile), logger.Attr("reason", "not a 'uv.lock' file"))
+		return &scaecosystems.PluginResult{}, nil
+	}
+
+	files, err := p.discoverLockFiles(ctx, inputDir, targetFile, options)
 	if err != nil {
 		return nil, err
 	}
 	if len(files) == 0 {
-		return []scaplugin.Finding{}, nil
+		return &scaecosystems.PluginResult{}, nil
 	}
 
-	findings := []scaplugin.Finding{}
+	combined := &scaecosystems.PluginResult{}
 	for _, file := range files {
 		lockFilePath := file.RelPath // e.g., "uv.lock" or "project1/uv.lock"
 		lockFileDir := filepath.Dir(lockFilePath)
@@ -62,49 +67,57 @@ func (p Plugin) BuildFindingsFromDir(
 			log.Error(ctx, "Failed to build dependency graph", logger.Attr("lockFile", lockFilePath), logger.Err(err))
 			wrappedErr := fmt.Errorf("failed to build dependency graph for %s: %w", lockFilePath, err)
 
-			errorFinding := scaplugin.Finding{
-				LockFile: lockFilePath,
-				Error:    wrappedErr,
+			errorResult := scaecosystems.SCAResult{
+				Metadata: scaecosystems.Metadata{
+					TargetFile: lockFilePath,
+				},
+				Error: wrappedErr,
 			}
-			findings = append(findings, errorFinding)
+			combined.Results = append(combined.Results, errorResult)
 			continue
 		}
-		fs, err := p.buildFindings(ctx, sbom, lockFilePath, lockFileDir, options, log)
+		pluginResult, err := p.buildResults(ctx, sbom, lockFilePath, lockFileDir, options, log)
 		if err != nil {
 			return nil, err
 		}
-		findings = append(findings, fs...)
+		combined.Results = append(combined.Results, pluginResult.Results...)
+		combined.ProcessedFiles = append(combined.ProcessedFiles, pluginResult.ProcessedFiles...)
 
-		if !options.AllProjects {
+		if !options.Global.AllProjects {
 			// We don't want more than one project
 			break
 		}
 	}
-	return findings, nil
+
+	return combined, nil
 }
 
-func (p Plugin) buildFindings(
+func (p Plugin) buildResults(
 	ctx context.Context,
 	sbom Sbom,
 	lockFilePath string,
 	lockFileDir string,
-	options *scaplugin.Options,
+	options *scaecosystems.SCAPluginOptions,
 	log logger.Logger,
-) ([]scaplugin.Finding, error) {
+) (*scaecosystems.PluginResult, error) {
 	parsedSbom, err := parseAndValidateSBOM(sbom)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse and validate sbom for %s: %w", lockFilePath, err)
 	}
 
-	if !options.AllProjects && !options.UvWorkspacePackages && !hasProjectRoot(parsedSbom) {
+	if !options.Global.AllProjects && !options.Global.ForceIncludeWorkspacePackages && !hasProjectRoot(parsedSbom) {
 		log.Info(ctx, "No root project found in SBOM", logger.Attr("lockFile", lockFilePath))
 		noRootErr := ecosystems.NewUvNoProjectRootError(
 			"Found uv workspace with no root project. To scan all workspace members use the --all-projects flag.",
 		)
-		return []scaplugin.Finding{{
-			LockFile: lockFilePath,
-			Error:    noRootErr,
-		}}, nil
+		return &scaecosystems.PluginResult{
+			Results: []scaecosystems.SCAResult{{
+				Metadata: scaecosystems.Metadata{
+					TargetFile: lockFilePath,
+				},
+				Error: noRootErr,
+			}},
+		}, nil
 	}
 
 	metadata := extractMetadata(parsedSbom)
@@ -117,13 +130,13 @@ func (p Plugin) buildFindings(
 		p.snykClient,
 		log,
 		p.remoteRepoURL,
-		options.ForceSingleGraph,
+		options.Global.ForceSingleGraph,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert sbom to dep-graphs for %s: %w", lockFilePath, err)
 	}
 
-	findings := []scaplugin.Finding{}
+	result := &scaecosystems.PluginResult{}
 
 	for _, depGraph := range depGraphs {
 		workspacePackage := findWorkspacePackage(depGraph, workspacePackages)
@@ -142,26 +155,27 @@ func (p Plugin) buildFindings(
 		if workspacePackage != nil {
 			packagePath = filepath.Join(packagePath, workspacePackage.Path)
 		}
-		fileExclusions := []string{
-			filepath.Join(packagePath, PyprojectTomlFileName),
-			filepath.Join(packagePath, RequirementsTxtFileName),
-		}
-		// TODO(uv): remove the below when we are able to pass these to the CLI correctly. Currently the
-		// `--exclude` flag does not accept paths, it only accepts file or dir names, which does not
-		// work for our use case.
-		if true {
-			fileExclusions = []string{}
+		for _, name := range []string{PyprojectTomlFileName, RequirementsTxtFileName} {
+			result.ProcessedFiles = append(result.ProcessedFiles, filepath.Join(packagePath, name))
 		}
 
-		finding := scaplugin.Finding{
-			DepGraph:       depGraph,
-			FileExclusions: fileExclusions,
-			LockFile:       lockFilePath,
-			ManifestFile:   manifestFile,
+		res := scaecosystems.SCAResult{
+			DepGraph: depGraph,
+			Metadata: scaecosystems.Metadata{
+				TargetFile: manifestFile,
+			},
 		}
-		findings = append(findings, finding)
+		result.Results = append(result.Results, res)
 	}
-	return findings, nil
+
+	// TODO(uv): remove the below when we are able to pass these to the CLI correctly. Currently the
+	// `--exclude` flag does not accept paths, it only accepts file or dir names, which does not
+	// work for our use case.
+	if true {
+		result.ProcessedFiles = []string{}
+	}
+
+	return result, nil
 }
 
 // Returns nil if the package was not found.
@@ -181,18 +195,18 @@ func (p Plugin) discoverLockFiles(
 	ctx context.Context,
 	dir string,
 	targetFile string,
-	options *scaplugin.Options,
+	options *scaecosystems.SCAPluginOptions,
 ) ([]discovery.FindResult, error) {
 	var findOpts []discovery.FindOption
 
 	switch {
-	case options.AllProjects:
+	case options.Global.AllProjects:
 		findOpts = []discovery.FindOption{
 			discovery.WithInclude(UvLockFileName),
 			discovery.WithCommonExcludes(),
 		}
-		if len(options.Exclude) > 0 {
-			findOpts = append(findOpts, discovery.WithExcludes(options.Exclude...))
+		if len(options.Global.Exclude) > 0 {
+			findOpts = append(findOpts, discovery.WithExcludes(options.Global.Exclude...))
 		}
 	default:
 		if targetFile != "" {
@@ -228,4 +242,4 @@ func fileExists(path string) bool {
 	return !info.IsDir()
 }
 
-var _ scaplugin.SCAPlugin = (*Plugin)(nil)
+var _ scaecosystems.SCAPlugin = (*Plugin)(nil)
