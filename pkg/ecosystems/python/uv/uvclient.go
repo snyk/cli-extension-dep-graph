@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	UvLockFileName          = "uv.lock"
+	LockFileName            = "uv.lock"
 	RequirementsTxtFileName = "requirements.txt"
 	PyprojectTomlFileName   = "pyproject.toml"
-	UvWorkspacePathProperty = "uv:workspace:path"
-	UvIsProjectRootProperty = "uv:package:is_project_root"
+	WorkspacePathProperty   = "uv:workspace:path"
+	IsProjectRootProperty   = "uv:package:is_project_root"
 )
 
 type Client interface {
@@ -33,16 +33,16 @@ type client struct {
 
 var _ Client = (*client)(nil)
 
-func NewUvClient() Client {
-	return NewUvClientWithPath("uv")
+func NewClient() Client {
+	return NewClientWithPath("uv")
 }
 
-func NewUvClientWithPath(uvBinary string) Client {
-	return NewUvClientWithExecutor(uvBinary, &uvCmdExecutor{})
+func NewClientWithPath(uvBinary string) Client {
+	return NewClientWithExecutor(uvBinary, &uvCmdExecutor{})
 }
 
-// NewUvClientWithExecutor creates a new uv client with a custom executor for testing.
-func NewUvClientWithExecutor(uvBinary string, executor cmdExecutor) Client {
+// NewClientWithExecutor creates a new uv client with a custom executor for testing.
+func NewClientWithExecutor(uvBinary string, executor cmdExecutor) Client {
 	return &client{
 		uvBinary: uvBinary,
 		executor: executor,
@@ -143,7 +143,7 @@ func extractWorkspacePackages(sbom *cycloneDXSBOM) []WorkspacePackage {
 	var workspacePackages []WorkspacePackage
 	for _, component := range sbom.Components {
 		for _, prop := range component.Properties {
-			if prop.Name == UvWorkspacePathProperty {
+			if prop.Name == WorkspacePathProperty {
 				workspacePackages = append(workspacePackages, WorkspacePackage{
 					Name:    component.Name,
 					Version: component.Version,
@@ -177,7 +177,7 @@ func componentIsProjectRoot(component *cycloneDXComponent) bool {
 		return false
 	}
 	for _, prop := range component.Properties {
-		if prop.Name == UvIsProjectRootProperty && prop.Value == "true" {
+		if prop.Name == IsProjectRootProperty && prop.Value == "true" {
 			return true
 		}
 	}

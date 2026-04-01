@@ -44,7 +44,7 @@ func handleSBOMResolution(
 		config,
 		logger,
 		[]ecosystems.SCAPlugin{
-			uv.NewUvPlugin(uv.NewUvClient(), snykClient, remoteRepoURL),
+			uv.NewPlugin(uv.NewClient(), snykClient, remoteRepoURL),
 		},
 		handleLegacyResolution,
 	)

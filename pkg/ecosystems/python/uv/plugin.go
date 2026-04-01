@@ -24,7 +24,7 @@ type Plugin struct {
 	remoteRepoURL string
 }
 
-func NewUvPlugin(client Client, snykClient *snykclient.SnykClient, remoteRepoURL string) Plugin {
+func NewPlugin(client Client, snykClient *snykclient.SnykClient, remoteRepoURL string) Plugin {
 	return Plugin{
 		client:        client,
 		snykClient:    snykClient,
@@ -43,7 +43,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 		targetFile = *options.Global.TargetFile
 	}
 
-	if targetFile != "" && filepath.Base(targetFile) != UvLockFileName {
+	if targetFile != "" && filepath.Base(targetFile) != LockFileName {
 		log.Info(ctx, "Skipping processing uv plugin", logger.Attr("targetFile", targetFile), logger.Attr("reason", "not a 'uv.lock' file"))
 		return &scaecosystems.PluginResult{}, nil
 	}
@@ -155,7 +155,7 @@ func (p Plugin) buildResults(
 		if workspacePackage != nil {
 			packagePath = filepath.Join(packagePath, workspacePackage.Path)
 		}
-		for _, name := range []string{PyprojectTomlFileName, RequirementsTxtFileName} {
+		for _, name := range []string{LockFileName, PyprojectTomlFileName, RequirementsTxtFileName} {
 			result.ProcessedFiles = append(result.ProcessedFiles, filepath.Join(packagePath, name))
 		}
 
@@ -202,7 +202,7 @@ func (p Plugin) discoverLockFiles(
 	switch {
 	case options.Global.AllProjects:
 		findOpts = []discovery.FindOption{
-			discovery.WithInclude(UvLockFileName),
+			discovery.WithInclude(LockFileName),
 			discovery.WithCommonExcludes(),
 		}
 		if len(options.Global.Exclude) > 0 {
@@ -212,12 +212,12 @@ func (p Plugin) discoverLockFiles(
 		if targetFile != "" {
 			findOpts = append(findOpts, discovery.WithTargetFile(targetFile))
 		} else {
-			rootLockPath := filepath.Join(dir, UvLockFileName)
+			rootLockPath := filepath.Join(dir, LockFileName)
 			// Default to root uv.lock file if it exists
 			if fileExists(rootLockPath) {
 				findRes := []discovery.FindResult{{
 					Path:    rootLockPath,
-					RelPath: UvLockFileName,
+					RelPath: LockFileName,
 				}}
 				return findRes, nil
 			}
