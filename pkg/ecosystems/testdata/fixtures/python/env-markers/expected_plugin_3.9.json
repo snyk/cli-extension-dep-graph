@@ -21,10 +21,10 @@
           }
         },
         {
-          "id": "zipp@3.23.0",
+          "id": "zipp@*",
           "info": {
             "name": "zipp",
-            "version": "3.23.0"
+            "version": "*"
           }
         },
         {
@@ -35,31 +35,31 @@
           }
         },
         {
-          "id": "certifi@2026.2.25",
+          "id": "certifi@*",
           "info": {
             "name": "certifi",
-            "version": "2026.2.25"
+            "version": "*"
           }
         },
         {
-          "id": "charset-normalizer@3.4.6",
+          "id": "charset-normalizer@*",
           "info": {
             "name": "charset-normalizer",
-            "version": "3.4.6"
+            "version": "*"
           }
         },
         {
-          "id": "idna@3.11",
+          "id": "idna@*",
           "info": {
             "name": "idna",
-            "version": "3.11"
+            "version": "*"
           }
         },
         {
-          "id": "urllib3@2.6.3",
+          "id": "urllib3@*",
           "info": {
             "name": "urllib3",
-            "version": "2.6.3"
+            "version": "*"
           }
         }
       ],
@@ -83,13 +83,13 @@
             "pkgId": "importlib-metadata@6.8.0",
             "deps": [
               {
-                "nodeId": "zipp@3.23.0"
+                "nodeId": "zipp@*"
               }
             ]
           },
           {
-            "nodeId": "zipp@3.23.0",
-            "pkgId": "zipp@3.23.0",
+            "nodeId": "zipp@*",
+            "pkgId": "zipp@*",
             "deps": []
           },
           {
@@ -97,37 +97,37 @@
             "pkgId": "requests@2.31.0",
             "deps": [
               {
-                "nodeId": "certifi@2026.2.25"
+                "nodeId": "certifi@*"
               },
               {
-                "nodeId": "charset-normalizer@3.4.6"
+                "nodeId": "charset-normalizer@*"
               },
               {
-                "nodeId": "idna@3.11"
+                "nodeId": "idna@*"
               },
               {
-                "nodeId": "urllib3@2.6.3"
+                "nodeId": "urllib3@*"
               }
             ]
           },
           {
-            "nodeId": "certifi@2026.2.25",
-            "pkgId": "certifi@2026.2.25",
+            "nodeId": "certifi@*",
+            "pkgId": "certifi@*",
             "deps": []
           },
           {
-            "nodeId": "charset-normalizer@3.4.6",
-            "pkgId": "charset-normalizer@3.4.6",
+            "nodeId": "charset-normalizer@*",
+            "pkgId": "charset-normalizer@*",
             "deps": []
           },
           {
-            "nodeId": "idna@3.11",
-            "pkgId": "idna@3.11",
+            "nodeId": "idna@*",
+            "pkgId": "idna@*",
             "deps": []
           },
           {
-            "nodeId": "urllib3@2.6.3",
-            "pkgId": "urllib3@2.6.3",
+            "nodeId": "urllib3@*",
+            "pkgId": "urllib3@*",
             "deps": []
           }
         ]

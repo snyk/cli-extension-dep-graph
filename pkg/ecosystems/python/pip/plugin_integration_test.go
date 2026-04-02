@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -255,7 +256,120 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 	expectedJSON, err := json.Marshal(sortExpected)
 	require.NoError(t, err, "[%s] failed to marshal expected results", fixtureName)
 
-	assert.JSONEq(t, string(expectedJSON), string(actualJSON), "[%s] results mismatch", fixtureName)
+	// Resolve wildcard versions (*) in expected using actual resolved versions, so fixtures
+	// don't need updating every time a transitive dependency releases a new patch version.
+	resolvedExpectedJSON, err := resolveWildcardVersions(expectedJSON, actualJSON)
+	require.NoError(t, err, "[%s] failed to resolve wildcard versions", fixtureName)
+
+	assert.JSONEq(t, string(resolvedExpectedJSON), string(actualJSON), "[%s] results mismatch", fixtureName)
+}
+
+// resolveWildcardVersions substitutes wildcard versions ("*") in expectedJSON with the actual
+// resolved versions from actualJSON. Each result's wildcards are resolved independently using
+// that result's actual packages, so results from different requirements files don't interfere.
+func resolveWildcardVersions(expectedJSON, actualJSON []byte) ([]byte, error) {
+	var actualResults []any
+	if err := json.Unmarshal(actualJSON, &actualResults); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal actual results: %w", err)
+	}
+
+	var expectedResults []any
+	if err := json.Unmarshal(expectedJSON, &expectedResults); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal expected results: %w", err)
+	}
+
+	if len(actualResults) != len(expectedResults) {
+		// Mismatched counts are caught by the caller; return expected as-is so the
+		// subsequent JSONEq still produces a useful diff.
+		return expectedJSON, nil
+	}
+
+	for i := range expectedResults {
+		actualResult, ok := actualResults[i].(map[string]any)
+		if !ok {
+			continue
+		}
+		expectedResult, ok := expectedResults[i].(map[string]any)
+		if !ok {
+			continue
+		}
+		nameToVersion := extractNameVersionMap(actualResult)
+		substituteWildcards(expectedResult, nameToVersion)
+	}
+
+	resolved, err := json.Marshal(expectedResults)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal resolved expected: %w", err)
+	}
+	return resolved, nil
+}
+
+// extractNameVersionMap builds a map of package name → resolved version from the "pkgs" list
+// in a single result's depGraph.
+func extractNameVersionMap(result map[string]any) map[string]string {
+	nameToVersion := make(map[string]string)
+	depGraph, ok := result["depGraph"].(map[string]any)
+	if !ok {
+		return nameToVersion
+	}
+	pkgs, ok := depGraph["pkgs"].([]any)
+	if !ok {
+		return nameToVersion
+	}
+	for _, pkg := range pkgs {
+		pkgMap, ok := pkg.(map[string]any)
+		if !ok {
+			continue
+		}
+		id, ok := pkgMap["id"].(string)
+		if !ok {
+			continue
+		}
+		atIdx := strings.LastIndex(id, "@")
+		if atIdx < 0 {
+			continue
+		}
+		nameToVersion[id[:atIdx]] = id[atIdx+1:]
+	}
+	return nameToVersion
+}
+
+// substituteWildcards replaces wildcard version markers ("*") in the expected JSON structure
+// with actual resolved versions. It handles:
+//   - "id", "nodeId", "pkgId" fields of the form "name@*" or "name@*:suffix" (e.g. pruned nodes)
+//   - "version": "*" in info objects that also carry a "name" field
+func substituteWildcards(v any, nameToVersion map[string]string) {
+	switch node := v.(type) {
+	case map[string]any:
+		// Handle info objects: {"name": "...", "version": "*"}
+		if version, ok := node["version"].(string); ok && version == "*" {
+			if name, ok := node["name"].(string); ok {
+				if actual, found := nameToVersion[name]; found {
+					node["version"] = actual
+				}
+			}
+		}
+		// Handle id/nodeId/pkgId with wildcard versions, e.g. "name@*" or "name@*:pruned"
+		for _, key := range []string{"id", "nodeId", "pkgId"} {
+			if s, ok := node[key].(string); ok {
+				if idx := strings.Index(s, "@*"); idx >= 0 {
+					name := s[:idx]
+					suffix := s[idx+2:] // everything after "@*", e.g. ":pruned"
+					if actual, found := nameToVersion[name]; found {
+						node[key] = name + "@" + actual + suffix
+					}
+				}
+			}
+		}
+		// Recurse into all child values
+		for _, val := range node {
+			substituteWildcards(val, nameToVersion)
+		}
+	case []any:
+		for _, item := range node {
+			substituteWildcards(item, nameToVersion)
+		}
+	}
 }
 
 // loadExpectedResults loads expected SCA results from a JSON file

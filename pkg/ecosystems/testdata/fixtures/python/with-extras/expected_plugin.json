@@ -21,38 +21,38 @@
           }
         },
         {
-          "id": "pysocks@1.7.1",
+          "id": "pysocks@*",
           "info": {
             "name": "pysocks",
-            "version": "1.7.1"
+            "version": "*"
           }
         },
         {
-          "id": "certifi@2026.2.25",
+          "id": "certifi@*",
           "info": {
             "name": "certifi",
-            "version": "2026.2.25"
+            "version": "*"
           }
         },
         {
-          "id": "charset-normalizer@3.4.6",
+          "id": "charset-normalizer@*",
           "info": {
             "name": "charset-normalizer",
-            "version": "3.4.6"
+            "version": "*"
           }
         },
         {
-          "id": "idna@3.11",
+          "id": "idna@*",
           "info": {
             "name": "idna",
-            "version": "3.11"
+            "version": "*"
           }
         },
         {
-          "id": "urllib3@2.6.3",
+          "id": "urllib3@*",
           "info": {
             "name": "urllib3",
-            "version": "2.6.3"
+            "version": "*"
           }
         }
       ],
@@ -73,45 +73,45 @@
             "pkgId": "requests@2.31.0",
             "deps": [
               {
-                "nodeId": "pysocks@1.7.1"
+                "nodeId": "pysocks@*"
               },
               {
-                "nodeId": "certifi@2026.2.25"
+                "nodeId": "certifi@*"
               },
               {
-                "nodeId": "charset-normalizer@3.4.6"
+                "nodeId": "charset-normalizer@*"
               },
               {
-                "nodeId": "idna@3.11"
+                "nodeId": "idna@*"
               },
               {
-                "nodeId": "urllib3@2.6.3"
+                "nodeId": "urllib3@*"
               }
             ]
           },
           {
-            "nodeId": "pysocks@1.7.1",
-            "pkgId": "pysocks@1.7.1",
+            "nodeId": "pysocks@*",
+            "pkgId": "pysocks@*",
             "deps": []
           },
           {
-            "nodeId": "certifi@2026.2.25",
-            "pkgId": "certifi@2026.2.25",
+            "nodeId": "certifi@*",
+            "pkgId": "certifi@*",
             "deps": []
           },
           {
-            "nodeId": "charset-normalizer@3.4.6",
-            "pkgId": "charset-normalizer@3.4.6",
+            "nodeId": "charset-normalizer@*",
+            "pkgId": "charset-normalizer@*",
             "deps": []
           },
           {
-            "nodeId": "idna@3.11",
-            "pkgId": "idna@3.11",
+            "nodeId": "idna@*",
+            "pkgId": "idna@*",
             "deps": []
           },
           {
-            "nodeId": "urllib3@2.6.3",
-            "pkgId": "urllib3@2.6.3",
+            "nodeId": "urllib3@*",
+            "pkgId": "urllib3@*",
             "deps": []
           }
         ]

@@ -21,10 +21,10 @@
           }
         },
         {
-          "id": "markupsafe@3.0.3",
+          "id": "markupsafe@*",
           "info": {
             "name": "markupsafe",
-            "version": "3.0.3"
+            "version": "*"
           }
         }
       ],
@@ -45,13 +45,13 @@
             "pkgId": "jinja2@3.1.2",
             "deps": [
               {
-                "nodeId": "markupsafe@3.0.3"
+                "nodeId": "markupsafe@*"
               }
             ]
           },
           {
-            "nodeId": "markupsafe@3.0.3",
-            "pkgId": "markupsafe@3.0.3",
+            "nodeId": "markupsafe@*",
+            "pkgId": "markupsafe@*",
             "deps": []
           }
         ]
@@ -84,31 +84,31 @@
           }
         },
         {
-          "id": "certifi@2026.2.25",
+          "id": "certifi@*",
           "info": {
             "name": "certifi",
-            "version": "2026.2.25"
+            "version": "*"
           }
         },
         {
-          "id": "charset-normalizer@3.4.6",
+          "id": "charset-normalizer@*",
           "info": {
             "name": "charset-normalizer",
-            "version": "3.4.6"
+            "version": "*"
           }
         },
         {
-          "id": "idna@3.11",
+          "id": "idna@*",
           "info": {
             "name": "idna",
-            "version": "3.11"
+            "version": "*"
           }
         },
         {
-          "id": "urllib3@2.6.3",
+          "id": "urllib3@*",
           "info": {
             "name": "urllib3",
-            "version": "2.6.3"
+            "version": "*"
           }
         }
       ],
@@ -129,37 +129,37 @@
             "pkgId": "requests@2.31.0",
             "deps": [
               {
-                "nodeId": "certifi@2026.2.25"
+                "nodeId": "certifi@*"
               },
               {
-                "nodeId": "charset-normalizer@3.4.6"
+                "nodeId": "charset-normalizer@*"
               },
               {
-                "nodeId": "idna@3.11"
+                "nodeId": "idna@*"
               },
               {
-                "nodeId": "urllib3@2.6.3"
+                "nodeId": "urllib3@*"
               }
             ]
           },
           {
-            "nodeId": "certifi@2026.2.25",
-            "pkgId": "certifi@2026.2.25",
+            "nodeId": "certifi@*",
+            "pkgId": "certifi@*",
             "deps": []
           },
           {
-            "nodeId": "charset-normalizer@3.4.6",
-            "pkgId": "charset-normalizer@3.4.6",
+            "nodeId": "charset-normalizer@*",
+            "pkgId": "charset-normalizer@*",
             "deps": []
           },
           {
-            "nodeId": "idna@3.11",
-            "pkgId": "idna@3.11",
+            "nodeId": "idna@*",
+            "pkgId": "idna@*",
             "deps": []
           },
           {
-            "nodeId": "urllib3@2.6.3",
-            "pkgId": "urllib3@2.6.3",
+            "nodeId": "urllib3@*",
+            "pkgId": "urllib3@*",
             "deps": []
           }
         ]
@@ -192,45 +192,45 @@
           }
         },
         {
-          "id": "jinja2@3.1.6",
+          "id": "jinja2@*",
           "info": {
             "name": "jinja2",
-            "version": "3.1.6"
+            "version": "*"
           }
         },
         {
-          "id": "markupsafe@3.0.3",
+          "id": "markupsafe@*",
           "info": {
             "name": "markupsafe",
-            "version": "3.0.3"
+            "version": "*"
           }
         },
         {
-          "id": "werkzeug@3.1.7",
+          "id": "werkzeug@*",
           "info": {
             "name": "werkzeug",
-            "version": "3.1.7"
+            "version": "*"
           }
         },
         {
-          "id": "blinker@1.9.0",
+          "id": "blinker@*",
           "info": {
             "name": "blinker",
-            "version": "1.9.0"
+            "version": "*"
           }
         },
         {
-          "id": "click@8.3.1",
+          "id": "click@*",
           "info": {
             "name": "click",
-            "version": "8.3.1"
+            "version": "*"
           }
         },
         {
-          "id": "itsdangerous@2.2.0",
+          "id": "itsdangerous@*",
           "info": {
             "name": "itsdangerous",
-            "version": "2.2.0"
+            "version": "*"
           }
         }
       ],
@@ -251,48 +251,48 @@
             "pkgId": "flask@3.0.0",
             "deps": [
               {
-                "nodeId": "jinja2@3.1.6"
+                "nodeId": "jinja2@*"
               },
               {
-                "nodeId": "werkzeug@3.1.7"
+                "nodeId": "werkzeug@*"
               },
               {
-                "nodeId": "blinker@1.9.0"
+                "nodeId": "blinker@*"
               },
               {
-                "nodeId": "click@8.3.1"
+                "nodeId": "click@*"
               },
               {
-                "nodeId": "itsdangerous@2.2.0"
+                "nodeId": "itsdangerous@*"
               }
             ]
           },
           {
-            "nodeId": "jinja2@3.1.6",
-            "pkgId": "jinja2@3.1.6",
+            "nodeId": "jinja2@*",
+            "pkgId": "jinja2@*",
             "deps": [
               {
-                "nodeId": "markupsafe@3.0.3"
+                "nodeId": "markupsafe@*"
               }
             ]
           },
           {
-            "nodeId": "markupsafe@3.0.3",
-            "pkgId": "markupsafe@3.0.3",
+            "nodeId": "markupsafe@*",
+            "pkgId": "markupsafe@*",
             "deps": []
           },
           {
-            "nodeId": "werkzeug@3.1.7",
-            "pkgId": "werkzeug@3.1.7",
+            "nodeId": "werkzeug@*",
+            "pkgId": "werkzeug@*",
             "deps": [
               {
-                "nodeId": "markupsafe@3.0.3:pruned"
+                "nodeId": "markupsafe@*:pruned"
               }
             ]
           },
           {
-            "nodeId": "markupsafe@3.0.3:pruned",
-            "pkgId": "markupsafe@3.0.3",
+            "nodeId": "markupsafe@*:pruned",
+            "pkgId": "markupsafe@*",
             "info": {
               "labels": {
                 "pruned": "true"
@@ -301,18 +301,18 @@
             "deps": []
           },
           {
-            "nodeId": "blinker@1.9.0",
-            "pkgId": "blinker@1.9.0",
+            "nodeId": "blinker@*",
+            "pkgId": "blinker@*",
             "deps": []
           },
           {
-            "nodeId": "click@8.3.1",
-            "pkgId": "click@8.3.1",
+            "nodeId": "click@*",
+            "pkgId": "click@*",
             "deps": []
           },
           {
-            "nodeId": "itsdangerous@2.2.0",
-            "pkgId": "itsdangerous@2.2.0",
+            "nodeId": "itsdangerous@*",
+            "pkgId": "itsdangerous@*",
             "deps": []
           }
         ]

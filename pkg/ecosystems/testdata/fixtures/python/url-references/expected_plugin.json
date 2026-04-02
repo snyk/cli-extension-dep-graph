@@ -28,24 +28,24 @@
           }
         },
         {
-          "id": "charset-normalizer@3.4.6",
+          "id": "charset-normalizer@*",
           "info": {
             "name": "charset-normalizer",
-            "version": "3.4.6"
+            "version": "*"
           }
         },
         {
-          "id": "idna@3.11",
+          "id": "idna@*",
           "info": {
             "name": "idna",
-            "version": "3.11"
+            "version": "*"
           }
         },
         {
-          "id": "urllib3@2.6.3",
+          "id": "urllib3@*",
           "info": {
             "name": "urllib3",
-            "version": "2.6.3"
+            "version": "*"
           }
         }
       ],
@@ -77,29 +77,29 @@
                 "nodeId": "certifi@2023.7.22"
               },
               {
-                "nodeId": "charset-normalizer@3.4.6"
+                "nodeId": "charset-normalizer@*"
               },
               {
-                "nodeId": "idna@3.11"
+                "nodeId": "idna@*"
               },
               {
-                "nodeId": "urllib3@2.6.3"
+                "nodeId": "urllib3@*"
               }
             ]
           },
           {
-            "nodeId": "charset-normalizer@3.4.6",
-            "pkgId": "charset-normalizer@3.4.6",
+            "nodeId": "charset-normalizer@*",
+            "pkgId": "charset-normalizer@*",
             "deps": []
           },
           {
-            "nodeId": "idna@3.11",
-            "pkgId": "idna@3.11",
+            "nodeId": "idna@*",
+            "pkgId": "idna@*",
             "deps": []
           },
           {
-            "nodeId": "urllib3@2.6.3",
-            "pkgId": "urllib3@2.6.3",
+            "nodeId": "urllib3@*",
+            "pkgId": "urllib3@*",
             "deps": []
           }
         ]
