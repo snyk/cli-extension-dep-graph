@@ -294,8 +294,11 @@ func executeLegacyWorkflow(
 	findings []scaplugin.Finding,
 ) ([]workflow.Data, error) {
 	legacyConfig := config.Clone()
+	legacyConfig.Set(FlagPrintGraph, true)
+	legacyConfig.Set(FlagJSONLOutput, true)
+	legacyConfig.Set(FlagPrintErrors, true)
 	legacyConfig.Unset(FlagPrintEffectiveGraph)
-	legacyConfig.Set(FlagPrintEffectiveGraphWithErrors, true)
+	legacyConfig.Unset(FlagPrintEffectiveGraphWithErrors)
 
 	legacyData, err := depGraphWorkflowFunc(ctx, legacyConfig, logger)
 	if err == nil {

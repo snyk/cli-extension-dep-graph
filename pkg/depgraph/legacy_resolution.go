@@ -45,12 +45,23 @@ func handleLegacyResolution(ctx workflow.InvocationContext, config configuration
 }
 
 func chooseGraphArgument(config configuration.Configuration) (string, parsers.OutputParser) {
-	if config.GetBool(FlagPrintEffectiveGraph) {
+	// Legacy compatibility path.
+	if !config.GetBool(FlagPrintGraph) && config.GetBool(FlagPrintEffectiveGraphWithErrors) {
+		return "--print-effective-graph-with-errors", parsers.NewJSONL()
+	}
+	if !config.GetBool(FlagPrintGraph) && config.GetBool(FlagPrintEffectiveGraph) && config.GetBool(FlagPrintErrors) {
+		return "--print-effective-graph-with-errors", parsers.NewJSONL()
+	}
+	if !config.GetBool(FlagPrintGraph) && config.GetBool(FlagPrintEffectiveGraph) {
 		return "--print-effective-graph", parsers.NewJSONL()
 	}
 
-	if config.GetBool(FlagPrintEffectiveGraphWithErrors) {
-		return "--print-effective-graph-with-errors", parsers.NewJSONL()
+	// Consolidated print-graph path. All axes are passed as explicit toggles.
+	if config.GetBool(FlagPrintGraph) {
+		if config.GetBool(FlagJSONLOutput) {
+			return "--print-graph", parsers.NewJSONL()
+		}
+		return "--print-graph", parsers.NewPlainText()
 	}
 
 	return "--print-graph", parsers.NewPlainText()
@@ -87,6 +98,15 @@ func mapToWorkflowData(depGraphs []parsers.DepGraphOutput, logger *zerolog.Logge
 func prepareLegacyFlags(argument string, cfg configuration.Configuration, logger *zerolog.Logger) {
 	cmdArgs := []string{"test", "--json"}
 	cmdArgs = append(cmdArgs, argument)
+	if cfg.GetBool(FlagPrintGraph) && cfg.GetBool(FlagJSONLOutput) {
+		cmdArgs = append(cmdArgs, "--jsonl-output")
+	}
+	if cfg.GetBool(FlagPrintGraph) && cfg.GetBool(FlagPrintEffectiveGraph) {
+		cmdArgs = append(cmdArgs, "--effective-graph")
+	}
+	if cfg.GetBool(FlagPrintGraph) && cfg.GetBool(FlagPrintErrors) {
+		cmdArgs = append(cmdArgs, "--print-errors")
+	}
 
 	if allProjects := cfg.GetBool("all-projects"); allProjects {
 		cmdArgs = append(cmdArgs, "--all-projects")

@@ -12,6 +12,8 @@ import (
 	"github.com/snyk/go-application-framework/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 )
 
 //go:embed testdata/legacy_cli_output
@@ -336,4 +338,126 @@ func verifyMeta(t *testing.T, data workflow.Data, key, expectedValue string) {
 	value, err := data.GetMetaData(key)
 	require.NoError(t, err)
 	assert.Equal(t, expectedValue, value)
+}
+
+func TestChooseGraphArgument(t *testing.T) {
+	testCases := []struct {
+		name         string
+		setup        func(cfg configuration.Configuration)
+		wantArgument string
+		wantParser   string
+	}{
+		{
+			name:         "defaults to plain print graph",
+			setup:        func(_ configuration.Configuration) {},
+			wantArgument: "--print-graph",
+			wantParser:   "plain",
+		},
+		{
+			name: "legacy effective graph",
+			setup: func(cfg configuration.Configuration) {
+				cfg.Set(FlagPrintEffectiveGraph, true)
+			},
+			wantArgument: "--print-effective-graph",
+			wantParser:   "jsonl",
+		},
+		{
+			name: "legacy effective graph with errors",
+			setup: func(cfg configuration.Configuration) {
+				cfg.Set(FlagPrintEffectiveGraphWithErrors, true)
+			},
+			wantArgument: "--print-effective-graph-with-errors",
+			wantParser:   "jsonl",
+		},
+		{
+			name: "new print graph plus effective graph",
+			setup: func(cfg configuration.Configuration) {
+				cfg.Set(FlagPrintGraph, true)
+				cfg.Set(FlagPrintEffectiveGraph, true)
+			},
+			wantArgument: "--print-graph",
+			wantParser:   "plain",
+		},
+		{
+			name: "new print graph plus effective graph plus print errors",
+			setup: func(cfg configuration.Configuration) {
+				cfg.Set(FlagPrintGraph, true)
+				cfg.Set(FlagJSONLOutput, true)
+				cfg.Set(FlagPrintEffectiveGraph, true)
+				cfg.Set(FlagPrintErrors, true)
+			},
+			wantArgument: "--print-graph",
+			wantParser:   "jsonl",
+		},
+		{
+			name: "new print graph plus jsonl plus print errors",
+			setup: func(cfg configuration.Configuration) {
+				cfg.Set(FlagPrintGraph, true)
+				cfg.Set(FlagJSONLOutput, true)
+				cfg.Set(FlagPrintErrors, true)
+			},
+			wantArgument: "--print-graph",
+			wantParser:   "jsonl",
+		},
+		{
+			name: "print graph with print errors and no jsonl remains plain",
+			setup: func(cfg configuration.Configuration) {
+				cfg.Set(FlagPrintGraph, true)
+				cfg.Set(FlagPrintErrors, true)
+			},
+			wantArgument: "--print-graph",
+			wantParser:   "plain",
+		},
+		{
+			name: "print graph with jsonl output uses jsonl parser",
+			setup: func(cfg configuration.Configuration) {
+				cfg.Set(FlagPrintGraph, true)
+				cfg.Set(FlagJSONLOutput, true)
+			},
+			wantArgument: "--print-graph",
+			wantParser:   "jsonl",
+		},
+		{
+			name: "mixed legacy effective with new print errors",
+			setup: func(cfg configuration.Configuration) {
+				cfg.Set(FlagPrintEffectiveGraph, true)
+				cfg.Set(FlagPrintErrors, true)
+			},
+			wantArgument: "--print-effective-graph-with-errors",
+			wantParser:   "jsonl",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := configuration.New()
+			tc.setup(cfg)
+
+			argument, parser := chooseGraphArgument(cfg)
+
+			assert.Equal(t, tc.wantArgument, argument)
+			if tc.wantParser == "jsonl" {
+				assert.IsType(t, parsers.NewJSONL(), parser)
+			} else {
+				assert.IsType(t, parsers.NewPlainText(), parser)
+			}
+		})
+	}
+}
+
+func TestPrepareLegacyFlags_ConsolidatedPrintGraphToggles(t *testing.T) {
+	cfg := configuration.New()
+	logger := zerolog.Nop()
+	cfg.Set(FlagPrintGraph, true)
+	cfg.Set(FlagJSONLOutput, true)
+	cfg.Set(FlagPrintEffectiveGraph, true)
+	cfg.Set(FlagPrintErrors, true)
+
+	prepareLegacyFlags("--print-graph", cfg, &logger)
+	args := cfg.GetStringSlice(configuration.RAW_CMD_ARGS)
+
+	assert.Contains(t, args, "--print-graph")
+	assert.Contains(t, args, "--jsonl-output")
+	assert.Contains(t, args, "--effective-graph")
+	assert.Contains(t, args, "--print-errors")
 }
