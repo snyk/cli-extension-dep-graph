@@ -10,19 +10,20 @@ import (
 	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
+	"github.com/snyk/cli-extension-dep-graph/internal/conversion"
+	scaecosystems "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 )
 
 const (
-	UvLockFileName          = "uv.lock"
+	LockFileName            = "uv.lock"
 	RequirementsTxtFileName = "requirements.txt"
 	PyprojectTomlFileName   = "pyproject.toml"
-	UvWorkspacePathProperty = "uv:workspace:path"
-	UvIsProjectRootProperty = "uv:package:is_project_root"
+	WorkspacePathProperty   = "uv:workspace:path"
+	IsProjectRootProperty   = "uv:package:is_project_root"
 )
 
 type Client interface {
-	ExportSBOM(inputDir string, opts *scaplugin.Options) (Sbom, error)
+	ExportSBOM(inputDir string, opts *scaecosystems.SCAPluginOptions) (Sbom, error)
 }
 
 type client struct {
@@ -32,16 +33,16 @@ type client struct {
 
 var _ Client = (*client)(nil)
 
-func NewUvClient() Client {
-	return NewUvClientWithPath("uv")
+func NewClient() Client {
+	return NewClientWithPath("uv")
 }
 
-func NewUvClientWithPath(uvBinary string) Client {
-	return NewUvClientWithExecutor(uvBinary, &uvCmdExecutor{})
+func NewClientWithPath(uvBinary string) Client {
+	return NewClientWithExecutor(uvBinary, &uvCmdExecutor{})
 }
 
-// NewUvClientWithExecutor creates a new uv client with a custom executor for testing.
-func NewUvClientWithExecutor(uvBinary string, executor cmdExecutor) Client {
+// NewClientWithExecutor creates a new uv client with a custom executor for testing.
+func NewClientWithExecutor(uvBinary string, executor cmdExecutor) Client {
 	return &client{
 		uvBinary: uvBinary,
 		executor: executor,
@@ -57,22 +58,22 @@ type WorkspacePackage struct {
 }
 
 // ExportSBOM exports an SBOM in CycloneDX format using uv.
-func (c client) ExportSBOM(inputDir string, opts *scaplugin.Options) (Sbom, error) {
+func (c client) ExportSBOM(inputDir string, opts *scaecosystems.SCAPluginOptions) (Sbom, error) {
 	args := []string{"export", "--format", "cyclonedx1.5", "--preview"}
-	if opts.AllowOutOfSync {
+	if opts.Global.AllowOutOfSync {
 		args = append(args, "--frozen")
 	} else {
 		args = append(args, "--locked")
 	}
-	if opts.AllProjects || opts.UvWorkspacePackages {
+	if opts.Global.AllProjects || opts.Global.ForceIncludeWorkspacePackages {
 		args = append(args, "--all-packages")
 	}
-	if !opts.Dev {
+	if !opts.Global.IncludeDev {
 		args = append(args, "--no-dev")
 	}
 	output, err := c.executor.Execute(c.uvBinary, inputDir, args...)
 	if err != nil {
-		if !opts.AllowOutOfSync && isOutOfSyncLockfileError(err) {
+		if !opts.Global.AllowOutOfSync && isOutOfSyncLockfileError(err) {
 			return nil, clierrors.NewGeneralSCAFailureError(
 				"uv.lock is out of sync with pyproject.toml. Run `uv lock` to update the lockfile, "+
 					"or re-run with `--strict-out-of-sync=false` to test the outdated lockfile regardless.",
@@ -130,8 +131,8 @@ func parseAndValidateSBOM(sbomData Sbom) (*cycloneDXSBOM, error) {
 	return &sbom, nil
 }
 
-func extractMetadata(sbom *cycloneDXSBOM) *scaplugin.Metadata {
-	return &scaplugin.Metadata{
+func extractMetadata(sbom *cycloneDXSBOM) *conversion.Metadata {
+	return &conversion.Metadata{
 		PackageManager: "uv",
 		Name:           sbom.Metadata.Component.Name,
 		Version:        sbom.Metadata.Component.Version,
@@ -142,7 +143,7 @@ func extractWorkspacePackages(sbom *cycloneDXSBOM) []WorkspacePackage {
 	var workspacePackages []WorkspacePackage
 	for _, component := range sbom.Components {
 		for _, prop := range component.Properties {
-			if prop.Name == UvWorkspacePathProperty {
+			if prop.Name == WorkspacePathProperty {
 				workspacePackages = append(workspacePackages, WorkspacePackage{
 					Name:    component.Name,
 					Version: component.Version,
@@ -176,7 +177,7 @@ func componentIsProjectRoot(component *cycloneDXComponent) bool {
 		return false
 	}
 	for _, prop := range component.Properties {
-		if prop.Name == UvIsProjectRootProperty && prop.Value == "true" {
+		if prop.Name == IsProjectRootProperty && prop.Value == "true" {
 			return true
 		}
 	}

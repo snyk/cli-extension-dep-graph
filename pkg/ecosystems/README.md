@@ -18,46 +18,11 @@ Modern software projects use diverse package managers (pip, npm, maven, gradle, 
 
 ### Core Interface
 
-```go
-type SCAPlugin interface {
-    BuildDepGraphsFromDir(ctx context.Context, dir string, options *SCAPluginOptions) ([]SCAResult, error)
-}
-```
-
-Every plugin implements this interface to:
+Every plugin implements the `SCAPlugin` interface to:
 - **Discover** dependency manifests in a directory (e.g., `requirements.txt`, `package.json`)
 - **Resolve** dependencies using the ecosystem's native tooling
 - **Build** a standardized dependency graph representation
 - **Return** results with metadata about the analysis
-
-### Why Go Interfaces?
-
-Go's interface design provides several benefits for plugin architecture:
-
-#### 1. **Compile-Time Verification**
-```go
-// This line ensures Plugin implements SCAPlugin at compile time
-var _ ecosystems.SCAPlugin = (*Plugin)(nil)
-```
-If the interface isn't properly implemented, the code won't compile—catching errors early.
-
-#### 2. **Implicit Implementation**
-Unlike explicit interface implementation in other languages, Go interfaces are satisfied implicitly. Any type that implements the required methods automatically implements the interface, making it easy to create plugins without tight coupling.
-
-#### 3. **Dependency Injection**
-```go
-func AnalyzeDependencies(plugin SCAPlugin, dir string) error {
-    results, err := plugin.BuildDepGraphsFromDir(context.Background(), dir, options)
-    // ...
-}
-```
-Functions can accept any type that implements `SCAPlugin`, enabling easy testing with mock implementations and swapping between different ecosystem plugins.
-
-#### 4. **Composition Over Inheritance**
-Go's interfaces encourage composition. You can embed interfaces or compose structs to build complex behavior from simple primitives, avoiding deep inheritance hierarchies.
-
-#### 5. **Zero Overhead Abstraction**
-Interface calls in Go are optimized by the compiler and have minimal runtime overhead, making abstraction essentially free from a performance perspective.
 
 ## Data Structures
 
@@ -188,101 +153,9 @@ type Metadata struct {
 }
 ```
 
-Plugins return `[]SCAResult` to support:
-- Monorepos with multiple projects
-- Projects with multiple dependency graphs (e.g., runtime + dev dependencies)
-- Workspaces (npm, yarn, cargo)
-
-## Configuration
-
-### SCAPluginOptions
-
-```go
-type SCAPluginOptions struct {
-    Global GlobalOptions    // Options that apply to all plugins
-    Python *PythonOptions   // Python-specific options
-}
-```
-
-### GlobalOptions
-
-Options that apply across all ecosystem plugins:
-
-```go
-type GlobalOptions struct {
-    TargetFile  *string  // Specific manifest file to analyze
-    AllProjects bool     // Discover and analyze all projects in directory
-}
-```
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `TargetFile` | `*string` | Path to a specific manifest file to analyze. When set, only this file is processed. |
-| `AllProjects` | `bool` | When `true`, recursively discovers and analyzes all supported manifest files in the directory. |
-
-### PythonOptions
-
-Python-specific options (currently empty, reserved for future use):
-
-```go
-type PythonOptions struct{}
-```
-
-### Builder Pattern
-
-Use the fluent builder pattern to configure options:
-
-```go
-// Analyze a specific file
-options := ecosystems.NewPluginOptions().
-    WithTargetFile("requirements.txt")
-
-// Analyze all projects in directory
-options := ecosystems.NewPluginOptions().
-    WithAllProjects(true)
-
-// Default options (single project at root)
-options := ecosystems.NewPluginOptions()
-```
-
-### Available Builder Methods
-
-| Method | Description |
-|--------|-------------|
-| `NewPluginOptions()` | Creates a new options instance with defaults |
-| `WithTargetFile(path string)` | Sets a specific manifest file to analyze |
-| `WithAllProjects(bool)` | Enables/disables recursive project discovery |
-
-## Plugin Implementations
-
-Plugins are organized by ecosystem:
-
-```
-pkg/ecosystems/
-├── plugin_interface.go    # Core interface definition
-├── options.go             # Configuration types
-├── discovery/             # File discovery utilities
-└── python/
-    ├── pip/
-    │   └── plugin.go      # Pip plugin implementation
-    └── uv/
-        └── plugin.go      # UV plugin implementation
-```
-
-### Current Plugins
-
-#### Python Ecosystem
-
-- **pip**: Discovers dependencies from `requirements.txt` using `pip install --dry-run --report`
-- **uv**: Modern Python package manager and resolver (in development)
-
-### Future Ecosystems
-
-The architecture supports adding plugins for:
-- **JavaScript/TypeScript**: npm, yarn, pnpm
-- **Java**: Maven, Gradle
-- **.NET**: NuGet
-- **Go**: Go modules
+Plugins return `PluginResult`, where:
+* `Results` contains depgraphs and other data. Multiple findings are permitted to allow for workspaces and other scenarios where more than one project are found within an ecosytem.
+* `ProcessedFiles` contains files that other plugins should not handle (either because the plugin has processed them directly, e.g. `uv.lock` for uv, or because it is associated with the handled project, e.g. `pyproject.toml` or `requirements.txt` associated with a uv project).
 
 ## Usage Examples
 
@@ -301,8 +174,9 @@ func main() {
     options := ecosystems.NewPluginOptions().
         WithTargetFile("requirements.txt")
     
-    results, err := plugin.BuildDepGraphsFromDir(
+    result, err := plugin.BuildDepGraphsFromDir(
         context.Background(),
+        logger.Nop(),
         "/path/to/python/project",
         options,
     )
@@ -310,16 +184,16 @@ func main() {
         // Handle error
     }
     
-    for _, result := range results {
-        if result.Error != nil {
-            fmt.Printf("Error analyzing %s: %v\n", result.Metadata.TargetFile, result.Error)
+    for _, scaResult := range result.Results {
+        if scaResult.Error != nil {
+            fmt.Printf("Error analyzing %s: %v\n", scaResult.Metadata.TargetFile, scaResult.Error)
             continue
         }
         
-        fmt.Printf("Target: %s\n", result.Metadata.TargetFile)
-        fmt.Printf("Runtime: %s\n", result.Metadata.Runtime)
-        fmt.Printf("Package Manager: %s\n", result.DepGraph.PkgManager.Name)
-        fmt.Printf("Total Packages: %d\n", len(result.DepGraph.Pkgs))
+        fmt.Printf("Target: %s\n", scaResult.Metadata.TargetFile)
+        fmt.Printf("Runtime: %s\n", scaResult.Metadata.Runtime)
+        fmt.Printf("Package Manager: %s\n", scaResult.DepGraph.PkgManager.Name)
+        fmt.Printf("Total Packages: %d\n", len(scaResult.DepGraph.Pkgs))
     }
 }
 ```
@@ -330,14 +204,14 @@ func main() {
 options := ecosystems.NewPluginOptions().
     WithAllProjects(true)
 
-results, err := plugin.BuildDepGraphsFromDir(ctx, "/path/to/monorepo", options)
+result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), "/path/to/monorepo", options)
 // Returns results for all requirements.txt files found
 ```
 
 ### Handling Errors in Results
 
 ```go
-for _, result := range results {
+for _, result := range result.Results {
     if result.Error != nil {
         // Individual file failed, but others may have succeeded
         log.Printf("Failed to analyze %s: %v", result.Metadata.TargetFile, result.Error)
@@ -365,7 +239,7 @@ To add support for a new ecosystem:
    import (
        "context"
        "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-       "github.com/snyk/dep-graph/go/pkg/depgraph"
+       "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
    )
    
    type Plugin struct {
@@ -374,11 +248,16 @@ To add support for a new ecosystem:
    
    var _ ecosystems.SCAPlugin = (*Plugin)(nil)
    
-   func (p *Plugin) BuildDepGraphsFromDir(ctx context.Context, dir string, options *ecosystems.SCAPluginOptions) ([]ecosystems.SCAResult, error) {
+   func (p *Plugin) BuildDepGraphsFromDir(
+       ctx context.Context,
+       log logger.Logger,
+       dir string,
+       options *ecosystems.SCAPluginOptions,
+   ) (*ecosystems.PluginResult, error) {
        // 1. Discover manifest files in dir
        // 2. Resolve dependencies using ecosystem tooling
        // 3. Build depgraph.DepGraph using the builder
-       // 4. Return SCAResult with metadata
+       // 4. Return PluginResult with results and processed files
    }
    ```
 
@@ -402,11 +281,11 @@ To add support for a new ecosystem:
        plugin := &Plugin{}
        options := ecosystems.NewPluginOptions()
        
-       results, err := plugin.BuildDepGraphsFromDir(context.Background(), "./testdata", options)
+       result, err := plugin.BuildDepGraphsFromDir(context.Background(), logger.Nop(), "./testdata", options)
        assert.NoError(t, err)
-       assert.Len(t, results, 1)
-       assert.NotNil(t, results[0].DepGraph)
-       assert.Equal(t, "mymanager", results[0].DepGraph.PkgManager.Name)
+       assert.Len(t, result.Results, 1)
+       assert.NotNil(t, result.Results[0].DepGraph)
+       assert.Equal(t, "mymanager", result.Results[0].DepGraph.PkgManager.Name)
    }
    ```
 
@@ -417,22 +296,6 @@ To add support for a new ecosystem:
 3. **Open/Closed**: Open for extension (new plugins), closed for modification (core interface)
 4. **Interface Segregation**: Keep interfaces minimal and focused
 5. **Don't Repeat Yourself**: Common functionality should be extracted to shared utilities
-
-## Benefits Summary
-
-### For Internal Use
-- ✅ Consistent API across all ecosystems
-- ✅ Easy to add new package manager support
-- ✅ Testable with dependency injection
-- ✅ Type-safe with compile-time checks
-- ✅ Standard Snyk dep-graph format
-
-### For External Consumers
-- ✅ Well-defined interface to implement
-- ✅ Standard dependency graph format compatible with Snyk tools
-- ✅ Compatible with Snyk workflows
-- ✅ No tight coupling to Snyk internals
-- ✅ Extensible for custom ecosystems
 
 ## References
 

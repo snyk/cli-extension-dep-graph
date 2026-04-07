@@ -16,8 +16,8 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
 )
 
 var testLogger = logger.Nop()
@@ -121,7 +121,7 @@ func setupMockSnykClient(t *testing.T, responseBody string) *snykclient.SnykClie
 	return setupMockSnykClientMultiResponse(t, []mocks.MockResponse{mockResponse})
 }
 
-func TestPlugin_BuildFindingsFromDir(t *testing.T) {
+func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 	tests := []struct {
 		name         string
 		files        []string // files to create relative to root
@@ -262,12 +262,12 @@ func TestPlugin_BuildFindingsFromDir(t *testing.T) {
 				)
 			}
 			snykClient := setupMockSnykClientMultiResponse(t, mockResponses)
-			plugin := NewUvPlugin(mockClient, snykClient, "")
+			plugin := NewPlugin(mockClient, snykClient, "")
 
 			// Execute
 			ctx := context.Background()
-			options := &scaplugin.Options{AllProjects: tt.allProjects, Exclude: tt.exclude}
-			findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, testLogger)
+			options := ecosystems.NewPluginOptions().WithAllProjects(tt.allProjects).WithExclude(tt.exclude)
+			pluginResult, err := plugin.BuildDepGraphsFromDir(ctx, testLogger, tmpDir, options)
 
 			// Check error
 			if tt.expectedErr != "" {
@@ -275,6 +275,8 @@ func TestPlugin_BuildFindingsFromDir(t *testing.T) {
 				require.ErrorContains(t, err, tt.expectedErr)
 				return
 			}
+
+			findings := pluginResult.Results
 
 			// Verify correct directories were processed
 			gotDirs := mockClient.CalledDirs
@@ -308,10 +310,11 @@ func TestPlugin_ShouldNotSkipProcessingWhenNoTargetFileIsSet(t *testing.T) {
 
 	mockClient := &MockClient{}
 	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewUvPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, snykClient, "")
 
-	options := &scaplugin.Options{}
-	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, testLogger)
+	options := ecosystems.NewPluginOptions()
+	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
+	findings := pluginResult.Results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 1, "Should return findings")
@@ -323,10 +326,11 @@ func TestPlugin_ShouldNotSkipProcessingWhenUvLockFile(t *testing.T) {
 
 	mockClient := &MockClient{}
 	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewUvPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, snykClient, "")
 
-	options := &scaplugin.Options{TargetFile: "uv.lock"}
-	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, testLogger)
+	options := ecosystems.NewPluginOptions().WithTargetFile("uv.lock")
+	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
+	findings := pluginResult.Results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 1, "Should return findings")
@@ -338,10 +342,11 @@ func TestPlugin_SkipsProcessingWhenTargetFileIsNotUVFile(t *testing.T) {
 
 	mockClient := &MockClient{}
 	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewUvPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, snykClient, "")
 
-	options := &scaplugin.Options{TargetFile: "package.json"}
-	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, testLogger)
+	options := ecosystems.NewPluginOptions().WithTargetFile("package.json")
+	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
+	findings := pluginResult.Results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 0, "Should return no findings")
@@ -353,10 +358,11 @@ func TestPlugin_SkipsProcessingWhenTargetFileIsAPyProjectTomlFile(t *testing.T) 
 
 	mockClient := &MockClient{}
 	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewUvPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, snykClient, "")
 
-	options := &scaplugin.Options{TargetFile: "pyproject.toml"}
-	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, testLogger)
+	options := ecosystems.NewPluginOptions().WithTargetFile("pyproject.toml")
+	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
+	findings := pluginResult.Results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 0, "Should return no findings")
@@ -373,10 +379,11 @@ func TestPlugin_ShouldNotSkipProcessingWhenTargetFileIsRelativeFolderPath(t *tes
 
 	mockClient := &MockClient{}
 	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewUvPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, snykClient, "")
 
-	options := &scaplugin.Options{TargetFile: "my-project/uv.lock"}
-	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, testLogger)
+	options := ecosystems.NewPluginOptions().WithTargetFile("my-project/uv.lock")
+	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
+	findings := pluginResult.Results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 1, "Should return findings for the specific uv.lock file")
@@ -394,10 +401,11 @@ func TestPlugin_ShouldSkipProcessingWhenTargetFileIsNotUvLockInRelativeFolderPat
 
 	mockClient := &MockClient{}
 	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewUvPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, snykClient, "")
 
-	options := &scaplugin.Options{TargetFile: "my-project/package.json"}
-	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, testLogger)
+	options := ecosystems.NewPluginOptions().WithTargetFile("my-project/package.json")
+	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
+	findings := pluginResult.Results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 0, "Should return no findings")
@@ -414,39 +422,40 @@ func TestPlugin_ShouldRaiseErrorWhenTargetFileIsUvLockInRelativeFolderButDoesNot
 
 	mockClient := &MockClient{}
 	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewUvPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, snykClient, "")
 
-	options := &scaplugin.Options{TargetFile: "my-project/uv.lock"}
-	findings, err := plugin.BuildFindingsFromDir(t.Context(), tmpDir, options, testLogger)
+	options := ecosystems.NewPluginOptions().WithTargetFile("my-project/uv.lock")
+	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
 
 	require.Error(t, err)
 	require.ErrorContains(t, err, "failed to find uv lockfile(s)")
 
-	require.Len(t, findings, 0, "Should return no findings")
+	require.Nil(t, pluginResult, "Should return nil result on error")
 	require.Empty(t, mockClient.CalledDirs, "Should not call the uv client")
 }
 
-func TestPlugin_BuildFindingsFromDir_ErrorHandling(t *testing.T) {
+func TestPlugin_BuildDepGraphsFromDir_ErrorHandling(t *testing.T) {
 	tmpDir := createFiles(t, "uv.lock")
 
 	mockClient := &MockClient{ReturnErr: errors.New("export failed")}
 	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewUvPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, snykClient, "")
 
 	ctx := context.Background()
-	options := &scaplugin.Options{AllProjects: false}
-	findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, testLogger)
+	options := ecosystems.NewPluginOptions()
+	pluginResult, err := plugin.BuildDepGraphsFromDir(ctx, testLogger, tmpDir, options)
+	findings := pluginResult.Results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 1)
 	require.NotNil(t, findings[0].Error)
 	require.ErrorContains(t, findings[0].Error, "failed to build dependency graph")
 
-	require.Equal(t, "uv.lock", findings[0].LockFile)
+	require.Equal(t, "uv.lock", findings[0].Metadata.TargetFile)
 	require.Nil(t, findings[0].DepGraph)
 }
 
-func TestPlugin_BuildFindingsFromDir_MixedSuccessAndFailure(t *testing.T) {
+func TestPlugin_BuildDepGraphsFromDir_MixedSuccessAndFailure(t *testing.T) {
 	// Create multiple lock files
 	tmpDir := createFiles(t,
 		"uv.lock",
@@ -461,7 +470,7 @@ func TestPlugin_BuildFindingsFromDir_MixedSuccessAndFailure(t *testing.T) {
 		},
 	}
 	ctx := context.Background()
-	options := &scaplugin.Options{AllProjects: true}
+	options := ecosystems.NewPluginOptions().WithAllProjects(true)
 	// Mock SBOM service: project1 fails at ExportSBOM (before conversion), so only "." and "project2" need conversion responses
 	//nolint:lll // Long JSON string for mock response
 	mockResponseBody := `{"scanResults":[{"facts":[{"type":"depGraph","data":{"schemaVersion":"1.3.0","pkgManager":{"name":"uv"},"pkgs":[{"id":"mock-project@1.0.0","info":{"name":"mock-project","version":"1.0.0"}}],"graph":{"rootNodeId":"root-node","nodes":[{"nodeId":"root-node","pkgId":"mock-project@1.0.0","deps":[]}]}}}]}],"warnings":[]}`
@@ -470,8 +479,9 @@ func TestPlugin_BuildFindingsFromDir_MixedSuccessAndFailure(t *testing.T) {
 		mocks.NewMockResponse("application/json", []byte(mockResponseBody), http.StatusOK),
 	}
 	snykClient := setupMockSnykClientMultiResponse(t, mockResponses)
-	plugin := NewUvPlugin(mockClient, snykClient, "")
-	findings, err := plugin.BuildFindingsFromDir(ctx, tmpDir, options, testLogger)
+	plugin := NewPlugin(mockClient, snykClient, "")
+	pluginResult, err := plugin.BuildDepGraphsFromDir(ctx, testLogger, tmpDir, options)
+	findings := pluginResult.Results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 3)
@@ -479,7 +489,7 @@ func TestPlugin_BuildFindingsFromDir_MixedSuccessAndFailure(t *testing.T) {
 	// Count successful vs error findings
 	successCount := 0
 	errorCount := 0
-	var errorFinding *scaplugin.Finding
+	var errorFinding *ecosystems.SCAResult
 	for i := range findings {
 		if findings[i].Error != nil {
 			errorCount++
@@ -493,7 +503,7 @@ func TestPlugin_BuildFindingsFromDir_MixedSuccessAndFailure(t *testing.T) {
 
 	require.NotNil(t, errorFinding)
 	require.ErrorContains(t, errorFinding.Error, "failed to build dependency graph")
-	require.Equal(t, "project1/uv.lock", errorFinding.LockFile)
+	require.Equal(t, "project1/uv.lock", errorFinding.Metadata.TargetFile)
 	require.Nil(t, errorFinding.DepGraph)
 }
 
@@ -501,15 +511,15 @@ func TestBuildFindings_Success(t *testing.T) {
 	sbom := Sbom(validSBOMJSON)
 	mockResponseBody := singleDepGraphResponse("test-package", "1.0.0")
 	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
+	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
+	findings := buildResult.Results
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
 	assert.NotNil(t, findings[0].DepGraph)
-	assert.Equal(t, "uv.lock", findings[0].LockFile)
-	assert.Equal(t, "pyproject.toml", findings[0].ManifestFile)
+	assert.Equal(t, "pyproject.toml", findings[0].Metadata.TargetFile)
 	assert.Nil(t, findings[0].Error)
 }
 
@@ -552,16 +562,17 @@ func TestBuildFindings_NoProjectRoot_ReturnsErrorFinding(t *testing.T) {
 	}`
 	sbom := Sbom(sbomJSON)
 	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
+	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
+	findings := buildResult.Results
 
 	require.NoError(t, err, "should not return an error, but rather an error finding")
 	require.Len(t, findings, 1)
 	require.NotNil(t, findings[0].Error)
 	assert.Contains(t, findings[0].Error.Error(), "No root project found")
 	assert.Nil(t, findings[0].DepGraph)
-	assert.Equal(t, "uv.lock", findings[0].LockFile)
+	assert.Equal(t, "uv.lock", findings[0].Metadata.TargetFile)
 
 	var catalogErr snyk_errors.Error
 	require.True(t, errors.As(findings[0].Error, &catalogErr), "error should be a catalog error")
@@ -601,10 +612,11 @@ func TestBuildFindings_NoProjectRoot_AllProjects_Succeeds(t *testing.T) {
 	sbom := Sbom(sbomJSON)
 	mockResponseBody := singleDepGraphResponse("albatross", "0.1.0")
 	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{AllProjects: true}, testLogger)
+	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions().WithAllProjects(true), testLogger)
 
+	findings := buildResult.Results
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
 	assert.NotNil(t, findings[0].DepGraph)
@@ -642,33 +654,34 @@ func TestBuildFindings_NoProjectRoot_UvWorkspacePackages_Succeeds(t *testing.T) 
 	sbom := Sbom(sbomJSON)
 	mockResponseBody := singleDepGraphResponse("albatross", "0.1.0")
 	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(
+	buildResult, err := plugin.buildResults(
 		context.Background(),
 		sbom,
 		"uv.lock",
 		".",
-		&scaplugin.Options{UvWorkspacePackages: true},
+		ecosystems.NewPluginOptions().WithForceIncludeWorkspacePackages(true),
 		testLogger,
 	)
+	findings := buildResult.Results
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
 	assert.NotNil(t, findings[0].DepGraph)
 	assert.Nil(t, findings[0].Error)
-	assert.Equal(t, filepath.Join("packages", "albatross", "pyproject.toml"), findings[0].ManifestFile)
+	assert.Equal(t, filepath.Join("packages", "albatross", "pyproject.toml"), findings[0].Metadata.TargetFile)
 }
 
 func TestBuildFindings_InvalidSBOM(t *testing.T) {
 	sbom := Sbom(`{"invalid": "json"}`)
 	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
+	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
 	assert.Error(t, err)
-	assert.Nil(t, findings)
+	assert.Nil(t, buildResult)
 	assert.Contains(t, err.Error(), "failed to parse and validate sbom")
 }
 
@@ -679,12 +692,12 @@ func TestBuildFindings_MissingRootComponent(t *testing.T) {
 	}`
 	sbom := Sbom(sbomJSON)
 	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
+	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
 	assert.Error(t, err)
-	assert.Nil(t, findings)
+	assert.Nil(t, buildResult)
 	assert.Contains(t, err.Error(), "failed to parse and validate sbom")
 }
 
@@ -692,12 +705,12 @@ func TestBuildFindings_ConversionError(t *testing.T) {
 	sbom := Sbom(validSBOMJSON)
 	mockResponse := mocks.NewMockResponse("application/json", []byte(`{"error": "invalid"}`), http.StatusBadRequest)
 	snykClient := setupMockSnykClientMultiResponse(t, []mocks.MockResponse{mockResponse})
-	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
+	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
 	assert.Error(t, err)
-	assert.Nil(t, findings)
+	assert.Nil(t, buildResult)
 	assert.Contains(t, err.Error(), "failed to convert sbom to dep-graphs")
 }
 
@@ -705,10 +718,11 @@ func TestBuildFindings_MultipleDepGraphs(t *testing.T) {
 	sbom := Sbom(validSBOMJSON)
 	mockResponseBody := multipleDepGraphsResponse()
 	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
+	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
+	findings := buildResult.Results
 	require.NoError(t, err)
 	require.Len(t, findings, 2)
 	assert.Equal(t, "package1", findings[0].DepGraph.GetRootPkg().Info.Name)
@@ -750,42 +764,42 @@ func TestBuildFindings_WorkspacePackage(t *testing.T) {
 	sbom := Sbom(sbomJSON)
 	mockResponseBody := singleDepGraphResponse("workspace-package", "3.1.0")
 	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
+	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
+	findings := buildResult.Results
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
-	assert.Equal(t, filepath.Join("packages", "my-package", "pyproject.toml"), findings[0].ManifestFile)
-	assert.Equal(t, "uv.lock", findings[0].LockFile)
+	assert.Equal(t, filepath.Join("packages", "my-package", "pyproject.toml"), findings[0].Metadata.TargetFile)
 }
 
 func TestBuildFindings_PathConstruction_RootDir(t *testing.T) {
 	sbom := Sbom(validSBOMJSON)
 	mockResponseBody := singleDepGraphResponse("test-package", "1.0.0")
 	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "uv.lock", ".", &scaplugin.Options{}, testLogger)
+	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
+	findings := buildResult.Results
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
-	assert.Equal(t, "pyproject.toml", findings[0].ManifestFile)
-	assert.Equal(t, "uv.lock", findings[0].LockFile)
+	assert.Equal(t, "pyproject.toml", findings[0].Metadata.TargetFile)
 }
 
 func TestBuildFindings_PathConstruction_NestedDir(t *testing.T) {
 	sbom := Sbom(validSBOMJSON)
 	mockResponseBody := singleDepGraphResponse("test-package", "1.0.0")
 	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "project1/uv.lock", "project1", &scaplugin.Options{}, testLogger)
+	buildResult, err := plugin.buildResults(context.Background(), sbom, "project1/uv.lock", "project1", ecosystems.NewPluginOptions(), testLogger)
 
+	findings := buildResult.Results
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
-	assert.Equal(t, filepath.Join("project1", "pyproject.toml"), findings[0].ManifestFile)
-	assert.Equal(t, "project1/uv.lock", findings[0].LockFile)
+	assert.Equal(t, filepath.Join("project1", "pyproject.toml"), findings[0].Metadata.TargetFile)
 }
 
 func TestBuildFindings_PathConstruction_NestedWorkspacePackage(t *testing.T) {
@@ -823,14 +837,14 @@ func TestBuildFindings_PathConstruction_NestedWorkspacePackage(t *testing.T) {
 	sbom := Sbom(sbomJSON)
 	mockResponseBody := singleDepGraphResponse("workspace-package", "3.1.0")
 	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewUvPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, snykClient, "")
 
-	findings, err := plugin.buildFindings(context.Background(), sbom, "workspace/uv.lock", "workspace", &scaplugin.Options{}, testLogger)
+	buildResult, err := plugin.buildResults(context.Background(), sbom, "workspace/uv.lock", "workspace", ecosystems.NewPluginOptions(), testLogger)
 
+	findings := buildResult.Results
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
-	assert.Equal(t, filepath.Join("workspace", "packages", "my-package", "pyproject.toml"), findings[0].ManifestFile)
-	assert.Equal(t, "workspace/uv.lock", findings[0].LockFile)
+	assert.Equal(t, filepath.Join("workspace", "packages", "my-package", "pyproject.toml"), findings[0].Metadata.TargetFile)
 }
 
 func TestFindWorkspacePackage_MatchFound(t *testing.T) {
@@ -962,13 +976,14 @@ func TestPlugin_DiscoverLockFiles(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := createFiles(t, tt.files...)
-			plugin := NewUvPlugin(&MockClient{}, nil, "")
+			plugin := NewPlugin(&MockClient{}, nil, "")
 
 			ctx := context.Background()
-			options := &scaplugin.Options{
-				AllProjects: tt.allProjects,
-				TargetFile:  tt.targetFile,
-				Exclude:     tt.exclude,
+			options := ecosystems.NewPluginOptions().
+				WithAllProjects(tt.allProjects).
+				WithExclude(tt.exclude)
+			if tt.targetFile != "" {
+				options = options.WithTargetFile(tt.targetFile)
 			}
 
 			files, err := plugin.discoverLockFiles(ctx, tmpDir, tt.targetFile, options)

@@ -2,6 +2,7 @@ package ecosystems
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/argparser"
@@ -16,11 +17,15 @@ type SCAPluginOptions struct {
 
 // GlobalOptions contains options that apply globally across all SCA plugins.
 type GlobalOptions struct {
-	TargetFile  *string              `arg:"--target-file"`
-	AllProjects bool                 `arg:"--all-projects"`
-	IncludeDev  bool                 `arg:"--dev,-d"`
-	Exclude     CommaSeparatedString `arg:"--exclude"`
-	RawFlags    []string
+	TargetFile                    *string              `arg:"--target-file"`
+	AllProjects                   bool                 `arg:"--all-projects"`
+	IncludeDev                    bool                 `arg:"--dev,-d"`
+	Exclude                       CommaSeparatedString `arg:"--exclude"`
+	FailFast                      bool                 `arg:"--fail-fast"`
+	AllowOutOfSync                bool                 // Derived from --strict-out-of-sync (inverted); parsed in NewPluginOptionsFromRawFlags.
+	ForceSingleGraph              bool                 `arg:"--force-single-graph"`
+	ForceIncludeWorkspacePackages bool                 `arg:"--internal-uv-workspace-packages"`
+	RawFlags                      []string
 }
 
 // CommaSeparatedString is a custom type that parses comma-separated values.
@@ -47,6 +52,7 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 	var args struct {
 		GlobalOptions
 		PythonOptions
+		StrictOutOfSync *string `arg:"--strict-out-of-sync"`
 	}
 
 	if err := argparser.Parse(rawFlags, &args); err != nil {
@@ -54,6 +60,12 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 	}
 
 	args.RawFlags = rawFlags
+
+	if args.StrictOutOfSync != nil {
+		if parsed, err := strconv.ParseBool(*args.StrictOutOfSync); err == nil {
+			args.AllowOutOfSync = !parsed
+		}
+	}
 
 	return &SCAPluginOptions{
 		Global: args.GlobalOptions,
@@ -88,5 +100,25 @@ func (o *SCAPluginOptions) WithRawFlags(rawflags string) *SCAPluginOptions {
 
 func (o *SCAPluginOptions) WithExclude(exclude []string) *SCAPluginOptions {
 	o.Global.Exclude = append(o.Global.Exclude, exclude...)
+	return o
+}
+
+func (o *SCAPluginOptions) WithFailFast(failFast bool) *SCAPluginOptions {
+	o.Global.FailFast = failFast
+	return o
+}
+
+func (o *SCAPluginOptions) WithAllowOutOfSync(allowOutOfSync bool) *SCAPluginOptions {
+	o.Global.AllowOutOfSync = allowOutOfSync
+	return o
+}
+
+func (o *SCAPluginOptions) WithForceSingleGraph(forceSingleGraph bool) *SCAPluginOptions {
+	o.Global.ForceSingleGraph = forceSingleGraph
+	return o
+}
+
+func (o *SCAPluginOptions) WithForceIncludeWorkspacePackages(forceIncludeWorkspacePackages bool) *SCAPluginOptions {
+	o.Global.ForceIncludeWorkspacePackages = forceIncludeWorkspacePackages
 	return o
 }

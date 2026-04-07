@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/scaplugin"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 )
 
 type mockCmdExecutor struct {
@@ -48,8 +48,8 @@ func TestUVClient_ExportSBOM_Success(t *testing.T) {
 		},
 	}
 
-	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{})
+	client := NewClientWithExecutor("/path/to/uv", mockExecutor)
+	result, err := client.ExportSBOM("/test/dir", ecosystems.NewPluginOptions())
 
 	assert.NoError(t, err)
 	require.NotNil(t, result)
@@ -82,11 +82,8 @@ func TestUVClient_ExportSBOM_AllProjects(t *testing.T) {
 		},
 	}
 
-	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{
-		AllProjects:         true,
-		UvWorkspacePackages: false,
-	})
+	client := NewClientWithExecutor("/path/to/uv", mockExecutor)
+	result, err := client.ExportSBOM("/test/dir", ecosystems.NewPluginOptions().WithAllProjects(true))
 
 	assert.NoError(t, err)
 	require.NotNil(t, result)
@@ -119,11 +116,8 @@ func TestUVClient_ExportSBOM_UvWorkspacePackages(t *testing.T) {
 		},
 	}
 
-	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{
-		AllProjects:         false,
-		UvWorkspacePackages: true,
-	})
+	client := NewClientWithExecutor("/path/to/uv", mockExecutor)
+	result, err := client.ExportSBOM("/test/dir", ecosystems.NewPluginOptions().WithForceIncludeWorkspacePackages(true))
 
 	assert.NoError(t, err)
 	require.NotNil(t, result)
@@ -143,8 +137,8 @@ func TestUVClient_ExportSBOM_DevTrue_OmitsNoDevFlag(t *testing.T) {
 		},
 	}
 
-	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	_, err := client.ExportSBOM("/test/dir", &scaplugin.Options{Dev: true})
+	client := NewClientWithExecutor("/path/to/uv", mockExecutor)
+	_, err := client.ExportSBOM("/test/dir", ecosystems.NewPluginOptions().WithIncludeDev(true))
 
 	assert.NoError(t, err)
 }
@@ -163,8 +157,8 @@ func TestUVClient_ExportSBOM_AllowOutOfSync_UsesFrozenFlag(t *testing.T) {
 		},
 	}
 
-	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	_, err := client.ExportSBOM("/test/dir", &scaplugin.Options{AllowOutOfSync: true})
+	client := NewClientWithExecutor("/path/to/uv", mockExecutor)
+	_, err := client.ExportSBOM("/test/dir", ecosystems.NewPluginOptions().WithAllowOutOfSync(true))
 
 	assert.NoError(t, err)
 }
@@ -181,8 +175,8 @@ func TestUVClient_ExportSBOM_OutOfSyncLockfile_ReturnsFriendlyError(t *testing.T
 		},
 	}
 
-	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{})
+	client := NewClientWithExecutor("/path/to/uv", mockExecutor)
+	result, err := client.ExportSBOM("/test/dir", ecosystems.NewPluginOptions())
 
 	require.Error(t, err)
 	assert.Nil(t, result)
@@ -204,8 +198,8 @@ func TestUVClient_ExportSBOM_NonOutOfSyncExportError_ReturnsOriginalError(t *tes
 		},
 	}
 
-	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{})
+	client := NewClientWithExecutor("/path/to/uv", mockExecutor)
+	result, err := client.ExportSBOM("/test/dir", ecosystems.NewPluginOptions())
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, expectedErr)
@@ -221,8 +215,8 @@ func TestUVClient_ExportSBOM_Error(t *testing.T) {
 		},
 	}
 
-	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{})
+	client := NewClientWithExecutor("/path/to/uv", mockExecutor)
+	result, err := client.ExportSBOM("/test/dir", ecosystems.NewPluginOptions())
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, expectedErr)
@@ -243,8 +237,8 @@ func TestUVClient_ExportSBOM_InvalidSBOM(t *testing.T) {
 		},
 	}
 
-	client := NewUvClientWithExecutor("/path/to/uv", mockExecutor)
-	result, err := client.ExportSBOM("/test/dir", &scaplugin.Options{})
+	client := NewClientWithExecutor("/path/to/uv", mockExecutor)
+	result, err := client.ExportSBOM("/test/dir", ecosystems.NewPluginOptions())
 
 	// ExportSBOM should succeed - validation happens later in buildFindings
 	assert.NoError(t, err)

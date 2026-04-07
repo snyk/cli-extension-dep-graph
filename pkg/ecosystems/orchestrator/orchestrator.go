@@ -26,6 +26,8 @@ var legacyCLIWorkflowID = workflow.NewWorkflowIdentifier("legacycli")
 // ResolveDepgraphs resolves dependency graphs for a directory by invoking the legacy CLI workflow.
 // It accepts a workflow.InvocationContext to provide access to the engine, configuration, and logger.
 // Returns a channel of SCAResult structs containing dependency graphs and associated metadata.
+//
+//nolint:gocritic // hugeParam: ensure `options` is not nil
 func ResolveDepgraphs(ictx workflow.InvocationContext, dir string, opts ecosystems.SCAPluginOptions) (<-chan ecosystems.SCAResult, error) {
 	enhancedLogger := ictx.GetEnhancedLogger()
 
@@ -50,6 +52,7 @@ func ResolveDepgraphs(ictx workflow.InvocationContext, dir string, opts ecosyste
 	return resultsChan, nil
 }
 
+//nolint:gocritic // hugeParam: ensure `options` is not nil
 func resolvePython(ctx context.Context, enhancedLogger *zerolog.Logger, dir string, opts ecosystems.SCAPluginOptions) ecosystems.PluginResult {
 	log := logger.NewFromZerolog(enhancedLogger)
 
@@ -74,6 +77,8 @@ func resolvePython(ctx context.Context, enhancedLogger *zerolog.Logger, dir stri
 }
 
 // LegacyFallback invokes the legacy CLI workflow with the raw flags and returns parsed results.
+//
+//nolint:gocritic // hugeParam: ensure `options` is not nil
 func LegacyFallback(ictx workflow.InvocationContext, options ecosystems.SCAPluginOptions, processedFiles []string) ([]ecosystems.SCAResult, error) {
 	log := ictx.GetEnhancedLogger()
 	config := ictx.GetConfiguration()

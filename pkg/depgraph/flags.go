@@ -39,8 +39,9 @@ const (
 	FlagPrintEffectiveGraphWithErrors = "effective-graph-with-errors"
 	FlagDotnetRuntimeResolution       = "dotnet-runtime-resolution"
 	FlagDotnetTargetFramework         = "dotnet-target-framework"
-	FlagUvWorkspacePackages           = "internal-uv-workspace-packages"
-	FlagForceSingleGraph              = "force-single-graph"
+	// TODO: rename this flag to remove the uv-specific reference.
+	FlagUvWorkspacePackages = "internal-uv-workspace-packages"
+	FlagForceSingleGraph    = "force-single-graph"
 )
 
 func getFlagSet() *pflag.FlagSet {
