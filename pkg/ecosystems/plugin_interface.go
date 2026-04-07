@@ -11,8 +11,10 @@ import (
 // Metadata contains contextual information about the dependency graph,
 // such as the target file and runtime environment.
 type Metadata struct {
-	TargetFile string `json:"targetFile"`
-	Runtime    string `json:"runtime"`
+	TargetFile     string   `json:"targetFile"`
+	Runtime        string   `json:"runtime"`
+	Lockfile       string   `json:"lockfile"`
+	ProcessedFiles []string `json:"processedFiles"`
 }
 
 // SCAResult represents the result of a Software Composition Analysis (SCA),
