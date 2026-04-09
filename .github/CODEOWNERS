@@ -1,5 +1,5 @@
-* @snyk/unify @snyk/codesec_unify @snyk/os-managed
+* @snyk/unify @snyk/codesec_unify @snyk/open-source_unify @snyk/os-managed
 
 /pkg/ecosystems/ @snyk/os-managed
-/pkg/depgraph @snyk/unify @snyk/codesec_unify 
-/pkg/sca_plugin @snyk/unify @snyk/codesec_unify 
+/pkg/depgraph @snyk/unify @snyk/codesec_unify @snyk/open-source_unify 
+/pkg/sca_plugin @snyk/unify @snyk/codesec_unify @snyk/open-source_unify 
