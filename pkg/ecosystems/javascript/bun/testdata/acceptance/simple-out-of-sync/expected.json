@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "bun"
+  },
+  "pkgs": [
+    {
+      "id": "simple-out-of-sync@1.0.0",
+      "info": {
+        "name": "simple-out-of-sync",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "lodash@4.17.21",
+      "info": {
+        "name": "lodash",
+        "version": "4.17.21"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "simple-out-of-sync@1.0.0",
+        "deps": [
+          {
+            "nodeId": "lodash@4.17.21"
+          }
+        ]
+      },
+      {
+        "nodeId": "lodash@4.17.21",
+        "pkgId": "lodash@4.17.21",
+        "deps": []
+      }
+    ]
+  }
+}

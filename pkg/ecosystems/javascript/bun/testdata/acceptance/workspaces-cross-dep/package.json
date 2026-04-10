@@ -1,0 +1,8 @@
+{
+  "name": "my-monorepo",
+  "version": "1.0.0",
+  "dependencies": {
+    "b": "workspace:*"
+  },
+  "workspaces": ["packages/a", "packages/b"]
+}

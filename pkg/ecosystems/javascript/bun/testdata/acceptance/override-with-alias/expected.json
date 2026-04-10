@@ -1,0 +1,1380 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "bun"
+  },
+  "pkgs": [
+    {
+      "id": "override-with-alias@1.0.0",
+      "info": {
+        "name": "override-with-alias",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "keycloak-connect@26.1.1",
+      "info": {
+        "name": "keycloak-connect",
+        "version": "26.1.1"
+      }
+    },
+    {
+      "id": "jwk-to-pem@2.0.7",
+      "info": {
+        "name": "jwk-to-pem",
+        "version": "2.0.7"
+      }
+    },
+    {
+      "id": "safe-buffer@5.2.1",
+      "info": {
+        "name": "safe-buffer",
+        "version": "5.2.1"
+      }
+    },
+    {
+      "id": "asn1.js@5.4.1",
+      "info": {
+        "name": "asn1.js",
+        "version": "5.4.1"
+      }
+    },
+    {
+      "id": "safer-buffer@2.1.2",
+      "info": {
+        "name": "safer-buffer",
+        "version": "2.1.2"
+      }
+    },
+    {
+      "id": "bn.js@4.12.3",
+      "info": {
+        "name": "bn.js",
+        "version": "4.12.3"
+      }
+    },
+    {
+      "id": "inherits@2.0.4",
+      "info": {
+        "name": "inherits",
+        "version": "2.0.4"
+      }
+    },
+    {
+      "id": "minimalistic-assert@1.0.1",
+      "info": {
+        "name": "minimalistic-assert",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "id": "dry-uninstall@0.3.0",
+      "info": {
+        "name": "dry-uninstall",
+        "version": "0.3.0"
+      }
+    },
+    {
+      "id": "chromedriver@147.0.2",
+      "info": {
+        "name": "chromedriver",
+        "version": "147.0.2"
+      }
+    },
+    {
+      "id": "tcp-port-used@1.0.2",
+      "info": {
+        "name": "tcp-port-used",
+        "version": "1.0.2"
+      }
+    },
+    {
+      "id": "is2@2.0.9",
+      "info": {
+        "name": "is2",
+        "version": "2.0.9"
+      }
+    },
+    {
+      "id": "is-url@1.2.4",
+      "info": {
+        "name": "is-url",
+        "version": "1.2.4"
+      }
+    },
+    {
+      "id": "ip-regex@4.3.0",
+      "info": {
+        "name": "ip-regex",
+        "version": "4.3.0"
+      }
+    },
+    {
+      "id": "deep-is@0.1.4",
+      "info": {
+        "name": "deep-is",
+        "version": "0.1.4"
+      }
+    },
+    {
+      "id": "debug@4.3.1",
+      "info": {
+        "name": "debug",
+        "version": "4.3.1"
+      }
+    },
+    {
+      "id": "ms@2.1.2",
+      "info": {
+        "name": "ms",
+        "version": "2.1.2"
+      }
+    },
+    {
+      "id": "axios@1.15.0",
+      "info": {
+        "name": "axios",
+        "version": "1.15.0"
+      }
+    },
+    {
+      "id": "proxy-from-env@2.1.0",
+      "info": {
+        "name": "proxy-from-env",
+        "version": "2.1.0"
+      }
+    },
+    {
+      "id": "follow-redirects@1.15.11",
+      "info": {
+        "name": "follow-redirects",
+        "version": "1.15.11"
+      }
+    },
+    {
+      "id": "form-data@4.0.5",
+      "info": {
+        "name": "form-data",
+        "version": "4.0.5"
+      }
+    },
+    {
+      "id": "es-set-tostringtag@2.1.0",
+      "info": {
+        "name": "es-set-tostringtag",
+        "version": "2.1.0"
+      }
+    },
+    {
+      "id": "get-intrinsic@1.3.0",
+      "info": {
+        "name": "get-intrinsic",
+        "version": "1.3.0"
+      }
+    },
+    {
+      "id": "function-bind@1.1.2",
+      "info": {
+        "name": "function-bind",
+        "version": "1.1.2"
+      }
+    },
+    {
+      "id": "es-define-property@1.0.1",
+      "info": {
+        "name": "es-define-property",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "id": "get-proto@1.0.1",
+      "info": {
+        "name": "get-proto",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "id": "dunder-proto@1.0.1",
+      "info": {
+        "name": "dunder-proto",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "id": "gopd@1.2.0",
+      "info": {
+        "name": "gopd",
+        "version": "1.2.0"
+      }
+    },
+    {
+      "id": "es-errors@1.3.0",
+      "info": {
+        "name": "es-errors",
+        "version": "1.3.0"
+      }
+    },
+    {
+      "id": "call-bind-apply-helpers@1.0.2",
+      "info": {
+        "name": "call-bind-apply-helpers",
+        "version": "1.0.2"
+      }
+    },
+    {
+      "id": "es-object-atoms@1.1.1",
+      "info": {
+        "name": "es-object-atoms",
+        "version": "1.1.1"
+      }
+    },
+    {
+      "id": "math-intrinsics@1.1.0",
+      "info": {
+        "name": "math-intrinsics",
+        "version": "1.1.0"
+      }
+    },
+    {
+      "id": "hasown@2.0.2",
+      "info": {
+        "name": "hasown",
+        "version": "2.0.2"
+      }
+    },
+    {
+      "id": "has-symbols@1.1.0",
+      "info": {
+        "name": "has-symbols",
+        "version": "1.1.0"
+      }
+    },
+    {
+      "id": "has-tostringtag@1.0.2",
+      "info": {
+        "name": "has-tostringtag",
+        "version": "1.0.2"
+      }
+    },
+    {
+      "id": "combined-stream@1.0.8",
+      "info": {
+        "name": "combined-stream",
+        "version": "1.0.8"
+      }
+    },
+    {
+      "id": "delayed-stream@1.0.0",
+      "info": {
+        "name": "delayed-stream",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "asynckit@0.4.0",
+      "info": {
+        "name": "asynckit",
+        "version": "0.4.0"
+      }
+    },
+    {
+      "id": "mime-types@2.1.35",
+      "info": {
+        "name": "mime-types",
+        "version": "2.1.35"
+      }
+    },
+    {
+      "id": "mime-db@1.52.0",
+      "info": {
+        "name": "mime-db",
+        "version": "1.52.0"
+      }
+    },
+    {
+      "id": "compare-versions@6.1.1",
+      "info": {
+        "name": "compare-versions",
+        "version": "6.1.1"
+      }
+    },
+    {
+      "id": "proxy-agent@6.5.0",
+      "info": {
+        "name": "proxy-agent",
+        "version": "6.5.0"
+      }
+    },
+    {
+      "id": "socks-proxy-agent@8.0.5",
+      "info": {
+        "name": "socks-proxy-agent",
+        "version": "8.0.5"
+      }
+    },
+    {
+      "id": "agent-base@7.1.4",
+      "info": {
+        "name": "agent-base",
+        "version": "7.1.4"
+      }
+    },
+    {
+      "id": "socks@2.8.7",
+      "info": {
+        "name": "socks",
+        "version": "2.8.7"
+      }
+    },
+    {
+      "id": "ip-address@10.1.0",
+      "info": {
+        "name": "ip-address",
+        "version": "10.1.0"
+      }
+    },
+    {
+      "id": "smart-buffer@4.2.0",
+      "info": {
+        "name": "smart-buffer",
+        "version": "4.2.0"
+      }
+    },
+    {
+      "id": "debug@4.4.3",
+      "info": {
+        "name": "debug",
+        "version": "4.4.3"
+      }
+    },
+    {
+      "id": "ms@2.1.3",
+      "info": {
+        "name": "ms",
+        "version": "2.1.3"
+      }
+    },
+    {
+      "id": "lru-cache@7.18.3",
+      "info": {
+        "name": "lru-cache",
+        "version": "7.18.3"
+      }
+    },
+    {
+      "id": "proxy-from-env@1.1.0",
+      "info": {
+        "name": "proxy-from-env",
+        "version": "1.1.0"
+      }
+    },
+    {
+      "id": "https-proxy-agent@7.0.6",
+      "info": {
+        "name": "https-proxy-agent",
+        "version": "7.0.6"
+      }
+    },
+    {
+      "id": "pac-proxy-agent@7.2.0",
+      "info": {
+        "name": "pac-proxy-agent",
+        "version": "7.2.0"
+      }
+    },
+    {
+      "id": "get-uri@6.0.5",
+      "info": {
+        "name": "get-uri",
+        "version": "6.0.5"
+      }
+    },
+    {
+      "id": "basic-ftp@5.2.2",
+      "info": {
+        "name": "basic-ftp",
+        "version": "5.2.2"
+      }
+    },
+    {
+      "id": "data-uri-to-buffer@6.0.2",
+      "info": {
+        "name": "data-uri-to-buffer",
+        "version": "6.0.2"
+      }
+    },
+    {
+      "id": "pac-resolver@7.0.1",
+      "info": {
+        "name": "pac-resolver",
+        "version": "7.0.1"
+      }
+    },
+    {
+      "id": "degenerator@5.0.1",
+      "info": {
+        "name": "degenerator",
+        "version": "5.0.1"
+      }
+    },
+    {
+      "id": "esprima@4.0.1",
+      "info": {
+        "name": "esprima",
+        "version": "4.0.1"
+      }
+    },
+    {
+      "id": "ast-types@0.13.4",
+      "info": {
+        "name": "ast-types",
+        "version": "0.13.4"
+      }
+    },
+    {
+      "id": "tslib@2.8.1",
+      "info": {
+        "name": "tslib",
+        "version": "2.8.1"
+      }
+    },
+    {
+      "id": "escodegen@2.1.0",
+      "info": {
+        "name": "escodegen",
+        "version": "2.1.0"
+      }
+    },
+    {
+      "id": "estraverse@5.3.0",
+      "info": {
+        "name": "estraverse",
+        "version": "5.3.0"
+      }
+    },
+    {
+      "id": "esutils@2.0.3",
+      "info": {
+        "name": "esutils",
+        "version": "2.0.3"
+      }
+    },
+    {
+      "id": "source-map@0.6.1",
+      "info": {
+        "name": "source-map",
+        "version": "0.6.1"
+      }
+    },
+    {
+      "id": "netmask@2.1.1",
+      "info": {
+        "name": "netmask",
+        "version": "2.1.1"
+      }
+    },
+    {
+      "id": "@tootallnate/quickjs-emscripten@0.23.0",
+      "info": {
+        "name": "@tootallnate/quickjs-emscripten",
+        "version": "0.23.0"
+      }
+    },
+    {
+      "id": "http-proxy-agent@7.0.2",
+      "info": {
+        "name": "http-proxy-agent",
+        "version": "7.0.2"
+      }
+    },
+    {
+      "id": "@testim/chrome-version@1.1.4",
+      "info": {
+        "name": "@testim/chrome-version",
+        "version": "1.1.4"
+      }
+    },
+    {
+      "id": "extract-zip@2.0.1",
+      "info": {
+        "name": "extract-zip",
+        "version": "2.0.1"
+      }
+    },
+    {
+      "id": "get-stream@5.2.0",
+      "info": {
+        "name": "get-stream",
+        "version": "5.2.0"
+      }
+    },
+    {
+      "id": "pump@3.0.4",
+      "info": {
+        "name": "pump",
+        "version": "3.0.4"
+      }
+    },
+    {
+      "id": "end-of-stream@1.4.5",
+      "info": {
+        "name": "end-of-stream",
+        "version": "1.4.5"
+      }
+    },
+    {
+      "id": "once@1.4.0",
+      "info": {
+        "name": "once",
+        "version": "1.4.0"
+      }
+    },
+    {
+      "id": "wrappy@1.0.2",
+      "info": {
+        "name": "wrappy",
+        "version": "1.0.2"
+      }
+    },
+    {
+      "id": "@types/yauzl@2.10.3",
+      "info": {
+        "name": "@types/yauzl",
+        "version": "2.10.3"
+      }
+    },
+    {
+      "id": "@types/node@25.6.0",
+      "info": {
+        "name": "@types/node",
+        "version": "25.6.0"
+      }
+    },
+    {
+      "id": "undici-types@7.19.2",
+      "info": {
+        "name": "undici-types",
+        "version": "7.19.2"
+      }
+    },
+    {
+      "id": "yauzl@2.10.0",
+      "info": {
+        "name": "yauzl",
+        "version": "2.10.0"
+      }
+    },
+    {
+      "id": "buffer-crc32@0.2.13",
+      "info": {
+        "name": "buffer-crc32",
+        "version": "0.2.13"
+      }
+    },
+    {
+      "id": "fd-slicer@1.1.0",
+      "info": {
+        "name": "fd-slicer",
+        "version": "1.1.0"
+      }
+    },
+    {
+      "id": "pend@1.2.0",
+      "info": {
+        "name": "pend",
+        "version": "1.2.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "override-with-alias@1.0.0",
+        "deps": [
+          {
+            "nodeId": "keycloak-connect@26.1.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "keycloak-connect@26.1.1",
+        "pkgId": "keycloak-connect@26.1.1",
+        "deps": [
+          {
+            "nodeId": "jwk-to-pem@2.0.7"
+          },
+          {
+            "nodeId": "chromedriver@147.0.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "jwk-to-pem@2.0.7",
+        "pkgId": "jwk-to-pem@2.0.7",
+        "deps": [
+          {
+            "nodeId": "safe-buffer@5.2.1"
+          },
+          {
+            "nodeId": "asn1.js@5.4.1"
+          },
+          {
+            "nodeId": "dry-uninstall@0.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "safe-buffer@5.2.1",
+        "pkgId": "safe-buffer@5.2.1",
+        "deps": []
+      },
+      {
+        "nodeId": "asn1.js@5.4.1",
+        "pkgId": "asn1.js@5.4.1",
+        "deps": [
+          {
+            "nodeId": "safer-buffer@2.1.2"
+          },
+          {
+            "nodeId": "bn.js@4.12.3"
+          },
+          {
+            "nodeId": "inherits@2.0.4"
+          },
+          {
+            "nodeId": "minimalistic-assert@1.0.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "safer-buffer@2.1.2",
+        "pkgId": "safer-buffer@2.1.2",
+        "deps": []
+      },
+      {
+        "nodeId": "bn.js@4.12.3",
+        "pkgId": "bn.js@4.12.3",
+        "deps": []
+      },
+      {
+        "nodeId": "inherits@2.0.4",
+        "pkgId": "inherits@2.0.4",
+        "deps": []
+      },
+      {
+        "nodeId": "minimalistic-assert@1.0.1",
+        "pkgId": "minimalistic-assert@1.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "dry-uninstall@0.3.0",
+        "pkgId": "dry-uninstall@0.3.0",
+        "deps": []
+      },
+      {
+        "nodeId": "chromedriver@147.0.2",
+        "pkgId": "chromedriver@147.0.2",
+        "deps": [
+          {
+            "nodeId": "tcp-port-used@1.0.2"
+          },
+          {
+            "nodeId": "axios@1.15.0"
+          },
+          {
+            "nodeId": "compare-versions@6.1.1"
+          },
+          {
+            "nodeId": "proxy-agent@6.5.0"
+          },
+          {
+            "nodeId": "proxy-from-env@2.1.0"
+          },
+          {
+            "nodeId": "@testim/chrome-version@1.1.4"
+          },
+          {
+            "nodeId": "extract-zip@2.0.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "tcp-port-used@1.0.2",
+        "pkgId": "tcp-port-used@1.0.2",
+        "deps": [
+          {
+            "nodeId": "is2@2.0.9"
+          },
+          {
+            "nodeId": "debug@4.3.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "is2@2.0.9",
+        "pkgId": "is2@2.0.9",
+        "deps": [
+          {
+            "nodeId": "is-url@1.2.4"
+          },
+          {
+            "nodeId": "ip-regex@4.3.0"
+          },
+          {
+            "nodeId": "deep-is@0.1.4"
+          }
+        ]
+      },
+      {
+        "nodeId": "is-url@1.2.4",
+        "pkgId": "is-url@1.2.4",
+        "deps": []
+      },
+      {
+        "nodeId": "ip-regex@4.3.0",
+        "pkgId": "ip-regex@4.3.0",
+        "deps": []
+      },
+      {
+        "nodeId": "deep-is@0.1.4",
+        "pkgId": "deep-is@0.1.4",
+        "deps": []
+      },
+      {
+        "nodeId": "debug@4.3.1",
+        "pkgId": "debug@4.3.1",
+        "deps": [
+          {
+            "nodeId": "ms@2.1.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "ms@2.1.2",
+        "pkgId": "ms@2.1.2",
+        "deps": []
+      },
+      {
+        "nodeId": "axios@1.15.0",
+        "pkgId": "axios@1.15.0",
+        "deps": [
+          {
+            "nodeId": "proxy-from-env@2.1.0"
+          },
+          {
+            "nodeId": "follow-redirects@1.15.11"
+          },
+          {
+            "nodeId": "form-data@4.0.5"
+          }
+        ]
+      },
+      {
+        "nodeId": "proxy-from-env@2.1.0",
+        "pkgId": "proxy-from-env@2.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "follow-redirects@1.15.11",
+        "pkgId": "follow-redirects@1.15.11",
+        "deps": []
+      },
+      {
+        "nodeId": "form-data@4.0.5",
+        "pkgId": "form-data@4.0.5",
+        "deps": [
+          {
+            "nodeId": "es-set-tostringtag@2.1.0"
+          },
+          {
+            "nodeId": "combined-stream@1.0.8"
+          },
+          {
+            "nodeId": "asynckit@0.4.0"
+          },
+          {
+            "nodeId": "hasown@2.0.2"
+          },
+          {
+            "nodeId": "mime-types@2.1.35"
+          }
+        ]
+      },
+      {
+        "nodeId": "es-set-tostringtag@2.1.0",
+        "pkgId": "es-set-tostringtag@2.1.0",
+        "deps": [
+          {
+            "nodeId": "get-intrinsic@1.3.0"
+          },
+          {
+            "nodeId": "hasown@2.0.2"
+          },
+          {
+            "nodeId": "has-tostringtag@1.0.2"
+          },
+          {
+            "nodeId": "es-errors@1.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "get-intrinsic@1.3.0",
+        "pkgId": "get-intrinsic@1.3.0",
+        "deps": [
+          {
+            "nodeId": "function-bind@1.1.2"
+          },
+          {
+            "nodeId": "es-define-property@1.0.1"
+          },
+          {
+            "nodeId": "get-proto@1.0.1"
+          },
+          {
+            "nodeId": "call-bind-apply-helpers@1.0.2"
+          },
+          {
+            "nodeId": "gopd@1.2.0"
+          },
+          {
+            "nodeId": "math-intrinsics@1.1.0"
+          },
+          {
+            "nodeId": "es-errors@1.3.0"
+          },
+          {
+            "nodeId": "es-object-atoms@1.1.1"
+          },
+          {
+            "nodeId": "hasown@2.0.2"
+          },
+          {
+            "nodeId": "has-symbols@1.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "function-bind@1.1.2",
+        "pkgId": "function-bind@1.1.2",
+        "deps": []
+      },
+      {
+        "nodeId": "es-define-property@1.0.1",
+        "pkgId": "es-define-property@1.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "get-proto@1.0.1",
+        "pkgId": "get-proto@1.0.1",
+        "deps": [
+          {
+            "nodeId": "dunder-proto@1.0.1"
+          },
+          {
+            "nodeId": "es-object-atoms@1.1.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "dunder-proto@1.0.1",
+        "pkgId": "dunder-proto@1.0.1",
+        "deps": [
+          {
+            "nodeId": "gopd@1.2.0"
+          },
+          {
+            "nodeId": "es-errors@1.3.0"
+          },
+          {
+            "nodeId": "call-bind-apply-helpers@1.0.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "gopd@1.2.0",
+        "pkgId": "gopd@1.2.0",
+        "deps": []
+      },
+      {
+        "nodeId": "es-errors@1.3.0",
+        "pkgId": "es-errors@1.3.0",
+        "deps": []
+      },
+      {
+        "nodeId": "call-bind-apply-helpers@1.0.2",
+        "pkgId": "call-bind-apply-helpers@1.0.2",
+        "deps": [
+          {
+            "nodeId": "es-errors@1.3.0"
+          },
+          {
+            "nodeId": "function-bind@1.1.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "es-object-atoms@1.1.1",
+        "pkgId": "es-object-atoms@1.1.1",
+        "deps": [
+          {
+            "nodeId": "es-errors@1.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "math-intrinsics@1.1.0",
+        "pkgId": "math-intrinsics@1.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "hasown@2.0.2",
+        "pkgId": "hasown@2.0.2",
+        "deps": [
+          {
+            "nodeId": "function-bind@1.1.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "has-symbols@1.1.0",
+        "pkgId": "has-symbols@1.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "has-tostringtag@1.0.2",
+        "pkgId": "has-tostringtag@1.0.2",
+        "deps": [
+          {
+            "nodeId": "has-symbols@1.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "combined-stream@1.0.8",
+        "pkgId": "combined-stream@1.0.8",
+        "deps": [
+          {
+            "nodeId": "delayed-stream@1.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "delayed-stream@1.0.0",
+        "pkgId": "delayed-stream@1.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "asynckit@0.4.0",
+        "pkgId": "asynckit@0.4.0",
+        "deps": []
+      },
+      {
+        "nodeId": "mime-types@2.1.35",
+        "pkgId": "mime-types@2.1.35",
+        "deps": [
+          {
+            "nodeId": "mime-db@1.52.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "mime-db@1.52.0",
+        "pkgId": "mime-db@1.52.0",
+        "deps": []
+      },
+      {
+        "nodeId": "compare-versions@6.1.1",
+        "pkgId": "compare-versions@6.1.1",
+        "deps": []
+      },
+      {
+        "nodeId": "proxy-agent@6.5.0",
+        "pkgId": "proxy-agent@6.5.0",
+        "deps": [
+          {
+            "nodeId": "socks-proxy-agent@8.0.5"
+          },
+          {
+            "nodeId": "lru-cache@7.18.3"
+          },
+          {
+            "nodeId": "proxy-from-env@1.1.0"
+          },
+          {
+            "nodeId": "https-proxy-agent@7.0.6"
+          },
+          {
+            "nodeId": "agent-base@7.1.4"
+          },
+          {
+            "nodeId": "pac-proxy-agent@7.2.0"
+          },
+          {
+            "nodeId": "http-proxy-agent@7.0.2"
+          },
+          {
+            "nodeId": "debug@4.4.3"
+          }
+        ]
+      },
+      {
+        "nodeId": "socks-proxy-agent@8.0.5",
+        "pkgId": "socks-proxy-agent@8.0.5",
+        "deps": [
+          {
+            "nodeId": "agent-base@7.1.4"
+          },
+          {
+            "nodeId": "socks@2.8.7"
+          },
+          {
+            "nodeId": "debug@4.4.3"
+          }
+        ]
+      },
+      {
+        "nodeId": "agent-base@7.1.4",
+        "pkgId": "agent-base@7.1.4",
+        "deps": []
+      },
+      {
+        "nodeId": "socks@2.8.7",
+        "pkgId": "socks@2.8.7",
+        "deps": [
+          {
+            "nodeId": "ip-address@10.1.0"
+          },
+          {
+            "nodeId": "smart-buffer@4.2.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "ip-address@10.1.0",
+        "pkgId": "ip-address@10.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "smart-buffer@4.2.0",
+        "pkgId": "smart-buffer@4.2.0",
+        "deps": []
+      },
+      {
+        "nodeId": "debug@4.4.3",
+        "pkgId": "debug@4.4.3",
+        "deps": [
+          {
+            "nodeId": "ms@2.1.3"
+          }
+        ]
+      },
+      {
+        "nodeId": "ms@2.1.3",
+        "pkgId": "ms@2.1.3",
+        "deps": []
+      },
+      {
+        "nodeId": "lru-cache@7.18.3",
+        "pkgId": "lru-cache@7.18.3",
+        "deps": []
+      },
+      {
+        "nodeId": "proxy-from-env@1.1.0",
+        "pkgId": "proxy-from-env@1.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "https-proxy-agent@7.0.6",
+        "pkgId": "https-proxy-agent@7.0.6",
+        "deps": [
+          {
+            "nodeId": "agent-base@7.1.4"
+          },
+          {
+            "nodeId": "debug@4.4.3"
+          }
+        ]
+      },
+      {
+        "nodeId": "pac-proxy-agent@7.2.0",
+        "pkgId": "pac-proxy-agent@7.2.0",
+        "deps": [
+          {
+            "nodeId": "https-proxy-agent@7.0.6"
+          },
+          {
+            "nodeId": "get-uri@6.0.5"
+          },
+          {
+            "nodeId": "pac-resolver@7.0.1"
+          },
+          {
+            "nodeId": "agent-base@7.1.4"
+          },
+          {
+            "nodeId": "@tootallnate/quickjs-emscripten@0.23.0"
+          },
+          {
+            "nodeId": "http-proxy-agent@7.0.2"
+          },
+          {
+            "nodeId": "debug@4.4.3"
+          },
+          {
+            "nodeId": "socks-proxy-agent@8.0.5"
+          }
+        ]
+      },
+      {
+        "nodeId": "get-uri@6.0.5",
+        "pkgId": "get-uri@6.0.5",
+        "deps": [
+          {
+            "nodeId": "basic-ftp@5.2.2"
+          },
+          {
+            "nodeId": "data-uri-to-buffer@6.0.2"
+          },
+          {
+            "nodeId": "debug@4.4.3"
+          }
+        ]
+      },
+      {
+        "nodeId": "basic-ftp@5.2.2",
+        "pkgId": "basic-ftp@5.2.2",
+        "deps": []
+      },
+      {
+        "nodeId": "data-uri-to-buffer@6.0.2",
+        "pkgId": "data-uri-to-buffer@6.0.2",
+        "deps": []
+      },
+      {
+        "nodeId": "pac-resolver@7.0.1",
+        "pkgId": "pac-resolver@7.0.1",
+        "deps": [
+          {
+            "nodeId": "degenerator@5.0.1"
+          },
+          {
+            "nodeId": "netmask@2.1.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "degenerator@5.0.1",
+        "pkgId": "degenerator@5.0.1",
+        "deps": [
+          {
+            "nodeId": "esprima@4.0.1"
+          },
+          {
+            "nodeId": "ast-types@0.13.4"
+          },
+          {
+            "nodeId": "escodegen@2.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "esprima@4.0.1",
+        "pkgId": "esprima@4.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "ast-types@0.13.4",
+        "pkgId": "ast-types@0.13.4",
+        "deps": [
+          {
+            "nodeId": "tslib@2.8.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "tslib@2.8.1",
+        "pkgId": "tslib@2.8.1",
+        "deps": []
+      },
+      {
+        "nodeId": "escodegen@2.1.0",
+        "pkgId": "escodegen@2.1.0",
+        "deps": [
+          {
+            "nodeId": "estraverse@5.3.0"
+          },
+          {
+            "nodeId": "esprima@4.0.1"
+          },
+          {
+            "nodeId": "esutils@2.0.3"
+          },
+          {
+            "nodeId": "source-map@0.6.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "estraverse@5.3.0",
+        "pkgId": "estraverse@5.3.0",
+        "deps": []
+      },
+      {
+        "nodeId": "esutils@2.0.3",
+        "pkgId": "esutils@2.0.3",
+        "deps": []
+      },
+      {
+        "nodeId": "source-map@0.6.1",
+        "pkgId": "source-map@0.6.1",
+        "deps": []
+      },
+      {
+        "nodeId": "netmask@2.1.1",
+        "pkgId": "netmask@2.1.1",
+        "deps": []
+      },
+      {
+        "nodeId": "@tootallnate/quickjs-emscripten@0.23.0",
+        "pkgId": "@tootallnate/quickjs-emscripten@0.23.0",
+        "deps": []
+      },
+      {
+        "nodeId": "http-proxy-agent@7.0.2",
+        "pkgId": "http-proxy-agent@7.0.2",
+        "deps": [
+          {
+            "nodeId": "agent-base@7.1.4"
+          },
+          {
+            "nodeId": "debug@4.4.3"
+          }
+        ]
+      },
+      {
+        "nodeId": "@testim/chrome-version@1.1.4",
+        "pkgId": "@testim/chrome-version@1.1.4",
+        "deps": []
+      },
+      {
+        "nodeId": "extract-zip@2.0.1",
+        "pkgId": "extract-zip@2.0.1",
+        "deps": [
+          {
+            "nodeId": "get-stream@5.2.0"
+          },
+          {
+            "nodeId": "@types/yauzl@2.10.3"
+          },
+          {
+            "nodeId": "yauzl@2.10.0"
+          },
+          {
+            "nodeId": "debug@4.4.3"
+          }
+        ]
+      },
+      {
+        "nodeId": "get-stream@5.2.0",
+        "pkgId": "get-stream@5.2.0",
+        "deps": [
+          {
+            "nodeId": "pump@3.0.4"
+          }
+        ]
+      },
+      {
+        "nodeId": "pump@3.0.4",
+        "pkgId": "pump@3.0.4",
+        "deps": [
+          {
+            "nodeId": "end-of-stream@1.4.5"
+          },
+          {
+            "nodeId": "once@1.4.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "end-of-stream@1.4.5",
+        "pkgId": "end-of-stream@1.4.5",
+        "deps": [
+          {
+            "nodeId": "once@1.4.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "once@1.4.0",
+        "pkgId": "once@1.4.0",
+        "deps": [
+          {
+            "nodeId": "wrappy@1.0.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "wrappy@1.0.2",
+        "pkgId": "wrappy@1.0.2",
+        "deps": []
+      },
+      {
+        "nodeId": "@types/yauzl@2.10.3",
+        "pkgId": "@types/yauzl@2.10.3",
+        "deps": [
+          {
+            "nodeId": "@types/node@25.6.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "@types/node@25.6.0",
+        "pkgId": "@types/node@25.6.0",
+        "deps": [
+          {
+            "nodeId": "undici-types@7.19.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "undici-types@7.19.2",
+        "pkgId": "undici-types@7.19.2",
+        "deps": []
+      },
+      {
+        "nodeId": "yauzl@2.10.0",
+        "pkgId": "yauzl@2.10.0",
+        "deps": [
+          {
+            "nodeId": "buffer-crc32@0.2.13"
+          },
+          {
+            "nodeId": "fd-slicer@1.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "buffer-crc32@0.2.13",
+        "pkgId": "buffer-crc32@0.2.13",
+        "deps": []
+      },
+      {
+        "nodeId": "fd-slicer@1.1.0",
+        "pkgId": "fd-slicer@1.1.0",
+        "deps": [
+          {
+            "nodeId": "pend@1.2.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "pend@1.2.0",
+        "pkgId": "pend@1.2.0",
+        "deps": []
+      }
+    ]
+  }
+}

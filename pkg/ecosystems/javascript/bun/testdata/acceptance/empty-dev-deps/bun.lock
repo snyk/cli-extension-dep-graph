@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "goof",
+      "dependencies": {
+        "adm-zip": "0.4.7",
+      },
+    },
+  },
+  "packages": {
+    "adm-zip": ["adm-zip@0.4.7", "", {}, "sha512-QHVQ6ekddFaGr9r2hBUC4gPw2wLqMZioXojt9BydQPbSh8us7+Q5xcUCUq+hnh4zAdauV3wqoY0quApjKqrhbA=="],
+  }
+}
