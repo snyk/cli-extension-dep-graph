@@ -19,9 +19,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/snyk/dep-graph/go/pkg/depgraph"
+
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/javascript/bun"
-	"github.com/snyk/dep-graph/go/pkg/depgraph"
 )
 
 type acceptanceFixture struct {
@@ -32,50 +33,44 @@ type acceptanceFixture struct {
 // TestAcceptance runs the full acceptance suite, comparing plugin output against
 // the expected.json in each fixture directory.
 func TestAcceptance(t *testing.T) {
-	if _, err := exec.LookPath("bun"); err != nil {
-		t.Skip("bun not found in PATH — skipping acceptance suite")
-	}
-
-	fixtures := discoverFixtures(t, filepath.Join("testdata", "acceptance"))
-	require.NotEmpty(t, fixtures, "no acceptance fixtures found — check testdata/acceptance/")
-
-	plugin := bun.Plugin{}
-	opts := &ecosystems.SCAPluginOptions{}
-
-	for _, fx := range fixtures {
-		t.Run(fx.name, func(t *testing.T) {
-			result, err := plugin.BuildDepGraphsFromDir(t.Context(), nil, fx.dir, opts)
-			require.NoError(t, err)
-			require.NotEmpty(t, result.Results)
-			require.NoError(t, result.Results[0].Error)
-
-			raw, err := os.ReadFile(filepath.Join(fx.dir, "expected.json"))
-			require.NoError(t, err, "reading expected.json")
-
-			expected, err := depgraph.UnmarshalJSON(raw)
-			require.NoError(t, err, "parsing expected.json")
-
-			assert.Equal(t, normalizedJSON(expected), normalizedJSON(result.Results[0].DepGraph))
-		})
-	}
+	runAcceptanceSuite(t, filepath.Join("testdata", "acceptance"), &ecosystems.SCAPluginOptions{})
 }
 
 // TestAcceptanceDev runs the acceptance suite with dev dependencies included,
 // comparing plugin output against the expected.json in testdata/acceptance_dev/.
 func TestAcceptanceDev(t *testing.T) {
+	runAcceptanceSuite(t, filepath.Join("testdata", "acceptance_dev"), &ecosystems.SCAPluginOptions{
+		Global: ecosystems.GlobalOptions{
+			IncludeDev: true,
+		},
+	})
+}
+
+// TestAcceptanceOutOfSync verifies that packages declared in package.json but
+// absent from bun.lock are silently skipped when AllowOutOfSync is true.
+// Fixtures live in testdata/acceptance_out_of_sync/ and their expected.json
+// reflects only the resolved packages.
+func TestAcceptanceOutOfSync(t *testing.T) {
+	runAcceptanceSuite(t, filepath.Join("testdata", "acceptance_out_of_sync"), &ecosystems.SCAPluginOptions{
+		Global: ecosystems.GlobalOptions{
+			AllowOutOfSync: true,
+		},
+	})
+}
+
+// runAcceptanceSuite discovers fixtures under fixtureDir and asserts each one
+// produces a dep graph matching its expected.json.
+func runAcceptanceSuite(t *testing.T, fixtureDir string, opts *ecosystems.SCAPluginOptions) {
+	t.Helper()
+
 	if _, err := exec.LookPath("bun"); err != nil {
 		t.Skip("bun not found in PATH — skipping acceptance suite")
 	}
 
-	fixtures := discoverFixtures(t, filepath.Join("testdata", "acceptance_dev"))
-	require.NotEmpty(t, fixtures, "no acceptance_dev fixtures found — check testdata/acceptance_dev/")
+	fixtures := discoverFixtures(t, fixtureDir)
+	require.NotEmpty(t, fixtures, "no fixtures found — check %s", fixtureDir)
 
 	plugin := bun.Plugin{}
-	opts := &ecosystems.SCAPluginOptions{
-		Global: ecosystems.GlobalOptions{
-			IncludeDev: true,
-		},
-	}
 
 	for _, fx := range fixtures {
 		t.Run(fx.name, func(t *testing.T) {
@@ -103,7 +98,7 @@ func TestInvalidPackageJSON(t *testing.T) {
 	plugin := bun.Plugin{}
 	opts := &ecosystems.SCAPluginOptions{}
 
-	dir := filepath.Join("testdata", "depgraphs", "invalid-pkg-json")
+	dir := filepath.Join("testdata", "acceptance", "invalid-pkg-json")
 
 	result, err := plugin.BuildDepGraphsFromDir(t.Context(), nil, dir, opts)
 	require.NoError(t, err)
