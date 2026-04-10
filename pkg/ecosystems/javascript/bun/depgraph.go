@@ -1,9 +1,12 @@
 package bun
 
 import (
+	"context"
 	"fmt"
 
 	godepgraph "github.com/snyk/dep-graph/go/pkg/depgraph"
+
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
 
 const pkgManager = "bun"
@@ -16,7 +19,14 @@ const pkgManager = "bun"
 // graph is the parsed and inverted output of `bun why '*' --top`.
 // allowOutOfSync controls whether a package declared in package.json but absent from
 // bun.lock is silently skipped (true) or causes an error (false).
-func buildDepGraph(rootName, rootVersion string, directDepNames map[pkgName]struct{}, graph *whyGraph, allowOutOfSync bool) (*godepgraph.DepGraph, error) {
+func buildDepGraph(
+	ctx context.Context,
+	log logger.Logger,
+	rootName, rootVersion string,
+	directDepNames map[pkgName]struct{},
+	graph *whyGraph,
+	allowOutOfSync bool,
+) (*godepgraph.DepGraph, error) {
 	builder, err := godepgraph.NewBuilder(
 		&godepgraph.PkgManager{Name: pkgManager},
 		&godepgraph.PkgInfo{Name: rootName, Version: rootVersion},
@@ -35,6 +45,8 @@ func buildDepGraph(rootName, rootVersion string, directDepNames map[pkgName]stru
 			if !allowOutOfSync {
 				return nil, fmt.Errorf("package %q is declared in package.json but not in bun.lock — run `bun install` to sync", name)
 			}
+
+			log.Debug(ctx, "Skipping unresolved package (package.json out of sync with bun.lock)", logger.Attr("package", name))
 
 			continue
 		}

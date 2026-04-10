@@ -1,10 +1,13 @@
 package bun
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
 
 func TestBuildDepGraph_Simple(t *testing.T) {
@@ -18,9 +21,9 @@ func TestBuildDepGraph_Simple(t *testing.T) {
 		},
 	}
 
-	seeds := map[pkgName]struct{}{"debug": struct{}{}}
+	seeds := map[pkgName]struct{}{"debug": {}}
 
-	dg, err := buildDepGraph("my-app", "1.0.0", seeds, graph, true)
+	dg, err := buildDepGraph(context.Background(), logger.Nop(), "my-app", "1.0.0", seeds, graph, true)
 	require.NoError(t, err)
 	require.NotNil(t, dg)
 
@@ -51,9 +54,9 @@ func TestBuildDepGraph_ExcludesDevDepsWhenNotRequested(t *testing.T) {
 	}
 
 	// Production seeds only.
-	seeds := map[pkgName]struct{}{"debug": struct{}{}}
+	seeds := map[pkgName]struct{}{"debug": {}}
 
-	dg, err := buildDepGraph("my-app", "1.0.0", seeds, graph, true)
+	dg, err := buildDepGraph(context.Background(), logger.Nop(), "my-app", "1.0.0", seeds, graph, true)
 	require.NoError(t, err)
 
 	pkgIDs := make(map[string]bool)
@@ -85,11 +88,11 @@ func TestBuildDepGraph_WorkspaceMegaGraph(t *testing.T) {
 	}
 
 	seeds := map[pkgName]struct{}{
-		"@workspace/logger": struct{}{},
-		"debug":             struct{}{},
+		"@workspace/logger": {},
+		"debug":             {},
 	}
 
-	dg, err := buildDepGraph("my-workspace", "1.0.0", seeds, graph, true)
+	dg, err := buildDepGraph(context.Background(), logger.Nop(), "my-workspace", "1.0.0", seeds, graph, true)
 	require.NoError(t, err)
 	require.NotNil(t, dg)
 
@@ -113,11 +116,11 @@ func TestBuildDepGraph_SkipsMissingPackages(t *testing.T) {
 	}
 
 	seeds := map[pkgName]struct{}{
-		"debug":   struct{}{},
-		"missing": struct{}{}, // not in Packages
+		"debug":   {},
+		"missing": {}, // not in Packages
 	}
 
-	dg, err := buildDepGraph("my-app", "1.0.0", seeds, graph, true)
+	dg, err := buildDepGraph(context.Background(), logger.Nop(), "my-app", "1.0.0", seeds, graph, true)
 	require.NoError(t, err)
 	require.NotNil(t, dg)
 
@@ -137,11 +140,11 @@ func TestBuildDepGraph_StrictOutOfSync(t *testing.T) {
 	}
 
 	seeds := map[pkgName]struct{}{
-		"debug":   struct{}{},
-		"missing": struct{}{}, // not in Packages
+		"debug":   {},
+		"missing": {}, // not in Packages
 	}
 
-	_, err := buildDepGraph("my-app", "1.0.0", seeds, graph, false)
+	_, err := buildDepGraph(context.Background(), logger.Nop(), "my-app", "1.0.0", seeds, graph, false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing")
 	assert.Contains(t, err.Error(), "bun install")
@@ -160,10 +163,10 @@ func TestBuildDepGraph_HandlesCircularDeps(t *testing.T) {
 		},
 	}
 
-	seeds := map[pkgName]struct{}{"pkg-a": struct{}{}}
+	seeds := map[pkgName]struct{}{"pkg-a": {}}
 
 	// Should not infinite-loop.
-	dg, err := buildDepGraph("root", "0.0.0", seeds, graph, true)
+	dg, err := buildDepGraph(context.Background(), logger.Nop(), "root", "0.0.0", seeds, graph, true)
 	require.NoError(t, err)
 	require.NotNil(t, dg)
 }

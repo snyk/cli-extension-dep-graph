@@ -12,6 +12,8 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
 
+const logFieldLockFile = "lockFile"
+
 // Plugin implements ecosystems.SCAPlugin for Bun projects.
 // It uses `bun why '*' --top` to resolve the full dependency graph without
 // bespoke lockfile parsing, requiring bun >= 1.2.19.
@@ -40,8 +42,11 @@ func (p Plugin) BuildDepGraphsFromDir(
 	}
 
 	if len(files) == 0 {
+		log.Debug(ctx, "No bun.lock files found", logger.Attr("dir", dir))
 		return &ecosystems.PluginResult{}, nil
 	}
+
+	log.Debug(ctx, "Discovered bun.lock files", logger.Attr("count", len(files)))
 
 	exec := p.getExecutor()
 
@@ -52,6 +57,12 @@ func (p Plugin) BuildDepGraphsFromDir(
 		lockFileAbsDir := filepath.Dir(file.Path)
 
 		result := p.buildResult(ctx, log, file.RelPath, lockFileAbsDir, exec, options)
+		if result.Error != nil {
+			log.Error(ctx, "Failed to build bun dependency graph",
+				logger.Attr(logFieldLockFile, file.RelPath),
+				logger.Err(result.Error),
+			)
+		}
 		results = append(results, result)
 		processedFiles = append(processedFiles, file.RelPath)
 	}
@@ -71,7 +82,7 @@ func (p Plugin) buildResult(
 ) ecosystems.SCAResult {
 	meta := ecosystems.Metadata{TargetFile: lockFileRelPath}
 
-	log.Info(ctx, "Building bun dependency graph", logger.Attr("lockFile", lockFileRelPath))
+	log.Info(ctx, "Building bun dependency graph", logger.Attr(logFieldLockFile, lockFileRelPath))
 
 	pkgJSON, err := readPackageJSON(lockFileAbsDir)
 	if err != nil {
@@ -88,14 +99,16 @@ func (p Plugin) buildResult(
 		return ecosystems.SCAResult{Metadata: meta, Error: fmt.Errorf("parsing bun why output: %w", err)}
 	}
 
+	log.Debug(ctx, "Parsed bun why output", logger.Attr(logFieldLockFile, lockFileRelPath), logger.Attr("packages", len(graph.Packages)))
+
 	seeds := pkgJSON.directDeps(options.Global.IncludeDev)
 
-	depGraph, err := buildDepGraph(pkgJSON.Name, pkgJSON.Version, seeds, graph, options.Global.AllowOutOfSync)
+	depGraph, err := buildDepGraph(ctx, log, pkgJSON.Name, pkgJSON.Version, seeds, graph, options.Global.AllowOutOfSync)
 	if err != nil {
 		return ecosystems.SCAResult{Metadata: meta, Error: fmt.Errorf("building dep graph: %w", err)}
 	}
 
-	log.Info(ctx, "Successfully built bun dependency graph", logger.Attr("lockFile", lockFileRelPath))
+	log.Info(ctx, "Successfully built bun dependency graph", logger.Attr(logFieldLockFile, lockFileRelPath), logger.Attr("packages", len(depGraph.Pkgs)))
 
 	return ecosystems.SCAResult{
 		DepGraph: depGraph,
