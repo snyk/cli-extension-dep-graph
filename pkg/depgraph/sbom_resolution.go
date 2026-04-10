@@ -19,6 +19,7 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	ecosystemslogger "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/uv"
+	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
 )
 
 func handleSBOMResolution(
@@ -113,8 +114,8 @@ func handleSBOMResolutionDI(
 		if failFast && allProjects {
 			for _, result := range pluginResult.Results {
 				if result.Error != nil {
-					logResultError(logger, result.Metadata.TargetFile, result.Error)
-					return nil, createFailFastError(result.Metadata.TargetFile, result.Error)
+					logResultError(logger, result.ProjectDescriptor.GetTargetFile(), result.Error)
+					return nil, createFailFastError(result.ProjectDescriptor.GetTargetFile(), result.Error)
 				}
 			}
 		}
@@ -200,7 +201,7 @@ func outputAnyWarnings(ctx workflow.InvocationContext, logger *zerolog.Logger, p
 func renderWarningForProblemResults(problemResults []ecosystems.SCAResult, totalResults int) string {
 	outputMessage := ""
 	for _, result := range problemResults {
-		outputMessage += fmt.Sprintf("\n%s:", result.Metadata.TargetFile)
+		outputMessage += fmt.Sprintf("\n%s:", result.ProjectDescriptor.GetTargetFile())
 		var snykErr snyk_errors.Error
 		if errors.As(result.Error, &snykErr) && snykErr.Detail != "" {
 			outputMessage += fmt.Sprintf("\n  %s", snykErr.Detail)
@@ -242,8 +243,12 @@ func extractProblemResults(logger *zerolog.Logger, data workflow.Data, errList [
 	}
 	for i := range errList {
 		results = append(results, ecosystems.SCAResult{
-			Metadata: ecosystems.Metadata{TargetFile: targetFile},
-			Error:    errList[i],
+			ProjectDescriptor: identity.ProjectDescriptor{
+				Identity: identity.ProjectIdentity{
+					TargetFile: &targetFile,
+				},
+			},
+			Error: errList[i],
 		})
 	}
 	return results
@@ -318,7 +323,7 @@ func combineWorkspaceResultsAsJSONL(logger *zerolog.Logger, results []ecosystems
 	var problemResults []ecosystems.SCAResult
 	for _, result := range results {
 		if result.Error != nil {
-			logResultError(logger, result.Metadata.TargetFile, result.Error)
+			logResultError(logger, result.ProjectDescriptor.GetTargetFile(), result.Error)
 			problemResults = append(problemResults, result)
 			return nil, problemResults, result.Error
 		}
@@ -336,7 +341,7 @@ func combineWorkspaceResultsAsJSONL(logger *zerolog.Logger, results []ecosystems
 	// Example failing test: https://github.com/snyk/go-application-framework/pull/559
 	workflowData := workflow.NewData(DataTypeID, contentTypeJSONL, data)
 
-	targetFile := results[0].Metadata.TargetFile
+	targetFile := results[0].ProjectDescriptor.GetTargetFile()
 	workflowData.SetMetaData(contentLocationKey, targetFile)
 	workflowData.SetMetaData(MetaKeyNormalisedTargetFile, targetFile)
 	workflowData.SetMetaData(MetaKeyTargetFileFromPlugin, targetFile)
@@ -351,7 +356,7 @@ func processResultsIndividually(logger *zerolog.Logger, results []ecosystems.SCA
 		result := &results[i]
 
 		if result.Error != nil {
-			logResultError(logger, result.Metadata.TargetFile, result.Error)
+			logResultError(logger, result.ProjectDescriptor.GetTargetFile(), result.Error)
 			problemResults = append(problemResults, *result)
 
 			if !allProjects {
@@ -383,7 +388,7 @@ func combineWorkspaceDepGraphsAsJSONL(results []ecosystems.SCAResult) ([]byte, e
 		}
 		line := jsonlOutputLine{
 			DepGraph:   results[i].DepGraph,
-			TargetFile: results[i].Metadata.TargetFile,
+			TargetFile: results[i].ProjectDescriptor.GetTargetFile(),
 		}
 		b, err := json.Marshal(line)
 		if err != nil {
@@ -403,7 +408,7 @@ func workflowDataFromDepGraph(result *ecosystems.SCAResult) (workflow.Data, erro
 
 	data := workflow.NewData(DataTypeID, contentTypeJSON, depGraphBytes)
 
-	targetFile := result.Metadata.TargetFile
+	targetFile := result.ProjectDescriptor.GetTargetFile()
 	data.SetMetaData(contentLocationKey, targetFile)
 	data.SetMetaData(MetaKeyNormalisedTargetFile, targetFile)
 	data.SetMetaData(MetaKeyTargetFileFromPlugin, targetFile)

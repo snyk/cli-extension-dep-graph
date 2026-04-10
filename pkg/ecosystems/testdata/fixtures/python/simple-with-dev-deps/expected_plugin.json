@@ -102,9 +102,11 @@
         ]
       }
     },
-    "metadata": {
-      "targetFile": "Pipfile",
-      "runtime": "python@3.14.0"
+    "projectDescriptor": {
+      "identity": {
+        "targetFile": "Pipfile",
+        "targetRuntime": "python@3.14.0"
+      }
     }
   }
 ]

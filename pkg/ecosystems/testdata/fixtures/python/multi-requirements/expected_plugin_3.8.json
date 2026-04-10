@@ -57,9 +57,11 @@
         ]
       }
     },
-    "metadata": {
-      "targetFile": "frontend/requirements.txt",
-      "runtime": "python@3.8.20"
+    "projectDescriptor": {
+      "identity": {
+        "targetFile": "frontend/requirements.txt",
+        "targetRuntime": "python@3.8.20"
+      }
     }
   },
   {
@@ -165,9 +167,11 @@
         ]
       }
     },
-    "metadata": {
-      "targetFile": "requirements.txt",
-      "runtime": "python@3.8.20"
+    "projectDescriptor": {
+      "identity": {
+        "targetFile": "requirements.txt",
+        "targetRuntime": "python@3.8.20"
+      }
     }
   },
   {
@@ -363,9 +367,11 @@
         ]
       }
     },
-    "metadata": {
-      "targetFile": "backend/requirements.txt",
-      "runtime": "python@3.8.20"
+    "projectDescriptor": {
+      "identity": {
+        "targetFile": "backend/requirements.txt",
+        "targetRuntime": "python@3.8.20"
+      }
     }
   }
 ]

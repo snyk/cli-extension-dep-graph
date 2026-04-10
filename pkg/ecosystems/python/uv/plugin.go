@@ -16,6 +16,7 @@ import (
 	scaecosystems "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
 )
 
 type Plugin struct {
@@ -68,8 +69,11 @@ func (p Plugin) BuildDepGraphsFromDir(
 			wrappedErr := fmt.Errorf("failed to build dependency graph for %s: %w", lockFilePath, err)
 
 			errorResult := scaecosystems.SCAResult{
-				Metadata: scaecosystems.Metadata{
-					TargetFile: lockFilePath,
+				ProjectDescriptor: identity.ProjectDescriptor{
+					Identity: identity.ProjectIdentity{
+						Type:       "uv",
+						TargetFile: &lockFilePath,
+					},
 				},
 				Error: wrappedErr,
 			}
@@ -112,8 +116,11 @@ func (p Plugin) buildResults(
 		)
 		return &scaecosystems.PluginResult{
 			Results: []scaecosystems.SCAResult{{
-				Metadata: scaecosystems.Metadata{
-					TargetFile: lockFilePath,
+				ProjectDescriptor: identity.ProjectDescriptor{
+					Identity: identity.ProjectIdentity{
+						Type:       "uv",
+						TargetFile: &lockFilePath,
+					},
 				},
 				Error: noRootErr,
 			}},
@@ -161,8 +168,11 @@ func (p Plugin) buildResults(
 
 		res := scaecosystems.SCAResult{
 			DepGraph: depGraph,
-			Metadata: scaecosystems.Metadata{
-				TargetFile: manifestFile,
+			ProjectDescriptor: identity.ProjectDescriptor{
+				Identity: identity.ProjectIdentity{
+					Type:       "uv",
+					TargetFile: &manifestFile,
+				},
 			},
 		}
 		result.Results = append(result.Results, res)

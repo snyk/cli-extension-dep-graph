@@ -193,9 +193,11 @@
         ]
       }
     },
-    "metadata": {
-      "targetFile": "requirements.txt",
-      "runtime": "python@3.14.1"
+    "projectDescriptor": {
+      "identity": {
+        "targetFile": "requirements.txt",
+        "targetRuntime": "python@3.14.1"
+      }
     }
   }
 ]
