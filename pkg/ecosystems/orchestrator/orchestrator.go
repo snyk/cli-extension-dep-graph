@@ -10,6 +10,7 @@ import (
 	extensionDepgraph "github.com/snyk/cli-extension-dep-graph/pkg/depgraph"
 	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/javascript/bun"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pip"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pipenv"
@@ -32,24 +33,43 @@ func ResolveDepgraphs(ictx workflow.InvocationContext, dir string, opts ecosyste
 	enhancedLogger := ictx.GetEnhancedLogger()
 
 	pythonResult := resolvePython(ictx.Context(), enhancedLogger, dir, opts)
+	bunResult := resolveBun(ictx.Context(), enhancedLogger, dir, opts)
+
+	processedFiles := append(pythonResult.ProcessedFiles, bunResult.ProcessedFiles...)
 
 	// Call legacy fallback to get results
-	results, err := LegacyFallback(ictx, opts, pythonResult.ProcessedFiles)
+	results, err := LegacyFallback(ictx, opts, processedFiles)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create channel and send all results
-	resultsChan := make(chan ecosystems.SCAResult, len(results)+len(pythonResult.Results))
+	resultsChan := make(chan ecosystems.SCAResult, len(results)+len(pythonResult.Results)+len(bunResult.Results))
 	for _, result := range results {
 		resultsChan <- result
 	}
 	for _, result := range pythonResult.Results {
 		resultsChan <- result
 	}
+	for _, result := range bunResult.Results {
+		resultsChan <- result
+	}
 	close(resultsChan)
 
 	return resultsChan, nil
+}
+
+//nolint:gocritic // hugeParam: ensure `options` is not nil
+func resolveBun(ctx context.Context, enhancedLogger *zerolog.Logger, dir string, opts ecosystems.SCAPluginOptions) ecosystems.PluginResult {
+	log := logger.NewFromZerolog(enhancedLogger)
+
+	bunResults, err := bun.Plugin{}.BuildDepGraphsFromDir(ctx, log, dir, &opts)
+	if err != nil {
+		enhancedLogger.Warn().Err(err).Msg("bun plugin failed, continuing with other plugins")
+		return ecosystems.PluginResult{}
+	}
+
+	return *bunResults
 }
 
 //nolint:gocritic // hugeParam: ensure `options` is not nil
