@@ -26,6 +26,7 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
 )
 
 //go:embed testdata/uv-sbom-convert-expected-dep-graph.json
@@ -182,7 +183,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: expectedDepGraph,
-						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("pyproject.toml"),
+							},
+						},
 					},
 				},
 			},
@@ -261,11 +266,19 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("pyproject.toml"),
+							},
+						},
 					},
 					{
-						Error:    fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
-						Metadata: ecosystems.Metadata{TargetFile: "uv.lock"},
+						Error: fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("uv.lock"),
+							},
+						},
 					},
 				},
 			},
@@ -305,12 +318,20 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			result: &ecosystems.PluginResult{
 				Results: []ecosystems.SCAResult{
 					{
-						Error:    fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
-						Metadata: ecosystems.Metadata{TargetFile: "project1/uv.lock"},
+						Error: fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("project1/uv.lock"),
+							},
+						},
 					},
 					{
-						Error:    fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
-						Metadata: ecosystems.Metadata{TargetFile: "project2/uv.lock"},
+						Error: fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("project2/uv.lock"),
+							},
+						},
 					},
 				},
 			},
@@ -351,7 +372,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("pyproject.toml"),
+							},
+						},
 					},
 				},
 			},
@@ -375,19 +400,35 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	t.Run("handleSBOMResolution with FlagAllProjects", func(t *testing.T) {
 		finding1 := ecosystems.SCAResult{
 			DepGraph: createTestDepGraph(t, "pip", "project-1", "1.0.0"),
-			Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+			ProjectDescriptor: identity.ProjectDescriptor{
+				Identity: identity.ProjectIdentity{
+					TargetFile: stringPtr("pyproject.toml"),
+				},
+			},
 		}
 		finding2 := ecosystems.SCAResult{
 			DepGraph: createTestDepGraph(t, "pip", "project-2", "2.0.0"),
-			Metadata: ecosystems.Metadata{TargetFile: "subproject/pyproject.toml"},
+			ProjectDescriptor: identity.ProjectDescriptor{
+				Identity: identity.ProjectIdentity{
+					TargetFile: stringPtr("subproject/pyproject.toml"),
+				},
+			},
 		}
 		finding3 := ecosystems.SCAResult{
 			DepGraph: createTestDepGraph(t, "npm", "project-3", "3.0.0"),
-			Metadata: ecosystems.Metadata{TargetFile: "package.json"},
+			ProjectDescriptor: identity.ProjectDescriptor{
+				Identity: identity.ProjectIdentity{
+					TargetFile: stringPtr("package.json"),
+				},
+			},
 		}
 		finding4 := ecosystems.SCAResult{
 			DepGraph: createTestDepGraph(t, "gomod", "project-4", "4.0.0"),
-			Metadata: ecosystems.Metadata{TargetFile: "go.mod"},
+			ProjectDescriptor: identity.ProjectDescriptor{
+				Identity: identity.ProjectIdentity{
+					TargetFile: stringPtr("go.mod"),
+				},
+			},
 		}
 
 		tc := []struct {
@@ -600,7 +641,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("pyproject.toml"),
+							},
+						},
 					},
 				},
 				ProcessedFiles: []string{"uv.lock"},
@@ -671,7 +716,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("pyproject.toml"),
+							},
+						},
 					},
 				},
 				ProcessedFiles: []string{"uv.lock"},
@@ -713,12 +762,20 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-						Metadata: ecosystems.Metadata{TargetFile: "project1/pyproject.toml"},
-						Error:    nil,
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("project1/pyproject.toml"),
+							},
+						},
+						Error: nil,
 					},
 					{
-						Metadata: ecosystems.Metadata{TargetFile: "project2/uv.lock"},
-						Error:    fmt.Errorf("failed to generate SBOM"),
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("project2/uv.lock"),
+							},
+						},
+						Error: fmt.Errorf("failed to generate SBOM"),
 					},
 				},
 				ProcessedFiles: []string{"project1/uv.lock", "project2/uv.lock"},
@@ -755,8 +812,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			result: &ecosystems.PluginResult{
 				Results: []ecosystems.SCAResult{
 					{
-						Metadata: ecosystems.Metadata{TargetFile: "uv.lock"},
-						Error:    snykErr,
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("uv.lock"),
+							},
+						},
+						Error: snykErr,
 					},
 				},
 				ProcessedFiles: []string{"uv.lock"},
@@ -801,7 +862,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("pyproject.toml"),
+							},
+						},
 					},
 				},
 			},
@@ -832,7 +897,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("pyproject.toml"),
+							},
+						},
 					},
 				},
 			},
@@ -861,7 +930,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("pyproject.toml"),
+							},
+						},
 					},
 				},
 			},
@@ -897,7 +970,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("pyproject.toml"),
+							},
+						},
 					},
 				},
 			},
@@ -931,7 +1008,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("pyproject.toml"),
+							},
+						},
 					},
 				},
 			},
@@ -965,7 +1046,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("pyproject.toml"),
+							},
+						},
 					},
 				},
 			},
@@ -1056,8 +1141,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			result: &ecosystems.PluginResult{
 				Results: []ecosystems.SCAResult{
 					{
-						Metadata: ecosystems.Metadata{TargetFile: "uv.lock"},
-						Error:    snykErr,
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("uv.lock"),
+							},
+						},
+						Error: snykErr,
 					},
 				},
 				ProcessedFiles: []string{"uv.lock"},
@@ -1101,16 +1190,28 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-						Metadata: ecosystems.Metadata{TargetFile: "valid-project/pyproject.toml"},
-						Error:    nil,
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("valid-project/pyproject.toml"),
+							},
+						},
+						Error: nil,
 					},
 					{
-						Metadata: ecosystems.Metadata{TargetFile: "project1/uv.lock"},
-						Error:    snykErr,
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("project1/uv.lock"),
+							},
+						},
+						Error: snykErr,
 					},
 					{
-						Metadata: ecosystems.Metadata{TargetFile: "project2/uv.lock"},
-						Error:    fmt.Errorf("This should not be processed"),
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("project2/uv.lock"),
+							},
+						},
+						Error: fmt.Errorf("This should not be processed"),
 					},
 				},
 				ProcessedFiles: []string{"project1/uv.lock", "project2/uv.lock"},
@@ -1151,8 +1252,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			result: &ecosystems.PluginResult{
 				Results: []ecosystems.SCAResult{
 					{
-						Metadata: ecosystems.Metadata{TargetFile: "project1/uv.lock"},
-						Error:    snykErr,
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("project1/uv.lock"),
+							},
+						},
+						Error: snykErr,
 					},
 				},
 				ProcessedFiles: []string{"project1/uv.lock"},
@@ -1194,12 +1299,20 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-						Metadata: ecosystems.Metadata{TargetFile: "valid-project/pyproject.toml"},
-						Error:    nil,
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("valid-project/pyproject.toml"),
+							},
+						},
+						Error: nil,
 					},
 					{
-						Metadata: ecosystems.Metadata{TargetFile: "project1/uv.lock"},
-						Error:    snykErr,
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("project1/uv.lock"),
+							},
+						},
+						Error: snykErr,
 					},
 				},
 				ProcessedFiles: []string{"project1/uv.lock"},
@@ -1253,8 +1366,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			result: &ecosystems.PluginResult{
 				Results: []ecosystems.SCAResult{
 					{
-						Metadata: ecosystems.Metadata{TargetFile: "uv.lock"},
-						Error:    snykErr,
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("uv.lock"),
+							},
+						},
+						Error: snykErr,
 					},
 				},
 				ProcessedFiles: []string{"uv.lock"},
@@ -1289,7 +1406,11 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("pyproject.toml"),
+							},
+						},
 					},
 				},
 			},
@@ -1329,16 +1450,28 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Results: []ecosystems.SCAResult{
 					{
 						DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-						Metadata: ecosystems.Metadata{TargetFile: "valid-project/pyproject.toml"},
-						Error:    nil,
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("valid-project/pyproject.toml"),
+							},
+						},
+						Error: nil,
 					},
 					{
-						Metadata: ecosystems.Metadata{TargetFile: "project1/uv.lock"},
-						Error:    snykErr,
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("project1/uv.lock"),
+							},
+						},
+						Error: snykErr,
 					},
 					{
-						Metadata: ecosystems.Metadata{TargetFile: "project2/uv.lock"},
-						Error:    regularErr,
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{
+								TargetFile: stringPtr("project2/uv.lock"),
+							},
+						},
+						Error: regularErr,
 					},
 				},
 				ProcessedFiles: []string{"project1/uv.lock", "project2/uv.lock"},
@@ -1451,8 +1584,8 @@ func Test_extractProblemResults(t *testing.T) {
 		findings := extractProblemResults(&nopLogger, data, errList)
 
 		require.Len(t, findings, 2)
-		assert.Equal(t, "project/requirements.txt", findings[0].Metadata.TargetFile)
-		assert.Equal(t, "project/requirements.txt", findings[1].Metadata.TargetFile)
+		assert.Equal(t, "project/requirements.txt", findings[0].ProjectDescriptor.GetTargetFile())
+		assert.Equal(t, "project/requirements.txt", findings[1].ProjectDescriptor.GetTargetFile())
 		assert.Equal(t, errList[0], findings[0].Error)
 		assert.Equal(t, errList[1], findings[1].Error)
 	})
@@ -1469,7 +1602,7 @@ func Test_extractProblemResults(t *testing.T) {
 		findings := extractProblemResults(&nopLogger, data, errList)
 
 		require.Len(t, findings, 1)
-		assert.Equal(t, "unknown", findings[0].Metadata.TargetFile)
+		assert.Equal(t, "unknown", findings[0].ProjectDescriptor.GetTargetFile())
 		assert.Equal(t, errList[0], findings[0].Error)
 	})
 
@@ -1552,7 +1685,11 @@ func Test_processedFilesFlowFromPluginsToExcludeConfig(t *testing.T) {
 		result: &ecosystems.PluginResult{
 			Results: []ecosystems.SCAResult{{
 				DepGraph: createTestDepGraph(t, "pip", "project-1", "1.0.0"),
-				Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+				ProjectDescriptor: identity.ProjectDescriptor{
+					Identity: identity.ProjectIdentity{
+						TargetFile: stringPtr("pyproject.toml"),
+					},
+				},
 			}},
 			ProcessedFiles: []string{"file1.py", "file2.py"},
 		},
@@ -1561,7 +1698,11 @@ func Test_processedFilesFlowFromPluginsToExcludeConfig(t *testing.T) {
 		result: &ecosystems.PluginResult{
 			Results: []ecosystems.SCAResult{{
 				DepGraph: createTestDepGraph(t, "pip", "project-2", "2.0.0"),
-				Metadata: ecosystems.Metadata{TargetFile: "package.json"},
+				ProjectDescriptor: identity.ProjectDescriptor{
+					Identity: identity.ProjectIdentity{
+						TargetFile: stringPtr("package.json"),
+					},
+				},
 			}},
 			ProcessedFiles: []string{"file3.py"},
 		},
@@ -1593,7 +1734,11 @@ func Test_uvWorkspacePackages_passesOptionToPlugin(t *testing.T) {
 			Results: []ecosystems.SCAResult{
 				{
 					DepGraph: createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
-					Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("pyproject.toml"),
+						},
+					},
 				},
 			},
 		},
@@ -1627,11 +1772,19 @@ func Test_uvWorkspacePackages_combinesMultipleDepGraphsAsJSONL(t *testing.T) {
 			Results: []ecosystems.SCAResult{
 				{
 					DepGraph: createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
-					Metadata: ecosystems.Metadata{TargetFile: "pyproject.toml"},
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("pyproject.toml"),
+						},
+					},
 				},
 				{
 					DepGraph: createTestDepGraph(t, "uv", "pkg-b", "2.0.0"),
-					Metadata: ecosystems.Metadata{TargetFile: "packages/pkg-b/pyproject.toml"},
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("packages/pkg-b/pyproject.toml"),
+						},
+					},
 				},
 			},
 		},
@@ -1701,8 +1854,12 @@ func Test_uvWorkspacePackages_returnsErrorWhenFindingHasError(t *testing.T) {
 		result: &ecosystems.PluginResult{
 			Results: []ecosystems.SCAResult{
 				{
-					Metadata: ecosystems.Metadata{TargetFile: "uv.lock"},
-					Error:    snykErr,
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("uv.lock"),
+						},
+					},
+					Error: snykErr,
 				},
 			},
 		},
@@ -1725,4 +1882,9 @@ func Test_uvWorkspacePackages_returnsErrorWhenFindingHasError(t *testing.T) {
 	assert.Equal(t, "SNYK-TEST-001", returnedSnykErr.ID)
 	assert.Equal(t, "Test Error Title", returnedSnykErr.Title)
 	assert.Equal(t, "Detailed error information for support debugging", returnedSnykErr.Detail)
+}
+
+// stringPtr returns a pointer to the given string value.
+func stringPtr(s string) *string {
+	return &s
 }

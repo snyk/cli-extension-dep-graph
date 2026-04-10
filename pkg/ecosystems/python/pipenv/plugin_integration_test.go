@@ -154,9 +154,9 @@ func TestPlugin_BuildDepGraphsFromDir_PipErrors(t *testing.T) {
 			pipenvResult := results[0]
 
 			// Basic metadata expectations
-			assert.Equal(t, "Pipfile", pipenvResult.Metadata.TargetFile)
+			assert.Equal(t, "Pipfile", pipenvResult.ProjectDescriptor.GetTargetFile())
 			if pythonVersion != "" {
-				assert.Contains(t, pipenvResult.Metadata.Runtime, fmt.Sprintf("python@%s", pythonVersion))
+				assert.Contains(t, *pipenvResult.ProjectDescriptor.Identity.TargetRuntime, fmt.Sprintf("python@%s", pythonVersion))
 			}
 
 			assert.Nil(t, pipenvResult.DepGraph, "dep graph should be nil for pip error fixture %s", tc.fixture)
@@ -218,8 +218,9 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 
 	// Sync fields that vary between pip and pipenv (allows sharing fixtures)
 	for i := range sortExpected {
-		sortExpected[i].Metadata.Runtime = sortActual[i].Metadata.Runtime
-		sortExpected[i].Metadata.TargetFile = sortActual[i].Metadata.TargetFile
+		sortExpected[i].ProjectDescriptor.Identity.TargetRuntime = sortActual[i].ProjectDescriptor.Identity.TargetRuntime
+		sortExpected[i].ProjectDescriptor.Identity.TargetFile = sortActual[i].ProjectDescriptor.Identity.TargetFile
+		sortActual[i].ProjectDescriptor.Identity.Type = "" // Clear type since fixtures are shared
 		if sortExpected[i].DepGraph != nil && sortActual[i].DepGraph != nil {
 			sortExpected[i].DepGraph.PkgManager = sortActual[i].DepGraph.PkgManager
 		}

@@ -18,6 +18,7 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pip"
+	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
 )
 
 const (
@@ -82,9 +83,11 @@ func (p Plugin) BuildDepGraphsFromDir(
 				log.Error(ctx, "Failed to build dependency graph", attrs...)
 
 				result = ecosystems.SCAResult{
-					Metadata: ecosystems.Metadata{
-						TargetFile: file.RelPath,
-						Runtime:    fmt.Sprintf(pythonRuntimeFmt, pythonVersion),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							Type:       "pipenv",
+							TargetFile: &file.RelPath,
+						},
 					},
 					Error: err,
 				}
@@ -103,7 +106,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	processedFiles := make([]string, 0, len(results))
 	for _, result := range results {
-		processedFiles = append(processedFiles, result.Metadata.TargetFile)
+		processedFiles = append(processedFiles, result.ProjectDescriptor.GetTargetFile())
 	}
 
 	return &ecosystems.PluginResult{
@@ -198,9 +201,11 @@ func (p Plugin) buildDepGraphFromPipfile(
 
 	return ecosystems.SCAResult{
 		DepGraph: depGraph,
-		Metadata: ecosystems.Metadata{
-			TargetFile: file.RelPath,
-			Runtime:    fmt.Sprintf(pythonRuntimeFmt, pythonVersion),
+		ProjectDescriptor: identity.ProjectDescriptor{
+			Identity: identity.ProjectIdentity{
+				Type:       "pipenv",
+				TargetFile: &file.RelPath,
+			},
 		},
 	}, nil
 }

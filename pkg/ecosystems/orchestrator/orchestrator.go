@@ -13,6 +13,7 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pip"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pipenv"
+	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
 
 	"github.com/rs/zerolog"
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
@@ -174,8 +175,12 @@ func parseLegacyJSONLToResults(bytes []byte, ictx workflow.InvocationContext, lo
 				Err(resErr).
 				Msg("Failed to convert depgraph output")
 			results = append(results, ecosystems.SCAResult{
-				Metadata: ecosystems.Metadata{TargetFile: output.NormalisedTargetFile},
-				Error:    resErr,
+				ProjectDescriptor: identity.ProjectDescriptor{
+					Identity: identity.ProjectIdentity{
+						TargetFile: &output.NormalisedTargetFile,
+					},
+				},
+				Error: resErr,
 			})
 		} else {
 			results = append(results, result)
@@ -188,8 +193,10 @@ func parseLegacyJSONLToResults(bytes []byte, ictx workflow.InvocationContext, lo
 func depGraphOutputToSCAResult(output *parsers.DepGraphOutput, ictx workflow.InvocationContext) (ecosystems.SCAResult, error) {
 	log := ictx.GetEnhancedLogger()
 	result := ecosystems.SCAResult{
-		Metadata: ecosystems.Metadata{
-			TargetFile: output.NormalisedTargetFile,
+		ProjectDescriptor: identity.ProjectDescriptor{
+			Identity: identity.ProjectIdentity{
+				TargetFile: &output.NormalisedTargetFile,
+			},
 		},
 	}
 
@@ -219,7 +226,7 @@ func depGraphOutputToSCAResult(output *parsers.DepGraphOutput, ictx workflow.Inv
 
 		// Extract runtime from depgraph if available
 		if dg.PkgManager.Name != "" {
-			result.Metadata.Runtime = dg.PkgManager.Name
+			result.ProjectDescriptor.Identity.TargetRuntime = &dg.PkgManager.Name
 		}
 	}
 

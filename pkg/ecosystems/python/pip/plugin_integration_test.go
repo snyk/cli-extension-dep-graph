@@ -63,19 +63,19 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 			absPath, err := filepath.Abs(fixturePath)
 			require.NoError(t, err, "failed to get absolute path for fixture")
 
-		// Run plugin
-		plugin := Plugin{}
-		result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, tc.Options)
-		require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
+			// Run plugin
+			plugin := Plugin{}
+			result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, tc.Options)
+			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 
-		// Load and compare expected output
-		expectedPath := getExpectedOutputPath(t, fixturePath, pythonVersion)
-		require.NotEmpty(t, expectedPath, "no expected output file found for fixture %s", tc.Fixture)
+			// Load and compare expected output
+			expectedPath := getExpectedOutputPath(t, fixturePath, pythonVersion)
+			require.NotEmpty(t, expectedPath, "no expected output file found for fixture %s", tc.Fixture)
 
-		expected, err := loadExpectedResults(expectedPath)
-		require.NoError(t, err, "failed to load expected output from %s", expectedPath)
+			expected, err := loadExpectedResults(expectedPath)
+			require.NoError(t, err, "failed to load expected output from %s", expectedPath)
 
-		assertResultsMatchExpected(t, result.Results, expected, tc.Fixture)
+			assertResultsMatchExpected(t, result.Results, expected, tc.Fixture)
 		})
 	}
 }
@@ -149,26 +149,26 @@ func TestPlugin_BuildDepGraphsFromDir_PipErrors(t *testing.T) {
 			absPath, err := filepath.Abs(fixturePath)
 			require.NoError(t, err, "failed to get absolute path for fixture")
 
-		plugin := Plugin{}
-		result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, ecosystems.NewPluginOptions())
-		require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
+			plugin := Plugin{}
+			result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, ecosystems.NewPluginOptions())
+			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 
-		require.Len(t, result.Results, 1, "expected a single result for fixture %s", tc.fixture)
-		pipResult := result.Results[0]
+			require.Len(t, result.Results, 1, "expected a single result for fixture %s", tc.fixture)
+			pipResult := result.Results[0]
 
-		// Basic metadata expectations
-		assert.Equal(t, "requirements.txt", pipResult.Metadata.TargetFile)
-		if pythonVersion != "" {
-			assert.Contains(t, pipResult.Metadata.Runtime, fmt.Sprintf("python@%s", pythonVersion))
-		}
+			// Basic metadata expectations
+			assert.Equal(t, "requirements.txt", pipResult.ProjectDescriptor.GetTargetFile())
+			if pythonVersion != "" && pipResult.ProjectDescriptor.Identity.TargetRuntime != nil {
+				assert.Contains(t, *pipResult.ProjectDescriptor.Identity.TargetRuntime, fmt.Sprintf("python@%s", pythonVersion))
+			}
 
-		assert.Nil(t, pipResult.DepGraph, "dep graph should be nil for pip error fixture %s", tc.fixture)
-		require.Error(t, pipResult.Error, "expected an error on the result for fixture %s", tc.fixture)
+			assert.Nil(t, pipResult.DepGraph, "dep graph should be nil for pip error fixture %s", tc.fixture)
+			require.Error(t, pipResult.Error, "expected an error on the result for fixture %s", tc.fixture)
 
-		var catalogErr snykerrors.Error
-		require.True(t, errors.As(pipResult.Error, &catalogErr), "error should be a catalog error")
-		assert.Equal(t, tc.expectedCode, catalogErr.ErrorCode)
-		assert.Contains(t, catalogErr.Detail, tc.expectedDetailSnippet)
+			var catalogErr snykerrors.Error
+			require.True(t, errors.As(pipResult.Error, &catalogErr), "error should be a catalog error")
+			assert.Equal(t, tc.expectedCode, catalogErr.ErrorCode)
+			assert.Contains(t, catalogErr.Detail, tc.expectedDetailSnippet)
 		})
 	}
 }
@@ -234,19 +234,20 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 	sortActual := make([]ecosystems.SCAResult, len(actual))
 	copy(sortActual, actual)
 	sort.Slice(sortActual, func(i, j int) bool {
-		return sortActual[i].Metadata.TargetFile < sortActual[j].Metadata.TargetFile
+		return sortActual[i].ProjectDescriptor.GetTargetFile() < sortActual[j].ProjectDescriptor.GetTargetFile()
 	})
 
 	sortExpected := make([]ecosystems.SCAResult, len(expected))
 	copy(sortExpected, expected)
 	sort.Slice(sortExpected, func(i, j int) bool {
-		return sortExpected[i].Metadata.TargetFile < sortExpected[j].Metadata.TargetFile
+		return sortExpected[i].ProjectDescriptor.GetTargetFile() < sortExpected[j].ProjectDescriptor.GetTargetFile()
 	})
 
 	// Sync runtime field (varies by Python version) and clear Error field (not in JSON)
 	for i := range sortExpected {
-		sortExpected[i].Metadata.Runtime = sortActual[i].Metadata.Runtime
-		sortActual[i].Error = nil // Error field isn't in expected JSON
+		sortExpected[i].ProjectDescriptor.Identity.TargetRuntime = sortActual[i].ProjectDescriptor.Identity.TargetRuntime
+		sortActual[i].ProjectDescriptor.Identity.Type = "" // Clear type since fixtures are shared
+		sortActual[i].Error = nil                          // Error field isn't in expected JSON
 	}
 
 	// Compare by JSON representation to ignore internal unexported fields in depgraph.DepGraph
