@@ -20,7 +20,7 @@ func TestBuildDepGraph_Simple(t *testing.T) {
 
 	seeds := map[pkgName]struct{}{"debug": struct{}{}}
 
-	dg, err := buildDepGraph("my-app", "1.0.0", seeds, graph)
+	dg, err := buildDepGraph("my-app", "1.0.0", seeds, graph, true)
 	require.NoError(t, err)
 	require.NotNil(t, dg)
 
@@ -53,7 +53,7 @@ func TestBuildDepGraph_ExcludesDevDepsWhenNotRequested(t *testing.T) {
 	// Production seeds only.
 	seeds := map[pkgName]struct{}{"debug": struct{}{}}
 
-	dg, err := buildDepGraph("my-app", "1.0.0", seeds, graph)
+	dg, err := buildDepGraph("my-app", "1.0.0", seeds, graph, true)
 	require.NoError(t, err)
 
 	pkgIDs := make(map[string]bool)
@@ -89,7 +89,7 @@ func TestBuildDepGraph_WorkspaceMegaGraph(t *testing.T) {
 		"debug":             struct{}{},
 	}
 
-	dg, err := buildDepGraph("my-workspace", "1.0.0", seeds, graph)
+	dg, err := buildDepGraph("my-workspace", "1.0.0", seeds, graph, true)
 	require.NoError(t, err)
 	require.NotNil(t, dg)
 
@@ -106,7 +106,7 @@ func TestBuildDepGraph_WorkspaceMegaGraph(t *testing.T) {
 }
 
 func TestBuildDepGraph_SkipsMissingPackages(t *testing.T) {
-	// Seeds include a package not in Packages (e.g. a workspace: ref).
+	// Seeds include a package not in Packages (out of sync with bun.lock).
 	graph := &whyGraph{
 		Packages:     pkgRegistry{"debug": "4.4.3"},
 		Dependencies: depEdges{},
@@ -117,7 +117,7 @@ func TestBuildDepGraph_SkipsMissingPackages(t *testing.T) {
 		"missing": struct{}{}, // not in Packages
 	}
 
-	dg, err := buildDepGraph("my-app", "1.0.0", seeds, graph)
+	dg, err := buildDepGraph("my-app", "1.0.0", seeds, graph, true)
 	require.NoError(t, err)
 	require.NotNil(t, dg)
 
@@ -128,6 +128,23 @@ func TestBuildDepGraph_SkipsMissingPackages(t *testing.T) {
 
 	assert.True(t, pkgIDs["debug@4.4.3"])
 	assert.False(t, pkgIDs["missing@"])
+}
+
+func TestBuildDepGraph_StrictOutOfSync(t *testing.T) {
+	graph := &whyGraph{
+		Packages:     pkgRegistry{"debug": "4.4.3"},
+		Dependencies: depEdges{},
+	}
+
+	seeds := map[pkgName]struct{}{
+		"debug":   struct{}{},
+		"missing": struct{}{}, // not in Packages
+	}
+
+	_, err := buildDepGraph("my-app", "1.0.0", seeds, graph, false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing")
+	assert.Contains(t, err.Error(), "bun install")
 }
 
 func TestBuildDepGraph_HandlesCircularDeps(t *testing.T) {
@@ -146,7 +163,7 @@ func TestBuildDepGraph_HandlesCircularDeps(t *testing.T) {
 	seeds := map[pkgName]struct{}{"pkg-a": struct{}{}}
 
 	// Should not infinite-loop.
-	dg, err := buildDepGraph("root", "0.0.0", seeds, graph)
+	dg, err := buildDepGraph("root", "0.0.0", seeds, graph, true)
 	require.NoError(t, err)
 	require.NotNil(t, dg)
 }

@@ -14,7 +14,9 @@ const pkgManager = "bun"
 // directDepNames is the set of package names that are direct dependencies of the root;
 // this seeds the DFS and naturally excludes dev-only packages when --dev is not set.
 // graph is the parsed and inverted output of `bun why '*' --top`.
-func buildDepGraph(rootName, rootVersion string, directDepNames map[pkgName]struct{}, graph *whyGraph) (*godepgraph.DepGraph, error) {
+// allowOutOfSync controls whether a package declared in package.json but absent from
+// bun.lock is silently skipped (true) or causes an error (false).
+func buildDepGraph(rootName, rootVersion string, directDepNames map[pkgName]struct{}, graph *whyGraph, allowOutOfSync bool) (*godepgraph.DepGraph, error) {
 	builder, err := godepgraph.NewBuilder(
 		&godepgraph.PkgManager{Name: pkgManager},
 		&godepgraph.PkgInfo{Name: rootName, Version: rootVersion},
@@ -29,7 +31,11 @@ func buildDepGraph(rootName, rootVersion string, directDepNames map[pkgName]stru
 	for name := range directDepNames {
 		version, ok := graph.Packages[name]
 		if !ok {
-			// Package listed in package.json but not resolved — skip (e.g. workspace: protocol refs).
+			// package.json is out of sync with bun.lock.
+			if !allowOutOfSync {
+				return nil, fmt.Errorf("package %q is declared in package.json but not in bun.lock — run `bun install` to sync", name)
+			}
+
 			continue
 		}
 

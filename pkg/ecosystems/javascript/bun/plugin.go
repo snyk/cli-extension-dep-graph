@@ -90,7 +90,7 @@ func (p Plugin) buildResult(
 
 	seeds := pkgJSON.directDeps(options.Global.IncludeDev)
 
-	depGraph, err := buildDepGraph(pkgJSON.Name, pkgJSON.Version, seeds, graph)
+	depGraph, err := buildDepGraph(pkgJSON.Name, pkgJSON.Version, seeds, graph, options.Global.AllowOutOfSync)
 	if err != nil {
 		return ecosystems.SCAResult{Metadata: meta, Error: fmt.Errorf("building dep graph: %w", err)}
 	}
