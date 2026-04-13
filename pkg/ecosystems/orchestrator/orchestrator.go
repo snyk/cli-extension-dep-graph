@@ -7,6 +7,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rs/zerolog"
+	"github.com/snyk/dep-graph/go/pkg/depgraph"
+	"github.com/snyk/error-catalog-golang-public/snyk_errors"
+	"github.com/snyk/go-application-framework/pkg/configuration"
+	"github.com/snyk/go-application-framework/pkg/workflow"
+
 	extensionDepgraph "github.com/snyk/cli-extension-dep-graph/pkg/depgraph"
 	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
@@ -14,12 +20,6 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pip"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pipenv"
 	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
-
-	"github.com/rs/zerolog"
-	"github.com/snyk/dep-graph/go/pkg/depgraph"
-	"github.com/snyk/error-catalog-golang-public/snyk_errors"
-	"github.com/snyk/go-application-framework/pkg/configuration"
-	"github.com/snyk/go-application-framework/pkg/workflow"
 )
 
 var legacyCLIWorkflowID = workflow.NewWorkflowIdentifier("legacycli")
@@ -78,9 +78,12 @@ func resolvePython(ctx context.Context, enhancedLogger *zerolog.Logger, dir stri
 }
 
 // LegacyFallback invokes the legacy CLI workflow with the raw flags and returns parsed results.
-//
-//nolint:gocritic // hugeParam: ensure `options` is not nil
-func LegacyFallback(ictx workflow.InvocationContext, options ecosystems.SCAPluginOptions, processedFiles []string) ([]ecosystems.SCAResult, error) {
+func LegacyFallback(
+	ictx workflow.InvocationContext,
+	//nolint:gocritic // hugeParam: ensure `options` is not nil
+	options ecosystems.SCAPluginOptions,
+	processedFiles []string,
+) ([]ecosystems.SCAResult, error) {
 	log := ictx.GetEnhancedLogger()
 	config := ictx.GetConfiguration()
 	engine := ictx.GetEngine()
@@ -224,8 +227,9 @@ func depGraphOutputToSCAResult(output *parsers.DepGraphOutput, ictx workflow.Inv
 
 		result.DepGraph = &dg
 
-		// Extract runtime from depgraph if available
 		if dg.PkgManager.Name != "" {
+			result.ProjectDescriptor.Identity.Type = dg.PkgManager.Name
+			// Extract runtime from depgraph if available
 			result.ProjectDescriptor.Identity.TargetRuntime = &dg.PkgManager.Name
 		}
 	}
