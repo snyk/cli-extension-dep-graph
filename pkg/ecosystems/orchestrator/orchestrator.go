@@ -236,3 +236,29 @@ func depGraphOutputToSCAResult(output *parsers.DepGraphOutput, ictx workflow.Inv
 
 	return result, nil
 }
+
+// getProjectTargetFileBasedOnType determines if a plugin sets targetFile based on package manager type.
+// Plugin audit: https://snyksec.atlassian.net/wiki/spaces/TOE1/pages/4651909131/Plugin+Audit
+func getProjectTargetFileBasedOnType(projectType, file string) *string {
+	switch projectType {
+	case "pip":
+		// snyk-python-plugin sets targetFile for Pipfile and setup.py, but not for requirements.txt
+		if strings.HasSuffix(file, "requirements.txt") {
+			return nil
+		}
+		return &file
+	case "gradle":
+		// snyk-gradle-plugin sets targetFile for build.gradle.kts but not for build.gradle
+		if strings.HasSuffix(file, "build.gradle.kts") {
+			return &file
+		}
+		return nil
+	case "poetry", "gomodules", "golangdep", "nuget", "paket", "composer", "cocoapods", "hex", "swift":
+		// These plugins set relative path to provided targetFile
+		return &file
+	case "npm", "yarn", "pnpm", "maven", "sbt", "rubygems":
+		// These plugins do not set plugin.targetFile
+		return nil
+	}
+	return nil
+}

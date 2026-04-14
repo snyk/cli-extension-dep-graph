@@ -25,6 +25,7 @@ type GlobalOptions struct {
 	AllowOutOfSync                bool                 // Derived from --strict-out-of-sync (inverted); parsed in NewPluginOptionsFromRawFlags.
 	ForceSingleGraph              bool                 `arg:"--force-single-graph"`
 	ForceIncludeWorkspacePackages bool                 `arg:"--internal-uv-workspace-packages"`
+	ProjectName                   *string              `arg:"--project-name"`
 	RawFlags                      []string
 }
 

@@ -68,7 +68,8 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	for _, file := range files {
 		g.Go(func() error {
-			result, err := p.buildDepGraphFromPipfile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation, options.Global.IncludeDev)
+			projectName := pip.GetProjectName(file.RelPath, dir, options)
+			result, err := p.buildDepGraphFromPipfile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation, options.Global.IncludeDev, projectName)
 			if err != nil {
 				attrs := []logger.Field{
 					logger.Attr(logFieldFile, file.RelPath),
@@ -85,7 +86,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 				result = ecosystems.SCAResult{
 					ProjectDescriptor: identity.ProjectDescriptor{
 						Identity: identity.ProjectIdentity{
-							Type:       "pipenv",
+							Type:       "pip",
 							TargetFile: &file.RelPath,
 						},
 					},
@@ -153,10 +154,12 @@ func (p Plugin) buildDepGraphFromPipfile(
 	pythonVersion string,
 	noBuildIsolation bool,
 	includeDevDeps bool,
+	projectName string,
 ) (ecosystems.SCAResult, error) {
 	log.Debug(ctx, "Building dependency graph from Pipfile",
 		logger.Attr(logFieldFile, file.RelPath),
-		logger.Attr("python_version", pythonVersion))
+		logger.Attr("python_version", pythonVersion),
+		logger.Attr("project_name", projectName))
 
 	// Parse Pipfile
 	pipfile, err := ParsePipfile(file.Path)
@@ -191,7 +194,7 @@ func (p Plugin) buildDepGraphFromPipfile(
 	}
 
 	// Convert report to dependency graph
-	depGraph, err := report.ToDependencyGraph(ctx, log, pip.PkgManagerPipenv)
+	depGraph, err := report.ToDependencyGraph(ctx, log, pip.PkgManagerPipenv, projectName)
 	if err != nil {
 		return ecosystems.SCAResult{}, fmt.Errorf("failed to convert pip report to dependency graph: %w", err)
 	}
@@ -203,7 +206,7 @@ func (p Plugin) buildDepGraphFromPipfile(
 		DepGraph: depGraph,
 		ProjectDescriptor: identity.ProjectDescriptor{
 			Identity: identity.ProjectIdentity{
-				Type:       "pipenv",
+				Type:       "pip",
 				TargetFile: &file.RelPath,
 			},
 		},

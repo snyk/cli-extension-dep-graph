@@ -7,9 +7,9 @@
       },
       "pkgs": [
         {
-          "id": "root@0.0.0",
+          "id": "url-references@0.0.0",
           "info": {
-            "name": "root",
+            "name": "url-references",
             "version": "0.0.0"
           }
         },
@@ -54,7 +54,7 @@
         "nodes": [
           {
             "nodeId": "root-node",
-            "pkgId": "root@0.0.0",
+            "pkgId": "url-references@0.0.0",
             "deps": [
               {
                 "nodeId": "certifi@2023.7.22"
@@ -107,7 +107,6 @@
     },
     "projectDescriptor": {
       "identity": {
-        "targetFile": "requirements.txt",
         "targetRuntime": "python@3.14.1"
       }
     }
