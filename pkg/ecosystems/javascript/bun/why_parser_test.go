@@ -43,7 +43,7 @@ func TestParseWhyOutput_Simple(t *testing.T) {
 
 	// Root project should not appear as a node.
 	for id := range out.Graph {
-		assert.NotEqual(t, "my-app", nameFromID(id), "root project should not appear in Graph")
+		assert.False(t, strings.HasPrefix(id, "my-app@"), "root project should not appear in Graph")
 	}
 
 	// Prod vs dev classification.
@@ -92,7 +92,7 @@ func TestParseWhyOutput_SkipsRootProject(t *testing.T) {
 
 	// Root project must not appear in the graph.
 	for id := range out.Graph {
-		assert.NotEqual(t, "my-app", nameFromID(id), "root project should not appear in Graph")
+		assert.False(t, strings.HasPrefix(id, "my-app@"), "root project should not appear in Graph")
 	}
 
 	// debug is a prod dep of root.
