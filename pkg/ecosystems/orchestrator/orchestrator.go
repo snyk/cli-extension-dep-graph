@@ -230,7 +230,7 @@ func depGraphOutputToSCAResult(output *parsers.DepGraphOutput, ictx workflow.Inv
 		if dg.PkgManager.Name != "" {
 			result.ProjectDescriptor.Identity.Type = dg.PkgManager.Name
 			// Extract runtime from depgraph if available
-			result.ProjectDescriptor.Identity.TargetRuntime = &dg.PkgManager.Name
+			result.ProjectDescriptor.Identity.TargetRuntime = output.TargetRuntime
 		}
 	}
 

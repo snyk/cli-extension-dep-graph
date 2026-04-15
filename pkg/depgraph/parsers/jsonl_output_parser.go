@@ -21,6 +21,7 @@ type jsonLine struct {
 	DepGraph             json.RawMessage `json:"depGraph"`
 	NormalisedTargetFile string          `json:"normalisedTargetFile"`
 	TargetFileFromPlugin *string         `json:"targetFileFromPlugin"`
+	TargetRuntime        *string         `json:"targetRuntime"`
 	Target               json.RawMessage `json:"target"`
 	Error                json.RawMessage `json:"error"`
 }
@@ -47,6 +48,7 @@ func (j *JSONLOutputParser) ParseOutput(data []byte) ([]DepGraphOutput, error) {
 			NormalisedTargetFile: parsed.NormalisedTargetFile,
 			TargetFileFromPlugin: parsed.TargetFileFromPlugin,
 			Target:               parsed.Target,
+			TargetRuntime:        parsed.TargetRuntime,
 			DepGraph:             parsed.DepGraph,
 			Error:                parsed.Error,
 		})
