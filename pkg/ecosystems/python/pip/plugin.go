@@ -66,8 +66,8 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	for _, file := range files {
 		g.Go(func() error {
-			projectName := GetProjectName(file.RelPath, dir, options)
-			result, err := p.buildDepGraphFromFile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation, projectName)
+			projectName := GetProjectName(file.RelPath, dir)
+			result, err := p.buildDepGraphFromFile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation, projectName, options.Global.ProjectName)
 			if err != nil {
 				attrs := []logger.Field{
 					logger.Attr(logFieldFile, file.RelPath),
@@ -84,7 +84,8 @@ func (p Plugin) BuildDepGraphsFromDir(
 				result = ecosystems.SCAResult{
 					ProjectDescriptor: identity.ProjectDescriptor{
 						Identity: identity.ProjectIdentity{
-							Type: "pip",
+							Type:             "pip",
+							BaseNameOverride: options.Global.ProjectName,
 						},
 					},
 					Error: err,
@@ -144,18 +145,12 @@ func (p Plugin) discoverRequirementsFiles(ctx context.Context, dir string, optio
 	return files, nil
 }
 
-// GetProjectName determines the project name based on the file path and options.
-// If --project-name is set, it uses that. Otherwise, it uses the directory name
-// containing the file. For example:
+// GetProjectName determines the project name based on the file path.
+// It uses the directory name containing the file. For example:
 //   - "project/test/requirements.txt" -> "test"
 //   - "project/requirements.txt" -> "project"
 //   - "requirements.txt" (with scanDir="/path/to/myproject") -> "myproject"
-func GetProjectName(filePath, scanDir string, options *ecosystems.SCAPluginOptions) string {
-	// If --project-name is explicitly set, use it
-	if options.Global.ProjectName != nil && *options.Global.ProjectName != "" {
-		return *options.Global.ProjectName
-	}
-
+func GetProjectName(filePath, scanDir string) string {
 	// Extract the directory name from the file path
 	dir := filepath.Dir(filePath)
 	projectName := filepath.Base(dir)
@@ -176,6 +171,7 @@ func (p Plugin) buildDepGraphFromFile(
 	pythonVersion string,
 	noBuildIsolation bool,
 	projectName string,
+	baseNameOverride *string,
 ) (ecosystems.SCAResult, error) {
 	log.Debug(ctx, "Building dependency graph",
 		logger.Attr(logFieldFile, file.RelPath),
@@ -201,7 +197,8 @@ func (p Plugin) buildDepGraphFromFile(
 		DepGraph: depGraph,
 		ProjectDescriptor: identity.ProjectDescriptor{
 			Identity: identity.ProjectIdentity{
-				Type: "pip",
+				Type:             "pip",
+				BaseNameOverride: baseNameOverride,
 			},
 		},
 	}, nil

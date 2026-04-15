@@ -68,8 +68,9 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	for _, file := range files {
 		g.Go(func() error {
-			projectName := pip.GetProjectName(file.RelPath, dir, options)
-			result, err := p.buildDepGraphFromPipfile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation, options.Global.IncludeDev, projectName)
+			projectName := pip.GetProjectName(file.RelPath, dir)
+			result, err := p.buildDepGraphFromPipfile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation,
+				options.Global.IncludeDev, projectName, options.Global.ProjectName)
 			if err != nil {
 				attrs := []logger.Field{
 					logger.Attr(logFieldFile, file.RelPath),
@@ -86,8 +87,9 @@ func (p Plugin) BuildDepGraphsFromDir(
 				result = ecosystems.SCAResult{
 					ProjectDescriptor: identity.ProjectDescriptor{
 						Identity: identity.ProjectIdentity{
-							Type:       "pip",
-							TargetFile: &file.RelPath,
+							Type:             "pip",
+							TargetFile:       &file.RelPath,
+							BaseNameOverride: options.Global.ProjectName,
 						},
 					},
 					Error: err,
@@ -155,6 +157,7 @@ func (p Plugin) buildDepGraphFromPipfile(
 	noBuildIsolation bool,
 	includeDevDeps bool,
 	projectName string,
+	baseNameOverride *string,
 ) (ecosystems.SCAResult, error) {
 	log.Debug(ctx, "Building dependency graph from Pipfile",
 		logger.Attr(logFieldFile, file.RelPath),
@@ -206,8 +209,9 @@ func (p Plugin) buildDepGraphFromPipfile(
 		DepGraph: depGraph,
 		ProjectDescriptor: identity.ProjectDescriptor{
 			Identity: identity.ProjectIdentity{
-				Type:       "pip",
-				TargetFile: &file.RelPath,
+				Type:             "pip",
+				TargetFile:       &file.RelPath,
+				BaseNameOverride: baseNameOverride,
 			},
 		},
 	}, nil

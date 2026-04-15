@@ -7,5 +7,6 @@ type DepGraphOutput struct {
 	TargetRuntime        *string
 	Target               []byte
 	DepGraph             []byte
+	Workspace            []byte
 	Error                []byte
 }

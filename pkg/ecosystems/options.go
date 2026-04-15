@@ -123,3 +123,8 @@ func (o *SCAPluginOptions) WithForceIncludeWorkspacePackages(forceIncludeWorkspa
 	o.Global.ForceIncludeWorkspacePackages = forceIncludeWorkspacePackages
 	return o
 }
+
+func (o *SCAPluginOptions) WithProjectName(projectName string) *SCAPluginOptions {
+	o.Global.ProjectName = &projectName
+	return o
+}
