@@ -84,9 +84,10 @@ func runAcceptanceSuite(t *testing.T, fixtureDir string, opts *ecosystems.SCAPlu
 
 			assert.Equal(t, normalizedJSON(expected), normalizedJSON(result.Results[0].DepGraph))
 
-			// Every package in bun.lock must appear in the dep graph.
-			// This catches multi-version packages being silently dropped.
-			assertLockfileCompleteness(t, fx.dir, result.Results[0].DepGraph.Pkgs)
+			// Every package in bun.lock must appear across all dep graphs.
+			// Workspace packages appear in their own dep graph, not the root's.
+			allPkgs := allResultPkgs(result.Results)
+			assertLockfileCompleteness(t, fx.dir, allPkgs)
 		})
 	}
 }
@@ -285,7 +286,7 @@ func TestBundledDepsVisibleInBunWhy(t *testing.T) {
 	require.Len(t, result.Results, 1)
 	require.NoError(t, result.Results[0].Error)
 
-	missing := lockfilePackagesMissingFromGraph(t, dir, result.Results[0].DepGraph.Pkgs)
+	missing := lockfilePackagesMissingFromGraph(t, dir, allResultPkgs(result.Results))
 	if len(missing) == 0 {
 		// bun has fixed the bug — remove the t.Skipf below and close the issue.
 		return
@@ -296,6 +297,18 @@ func TestBundledDepsVisibleInBunWhy(t *testing.T) {
 			"track at https://github.com/oven-sh/bun/issues/29263",
 		len(missing), missing,
 	)
+}
+
+// allResultPkgs aggregates Pkgs from all SCAResults into a single flat slice.
+// Used to check lockfile completeness across a workspace project's multiple dep graphs.
+func allResultPkgs(results []ecosystems.SCAResult) []depgraph.Pkg {
+	var all []depgraph.Pkg
+	for _, r := range results {
+		if r.DepGraph != nil {
+			all = append(all, r.DepGraph.Pkgs...)
+		}
+	}
+	return all
 }
 
 var bunLockTrailingCommaRe = regexp.MustCompile(`,(\s*[}\]])`)

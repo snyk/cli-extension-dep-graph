@@ -12,13 +12,6 @@
       }
     },
     {
-      "id": "b@workspace:packages/b",
-      "info": {
-        "name": "b",
-        "version": "workspace:packages/b"
-      }
-    },
-    {
       "id": "a@workspace:packages/a",
       "info": {
         "name": "a",
@@ -26,24 +19,10 @@
       }
     },
     {
-      "id": "react@18.3.1",
+      "id": "b@workspace:packages/b",
       "info": {
-        "name": "react",
-        "version": "18.3.1"
-      }
-    },
-    {
-      "id": "loose-envify@1.4.0",
-      "info": {
-        "name": "loose-envify",
-        "version": "1.4.0"
-      }
-    },
-    {
-      "id": "js-tokens@4.0.0",
-      "info": {
-        "name": "js-tokens",
-        "version": "4.0.0"
+        "name": "b",
+        "version": "workspace:packages/b"
       }
     },
     {
@@ -54,27 +33,6 @@
       }
     },
     {
-      "id": "cookie-signature@1.0.6",
-      "info": {
-        "name": "cookie-signature",
-        "version": "1.0.6"
-      }
-    },
-    {
-      "id": "serve-static@1.9.3",
-      "info": {
-        "name": "serve-static",
-        "version": "1.9.3"
-      }
-    },
-    {
-      "id": "escape-html@1.0.1",
-      "info": {
-        "name": "escape-html",
-        "version": "1.0.1"
-      }
-    },
-    {
       "id": "send@0.12.3",
       "info": {
         "name": "send",
@@ -82,24 +40,10 @@
       }
     },
     {
-      "id": "fresh@0.2.4",
+      "id": "mime@1.3.4",
       "info": {
-        "name": "fresh",
-        "version": "0.2.4"
-      }
-    },
-    {
-      "id": "on-finished@2.2.1",
-      "info": {
-        "name": "on-finished",
-        "version": "2.2.1"
-      }
-    },
-    {
-      "id": "ee-first@1.1.0",
-      "info": {
-        "name": "ee-first",
-        "version": "1.1.0"
+        "name": "mime",
+        "version": "1.3.4"
       }
     },
     {
@@ -117,17 +61,24 @@
       }
     },
     {
-      "id": "mime@1.3.4",
-      "info": {
-        "name": "mime",
-        "version": "1.3.4"
-      }
-    },
-    {
       "id": "destroy@1.0.3",
       "info": {
         "name": "destroy",
         "version": "1.0.3"
+      }
+    },
+    {
+      "id": "on-finished@2.2.1",
+      "info": {
+        "name": "on-finished",
+        "version": "2.2.1"
+      }
+    },
+    {
+      "id": "ee-first@1.1.0",
+      "info": {
+        "name": "ee-first",
+        "version": "1.1.0"
       }
     },
     {
@@ -159,17 +110,31 @@
       }
     },
     {
-      "id": "utils-merge@1.0.0",
+      "id": "escape-html@1.0.1",
       "info": {
-        "name": "utils-merge",
-        "version": "1.0.0"
+        "name": "escape-html",
+        "version": "1.0.1"
       }
     },
     {
-      "id": "parseurl@1.3.3",
+      "id": "fresh@0.2.4",
       "info": {
-        "name": "parseurl",
-        "version": "1.3.3"
+        "name": "fresh",
+        "version": "0.2.4"
+      }
+    },
+    {
+      "id": "vary@1.0.1",
+      "info": {
+        "name": "vary",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "id": "merge-descriptors@1.0.0",
+      "info": {
+        "name": "merge-descriptors",
+        "version": "1.0.0"
       }
     },
     {
@@ -201,73 +166,10 @@
       }
     },
     {
-      "id": "cookie@0.1.2",
-      "info": {
-        "name": "cookie",
-        "version": "0.1.2"
-      }
-    },
-    {
-      "id": "content-type@1.0.5",
-      "info": {
-        "name": "content-type",
-        "version": "1.0.5"
-      }
-    },
-    {
       "id": "methods@1.1.2",
       "info": {
         "name": "methods",
         "version": "1.1.2"
-      }
-    },
-    {
-      "id": "merge-descriptors@1.0.0",
-      "info": {
-        "name": "merge-descriptors",
-        "version": "1.0.0"
-      }
-    },
-    {
-      "id": "vary@1.0.1",
-      "info": {
-        "name": "vary",
-        "version": "1.0.1"
-      }
-    },
-    {
-      "id": "proxy-addr@1.0.10",
-      "info": {
-        "name": "proxy-addr",
-        "version": "1.0.10"
-      }
-    },
-    {
-      "id": "forwarded@0.1.2",
-      "info": {
-        "name": "forwarded",
-        "version": "0.1.2"
-      }
-    },
-    {
-      "id": "ipaddr.js@1.0.5",
-      "info": {
-        "name": "ipaddr.js",
-        "version": "1.0.5"
-      }
-    },
-    {
-      "id": "qs@2.4.2",
-      "info": {
-        "name": "qs",
-        "version": "2.4.2"
-      }
-    },
-    {
-      "id": "path-to-regexp@0.1.3",
-      "info": {
-        "name": "path-to-regexp",
-        "version": "0.1.3"
       }
     },
     {
@@ -285,10 +187,17 @@
       }
     },
     {
-      "id": "finalhandler@0.3.6",
+      "id": "cookie-signature@1.0.6",
       "info": {
-        "name": "finalhandler",
-        "version": "0.3.6"
+        "name": "cookie-signature",
+        "version": "1.0.6"
+      }
+    },
+    {
+      "id": "utils-merge@1.0.0",
+      "info": {
+        "name": "utils-merge",
+        "version": "1.0.0"
       }
     },
     {
@@ -296,6 +205,76 @@
       "info": {
         "name": "content-disposition",
         "version": "0.5.0"
+      }
+    },
+    {
+      "id": "path-to-regexp@0.1.3",
+      "info": {
+        "name": "path-to-regexp",
+        "version": "0.1.3"
+      }
+    },
+    {
+      "id": "content-type@1.0.5",
+      "info": {
+        "name": "content-type",
+        "version": "1.0.5"
+      }
+    },
+    {
+      "id": "cookie@0.1.2",
+      "info": {
+        "name": "cookie",
+        "version": "0.1.2"
+      }
+    },
+    {
+      "id": "qs@2.4.2",
+      "info": {
+        "name": "qs",
+        "version": "2.4.2"
+      }
+    },
+    {
+      "id": "finalhandler@0.3.6",
+      "info": {
+        "name": "finalhandler",
+        "version": "0.3.6"
+      }
+    },
+    {
+      "id": "parseurl@1.3.3",
+      "info": {
+        "name": "parseurl",
+        "version": "1.3.3"
+      }
+    },
+    {
+      "id": "serve-static@1.9.3",
+      "info": {
+        "name": "serve-static",
+        "version": "1.9.3"
+      }
+    },
+    {
+      "id": "proxy-addr@1.0.10",
+      "info": {
+        "name": "proxy-addr",
+        "version": "1.0.10"
+      }
+    },
+    {
+      "id": "ipaddr.js@1.0.5",
+      "info": {
+        "name": "ipaddr.js",
+        "version": "1.0.5"
+      }
+    },
+    {
+      "id": "forwarded@0.1.2",
+      "info": {
+        "name": "forwarded",
+        "version": "0.1.2"
       }
     }
   ],
@@ -307,55 +286,24 @@
         "pkgId": "bun-workspaces@1.0.0",
         "deps": [
           {
+            "nodeId": "a@workspace:packages/a"
+          },
+          {
             "nodeId": "b@workspace:packages/b"
           },
           {
             "nodeId": "express@4.12.4"
-          },
-          {
-            "nodeId": "a@workspace:packages/a"
-          }
-        ]
-      },
-      {
-        "nodeId": "b@workspace:packages/b",
-        "pkgId": "b@workspace:packages/b",
-        "deps": [
-          {
-            "nodeId": "a@workspace:packages/a"
           }
         ]
       },
       {
         "nodeId": "a@workspace:packages/a",
         "pkgId": "a@workspace:packages/a",
-        "deps": [
-          {
-            "nodeId": "react@18.3.1"
-          }
-        ]
+        "deps": []
       },
       {
-        "nodeId": "react@18.3.1",
-        "pkgId": "react@18.3.1",
-        "deps": [
-          {
-            "nodeId": "loose-envify@1.4.0"
-          }
-        ]
-      },
-      {
-        "nodeId": "loose-envify@1.4.0",
-        "pkgId": "loose-envify@1.4.0",
-        "deps": [
-          {
-            "nodeId": "js-tokens@4.0.0"
-          }
-        ]
-      },
-      {
-        "nodeId": "js-tokens@4.0.0",
-        "pkgId": "js-tokens@4.0.0",
+        "nodeId": "b@workspace:packages/b",
+        "pkgId": "b@workspace:packages/b",
         "deps": []
       },
       {
@@ -363,28 +311,19 @@
         "pkgId": "express@4.12.4",
         "deps": [
           {
-            "nodeId": "cookie-signature@1.0.6"
+            "nodeId": "send@0.12.3"
           },
           {
-            "nodeId": "serve-static@1.9.3"
+            "nodeId": "vary@1.0.1"
+          },
+          {
+            "nodeId": "merge-descriptors@1.0.0"
+          },
+          {
+            "nodeId": "range-parser@1.0.3"
           },
           {
             "nodeId": "accepts@1.2.13"
-          },
-          {
-            "nodeId": "cookie@0.1.2"
-          },
-          {
-            "nodeId": "utils-merge@1.0.0"
-          },
-          {
-            "nodeId": "parseurl@1.3.3"
-          },
-          {
-            "nodeId": "etag@1.6.0"
-          },
-          {
-            "nodeId": "content-type@1.0.5"
           },
           {
             "nodeId": "methods@1.1.2"
@@ -393,98 +332,73 @@
             "nodeId": "escape-html@1.0.1"
           },
           {
-            "nodeId": "merge-descriptors@1.0.0"
-          },
-          {
-            "nodeId": "depd@1.0.1"
-          },
-          {
-            "nodeId": "send@0.12.3"
-          },
-          {
-            "nodeId": "on-finished@2.2.1"
-          },
-          {
-            "nodeId": "vary@1.0.1"
-          },
-          {
-            "nodeId": "proxy-addr@1.0.10"
-          },
-          {
-            "nodeId": "qs@2.4.2"
-          },
-          {
-            "nodeId": "fresh@0.2.4"
-          },
-          {
-            "nodeId": "path-to-regexp@0.1.3"
-          },
-          {
             "nodeId": "type-is@1.6.18"
           },
           {
-            "nodeId": "range-parser@1.0.3"
-          },
-          {
-            "nodeId": "debug@2.2.0"
-          },
-          {
-            "nodeId": "finalhandler@0.3.6"
-          },
-          {
-            "nodeId": "content-disposition@0.5.0"
-          }
-        ]
-      },
-      {
-        "nodeId": "cookie-signature@1.0.6",
-        "pkgId": "cookie-signature@1.0.6",
-        "deps": []
-      },
-      {
-        "nodeId": "serve-static@1.9.3",
-        "pkgId": "serve-static@1.9.3",
-        "deps": [
-          {
-            "nodeId": "escape-html@1.0.1"
-          },
-          {
-            "nodeId": "send@0.12.3"
+            "nodeId": "cookie-signature@1.0.6"
           },
           {
             "nodeId": "utils-merge@1.0.0"
           },
           {
+            "nodeId": "depd@1.0.1"
+          },
+          {
+            "nodeId": "fresh@0.2.4"
+          },
+          {
+            "nodeId": "etag@1.6.0"
+          },
+          {
+            "nodeId": "content-disposition@0.5.0"
+          },
+          {
+            "nodeId": "debug@2.2.0"
+          },
+          {
+            "nodeId": "path-to-regexp@0.1.3"
+          },
+          {
+            "nodeId": "content-type@1.0.5"
+          },
+          {
+            "nodeId": "cookie@0.1.2"
+          },
+          {
+            "nodeId": "qs@2.4.2"
+          },
+          {
+            "nodeId": "on-finished@2.2.1"
+          },
+          {
+            "nodeId": "finalhandler@0.3.6"
+          },
+          {
             "nodeId": "parseurl@1.3.3"
+          },
+          {
+            "nodeId": "serve-static@1.9.3"
+          },
+          {
+            "nodeId": "proxy-addr@1.0.10"
           }
         ]
-      },
-      {
-        "nodeId": "escape-html@1.0.1",
-        "pkgId": "escape-html@1.0.1",
-        "deps": []
       },
       {
         "nodeId": "send@0.12.3",
         "pkgId": "send@0.12.3",
         "deps": [
           {
-            "nodeId": "fresh@0.2.4"
-          },
-          {
-            "nodeId": "on-finished@2.2.1"
+            "nodeId": "mime@1.3.4"
           },
           {
             "nodeId": "etag@1.6.0"
           },
           {
-            "nodeId": "mime@1.3.4"
-          },
-          {
             "nodeId": "destroy@1.0.3"
           },
           {
-            "nodeId": "escape-html@1.0.1"
+            "nodeId": "on-finished@2.2.1"
           },
           {
             "nodeId": "depd@1.0.1"
@@ -497,26 +411,18 @@
           },
           {
             "nodeId": "debug@2.2.0"
-          }
-        ]
-      },
-      {
-        "nodeId": "fresh@0.2.4",
-        "pkgId": "fresh@0.2.4",
-        "deps": []
-      },
-      {
-        "nodeId": "on-finished@2.2.1",
-        "pkgId": "on-finished@2.2.1",
-        "deps": [
+          },
           {
-            "nodeId": "ee-first@1.1.0"
+            "nodeId": "escape-html@1.0.1"
+          },
+          {
+            "nodeId": "fresh@0.2.4"
           }
         ]
       },
       {
-        "nodeId": "ee-first@1.1.0",
-        "pkgId": "ee-first@1.1.0",
+        "nodeId": "mime@1.3.4",
+        "pkgId": "mime@1.3.4",
         "deps": []
       },
       {
@@ -534,13 +440,22 @@
         "deps": []
       },
       {
-        "nodeId": "mime@1.3.4",
-        "pkgId": "mime@1.3.4",
+        "nodeId": "destroy@1.0.3",
+        "pkgId": "destroy@1.0.3",
         "deps": []
       },
       {
-        "nodeId": "destroy@1.0.3",
-        "pkgId": "destroy@1.0.3",
+        "nodeId": "on-finished@2.2.1",
+        "pkgId": "on-finished@2.2.1",
+        "deps": [
+          {
+            "nodeId": "ee-first@1.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "ee-first@1.1.0",
+        "pkgId": "ee-first@1.1.0",
         "deps": []
       },
       {
@@ -568,13 +483,23 @@
         ]
       },
       {
-        "nodeId": "utils-merge@1.0.0",
-        "pkgId": "utils-merge@1.0.0",
+        "nodeId": "escape-html@1.0.1",
+        "pkgId": "escape-html@1.0.1",
         "deps": []
       },
       {
-        "nodeId": "parseurl@1.3.3",
-        "pkgId": "parseurl@1.3.3",
+        "nodeId": "fresh@0.2.4",
+        "pkgId": "fresh@0.2.4",
+        "deps": []
+      },
+      {
+        "nodeId": "vary@1.0.1",
+        "pkgId": "vary@1.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "merge-descriptors@1.0.0",
+        "pkgId": "merge-descriptors@1.0.0",
         "deps": []
       },
       {
@@ -609,55 +534,40 @@
         "deps": []
       },
       {
-        "nodeId": "cookie@0.1.2",
-        "pkgId": "cookie@0.1.2",
-        "deps": []
-      },
-      {
-        "nodeId": "content-type@1.0.5",
-        "pkgId": "content-type@1.0.5",
-        "deps": []
-      },
-      {
         "nodeId": "methods@1.1.2",
         "pkgId": "methods@1.1.2",
         "deps": []
       },
       {
-        "nodeId": "merge-descriptors@1.0.0",
-        "pkgId": "merge-descriptors@1.0.0",
-        "deps": []
-      },
-      {
-        "nodeId": "vary@1.0.1",
-        "pkgId": "vary@1.0.1",
-        "deps": []
-      },
-      {
-        "nodeId": "proxy-addr@1.0.10",
-        "pkgId": "proxy-addr@1.0.10",
+        "nodeId": "type-is@1.6.18",
+        "pkgId": "type-is@1.6.18",
         "deps": [
           {
-            "nodeId": "forwarded@0.1.2"
+            "nodeId": "mime-types@2.1.35"
           },
           {
-            "nodeId": "ipaddr.js@1.0.5"
+            "nodeId": "media-typer@0.3.0"
           }
         ]
       },
       {
-        "nodeId": "forwarded@0.1.2",
-        "pkgId": "forwarded@0.1.2",
+        "nodeId": "media-typer@0.3.0",
+        "pkgId": "media-typer@0.3.0",
         "deps": []
       },
       {
-        "nodeId": "ipaddr.js@1.0.5",
-        "pkgId": "ipaddr.js@1.0.5",
+        "nodeId": "cookie-signature@1.0.6",
+        "pkgId": "cookie-signature@1.0.6",
         "deps": []
       },
       {
-        "nodeId": "qs@2.4.2",
-        "pkgId": "qs@2.4.2",
+        "nodeId": "utils-merge@1.0.0",
+        "pkgId": "utils-merge@1.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "content-disposition@0.5.0",
+        "pkgId": "content-disposition@0.5.0",
         "deps": []
       },
       {
@@ -666,20 +576,18 @@
         "deps": []
       },
       {
-        "nodeId": "type-is@1.6.18",
-        "pkgId": "type-is@1.6.18",
-        "deps": [
-          {
-            "nodeId": "media-typer@0.3.0"
-          },
-          {
-            "nodeId": "mime-types@2.1.35"
-          }
-        ]
+        "nodeId": "content-type@1.0.5",
+        "pkgId": "content-type@1.0.5",
+        "deps": []
       },
       {
-        "nodeId": "media-typer@0.3.0",
-        "pkgId": "media-typer@0.3.0",
+        "nodeId": "cookie@0.1.2",
+        "pkgId": "cookie@0.1.2",
+        "deps": []
+      },
+      {
+        "nodeId": "qs@2.4.2",
+        "pkgId": "qs@2.4.2",
         "deps": []
       },
       {
@@ -698,8 +606,48 @@
         ]
       },
       {
-        "nodeId": "content-disposition@0.5.0",
-        "pkgId": "content-disposition@0.5.0",
+        "nodeId": "parseurl@1.3.3",
+        "pkgId": "parseurl@1.3.3",
+        "deps": []
+      },
+      {
+        "nodeId": "serve-static@1.9.3",
+        "pkgId": "serve-static@1.9.3",
+        "deps": [
+          {
+            "nodeId": "send@0.12.3"
+          },
+          {
+            "nodeId": "utils-merge@1.0.0"
+          },
+          {
+            "nodeId": "parseurl@1.3.3"
+          },
+          {
+            "nodeId": "escape-html@1.0.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "proxy-addr@1.0.10",
+        "pkgId": "proxy-addr@1.0.10",
+        "deps": [
+          {
+            "nodeId": "ipaddr.js@1.0.5"
+          },
+          {
+            "nodeId": "forwarded@0.1.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "ipaddr.js@1.0.5",
+        "pkgId": "ipaddr.js@1.0.5",
+        "deps": []
+      },
+      {
+        "nodeId": "forwarded@0.1.2",
+        "pkgId": "forwarded@0.1.2",
         "deps": []
       }
     ]

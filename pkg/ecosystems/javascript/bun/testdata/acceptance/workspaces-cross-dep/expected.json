@@ -12,13 +12,6 @@
       }
     },
     {
-      "id": "b@workspace:packages/b",
-      "info": {
-        "name": "b",
-        "version": "workspace:packages/b"
-      }
-    },
-    {
       "id": "a@workspace:packages/a",
       "info": {
         "name": "a",
@@ -26,10 +19,10 @@
       }
     },
     {
-      "id": "ms@2.1.3",
+      "id": "b@workspace:packages/b",
       "info": {
-        "name": "ms",
-        "version": "2.1.3"
+        "name": "b",
+        "version": "workspace:packages/b"
       }
     }
   ],
@@ -41,34 +34,21 @@
         "pkgId": "my-monorepo@1.0.0",
         "deps": [
           {
-            "nodeId": "b@workspace:packages/b"
+            "nodeId": "a@workspace:packages/a"
           },
           {
-            "nodeId": "a@workspace:packages/a"
-          }
-        ]
-      },
-      {
-        "nodeId": "b@workspace:packages/b",
-        "pkgId": "b@workspace:packages/b",
-        "deps": [
-          {
-            "nodeId": "a@workspace:packages/a"
+            "nodeId": "b@workspace:packages/b"
           }
         ]
       },
       {
         "nodeId": "a@workspace:packages/a",
         "pkgId": "a@workspace:packages/a",
-        "deps": [
-          {
-            "nodeId": "ms@2.1.3"
-          }
-        ]
+        "deps": []
       },
       {
-        "nodeId": "ms@2.1.3",
-        "pkgId": "ms@2.1.3",
+        "nodeId": "b@workspace:packages/b",
+        "pkgId": "b@workspace:packages/b",
         "deps": []
       }
     ]
