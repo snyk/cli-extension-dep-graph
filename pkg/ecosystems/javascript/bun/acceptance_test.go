@@ -213,6 +213,17 @@ func TestInvalidPackageJSON(t *testing.T) {
 func assertLockfileCompleteness(t *testing.T, dir string, pkgs []depgraph.Pkg) {
 	t.Helper()
 
+	for _, id := range lockfilePackagesMissingFromGraph(t, dir, pkgs) {
+		t.Errorf("bun.lock package %q is missing from the dep graph", id)
+	}
+}
+
+// lockfilePackagesMissingFromGraph returns the IDs of packages present in
+// bun.lock but absent from pkgs. Unlike assertLockfileCompleteness it does
+// not call t.Fail, so callers can decide how to handle the result.
+func lockfilePackagesMissingFromGraph(t *testing.T, dir string, pkgs []depgraph.Pkg) []string {
+	t.Helper()
+
 	data, err := os.ReadFile(filepath.Join(dir, "bun.lock"))
 	require.NoError(t, err, "reading bun.lock")
 
@@ -229,6 +240,8 @@ func assertLockfileCompleteness(t *testing.T, dir string, pkgs []depgraph.Pkg) {
 		graphIDs[p.ID] = struct{}{}
 	}
 
+	var missing []string
+
 	for _, entry := range lock.Packages {
 		if len(entry) == 0 {
 			continue
@@ -242,8 +255,47 @@ func assertLockfileCompleteness(t *testing.T, dir string, pkgs []depgraph.Pkg) {
 		// Normalise "file:" protocol in versions to match bun why output.
 		id = stripFileProtocol(id)
 
-		assert.Contains(t, graphIDs, id, "bun.lock package %q is missing from the dep graph", id)
+		if _, ok := graphIDs[id]; !ok {
+			missing = append(missing, id)
+		}
 	}
+
+	return missing
+}
+
+// TestBundledDepsVisibleInBunWhy verifies that packages bundled inside another
+// package's distribution appear in the dep graph produced by the plugin.
+//
+// This is a known bun bug (https://github.com/oven-sh/bun/issues/29263):
+// `bun why '*' --top` outputs "No dependents found" for bundled packages,
+// making them invisible to the plugin. The test is marked expected-to-fail
+// via t.Skip while the bug persists. When a bun release fixes it the test
+// will pass automatically — at that point remove the t.Skipf call below
+// and close the tracking issue.
+func TestBundledDepsVisibleInBunWhy(t *testing.T) {
+	if _, err := exec.LookPath("bun"); err != nil {
+		t.Skip("bun not found in PATH — skipping")
+	}
+
+	plugin := bun.Plugin{}
+	dir := filepath.Join("testdata", "bundled-deps")
+
+	result, err := plugin.BuildDepGraphsFromDir(t.Context(), nil, dir, &ecosystems.SCAPluginOptions{})
+	require.NoError(t, err)
+	require.Len(t, result.Results, 1)
+	require.NoError(t, result.Results[0].Error)
+
+	missing := lockfilePackagesMissingFromGraph(t, dir, result.Results[0].DepGraph.Pkgs)
+	if len(missing) == 0 {
+		// bun has fixed the bug — remove the t.Skipf below and close the issue.
+		return
+	}
+
+	t.Skipf(
+		"known bun bug #29263 — %d bundled package(s) not reported by `bun why '*' --top`: %v\n"+
+			"track at https://github.com/oven-sh/bun/issues/29263",
+		len(missing), missing,
+	)
 }
 
 var bunLockTrailingCommaRe = regexp.MustCompile(`,(\s*[}\]])`)
