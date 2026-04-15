@@ -1,0 +1,23 @@
+my-workspace@
+  └─ No dependents found
+
+@workspace/logger@workspace:packages/logger
+  └─ my-workspace (requires workspace:*)
+
+@workspace/utils@workspace:packages/utils
+  └─ my-workspace (requires workspace:*)
+
+@types/bun@1.3.11
+  └─ dev my-workspace (requires latest)
+
+axios@1.14.0
+  └─ @workspace/logger@workspace:packages/logger (requires ^1.9.0)
+
+debug@4.4.3
+  └─ my-workspace (requires ^4.4.3)
+
+follow-redirects@1.15.9
+  └─ axios@1.14.0 (requires ^1.15.0)
+
+ms@2.1.3
+  └─ debug@4.4.3 (requires ^2.1.3)
