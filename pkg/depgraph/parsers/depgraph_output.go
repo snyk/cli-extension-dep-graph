@@ -4,6 +4,7 @@ package parsers
 type DepGraphOutput struct {
 	NormalisedTargetFile string
 	TargetFileFromPlugin *string
+	TargetRuntime        *string
 	Target               []byte
 	DepGraph             []byte
 	Error                []byte
