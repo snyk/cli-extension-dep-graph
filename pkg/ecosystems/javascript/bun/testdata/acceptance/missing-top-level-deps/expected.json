@@ -1,0 +1,782 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "bun"
+  },
+  "pkgs": [
+    {
+      "id": "trucolor@0.7.1",
+      "info": {
+        "name": "trucolor",
+        "version": "0.7.1"
+      }
+    },
+    {
+      "id": "debug@2.0.0",
+      "info": {
+        "name": "debug",
+        "version": "2.0.0"
+      }
+    },
+    {
+      "id": "ms@0.6.2",
+      "info": {
+        "name": "ms",
+        "version": "0.6.2"
+      }
+    },
+    {
+      "id": "lodash@4.17.11",
+      "info": {
+        "name": "lodash",
+        "version": "4.17.11"
+      }
+    },
+    {
+      "id": "body-parser@1.20.4",
+      "info": {
+        "name": "body-parser",
+        "version": "1.20.4"
+      }
+    },
+    {
+      "id": "raw-body@2.5.3",
+      "info": {
+        "name": "raw-body",
+        "version": "2.5.3"
+      }
+    },
+    {
+      "id": "http-errors@2.0.1",
+      "info": {
+        "name": "http-errors",
+        "version": "2.0.1"
+      }
+    },
+    {
+      "id": "statuses@2.0.2",
+      "info": {
+        "name": "statuses",
+        "version": "2.0.2"
+      }
+    },
+    {
+      "id": "toidentifier@1.0.1",
+      "info": {
+        "name": "toidentifier",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "id": "setprototypeof@1.2.0",
+      "info": {
+        "name": "setprototypeof",
+        "version": "1.2.0"
+      }
+    },
+    {
+      "id": "inherits@2.0.4",
+      "info": {
+        "name": "inherits",
+        "version": "2.0.4"
+      }
+    },
+    {
+      "id": "depd@2.0.0",
+      "info": {
+        "name": "depd",
+        "version": "2.0.0"
+      }
+    },
+    {
+      "id": "bytes@3.1.2",
+      "info": {
+        "name": "bytes",
+        "version": "3.1.2"
+      }
+    },
+    {
+      "id": "iconv-lite@0.4.24",
+      "info": {
+        "name": "iconv-lite",
+        "version": "0.4.24"
+      }
+    },
+    {
+      "id": "safer-buffer@2.1.2",
+      "info": {
+        "name": "safer-buffer",
+        "version": "2.1.2"
+      }
+    },
+    {
+      "id": "unpipe@1.0.0",
+      "info": {
+        "name": "unpipe",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "destroy@1.2.0",
+      "info": {
+        "name": "destroy",
+        "version": "1.2.0"
+      }
+    },
+    {
+      "id": "on-finished@2.4.1",
+      "info": {
+        "name": "on-finished",
+        "version": "2.4.1"
+      }
+    },
+    {
+      "id": "ee-first@1.1.1",
+      "info": {
+        "name": "ee-first",
+        "version": "1.1.1"
+      }
+    },
+    {
+      "id": "qs@6.14.2",
+      "info": {
+        "name": "qs",
+        "version": "6.14.2"
+      }
+    },
+    {
+      "id": "side-channel@1.1.0",
+      "info": {
+        "name": "side-channel",
+        "version": "1.1.0"
+      }
+    },
+    {
+      "id": "es-errors@1.3.0",
+      "info": {
+        "name": "es-errors",
+        "version": "1.3.0"
+      }
+    },
+    {
+      "id": "side-channel-map@1.0.1",
+      "info": {
+        "name": "side-channel-map",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "id": "object-inspect@1.13.4",
+      "info": {
+        "name": "object-inspect",
+        "version": "1.13.4"
+      }
+    },
+    {
+      "id": "call-bound@1.0.4",
+      "info": {
+        "name": "call-bound",
+        "version": "1.0.4"
+      }
+    },
+    {
+      "id": "call-bind-apply-helpers@1.0.2",
+      "info": {
+        "name": "call-bind-apply-helpers",
+        "version": "1.0.2"
+      }
+    },
+    {
+      "id": "function-bind@1.1.2",
+      "info": {
+        "name": "function-bind",
+        "version": "1.1.2"
+      }
+    },
+    {
+      "id": "get-intrinsic@1.3.0",
+      "info": {
+        "name": "get-intrinsic",
+        "version": "1.3.0"
+      }
+    },
+    {
+      "id": "es-define-property@1.0.1",
+      "info": {
+        "name": "es-define-property",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "id": "get-proto@1.0.1",
+      "info": {
+        "name": "get-proto",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "id": "dunder-proto@1.0.1",
+      "info": {
+        "name": "dunder-proto",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "id": "gopd@1.2.0",
+      "info": {
+        "name": "gopd",
+        "version": "1.2.0"
+      }
+    },
+    {
+      "id": "es-object-atoms@1.1.1",
+      "info": {
+        "name": "es-object-atoms",
+        "version": "1.1.1"
+      }
+    },
+    {
+      "id": "math-intrinsics@1.1.0",
+      "info": {
+        "name": "math-intrinsics",
+        "version": "1.1.0"
+      }
+    },
+    {
+      "id": "hasown@2.0.2",
+      "info": {
+        "name": "hasown",
+        "version": "2.0.2"
+      }
+    },
+    {
+      "id": "has-symbols@1.1.0",
+      "info": {
+        "name": "has-symbols",
+        "version": "1.1.0"
+      }
+    },
+    {
+      "id": "side-channel-weakmap@1.0.2",
+      "info": {
+        "name": "side-channel-weakmap",
+        "version": "1.0.2"
+      }
+    },
+    {
+      "id": "side-channel-list@1.0.1",
+      "info": {
+        "name": "side-channel-list",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "id": "content-type@1.0.5",
+      "info": {
+        "name": "content-type",
+        "version": "1.0.5"
+      }
+    },
+    {
+      "id": "debug@2.6.9",
+      "info": {
+        "name": "debug",
+        "version": "2.6.9"
+      }
+    },
+    {
+      "id": "ms@2.0.0",
+      "info": {
+        "name": "ms",
+        "version": "2.0.0"
+      }
+    },
+    {
+      "id": "type-is@1.6.18",
+      "info": {
+        "name": "type-is",
+        "version": "1.6.18"
+      }
+    },
+    {
+      "id": "mime-types@2.1.35",
+      "info": {
+        "name": "mime-types",
+        "version": "2.1.35"
+      }
+    },
+    {
+      "id": "mime-db@1.52.0",
+      "info": {
+        "name": "mime-db",
+        "version": "1.52.0"
+      }
+    },
+    {
+      "id": "media-typer@0.3.0",
+      "info": {
+        "name": "media-typer",
+        "version": "0.3.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "trucolor@0.7.1",
+        "deps": [
+          {
+            "nodeId": "debug@2.0.0"
+          },
+          {
+            "nodeId": "lodash@4.17.11"
+          },
+          {
+            "nodeId": "body-parser@1.20.4"
+          }
+        ]
+      },
+      {
+        "nodeId": "debug@2.0.0",
+        "pkgId": "debug@2.0.0",
+        "deps": [
+          {
+            "nodeId": "ms@0.6.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "ms@0.6.2",
+        "pkgId": "ms@0.6.2",
+        "deps": []
+      },
+      {
+        "nodeId": "lodash@4.17.11",
+        "pkgId": "lodash@4.17.11",
+        "deps": []
+      },
+      {
+        "nodeId": "body-parser@1.20.4",
+        "pkgId": "body-parser@1.20.4",
+        "deps": [
+          {
+            "nodeId": "raw-body@2.5.3"
+          },
+          {
+            "nodeId": "bytes@3.1.2"
+          },
+          {
+            "nodeId": "destroy@1.2.0"
+          },
+          {
+            "nodeId": "iconv-lite@0.4.24"
+          },
+          {
+            "nodeId": "depd@2.0.0"
+          },
+          {
+            "nodeId": "on-finished@2.4.1"
+          },
+          {
+            "nodeId": "qs@6.14.2"
+          },
+          {
+            "nodeId": "content-type@1.0.5"
+          },
+          {
+            "nodeId": "unpipe@1.0.0"
+          },
+          {
+            "nodeId": "debug@2.6.9"
+          },
+          {
+            "nodeId": "type-is@1.6.18"
+          },
+          {
+            "nodeId": "http-errors@2.0.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "raw-body@2.5.3",
+        "pkgId": "raw-body@2.5.3",
+        "deps": [
+          {
+            "nodeId": "http-errors@2.0.1"
+          },
+          {
+            "nodeId": "bytes@3.1.2"
+          },
+          {
+            "nodeId": "iconv-lite@0.4.24"
+          },
+          {
+            "nodeId": "unpipe@1.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "http-errors@2.0.1",
+        "pkgId": "http-errors@2.0.1",
+        "deps": [
+          {
+            "nodeId": "statuses@2.0.2"
+          },
+          {
+            "nodeId": "toidentifier@1.0.1"
+          },
+          {
+            "nodeId": "setprototypeof@1.2.0"
+          },
+          {
+            "nodeId": "inherits@2.0.4"
+          },
+          {
+            "nodeId": "depd@2.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "statuses@2.0.2",
+        "pkgId": "statuses@2.0.2",
+        "deps": []
+      },
+      {
+        "nodeId": "toidentifier@1.0.1",
+        "pkgId": "toidentifier@1.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "setprototypeof@1.2.0",
+        "pkgId": "setprototypeof@1.2.0",
+        "deps": []
+      },
+      {
+        "nodeId": "inherits@2.0.4",
+        "pkgId": "inherits@2.0.4",
+        "deps": []
+      },
+      {
+        "nodeId": "depd@2.0.0",
+        "pkgId": "depd@2.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "bytes@3.1.2",
+        "pkgId": "bytes@3.1.2",
+        "deps": []
+      },
+      {
+        "nodeId": "iconv-lite@0.4.24",
+        "pkgId": "iconv-lite@0.4.24",
+        "deps": [
+          {
+            "nodeId": "safer-buffer@2.1.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "safer-buffer@2.1.2",
+        "pkgId": "safer-buffer@2.1.2",
+        "deps": []
+      },
+      {
+        "nodeId": "unpipe@1.0.0",
+        "pkgId": "unpipe@1.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "destroy@1.2.0",
+        "pkgId": "destroy@1.2.0",
+        "deps": []
+      },
+      {
+        "nodeId": "on-finished@2.4.1",
+        "pkgId": "on-finished@2.4.1",
+        "deps": [
+          {
+            "nodeId": "ee-first@1.1.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "ee-first@1.1.1",
+        "pkgId": "ee-first@1.1.1",
+        "deps": []
+      },
+      {
+        "nodeId": "qs@6.14.2",
+        "pkgId": "qs@6.14.2",
+        "deps": [
+          {
+            "nodeId": "side-channel@1.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "side-channel@1.1.0",
+        "pkgId": "side-channel@1.1.0",
+        "deps": [
+          {
+            "nodeId": "es-errors@1.3.0"
+          },
+          {
+            "nodeId": "side-channel-map@1.0.1"
+          },
+          {
+            "nodeId": "object-inspect@1.13.4"
+          },
+          {
+            "nodeId": "side-channel-weakmap@1.0.2"
+          },
+          {
+            "nodeId": "side-channel-list@1.0.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "es-errors@1.3.0",
+        "pkgId": "es-errors@1.3.0",
+        "deps": []
+      },
+      {
+        "nodeId": "side-channel-map@1.0.1",
+        "pkgId": "side-channel-map@1.0.1",
+        "deps": [
+          {
+            "nodeId": "es-errors@1.3.0"
+          },
+          {
+            "nodeId": "object-inspect@1.13.4"
+          },
+          {
+            "nodeId": "call-bound@1.0.4"
+          },
+          {
+            "nodeId": "get-intrinsic@1.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "object-inspect@1.13.4",
+        "pkgId": "object-inspect@1.13.4",
+        "deps": []
+      },
+      {
+        "nodeId": "call-bound@1.0.4",
+        "pkgId": "call-bound@1.0.4",
+        "deps": [
+          {
+            "nodeId": "call-bind-apply-helpers@1.0.2"
+          },
+          {
+            "nodeId": "get-intrinsic@1.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "call-bind-apply-helpers@1.0.2",
+        "pkgId": "call-bind-apply-helpers@1.0.2",
+        "deps": [
+          {
+            "nodeId": "function-bind@1.1.2"
+          },
+          {
+            "nodeId": "es-errors@1.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "function-bind@1.1.2",
+        "pkgId": "function-bind@1.1.2",
+        "deps": []
+      },
+      {
+        "nodeId": "get-intrinsic@1.3.0",
+        "pkgId": "get-intrinsic@1.3.0",
+        "deps": [
+          {
+            "nodeId": "es-define-property@1.0.1"
+          },
+          {
+            "nodeId": "get-proto@1.0.1"
+          },
+          {
+            "nodeId": "math-intrinsics@1.1.0"
+          },
+          {
+            "nodeId": "es-object-atoms@1.1.1"
+          },
+          {
+            "nodeId": "hasown@2.0.2"
+          },
+          {
+            "nodeId": "gopd@1.2.0"
+          },
+          {
+            "nodeId": "function-bind@1.1.2"
+          },
+          {
+            "nodeId": "es-errors@1.3.0"
+          },
+          {
+            "nodeId": "has-symbols@1.1.0"
+          },
+          {
+            "nodeId": "call-bind-apply-helpers@1.0.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "es-define-property@1.0.1",
+        "pkgId": "es-define-property@1.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "get-proto@1.0.1",
+        "pkgId": "get-proto@1.0.1",
+        "deps": [
+          {
+            "nodeId": "dunder-proto@1.0.1"
+          },
+          {
+            "nodeId": "es-object-atoms@1.1.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "dunder-proto@1.0.1",
+        "pkgId": "dunder-proto@1.0.1",
+        "deps": [
+          {
+            "nodeId": "gopd@1.2.0"
+          },
+          {
+            "nodeId": "es-errors@1.3.0"
+          },
+          {
+            "nodeId": "call-bind-apply-helpers@1.0.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "gopd@1.2.0",
+        "pkgId": "gopd@1.2.0",
+        "deps": []
+      },
+      {
+        "nodeId": "es-object-atoms@1.1.1",
+        "pkgId": "es-object-atoms@1.1.1",
+        "deps": [
+          {
+            "nodeId": "es-errors@1.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "math-intrinsics@1.1.0",
+        "pkgId": "math-intrinsics@1.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "hasown@2.0.2",
+        "pkgId": "hasown@2.0.2",
+        "deps": [
+          {
+            "nodeId": "function-bind@1.1.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "has-symbols@1.1.0",
+        "pkgId": "has-symbols@1.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "side-channel-weakmap@1.0.2",
+        "pkgId": "side-channel-weakmap@1.0.2",
+        "deps": [
+          {
+            "nodeId": "side-channel-map@1.0.1"
+          },
+          {
+            "nodeId": "object-inspect@1.13.4"
+          },
+          {
+            "nodeId": "call-bound@1.0.4"
+          },
+          {
+            "nodeId": "get-intrinsic@1.3.0"
+          },
+          {
+            "nodeId": "es-errors@1.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "side-channel-list@1.0.1",
+        "pkgId": "side-channel-list@1.0.1",
+        "deps": [
+          {
+            "nodeId": "object-inspect@1.13.4"
+          },
+          {
+            "nodeId": "es-errors@1.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "content-type@1.0.5",
+        "pkgId": "content-type@1.0.5",
+        "deps": []
+      },
+      {
+        "nodeId": "debug@2.6.9",
+        "pkgId": "debug@2.6.9",
+        "deps": [
+          {
+            "nodeId": "ms@2.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "ms@2.0.0",
+        "pkgId": "ms@2.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "type-is@1.6.18",
+        "pkgId": "type-is@1.6.18",
+        "deps": [
+          {
+            "nodeId": "mime-types@2.1.35"
+          },
+          {
+            "nodeId": "media-typer@0.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "mime-types@2.1.35",
+        "pkgId": "mime-types@2.1.35",
+        "deps": [
+          {
+            "nodeId": "mime-db@1.52.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "mime-db@1.52.0",
+        "pkgId": "mime-db@1.52.0",
+        "deps": []
+      },
+      {
+        "nodeId": "media-typer@0.3.0",
+        "pkgId": "media-typer@0.3.0",
+        "deps": []
+      }
+    ]
+  }
+}
