@@ -1,0 +1,1180 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "bun"
+  },
+  "pkgs": [
+    {
+      "id": "test-bundled-deps-wasm@1.0.0",
+      "info": {
+        "name": "test-bundled-deps-wasm",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "@tailwindcss/vite@4.2.2",
+      "info": {
+        "name": "@tailwindcss/vite",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "@tailwindcss/oxide@4.2.2",
+      "info": {
+        "name": "@tailwindcss/oxide",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "@tailwindcss/oxide-linux-arm64-musl@4.2.2",
+      "info": {
+        "name": "@tailwindcss/oxide-linux-arm64-musl",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "@tailwindcss/oxide-darwin-x64@4.2.2",
+      "info": {
+        "name": "@tailwindcss/oxide-darwin-x64",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "@tailwindcss/oxide-linux-arm-gnueabihf@4.2.2",
+      "info": {
+        "name": "@tailwindcss/oxide-linux-arm-gnueabihf",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "@tailwindcss/oxide-win32-x64-msvc@4.2.2",
+      "info": {
+        "name": "@tailwindcss/oxide-win32-x64-msvc",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "@tailwindcss/oxide-wasm32-wasi@4.2.2",
+      "info": {
+        "name": "@tailwindcss/oxide-wasm32-wasi",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "@napi-rs/wasm-runtime@1.1.3",
+      "info": {
+        "name": "@napi-rs/wasm-runtime",
+        "version": "1.1.3"
+      }
+    },
+    {
+      "id": "@emnapi/runtime@1.9.2",
+      "info": {
+        "name": "@emnapi/runtime",
+        "version": "1.9.2"
+      }
+    },
+    {
+      "id": "tslib@2.8.1",
+      "info": {
+        "name": "tslib",
+        "version": "2.8.1"
+      }
+    },
+    {
+      "id": "@tybys/wasm-util@0.10.1",
+      "info": {
+        "name": "@tybys/wasm-util",
+        "version": "0.10.1"
+      }
+    },
+    {
+      "id": "@emnapi/core@1.9.2",
+      "info": {
+        "name": "@emnapi/core",
+        "version": "1.9.2"
+      }
+    },
+    {
+      "id": "@emnapi/wasi-threads@1.2.1",
+      "info": {
+        "name": "@emnapi/wasi-threads",
+        "version": "1.2.1"
+      }
+    },
+    {
+      "id": "@tailwindcss/oxide-linux-x64-musl@4.2.2",
+      "info": {
+        "name": "@tailwindcss/oxide-linux-x64-musl",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "@tailwindcss/oxide-linux-arm64-gnu@4.2.2",
+      "info": {
+        "name": "@tailwindcss/oxide-linux-arm64-gnu",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "@tailwindcss/oxide-android-arm64@4.2.2",
+      "info": {
+        "name": "@tailwindcss/oxide-android-arm64",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "@tailwindcss/oxide-linux-x64-gnu@4.2.2",
+      "info": {
+        "name": "@tailwindcss/oxide-linux-x64-gnu",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "@tailwindcss/oxide-darwin-arm64@4.2.2",
+      "info": {
+        "name": "@tailwindcss/oxide-darwin-arm64",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "@tailwindcss/oxide-win32-arm64-msvc@4.2.2",
+      "info": {
+        "name": "@tailwindcss/oxide-win32-arm64-msvc",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "@tailwindcss/oxide-freebsd-x64@4.2.2",
+      "info": {
+        "name": "@tailwindcss/oxide-freebsd-x64",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "tailwindcss@4.2.2",
+      "info": {
+        "name": "tailwindcss",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "vite@8.0.8",
+      "info": {
+        "name": "vite",
+        "version": "8.0.8"
+      }
+    },
+    {
+      "id": "lightningcss@1.32.0",
+      "info": {
+        "name": "lightningcss",
+        "version": "1.32.0"
+      }
+    },
+    {
+      "id": "lightningcss-freebsd-x64@1.32.0",
+      "info": {
+        "name": "lightningcss-freebsd-x64",
+        "version": "1.32.0"
+      }
+    },
+    {
+      "id": "lightningcss-darwin-x64@1.32.0",
+      "info": {
+        "name": "lightningcss-darwin-x64",
+        "version": "1.32.0"
+      }
+    },
+    {
+      "id": "lightningcss-linux-arm64-gnu@1.32.0",
+      "info": {
+        "name": "lightningcss-linux-arm64-gnu",
+        "version": "1.32.0"
+      }
+    },
+    {
+      "id": "lightningcss-linux-arm64-musl@1.32.0",
+      "info": {
+        "name": "lightningcss-linux-arm64-musl",
+        "version": "1.32.0"
+      }
+    },
+    {
+      "id": "lightningcss-android-arm64@1.32.0",
+      "info": {
+        "name": "lightningcss-android-arm64",
+        "version": "1.32.0"
+      }
+    },
+    {
+      "id": "detect-libc@2.1.2",
+      "info": {
+        "name": "detect-libc",
+        "version": "2.1.2"
+      }
+    },
+    {
+      "id": "lightningcss-win32-x64-msvc@1.32.0",
+      "info": {
+        "name": "lightningcss-win32-x64-msvc",
+        "version": "1.32.0"
+      }
+    },
+    {
+      "id": "lightningcss-linux-x64-gnu@1.32.0",
+      "info": {
+        "name": "lightningcss-linux-x64-gnu",
+        "version": "1.32.0"
+      }
+    },
+    {
+      "id": "lightningcss-darwin-arm64@1.32.0",
+      "info": {
+        "name": "lightningcss-darwin-arm64",
+        "version": "1.32.0"
+      }
+    },
+    {
+      "id": "lightningcss-win32-arm64-msvc@1.32.0",
+      "info": {
+        "name": "lightningcss-win32-arm64-msvc",
+        "version": "1.32.0"
+      }
+    },
+    {
+      "id": "lightningcss-linux-arm-gnueabihf@1.32.0",
+      "info": {
+        "name": "lightningcss-linux-arm-gnueabihf",
+        "version": "1.32.0"
+      }
+    },
+    {
+      "id": "lightningcss-linux-x64-musl@1.32.0",
+      "info": {
+        "name": "lightningcss-linux-x64-musl",
+        "version": "1.32.0"
+      }
+    },
+    {
+      "id": "fsevents@2.3.3",
+      "info": {
+        "name": "fsevents",
+        "version": "2.3.3"
+      }
+    },
+    {
+      "id": "picomatch@4.0.4",
+      "info": {
+        "name": "picomatch",
+        "version": "4.0.4"
+      }
+    },
+    {
+      "id": "postcss@8.5.9",
+      "info": {
+        "name": "postcss",
+        "version": "8.5.9"
+      }
+    },
+    {
+      "id": "picocolors@1.1.1",
+      "info": {
+        "name": "picocolors",
+        "version": "1.1.1"
+      }
+    },
+    {
+      "id": "source-map-js@1.2.1",
+      "info": {
+        "name": "source-map-js",
+        "version": "1.2.1"
+      }
+    },
+    {
+      "id": "nanoid@3.3.11",
+      "info": {
+        "name": "nanoid",
+        "version": "3.3.11"
+      }
+    },
+    {
+      "id": "tinyglobby@0.2.16",
+      "info": {
+        "name": "tinyglobby",
+        "version": "0.2.16"
+      }
+    },
+    {
+      "id": "fdir@6.5.0",
+      "info": {
+        "name": "fdir",
+        "version": "6.5.0"
+      }
+    },
+    {
+      "id": "rolldown@1.0.0-rc.15",
+      "info": {
+        "name": "rolldown",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@oxc-project/types@0.124.0",
+      "info": {
+        "name": "@oxc-project/types",
+        "version": "0.124.0"
+      }
+    },
+    {
+      "id": "@rolldown/binding-darwin-arm64@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/binding-darwin-arm64",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@rolldown/pluginutils@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/pluginutils",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@rolldown/binding-freebsd-x64@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/binding-freebsd-x64",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@rolldown/binding-android-arm64@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/binding-android-arm64",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@rolldown/binding-linux-arm-gnueabihf@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/binding-linux-arm-gnueabihf",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@rolldown/binding-linux-arm64-musl@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/binding-linux-arm64-musl",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@rolldown/binding-linux-arm64-gnu@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/binding-linux-arm64-gnu",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@rolldown/binding-openharmony-arm64@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/binding-openharmony-arm64",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@rolldown/binding-linux-ppc64-gnu@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/binding-linux-ppc64-gnu",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@rolldown/binding-linux-x64-gnu@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/binding-linux-x64-gnu",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@rolldown/binding-win32-x64-msvc@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/binding-win32-x64-msvc",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@rolldown/binding-linux-s390x-gnu@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/binding-linux-s390x-gnu",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@rolldown/binding-win32-arm64-msvc@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/binding-win32-arm64-msvc",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@rolldown/binding-linux-x64-musl@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/binding-linux-x64-musl",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@rolldown/binding-wasm32-wasi@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/binding-wasm32-wasi",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@rolldown/binding-darwin-x64@1.0.0-rc.15",
+      "info": {
+        "name": "@rolldown/binding-darwin-x64",
+        "version": "1.0.0-rc.15"
+      }
+    },
+    {
+      "id": "@tailwindcss/node@4.2.2",
+      "info": {
+        "name": "@tailwindcss/node",
+        "version": "4.2.2"
+      }
+    },
+    {
+      "id": "jiti@2.6.1",
+      "info": {
+        "name": "jiti",
+        "version": "2.6.1"
+      }
+    },
+    {
+      "id": "magic-string@0.30.21",
+      "info": {
+        "name": "magic-string",
+        "version": "0.30.21"
+      }
+    },
+    {
+      "id": "@jridgewell/sourcemap-codec@1.5.5",
+      "info": {
+        "name": "@jridgewell/sourcemap-codec",
+        "version": "1.5.5"
+      }
+    },
+    {
+      "id": "enhanced-resolve@5.20.1",
+      "info": {
+        "name": "enhanced-resolve",
+        "version": "5.20.1"
+      }
+    },
+    {
+      "id": "graceful-fs@4.2.11",
+      "info": {
+        "name": "graceful-fs",
+        "version": "4.2.11"
+      }
+    },
+    {
+      "id": "tapable@2.3.2",
+      "info": {
+        "name": "tapable",
+        "version": "2.3.2"
+      }
+    },
+    {
+      "id": "@jridgewell/remapping@2.3.5",
+      "info": {
+        "name": "@jridgewell/remapping",
+        "version": "2.3.5"
+      }
+    },
+    {
+      "id": "@jridgewell/trace-mapping@0.3.31",
+      "info": {
+        "name": "@jridgewell/trace-mapping",
+        "version": "0.3.31"
+      }
+    },
+    {
+      "id": "@jridgewell/resolve-uri@3.1.2",
+      "info": {
+        "name": "@jridgewell/resolve-uri",
+        "version": "3.1.2"
+      }
+    },
+    {
+      "id": "@jridgewell/gen-mapping@0.3.13",
+      "info": {
+        "name": "@jridgewell/gen-mapping",
+        "version": "0.3.13"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "test-bundled-deps-wasm@1.0.0",
+        "deps": [
+          {
+            "nodeId": "@tailwindcss/vite@4.2.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "@tailwindcss/vite@4.2.2",
+        "pkgId": "@tailwindcss/vite@4.2.2",
+        "deps": [
+          {
+            "nodeId": "@tailwindcss/oxide@4.2.2"
+          },
+          {
+            "nodeId": "tailwindcss@4.2.2"
+          },
+          {
+            "nodeId": "vite@8.0.8"
+          },
+          {
+            "nodeId": "@tailwindcss/node@4.2.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "@tailwindcss/oxide@4.2.2",
+        "pkgId": "@tailwindcss/oxide@4.2.2",
+        "deps": [
+          {
+            "nodeId": "@tailwindcss/oxide-linux-arm64-musl@4.2.2"
+          },
+          {
+            "nodeId": "@tailwindcss/oxide-darwin-x64@4.2.2"
+          },
+          {
+            "nodeId": "@tailwindcss/oxide-linux-arm-gnueabihf@4.2.2"
+          },
+          {
+            "nodeId": "@tailwindcss/oxide-win32-x64-msvc@4.2.2"
+          },
+          {
+            "nodeId": "@tailwindcss/oxide-wasm32-wasi@4.2.2"
+          },
+          {
+            "nodeId": "@tailwindcss/oxide-linux-x64-musl@4.2.2"
+          },
+          {
+            "nodeId": "@tailwindcss/oxide-linux-arm64-gnu@4.2.2"
+          },
+          {
+            "nodeId": "@tailwindcss/oxide-android-arm64@4.2.2"
+          },
+          {
+            "nodeId": "@tailwindcss/oxide-linux-x64-gnu@4.2.2"
+          },
+          {
+            "nodeId": "@tailwindcss/oxide-darwin-arm64@4.2.2"
+          },
+          {
+            "nodeId": "@tailwindcss/oxide-win32-arm64-msvc@4.2.2"
+          },
+          {
+            "nodeId": "@tailwindcss/oxide-freebsd-x64@4.2.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "@tailwindcss/oxide-linux-arm64-musl@4.2.2",
+        "pkgId": "@tailwindcss/oxide-linux-arm64-musl@4.2.2",
+        "deps": []
+      },
+      {
+        "nodeId": "@tailwindcss/oxide-darwin-x64@4.2.2",
+        "pkgId": "@tailwindcss/oxide-darwin-x64@4.2.2",
+        "deps": []
+      },
+      {
+        "nodeId": "@tailwindcss/oxide-linux-arm-gnueabihf@4.2.2",
+        "pkgId": "@tailwindcss/oxide-linux-arm-gnueabihf@4.2.2",
+        "deps": []
+      },
+      {
+        "nodeId": "@tailwindcss/oxide-win32-x64-msvc@4.2.2",
+        "pkgId": "@tailwindcss/oxide-win32-x64-msvc@4.2.2",
+        "deps": []
+      },
+      {
+        "nodeId": "@tailwindcss/oxide-wasm32-wasi@4.2.2",
+        "pkgId": "@tailwindcss/oxide-wasm32-wasi@4.2.2",
+        "deps": [
+          {
+            "nodeId": "@napi-rs/wasm-runtime@1.1.3"
+          },
+          {
+            "nodeId": "@tybys/wasm-util@0.10.1"
+          },
+          {
+            "nodeId": "@emnapi/core@1.9.2"
+          },
+          {
+            "nodeId": "@emnapi/runtime@1.9.2"
+          },
+          {
+            "nodeId": "@emnapi/wasi-threads@1.2.1"
+          },
+          {
+            "nodeId": "tslib@2.8.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "@napi-rs/wasm-runtime@1.1.3",
+        "pkgId": "@napi-rs/wasm-runtime@1.1.3",
+        "deps": [
+          {
+            "nodeId": "@emnapi/runtime@1.9.2"
+          },
+          {
+            "nodeId": "@tybys/wasm-util@0.10.1"
+          },
+          {
+            "nodeId": "@emnapi/core@1.9.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "@emnapi/runtime@1.9.2",
+        "pkgId": "@emnapi/runtime@1.9.2",
+        "deps": [
+          {
+            "nodeId": "tslib@2.8.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "tslib@2.8.1",
+        "pkgId": "tslib@2.8.1",
+        "deps": []
+      },
+      {
+        "nodeId": "@tybys/wasm-util@0.10.1",
+        "pkgId": "@tybys/wasm-util@0.10.1",
+        "deps": [
+          {
+            "nodeId": "tslib@2.8.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "@emnapi/core@1.9.2",
+        "pkgId": "@emnapi/core@1.9.2",
+        "deps": [
+          {
+            "nodeId": "tslib@2.8.1"
+          },
+          {
+            "nodeId": "@emnapi/wasi-threads@1.2.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "@emnapi/wasi-threads@1.2.1",
+        "pkgId": "@emnapi/wasi-threads@1.2.1",
+        "deps": [
+          {
+            "nodeId": "tslib@2.8.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "@tailwindcss/oxide-linux-x64-musl@4.2.2",
+        "pkgId": "@tailwindcss/oxide-linux-x64-musl@4.2.2",
+        "deps": []
+      },
+      {
+        "nodeId": "@tailwindcss/oxide-linux-arm64-gnu@4.2.2",
+        "pkgId": "@tailwindcss/oxide-linux-arm64-gnu@4.2.2",
+        "deps": []
+      },
+      {
+        "nodeId": "@tailwindcss/oxide-android-arm64@4.2.2",
+        "pkgId": "@tailwindcss/oxide-android-arm64@4.2.2",
+        "deps": []
+      },
+      {
+        "nodeId": "@tailwindcss/oxide-linux-x64-gnu@4.2.2",
+        "pkgId": "@tailwindcss/oxide-linux-x64-gnu@4.2.2",
+        "deps": []
+      },
+      {
+        "nodeId": "@tailwindcss/oxide-darwin-arm64@4.2.2",
+        "pkgId": "@tailwindcss/oxide-darwin-arm64@4.2.2",
+        "deps": []
+      },
+      {
+        "nodeId": "@tailwindcss/oxide-win32-arm64-msvc@4.2.2",
+        "pkgId": "@tailwindcss/oxide-win32-arm64-msvc@4.2.2",
+        "deps": []
+      },
+      {
+        "nodeId": "@tailwindcss/oxide-freebsd-x64@4.2.2",
+        "pkgId": "@tailwindcss/oxide-freebsd-x64@4.2.2",
+        "deps": []
+      },
+      {
+        "nodeId": "tailwindcss@4.2.2",
+        "pkgId": "tailwindcss@4.2.2",
+        "deps": []
+      },
+      {
+        "nodeId": "vite@8.0.8",
+        "pkgId": "vite@8.0.8",
+        "deps": [
+          {
+            "nodeId": "lightningcss@1.32.0"
+          },
+          {
+            "nodeId": "fsevents@2.3.3"
+          },
+          {
+            "nodeId": "picomatch@4.0.4"
+          },
+          {
+            "nodeId": "postcss@8.5.9"
+          },
+          {
+            "nodeId": "tinyglobby@0.2.16"
+          },
+          {
+            "nodeId": "rolldown@1.0.0-rc.15"
+          }
+        ]
+      },
+      {
+        "nodeId": "lightningcss@1.32.0",
+        "pkgId": "lightningcss@1.32.0",
+        "deps": [
+          {
+            "nodeId": "lightningcss-freebsd-x64@1.32.0"
+          },
+          {
+            "nodeId": "lightningcss-darwin-x64@1.32.0"
+          },
+          {
+            "nodeId": "lightningcss-linux-arm64-gnu@1.32.0"
+          },
+          {
+            "nodeId": "lightningcss-linux-arm64-musl@1.32.0"
+          },
+          {
+            "nodeId": "lightningcss-android-arm64@1.32.0"
+          },
+          {
+            "nodeId": "detect-libc@2.1.2"
+          },
+          {
+            "nodeId": "lightningcss-win32-x64-msvc@1.32.0"
+          },
+          {
+            "nodeId": "lightningcss-linux-x64-gnu@1.32.0"
+          },
+          {
+            "nodeId": "lightningcss-darwin-arm64@1.32.0"
+          },
+          {
+            "nodeId": "lightningcss-win32-arm64-msvc@1.32.0"
+          },
+          {
+            "nodeId": "lightningcss-linux-arm-gnueabihf@1.32.0"
+          },
+          {
+            "nodeId": "lightningcss-linux-x64-musl@1.32.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "lightningcss-freebsd-x64@1.32.0",
+        "pkgId": "lightningcss-freebsd-x64@1.32.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lightningcss-darwin-x64@1.32.0",
+        "pkgId": "lightningcss-darwin-x64@1.32.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lightningcss-linux-arm64-gnu@1.32.0",
+        "pkgId": "lightningcss-linux-arm64-gnu@1.32.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lightningcss-linux-arm64-musl@1.32.0",
+        "pkgId": "lightningcss-linux-arm64-musl@1.32.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lightningcss-android-arm64@1.32.0",
+        "pkgId": "lightningcss-android-arm64@1.32.0",
+        "deps": []
+      },
+      {
+        "nodeId": "detect-libc@2.1.2",
+        "pkgId": "detect-libc@2.1.2",
+        "deps": []
+      },
+      {
+        "nodeId": "lightningcss-win32-x64-msvc@1.32.0",
+        "pkgId": "lightningcss-win32-x64-msvc@1.32.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lightningcss-linux-x64-gnu@1.32.0",
+        "pkgId": "lightningcss-linux-x64-gnu@1.32.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lightningcss-darwin-arm64@1.32.0",
+        "pkgId": "lightningcss-darwin-arm64@1.32.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lightningcss-win32-arm64-msvc@1.32.0",
+        "pkgId": "lightningcss-win32-arm64-msvc@1.32.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lightningcss-linux-arm-gnueabihf@1.32.0",
+        "pkgId": "lightningcss-linux-arm-gnueabihf@1.32.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lightningcss-linux-x64-musl@1.32.0",
+        "pkgId": "lightningcss-linux-x64-musl@1.32.0",
+        "deps": []
+      },
+      {
+        "nodeId": "fsevents@2.3.3",
+        "pkgId": "fsevents@2.3.3",
+        "deps": []
+      },
+      {
+        "nodeId": "picomatch@4.0.4",
+        "pkgId": "picomatch@4.0.4",
+        "deps": []
+      },
+      {
+        "nodeId": "postcss@8.5.9",
+        "pkgId": "postcss@8.5.9",
+        "deps": [
+          {
+            "nodeId": "picocolors@1.1.1"
+          },
+          {
+            "nodeId": "source-map-js@1.2.1"
+          },
+          {
+            "nodeId": "nanoid@3.3.11"
+          }
+        ]
+      },
+      {
+        "nodeId": "picocolors@1.1.1",
+        "pkgId": "picocolors@1.1.1",
+        "deps": []
+      },
+      {
+        "nodeId": "source-map-js@1.2.1",
+        "pkgId": "source-map-js@1.2.1",
+        "deps": []
+      },
+      {
+        "nodeId": "nanoid@3.3.11",
+        "pkgId": "nanoid@3.3.11",
+        "deps": []
+      },
+      {
+        "nodeId": "tinyglobby@0.2.16",
+        "pkgId": "tinyglobby@0.2.16",
+        "deps": [
+          {
+            "nodeId": "fdir@6.5.0"
+          },
+          {
+            "nodeId": "picomatch@4.0.4"
+          }
+        ]
+      },
+      {
+        "nodeId": "fdir@6.5.0",
+        "pkgId": "fdir@6.5.0",
+        "deps": []
+      },
+      {
+        "nodeId": "rolldown@1.0.0-rc.15",
+        "pkgId": "rolldown@1.0.0-rc.15",
+        "deps": [
+          {
+            "nodeId": "@oxc-project/types@0.124.0"
+          },
+          {
+            "nodeId": "@rolldown/binding-darwin-arm64@1.0.0-rc.15"
+          },
+          {
+            "nodeId": "@rolldown/pluginutils@1.0.0-rc.15"
+          },
+          {
+            "nodeId": "@rolldown/binding-freebsd-x64@1.0.0-rc.15"
+          },
+          {
+            "nodeId": "@rolldown/binding-android-arm64@1.0.0-rc.15"
+          },
+          {
+            "nodeId": "@rolldown/binding-linux-arm-gnueabihf@1.0.0-rc.15"
+          },
+          {
+            "nodeId": "@rolldown/binding-linux-arm64-musl@1.0.0-rc.15"
+          },
+          {
+            "nodeId": "@rolldown/binding-linux-arm64-gnu@1.0.0-rc.15"
+          },
+          {
+            "nodeId": "@rolldown/binding-openharmony-arm64@1.0.0-rc.15"
+          },
+          {
+            "nodeId": "@rolldown/binding-linux-ppc64-gnu@1.0.0-rc.15"
+          },
+          {
+            "nodeId": "@rolldown/binding-linux-x64-gnu@1.0.0-rc.15"
+          },
+          {
+            "nodeId": "@rolldown/binding-win32-x64-msvc@1.0.0-rc.15"
+          },
+          {
+            "nodeId": "@rolldown/binding-linux-s390x-gnu@1.0.0-rc.15"
+          },
+          {
+            "nodeId": "@rolldown/binding-win32-arm64-msvc@1.0.0-rc.15"
+          },
+          {
+            "nodeId": "@rolldown/binding-linux-x64-musl@1.0.0-rc.15"
+          },
+          {
+            "nodeId": "@rolldown/binding-wasm32-wasi@1.0.0-rc.15"
+          },
+          {
+            "nodeId": "@rolldown/binding-darwin-x64@1.0.0-rc.15"
+          }
+        ]
+      },
+      {
+        "nodeId": "@oxc-project/types@0.124.0",
+        "pkgId": "@oxc-project/types@0.124.0",
+        "deps": []
+      },
+      {
+        "nodeId": "@rolldown/binding-darwin-arm64@1.0.0-rc.15",
+        "pkgId": "@rolldown/binding-darwin-arm64@1.0.0-rc.15",
+        "deps": []
+      },
+      {
+        "nodeId": "@rolldown/pluginutils@1.0.0-rc.15",
+        "pkgId": "@rolldown/pluginutils@1.0.0-rc.15",
+        "deps": []
+      },
+      {
+        "nodeId": "@rolldown/binding-freebsd-x64@1.0.0-rc.15",
+        "pkgId": "@rolldown/binding-freebsd-x64@1.0.0-rc.15",
+        "deps": []
+      },
+      {
+        "nodeId": "@rolldown/binding-android-arm64@1.0.0-rc.15",
+        "pkgId": "@rolldown/binding-android-arm64@1.0.0-rc.15",
+        "deps": []
+      },
+      {
+        "nodeId": "@rolldown/binding-linux-arm-gnueabihf@1.0.0-rc.15",
+        "pkgId": "@rolldown/binding-linux-arm-gnueabihf@1.0.0-rc.15",
+        "deps": []
+      },
+      {
+        "nodeId": "@rolldown/binding-linux-arm64-musl@1.0.0-rc.15",
+        "pkgId": "@rolldown/binding-linux-arm64-musl@1.0.0-rc.15",
+        "deps": []
+      },
+      {
+        "nodeId": "@rolldown/binding-linux-arm64-gnu@1.0.0-rc.15",
+        "pkgId": "@rolldown/binding-linux-arm64-gnu@1.0.0-rc.15",
+        "deps": []
+      },
+      {
+        "nodeId": "@rolldown/binding-openharmony-arm64@1.0.0-rc.15",
+        "pkgId": "@rolldown/binding-openharmony-arm64@1.0.0-rc.15",
+        "deps": []
+      },
+      {
+        "nodeId": "@rolldown/binding-linux-ppc64-gnu@1.0.0-rc.15",
+        "pkgId": "@rolldown/binding-linux-ppc64-gnu@1.0.0-rc.15",
+        "deps": []
+      },
+      {
+        "nodeId": "@rolldown/binding-linux-x64-gnu@1.0.0-rc.15",
+        "pkgId": "@rolldown/binding-linux-x64-gnu@1.0.0-rc.15",
+        "deps": []
+      },
+      {
+        "nodeId": "@rolldown/binding-win32-x64-msvc@1.0.0-rc.15",
+        "pkgId": "@rolldown/binding-win32-x64-msvc@1.0.0-rc.15",
+        "deps": []
+      },
+      {
+        "nodeId": "@rolldown/binding-linux-s390x-gnu@1.0.0-rc.15",
+        "pkgId": "@rolldown/binding-linux-s390x-gnu@1.0.0-rc.15",
+        "deps": []
+      },
+      {
+        "nodeId": "@rolldown/binding-win32-arm64-msvc@1.0.0-rc.15",
+        "pkgId": "@rolldown/binding-win32-arm64-msvc@1.0.0-rc.15",
+        "deps": []
+      },
+      {
+        "nodeId": "@rolldown/binding-linux-x64-musl@1.0.0-rc.15",
+        "pkgId": "@rolldown/binding-linux-x64-musl@1.0.0-rc.15",
+        "deps": []
+      },
+      {
+        "nodeId": "@rolldown/binding-wasm32-wasi@1.0.0-rc.15",
+        "pkgId": "@rolldown/binding-wasm32-wasi@1.0.0-rc.15",
+        "deps": [
+          {
+            "nodeId": "@emnapi/runtime@1.9.2"
+          },
+          {
+            "nodeId": "@napi-rs/wasm-runtime@1.1.3"
+          },
+          {
+            "nodeId": "@emnapi/core@1.9.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "@rolldown/binding-darwin-x64@1.0.0-rc.15",
+        "pkgId": "@rolldown/binding-darwin-x64@1.0.0-rc.15",
+        "deps": []
+      },
+      {
+        "nodeId": "@tailwindcss/node@4.2.2",
+        "pkgId": "@tailwindcss/node@4.2.2",
+        "deps": [
+          {
+            "nodeId": "source-map-js@1.2.1"
+          },
+          {
+            "nodeId": "tailwindcss@4.2.2"
+          },
+          {
+            "nodeId": "jiti@2.6.1"
+          },
+          {
+            "nodeId": "lightningcss@1.32.0"
+          },
+          {
+            "nodeId": "magic-string@0.30.21"
+          },
+          {
+            "nodeId": "enhanced-resolve@5.20.1"
+          },
+          {
+            "nodeId": "@jridgewell/remapping@2.3.5"
+          }
+        ]
+      },
+      {
+        "nodeId": "jiti@2.6.1",
+        "pkgId": "jiti@2.6.1",
+        "deps": []
+      },
+      {
+        "nodeId": "magic-string@0.30.21",
+        "pkgId": "magic-string@0.30.21",
+        "deps": [
+          {
+            "nodeId": "@jridgewell/sourcemap-codec@1.5.5"
+          }
+        ]
+      },
+      {
+        "nodeId": "@jridgewell/sourcemap-codec@1.5.5",
+        "pkgId": "@jridgewell/sourcemap-codec@1.5.5",
+        "deps": []
+      },
+      {
+        "nodeId": "enhanced-resolve@5.20.1",
+        "pkgId": "enhanced-resolve@5.20.1",
+        "deps": [
+          {
+            "nodeId": "graceful-fs@4.2.11"
+          },
+          {
+            "nodeId": "tapable@2.3.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "graceful-fs@4.2.11",
+        "pkgId": "graceful-fs@4.2.11",
+        "deps": []
+      },
+      {
+        "nodeId": "tapable@2.3.2",
+        "pkgId": "tapable@2.3.2",
+        "deps": []
+      },
+      {
+        "nodeId": "@jridgewell/remapping@2.3.5",
+        "pkgId": "@jridgewell/remapping@2.3.5",
+        "deps": [
+          {
+            "nodeId": "@jridgewell/trace-mapping@0.3.31"
+          },
+          {
+            "nodeId": "@jridgewell/gen-mapping@0.3.13"
+          }
+        ]
+      },
+      {
+        "nodeId": "@jridgewell/trace-mapping@0.3.31",
+        "pkgId": "@jridgewell/trace-mapping@0.3.31",
+        "deps": [
+          {
+            "nodeId": "@jridgewell/resolve-uri@3.1.2"
+          },
+          {
+            "nodeId": "@jridgewell/sourcemap-codec@1.5.5"
+          }
+        ]
+      },
+      {
+        "nodeId": "@jridgewell/resolve-uri@3.1.2",
+        "pkgId": "@jridgewell/resolve-uri@3.1.2",
+        "deps": []
+      },
+      {
+        "nodeId": "@jridgewell/gen-mapping@0.3.13",
+        "pkgId": "@jridgewell/gen-mapping@0.3.13",
+        "deps": [
+          {
+            "nodeId": "@jridgewell/trace-mapping@0.3.31"
+          },
+          {
+            "nodeId": "@jridgewell/sourcemap-codec@1.5.5"
+          }
+        ]
+      }
+    ]
+  }
+}

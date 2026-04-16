@@ -1,0 +1,8 @@
+{
+  "name": "b",
+  "version": "1.0.0",
+  "dependencies": {
+    "a": "workspace:*",
+    "debug": "catalog:utils"
+  }
+}
