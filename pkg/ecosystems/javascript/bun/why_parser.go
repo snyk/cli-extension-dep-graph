@@ -40,13 +40,21 @@ var (
 	// The dependent has no @version component — bun prints just the project name.
 	//
 	// Group 1: "dev " if this is a dev dependency; empty string otherwise.
+	// Group 2: project name (captured but not used; needed to anchor group 3).
+	// Group 3: the "(requires ...)" clause, or empty string if absent.
+	//
+	// A non-empty group 3 means the root project explicitly declared this dependency.
+	// An empty group 3 means the package appears only as an implicit workspace member
+	// (listed in the `workspaces` field but not in `dependencies`/`devDependencies`);
+	// such lines must NOT be recorded as root-direct deps.
 	//
 	// Examples (where "my-app" is the root):
-	//   "  └─ my-app (requires ^4)"              → group 1: ""
-	//   "  └─ dev my-app (requires latest)"      → group 1: "dev "
-	//   "  └─ peer my-app (requires ^5)"         → group 1: ""  (peer treated as prod)
+	//   "  └─ my-app (requires ^4)"              → group 1: "",     group 3: " (requires ^4)"
+	//   "  └─ dev my-app (requires latest)"      → group 1: "dev ", group 3: " (requires latest)"
+	//   "  └─ peer my-app (requires ^5)"         → group 1: "",     group 3: " (requires ^5)"
+	//   "  └─ my-app"                            → group 1: "",     group 3: ""  (implicit workspace member, skip)
 	//   "  └─ No dependents found"               → no match (contains spaces)
-	depth1RootRe = regexp.MustCompile(`^  [└├]─ (dev )?(?:peer |optional )?(@?[^@\s(]+)(?:\s+\(requires[^)]+\))?$`)
+	depth1RootRe = regexp.MustCompile(`^  [└├]─ (dev )?(?:peer |optional )?(@?[^@\s(]+)(\s+\(requires[^)]+\))?$`)
 )
 
 // whyParser holds the mutable state accumulated while scanning `bun why '*' --top` output.
@@ -131,8 +139,13 @@ func (p *whyParser) parse(ctx context.Context, r io.Reader) (*whyOutput, error) 
 		case rm != nil:
 			p.setCurrentPackage(rm)
 		case d1rm != nil:
-			if err := p.recordRootPackageDependency(d1rm[1] == "dev "); err != nil {
-				return nil, err
+			// Only record when there is an explicit "(requires ...)" clause.
+			// A missing clause means the package is an implicit workspace member
+			// (in the `workspaces` field but not `dependencies`) — skip silently.
+			if d1rm[3] != "" {
+				if err := p.recordRootPackageDependency(d1rm[1] == "dev "); err != nil {
+					return nil, err
+				}
 			}
 		case d1m != nil:
 			if err := p.recordVersionedPackageDependency(d1m[1]); err != nil {
