@@ -27,10 +27,9 @@ func Err(err error) Field {
 	return Field{Key: "err_msg", Value: errMsg}
 }
 
-// Logger is an interface for structured logging.
+// Logger is an interface for logging that supports Info, Debug, and Error operations.
 type Logger interface {
 	Info(ctx context.Context, msg string, fields ...Field)
-	Warn(ctx context.Context, msg string, fields ...Field)
 	Debug(ctx context.Context, msg string, fields ...Field)
 	Error(ctx context.Context, msg string, fields ...Field)
 }
@@ -46,14 +45,6 @@ type zerologAdapter struct {
 
 func (z *zerologAdapter) Info(ctx context.Context, msg string, fields ...Field) {
 	e := z.zl.Info().Ctx(ctx)
-	for _, f := range fields {
-		e = e.Any(f.Key, f.Value)
-	}
-	e.Msg(msg)
-}
-
-func (z *zerologAdapter) Warn(ctx context.Context, msg string, fields ...Field) {
-	e := z.zl.Warn().Ctx(ctx)
 	for _, f := range fields {
 		e = e.Any(f.Key, f.Value)
 	}
@@ -89,10 +80,6 @@ func (s *slogAdapter) Info(ctx context.Context, msg string, fields ...Field) {
 	s.sl.InfoContext(ctx, msg, fieldsToSlogAttrs(fields)...)
 }
 
-func (s *slogAdapter) Warn(ctx context.Context, msg string, fields ...Field) {
-	s.sl.WarnContext(ctx, msg, fieldsToSlogAttrs(fields)...)
-}
-
 func (s *slogAdapter) Debug(ctx context.Context, msg string, fields ...Field) {
 	s.sl.DebugContext(ctx, msg, fieldsToSlogAttrs(fields)...)
 }
@@ -117,6 +104,5 @@ func Nop() Logger {
 type nopLogger struct{}
 
 func (n *nopLogger) Info(_ context.Context, _ string, _ ...Field)  {}
-func (n *nopLogger) Warn(_ context.Context, _ string, _ ...Field)  {}
 func (n *nopLogger) Debug(_ context.Context, _ string, _ ...Field) {}
 func (n *nopLogger) Error(_ context.Context, _ string, _ ...Field) {}

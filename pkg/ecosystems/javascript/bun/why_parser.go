@@ -152,7 +152,7 @@ func (p *whyParser) parse(ctx context.Context, r io.Reader) (*whyOutput, error) 
 				return nil, err
 			}
 		default:
-			p.log.Warn(ctx, "Skipping unrecognized bun why output line", logger.Attr("line", p.currentLine))
+			p.log.Debug(ctx, "Skipping unrecognized bun why output line", logger.Attr("line", p.currentLine))
 		}
 	}
 
