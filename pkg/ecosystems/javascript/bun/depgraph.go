@@ -2,10 +2,21 @@ package bun
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	godepgraph "github.com/snyk/dep-graph/go/pkg/depgraph"
 )
+
+// depGraphResult pairs a built dep graph with the relative path to the
+// package.json that describes it (relative to the directory containing bun.lock).
+//
+// For the root project this is always "package.json". For a workspace package
+// whose ID is "name@workspace:packages/a" the path is "packages/a/package.json".
+type depGraphResult struct {
+	graph          *godepgraph.DepGraph
+	pkgJSONRelPath string
+}
 
 const pkgManager = "bun"
 
@@ -14,9 +25,14 @@ const pkgManager = "bun"
 // in as a dependency: their subtrees are walked only in their own dep graph,
 // preventing duplicated vulnerability reporting across workspaces.
 //
+// Each result carries the relative path to its package.json (relative to the
+// directory containing bun.lock). The root result is always "package.json";
+// workspace results use the path encoded in the workspace ID
+// (e.g. "name@workspace:packages/a" → "packages/a/package.json").
+//
 // If the project contains no workspace packages, a single-element slice is
 // returned containing the root dep graph.
-func buildDepGraphs(rootName, rootVersion string, out *whyOutput) ([]*godepgraph.DepGraph, error) {
+func buildDepGraphs(rootName, rootVersion string, out *whyOutput) ([]depGraphResult, error) {
 	wsPkgs := workspacePkgs(out.Graph)
 	forward := buildForward(out.Graph)
 
@@ -34,12 +50,17 @@ func buildDepGraphs(rootName, rootVersion string, out *whyOutput) ([]*godepgraph
 		return nil, fmt.Errorf("building root dep graph: %w", err)
 	}
 
-	graphs := []*godepgraph.DepGraph{rootGraph}
+	results := []depGraphResult{{graph: rootGraph, pkgJSONRelPath: packageJSONFile}}
 
 	// One dep graph per workspace package. Each stops at other workspace
 	// packages so their subtrees are not duplicated.
 	for wsID := range wsPkgs {
 		name, version := splitPkgID(wsID)
+
+		// Derive the workspace package.json path from the workspace: version specifier.
+		// e.g. "workspace:packages/a" → "packages/a/package.json"
+		wsDir := strings.TrimPrefix(version, "workspace:")
+		pkgJSONRelPath := filepath.Join(wsDir, packageJSONFile)
 
 		wsSeeds := make(map[string]struct{}, len(forward[wsID]))
 		for dep := range forward[wsID] {
@@ -59,10 +80,10 @@ func buildDepGraphs(rootName, rootVersion string, out *whyOutput) ([]*godepgraph
 			return nil, fmt.Errorf("building dep graph for %s: %w", wsID, err)
 		}
 
-		graphs = append(graphs, wsGraph)
+		results = append(results, depGraphResult{graph: wsGraph, pkgJSONRelPath: pkgJSONRelPath})
 	}
 
-	return graphs, nil
+	return results, nil
 }
 
 // buildSingleDepGraph constructs one dep graph rooted at rootName/rootVersion.

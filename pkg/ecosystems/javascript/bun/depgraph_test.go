@@ -8,6 +8,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// findResultByRoot returns the depGraphResult whose root package name equals rootName.
+func findResultByRoot(t *testing.T, results []depGraphResult, rootName string) depGraphResult {
+	t.Helper()
+
+	for _, r := range results {
+		if r.graph.GetRootPkg().Info.Name == rootName {
+			return r
+		}
+	}
+
+	t.Fatalf("no dep graph with root package %q", rootName)
+
+	return depGraphResult{}
+}
+
 func TestBuildDepGraphs_Simple(t *testing.T) {
 	// root → debug@4.4.3 → ms@2.1.3 (no workspaces)
 	out := &whyOutput{
@@ -18,18 +33,19 @@ func TestBuildDepGraphs_Simple(t *testing.T) {
 		ProdDeps: []string{"debug@4.4.3"},
 	}
 
-	graphs, err := buildDepGraphs("my-app", "1.0.0", out)
+	results, err := buildDepGraphs("my-app", "1.0.0", out)
 	require.NoError(t, err)
-	require.Len(t, graphs, 1, "non-workspace project produces exactly one dep graph")
+	require.Len(t, results, 1, "non-workspace project produces exactly one dep graph")
 
-	dg := graphs[0]
-	assert.Equal(t, "bun", dg.PkgManager.Name)
-	assert.Equal(t, "my-app", dg.GetRootPkg().Info.Name)
-	assert.Equal(t, "1.0.0", dg.GetRootPkg().Info.Version)
+	r := results[0]
+	assert.Equal(t, "package.json", r.pkgJSONRelPath)
+	assert.Equal(t, "bun", r.graph.PkgManager.Name)
+	assert.Equal(t, "my-app", r.graph.GetRootPkg().Info.Name)
+	assert.Equal(t, "1.0.0", r.graph.GetRootPkg().Info.Version)
 
-	assert.Contains(t, nodeDeps(dg, "root-node"), "debug@4.4.3", "root → debug")
-	assert.Contains(t, nodeDeps(dg, "debug@4.4.3"), "ms@2.1.3", "debug → ms")
-	assert.Empty(t, nodeDeps(dg, "ms@2.1.3"), "ms has no deps")
+	assert.Contains(t, nodeDeps(r.graph, "root-node"), "debug@4.4.3", "root → debug")
+	assert.Contains(t, nodeDeps(r.graph, "debug@4.4.3"), "ms@2.1.3", "debug → ms")
+	assert.Empty(t, nodeDeps(r.graph, "ms@2.1.3"), "ms has no deps")
 }
 
 func TestBuildDepGraphs_WithWorkspaces(t *testing.T) {
@@ -50,24 +66,28 @@ func TestBuildDepGraphs_WithWorkspaces(t *testing.T) {
 		},
 	}
 
-	graphs, err := buildDepGraphs("my-workspace", "1.0.0", out)
+	results, err := buildDepGraphs("my-workspace", "1.0.0", out)
 	require.NoError(t, err)
-	require.Len(t, graphs, 2, "root graph + one per workspace package")
+	require.Len(t, results, 2, "root graph + one per workspace package")
 
 	// Identify root and workspace graphs by root package name.
-	rootGraph := findGraphByRoot(t, graphs, "my-workspace")
-	loggerGraph := findGraphByRoot(t, graphs, "@workspace/logger")
+	rootResult := findResultByRoot(t, results, "my-workspace")
+	loggerResult := findResultByRoot(t, results, "@workspace/logger")
+
+	// Verify target file paths.
+	assert.Equal(t, "package.json", rootResult.pkgJSONRelPath)
+	assert.Equal(t, "packages/logger/package.json", loggerResult.pkgJSONRelPath)
 
 	// Root graph: workspace package is a leaf — its transitive deps are absent.
-	assert.Contains(t, nodeDeps(rootGraph, "root-node"), "@workspace/logger@workspace:packages/logger", "root → logger")
-	assert.Contains(t, nodeDeps(rootGraph, "root-node"), "debug@4.4.3", "root → debug")
-	assert.Contains(t, nodeDeps(rootGraph, "debug@4.4.3"), "ms@2.1.3", "debug → ms in root graph")
-	assert.Empty(t, nodeDeps(rootGraph, "@workspace/logger@workspace:packages/logger"),
+	assert.Contains(t, nodeDeps(rootResult.graph, "root-node"), "@workspace/logger@workspace:packages/logger", "root → logger")
+	assert.Contains(t, nodeDeps(rootResult.graph, "root-node"), "debug@4.4.3", "root → debug")
+	assert.Contains(t, nodeDeps(rootResult.graph, "debug@4.4.3"), "ms@2.1.3", "debug → ms in root graph")
+	assert.Empty(t, nodeDeps(rootResult.graph, "@workspace/logger@workspace:packages/logger"),
 		"logger is a leaf in the root graph — its subtree lives in its own dep graph")
 
 	// Workspace logger graph: logger's subtree is fully walked.
-	assert.Contains(t, nodeDeps(loggerGraph, "root-node"), "axios@1.14.0", "logger root → axios")
-	assert.Contains(t, nodeDeps(loggerGraph, "axios@1.14.0"), "follow-redirects@1.15.9", "axios → follow-redirects")
+	assert.Contains(t, nodeDeps(loggerResult.graph, "root-node"), "axios@1.14.0", "logger root → axios")
+	assert.Contains(t, nodeDeps(loggerResult.graph, "axios@1.14.0"), "follow-redirects@1.15.9", "axios → follow-redirects")
 }
 
 func TestBuildDepGraphs_WorkspaceCycle(t *testing.T) {
@@ -80,27 +100,32 @@ func TestBuildDepGraphs_WorkspaceCycle(t *testing.T) {
 		ProdDeps: []string{"wsA@workspace:packages/a", "wsB@workspace:packages/b"},
 	}
 
-	graphs, err := buildDepGraphs("root", "0.0.0", out)
+	results, err := buildDepGraphs("root", "0.0.0", out)
 	require.NoError(t, err)
-	require.Len(t, graphs, 3, "root + wsA + wsB")
+	require.Len(t, results, 3, "root + wsA + wsB")
 
-	rootGraph := findGraphByRoot(t, graphs, "root")
-	wsAGraph := findGraphByRoot(t, graphs, "wsA")
-	wsBGraph := findGraphByRoot(t, graphs, "wsB")
+	rootResult := findResultByRoot(t, results, "root")
+	wsAResult := findResultByRoot(t, results, "wsA")
+	wsBResult := findResultByRoot(t, results, "wsB")
+
+	// Verify target file paths.
+	assert.Equal(t, "package.json", rootResult.pkgJSONRelPath)
+	assert.Equal(t, "packages/a/package.json", wsAResult.pkgJSONRelPath)
+	assert.Equal(t, "packages/b/package.json", wsBResult.pkgJSONRelPath)
 
 	// Both workspace packages appear as leaves in the root graph.
-	assert.Contains(t, nodeDeps(rootGraph, "root-node"), "wsA@workspace:packages/a")
-	assert.Contains(t, nodeDeps(rootGraph, "root-node"), "wsB@workspace:packages/b")
-	assert.Empty(t, nodeDeps(rootGraph, "wsA@workspace:packages/a"), "wsA is a leaf in root graph")
-	assert.Empty(t, nodeDeps(rootGraph, "wsB@workspace:packages/b"), "wsB is a leaf in root graph")
+	assert.Contains(t, nodeDeps(rootResult.graph, "root-node"), "wsA@workspace:packages/a")
+	assert.Contains(t, nodeDeps(rootResult.graph, "root-node"), "wsB@workspace:packages/b")
+	assert.Empty(t, nodeDeps(rootResult.graph, "wsA@workspace:packages/a"), "wsA is a leaf in root graph")
+	assert.Empty(t, nodeDeps(rootResult.graph, "wsB@workspace:packages/b"), "wsB is a leaf in root graph")
 
 	// In wsA's own graph, wsB appears as a leaf (cycle broken by stopAt).
-	assert.Contains(t, nodeDeps(wsAGraph, "root-node"), "wsB@workspace:packages/b", "wsA root → wsB")
-	assert.Empty(t, nodeDeps(wsAGraph, "wsB@workspace:packages/b"), "wsB is a leaf in wsA graph")
+	assert.Contains(t, nodeDeps(wsAResult.graph, "root-node"), "wsB@workspace:packages/b", "wsA root → wsB")
+	assert.Empty(t, nodeDeps(wsAResult.graph, "wsB@workspace:packages/b"), "wsB is a leaf in wsA graph")
 
 	// In wsB's own graph, wsA appears as a leaf (cycle broken by stopAt).
-	assert.Contains(t, nodeDeps(wsBGraph, "root-node"), "wsA@workspace:packages/a", "wsB root → wsA")
-	assert.Empty(t, nodeDeps(wsBGraph, "wsA@workspace:packages/a"), "wsA is a leaf in wsB graph")
+	assert.Contains(t, nodeDeps(wsBResult.graph, "root-node"), "wsA@workspace:packages/a", "wsB root → wsA")
+	assert.Empty(t, nodeDeps(wsBResult.graph, "wsA@workspace:packages/a"), "wsA is a leaf in wsB graph")
 }
 
 func TestBuildDepGraphs_HandlesCircularDeps(t *testing.T) {
@@ -114,29 +139,15 @@ func TestBuildDepGraphs_HandlesCircularDeps(t *testing.T) {
 	}
 
 	// Must not infinite-loop.
-	graphs, err := buildDepGraphs("root", "0.0.0", out)
+	results, err := buildDepGraphs("root", "0.0.0", out)
 	require.NoError(t, err)
-	require.Len(t, graphs, 1)
+	require.Len(t, results, 1)
 
-	dg := graphs[0]
-	assert.Contains(t, nodeDeps(dg, "root-node"), "pkg-a@1.0.0", "root → pkg-a")
-	assert.Contains(t, nodeDeps(dg, "pkg-a@1.0.0"), "pkg-b@2.0.0", "pkg-a → pkg-b")
-	assert.Contains(t, nodeDeps(dg, "pkg-b@2.0.0"), "pkg-a@1.0.0", "pkg-b → pkg-a (cycle edge present)")
-}
-
-// findGraphByRoot returns the dep graph whose root package name equals rootName.
-func findGraphByRoot(t *testing.T, graphs []*godepgraph.DepGraph, rootName string) *godepgraph.DepGraph {
-	t.Helper()
-
-	for _, g := range graphs {
-		if g.GetRootPkg().Info.Name == rootName {
-			return g
-		}
-	}
-
-	t.Fatalf("no dep graph with root package %q", rootName)
-
-	return nil
+	r := results[0]
+	assert.Equal(t, "package.json", r.pkgJSONRelPath)
+	assert.Contains(t, nodeDeps(r.graph, "root-node"), "pkg-a@1.0.0", "root → pkg-a")
+	assert.Contains(t, nodeDeps(r.graph, "pkg-a@1.0.0"), "pkg-b@2.0.0", "pkg-a → pkg-b")
+	assert.Contains(t, nodeDeps(r.graph, "pkg-b@2.0.0"), "pkg-a@1.0.0", "pkg-b → pkg-a (cycle edge present)")
 }
 
 // nodeDeps returns the NodeIDs of nodeID's direct dependencies in dg.

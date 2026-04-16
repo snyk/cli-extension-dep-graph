@@ -13,25 +13,23 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/snyk/dep-graph/go/pkg/depgraph"
-
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
 
-// testFindGraphByRoot finds the SCAResult whose root package name equals rootName.
-func testFindGraphByRoot(t *testing.T, results []ecosystems.SCAResult, rootName string) *depgraph.DepGraph {
+// testFindResultByRoot finds the SCAResult whose root package name equals rootName.
+func testFindResultByRoot(t *testing.T, results []ecosystems.SCAResult, rootName string) ecosystems.SCAResult {
 	t.Helper()
 
 	for _, r := range results {
 		if r.DepGraph != nil && r.DepGraph.GetRootPkg().Info.Name == rootName {
-			return r.DepGraph
+			return r
 		}
 	}
 
 	t.Fatalf("no dep graph with root package %q", rootName)
 
-	return nil
+	return ecosystems.SCAResult{}
 }
 
 // fakeExecutor implements bunWhyRunner using a fixture file for bun why output.
@@ -71,7 +69,7 @@ func TestPlugin_Simple(t *testing.T) {
 	require.NoError(t, scaResult.Error)
 	require.NotNil(t, scaResult.DepGraph)
 	assert.Equal(t, "my-app", scaResult.DepGraph.GetRootPkg().Info.Name)
-	assert.Equal(t, "bun.lock", scaResult.Metadata.TargetFile)
+	assert.Equal(t, "package.json", scaResult.ProjectDescriptor.GetTargetFile())
 
 	pkgIDs := make(map[string]bool)
 	for _, p := range scaResult.DepGraph.Pkgs {
@@ -103,11 +101,18 @@ func TestPlugin_Workspace_MultipleDepGraphs(t *testing.T) {
 		require.NotNil(t, r.DepGraph)
 	}
 
-	rootGraph := testFindGraphByRoot(t, result.Results, "my-workspace")
-	loggerGraph := testFindGraphByRoot(t, result.Results, "@workspace/logger")
-	utilsGraph := testFindGraphByRoot(t, result.Results, "@workspace/utils")
+	rootResult := testFindResultByRoot(t, result.Results, "my-workspace")
+	loggerResult := testFindResultByRoot(t, result.Results, "@workspace/logger")
+	utilsResult := testFindResultByRoot(t, result.Results, "@workspace/utils")
+
+	// Each dep graph's TargetFile should be the package.json for that workspace package.
+	assert.Equal(t, "package.json", rootResult.ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, "packages/logger/package.json", loggerResult.ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, "packages/utils/package.json", utilsResult.ProjectDescriptor.GetTargetFile())
 
 	// Root graph: workspace packages are leaves; their transitive deps absent.
+	rootGraph := rootResult.DepGraph
+	loggerGraph := loggerResult.DepGraph
 	assert.Contains(t, nodeDeps(rootGraph, "root-node"), "@workspace/logger@workspace:packages/logger", "root → logger")
 	assert.Contains(t, nodeDeps(rootGraph, "root-node"), "@workspace/utils@workspace:packages/utils", "root → utils")
 	assert.Contains(t, nodeDeps(rootGraph, "root-node"), "debug@4.4.3", "root → debug")
@@ -118,9 +123,6 @@ func TestPlugin_Workspace_MultipleDepGraphs(t *testing.T) {
 	// Logger workspace graph: logger's own subtree is fully walked.
 	assert.Contains(t, nodeDeps(loggerGraph, "root-node"), "axios@1.14.0", "logger root → axios")
 	assert.Contains(t, nodeDeps(loggerGraph, "axios@1.14.0"), "follow-redirects@1.15.9", "axios → follow-redirects")
-
-	// Utils workspace graph exists (may have no deps of its own).
-	_ = utilsGraph
 }
 
 func TestPlugin_NoBunLock_ReturnsEmpty(t *testing.T) {

@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
 )
 
 const logFieldLockFile = "lockFile"
@@ -83,10 +83,19 @@ func (p Plugin) buildResults(
 	lockFileRelPath, lockFileAbsDir string,
 	exec bunWhyRunner,
 ) []ecosystems.SCAResult {
-	meta := ecosystems.Metadata{TargetFile: lockFileRelPath}
-
+	// TargetFile for error results: the root package.json alongside bun.lock.
+	lockFileDir := filepath.Dir(lockFileRelPath)
+	rootTargetFile := filepath.Join(lockFileDir, packageJSONFile)
 	errResult := func(err error) []ecosystems.SCAResult {
-		return []ecosystems.SCAResult{{Metadata: meta, Error: err}}
+		return []ecosystems.SCAResult{{
+			ProjectDescriptor: identity.ProjectDescriptor{
+				Identity: identity.ProjectIdentity{
+					Type:       pkgManager,
+					TargetFile: &rootTargetFile,
+				},
+			},
+			Error: err,
+		}}
 	}
 
 	log.Info(ctx, "Building bun dependency graph", logger.Attr(logFieldLockFile, lockFileRelPath))
@@ -100,28 +109,36 @@ func (p Plugin) buildResults(
 	if err != nil {
 		return errResult(p.wrapRunError(err))
 	}
+	// Close the reader on all return paths so the subprocess goroutine in
+	// bunCmdExecutor is released promptly, regardless of where we exit.
+	defer output.Close()
 
 	out, err := parseWhyOutput(ctx, log, output)
 	if err != nil {
-		// Drain the reader so the subprocess goroutine in bunCmdExecutor can finish.
-		if _, drainErr := io.Copy(io.Discard, output); drainErr != nil {
-			log.Debug(ctx, "draining reader after parse error", logger.Err(drainErr))
-		}
 		return errResult(fmt.Errorf("parsing bun why output: %w", err))
 	}
 
 	log.Debug(ctx, "Parsed bun why output", logger.Attr(logFieldLockFile, lockFileRelPath), logger.Attr("packages", len(out.Graph)))
 
-	graphs, err := buildDepGraphs(pkgJSON.Name, pkgJSON.Version, out)
+	graphResults, err := buildDepGraphs(pkgJSON.Name, pkgJSON.Version, out)
 	if err != nil {
 		return errResult(fmt.Errorf("building dep graphs: %w", err))
 	}
 
-	log.Info(ctx, "Successfully built bun dependency graphs", logger.Attr(logFieldLockFile, lockFileRelPath), logger.Attr("graphs", len(graphs)))
+	log.Info(ctx, "Successfully built bun dependency graphs", logger.Attr(logFieldLockFile, lockFileRelPath), logger.Attr("graphs", len(graphResults)))
 
-	results := make([]ecosystems.SCAResult, len(graphs))
-	for i, g := range graphs {
-		results[i] = ecosystems.SCAResult{DepGraph: g, Metadata: meta}
+	results := make([]ecosystems.SCAResult, len(graphResults))
+	for i, gr := range graphResults {
+		tf := filepath.Join(lockFileDir, gr.pkgJSONRelPath)
+		results[i] = ecosystems.SCAResult{
+			DepGraph: gr.graph,
+			ProjectDescriptor: identity.ProjectDescriptor{
+				Identity: identity.ProjectIdentity{
+					Type:       pkgManager,
+					TargetFile: &tf,
+				},
+			},
+		}
 	}
 
 	return results
