@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "bun"
+  },
+  "pkgs": [
+    {
+      "id": "b@workspace:packages/b",
+      "info": {
+        "name": "b",
+        "version": "workspace:packages/b"
+      }
+    },
+    {
+      "id": "a@workspace:packages/a",
+      "info": {
+        "name": "a",
+        "version": "workspace:packages/a"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "b@workspace:packages/b",
+        "deps": [
+          {
+            "nodeId": "a@workspace:packages/a"
+          }
+        ]
+      },
+      {
+        "nodeId": "a@workspace:packages/a",
+        "pkgId": "a@workspace:packages/a",
+        "deps": []
+      }
+    ]
+  }
+}
