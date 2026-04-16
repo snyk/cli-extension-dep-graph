@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -38,7 +39,7 @@ type fakeExecutor struct {
 	err        error
 }
 
-func (f *fakeExecutor) Run(_ context.Context, _ string) (io.Reader, error) {
+func (f *fakeExecutor) Run(_ context.Context, _ string) (io.ReadCloser, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -48,7 +49,7 @@ func (f *fakeExecutor) Run(_ context.Context, _ string) (io.Reader, error) {
 		return nil, err
 	}
 
-	return bytes.NewReader(data), nil
+	return io.NopCloser(bytes.NewReader(data)), nil
 }
 
 func newPlugin(exec bunWhyRunner) Plugin {
@@ -201,7 +202,120 @@ func TestPlugin_StreamingError(t *testing.T) {
 // streamExecutor injects an already-prepared io.Reader.
 type streamExecutor struct{ r io.Reader }
 
-func (s *streamExecutor) Run(_ context.Context, _ string) (io.Reader, error) { return s.r, nil }
+func (s *streamExecutor) Run(_ context.Context, _ string) (io.ReadCloser, error) {
+	return io.NopCloser(s.r), nil
+}
+
+// dirAwareExecutor implements bunWhyRunner, returning per-directory bun why output.
+// The outputs map keys are absolute directory paths.
+type dirAwareExecutor struct {
+	outputs map[string]string
+}
+
+func (d *dirAwareExecutor) Run(_ context.Context, dir string) (io.ReadCloser, error) {
+	out, ok := d.outputs[dir]
+	if !ok {
+		return nil, fmt.Errorf("dirAwareExecutor: no output configured for dir %q", dir)
+	}
+	return io.NopCloser(strings.NewReader(out)), nil
+}
+
+// TestPlugin_AllProjects_WorkspacesWithSubpackages proves that when scanning a
+// directory with two independent bun workspaces (backend/ and frontend/), each
+// containing sub-packages, every SCAResult.ProjectDescriptor.TargetFile points
+// to a package.json — never to a bun.lock.
+func TestPlugin_AllProjects_WorkspacesWithSubpackages(t *testing.T) {
+	tmp := t.TempDir()
+
+	// Create bun.lock + root package.json for each workspace root.
+	for _, ws := range []struct {
+		dir, name string
+	}{
+		{"backend", "bun-backend"},
+		{"frontend", "bun-frontend"},
+	} {
+		require.NoError(t, os.MkdirAll(filepath.Join(tmp, ws.dir), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(tmp, ws.dir, "bun.lock"), nil, 0o600))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmp, ws.dir, "package.json"),
+			[]byte(`{"name":"`+ws.name+`","version":"1.0.0"}`),
+			0o600,
+		))
+	}
+
+	// bun why output for backend: three workspace sub-packages (1, 2, 3).
+	backendWhy := strings.Join([]string{
+		"ws-1@workspace:1",
+		"  └─ bun-backend (requires workspace:^1.0.0)",
+		"",
+		"ws-2@workspace:2",
+		"  └─ bun-backend (requires workspace:^1.0.0)",
+		"",
+		"ws-3@workspace:3",
+		"  └─ bun-backend (requires workspace:^1.0.0)",
+		"",
+		"bun-backend@",
+		"",
+	}, "\n")
+
+	// bun why output for frontend: three workspace sub-packages (3, 4, 5).
+	// Sub-package "3" shares its numeric dir name with backend/3, proving that
+	// TargetFiles are correctly scoped under their own workspace root.
+	frontendWhy := strings.Join([]string{
+		"ws-3@workspace:3",
+		"  └─ bun-frontend (requires workspace:^1.0.0)",
+		"",
+		"ws-4@workspace:4",
+		"  └─ bun-frontend (requires workspace:^1.0.0)",
+		"",
+		"ws-5@workspace:5",
+		"  └─ bun-frontend (requires workspace:^1.0.0)",
+		"",
+		"bun-frontend@",
+		"",
+	}, "\n")
+
+	exec := &dirAwareExecutor{outputs: map[string]string{
+		filepath.Join(tmp, "backend"):  backendWhy,
+		filepath.Join(tmp, "frontend"): frontendWhy,
+	}}
+
+	plugin := newPlugin(exec)
+	opts := ecosystems.NewPluginOptions().WithAllProjects(true)
+
+	result, err := plugin.BuildDepGraphsFromDir(context.Background(), logger.Nop(), tmp, opts)
+	require.NoError(t, err)
+	require.Len(t, result.Results, 8, "4 dep graphs per workspace (root + 3 sub-packages) × 2 workspaces")
+
+	for i, r := range result.Results {
+		require.NoError(t, r.Error, "result[%d] must not carry an error", i)
+		require.NotNil(t, r.DepGraph, "result[%d] must have a dep graph", i)
+	}
+
+	wantTargetFiles := []string{
+		"backend/package.json",
+		"backend/1/package.json",
+		"backend/2/package.json",
+		"backend/3/package.json",
+		"frontend/package.json",
+		"frontend/3/package.json",
+		"frontend/4/package.json",
+		"frontend/5/package.json",
+	}
+
+	gotTargetFiles := make([]string, len(result.Results))
+	for i, r := range result.Results {
+		gotTargetFiles[i] = r.ProjectDescriptor.GetTargetFile()
+	}
+
+	assert.ElementsMatch(t, wantTargetFiles, gotTargetFiles,
+		"each dep graph must point to its package.json, not to bun.lock")
+
+	for _, tf := range gotTargetFiles {
+		assert.NotContains(t, tf, "bun.lock",
+			"TargetFile must never be a lockfile path")
+	}
+}
 
 // TestParseWhyOutput_ReaderInterface confirms parseWhyOutput works with strings.NewReader.
 func TestParseWhyOutput_ReaderInterface(t *testing.T) {
