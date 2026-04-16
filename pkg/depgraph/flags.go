@@ -9,6 +9,7 @@ const (
 const (
 	FlagFailFast                      = "fail-fast"
 	FlagAllProjects                   = "all-projects"
+	FlagPrintOutputJsonlWithErrors    = "print-output-jsonl-with-errors"
 	FlagDev                           = "dev"
 	FlagExclude                       = "exclude"
 	FlagFile                          = "file"
@@ -49,6 +50,7 @@ func getFlagSet() *pflag.FlagSet {
 
 	flagSet.Bool(FlagFailFast, false, "Fail fast when scanning all projects")
 	flagSet.Bool(FlagAllProjects, false, "Enable all projects")
+	flagSet.Bool(FlagPrintOutputJsonlWithErrors, false, "Print output JSONL with errors")
 	flagSet.Bool(FlagDev, false, "Include dev dependencies")
 	flagSet.String(FlagFile, "", "Input file")
 	flagSet.String(FlagDetectionDepth, "", "Detection depth")
