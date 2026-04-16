@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "bun"
+  },
+  "pkgs": [
+    {
+      "id": "my-catalog-monorepo@1.0.0",
+      "info": {
+        "name": "my-catalog-monorepo",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "a@workspace:packages/a",
+      "info": {
+        "name": "a",
+        "version": "workspace:packages/a"
+      }
+    },
+    {
+      "id": "b@workspace:packages/b",
+      "info": {
+        "name": "b",
+        "version": "workspace:packages/b"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "my-catalog-monorepo@1.0.0",
+        "deps": [
+          {
+            "nodeId": "a@workspace:packages/a"
+          },
+          {
+            "nodeId": "b@workspace:packages/b"
+          }
+        ]
+      },
+      {
+        "nodeId": "a@workspace:packages/a",
+        "pkgId": "a@workspace:packages/a",
+        "deps": []
+      },
+      {
+        "nodeId": "b@workspace:packages/b",
+        "pkgId": "b@workspace:packages/b",
+        "deps": []
+      }
+    ]
+  }
+}

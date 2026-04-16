@@ -149,6 +149,14 @@ func TestAcceptance_Workspaces(t *testing.T) {
 				{"b", "expected-b.json"},
 			},
 		},
+		{
+			fixture: "workspaces-catalog",
+			graphs: []graphCase{
+				{"my-catalog-monorepo", "expected.json"},
+				{"a", "expected-a.json"},
+				{"b", "expected-b.json"},
+			},
+		},
 	}
 
 	plugin := bun.Plugin{}
@@ -170,6 +178,22 @@ func TestAcceptance_Workspaces(t *testing.T) {
 			byRoot := make(map[string]*depgraph.DepGraph, len(result.Results))
 			for _, r := range result.Results {
 				byRoot[r.DepGraph.GetRootPkg().Info.Name] = r.DepGraph
+			}
+
+			if *updateGolden {
+				for _, gc := range tt.graphs {
+					dg, ok := byRoot[gc.rootPkg]
+					require.True(t, ok, "no dep graph with root package %q", gc.rootPkg)
+
+					data, writeErr := json.MarshalIndent(dg, "", "  ")
+					require.NoError(t, writeErr, "marshaling dep graph for %s", gc.golden)
+					writeErr = os.WriteFile(filepath.Join(dir, gc.golden), append(data, '\n'), 0o600)
+					require.NoError(t, writeErr, "writing %s", gc.golden)
+					t.Logf("updated %s/%s", tt.fixture, gc.golden)
+				}
+
+				assertLockfileCompleteness(t, dir, allResultPkgs(result.Results))
+				return
 			}
 
 			for _, gc := range tt.graphs {
