@@ -9,16 +9,18 @@ import (
 
 const pkgManager = "bun"
 
-// buildDepGraph constructs a Snyk dep graph from a whyOutput.
+// buildDepGraphs produces one dep graph per workspace package, plus one for the
+// root project. Workspace packages terminate the DFS in every graph they appear
+// in as a dependency: their subtrees are walked only in their own dep graph,
+// preventing duplicated vulnerability reporting across workspaces.
 //
-// All packages in out.ProdDeps and out.DevDeps are included as seeds.
-// The dep graph is built by inverting the reverse-adjacency in out.Graph into
-// a forward adjacency and performing a DFS from each seed.
-func buildDepGraph(
-	rootName, rootVersion string,
-	out *whyOutput,
-) (*godepgraph.DepGraph, error) {
-	// Seed from all root-direct deps — both prod and dev.
+// If the project contains no workspace packages, a single-element slice is
+// returned containing the root dep graph.
+func buildDepGraphs(rootName, rootVersion string, out *whyOutput) ([]*godepgraph.DepGraph, error) {
+	wsPkgs := workspacePkgs(out.Graph)
+	forward := buildForward(out.Graph)
+
+	// Root dep graph — seeds from all direct root deps; workspace packages are leaves.
 	seeds := make(map[string]struct{}, len(out.ProdDeps)+len(out.DevDeps))
 	for _, id := range out.ProdDeps {
 		seeds[id] = struct{}{}
@@ -27,11 +29,114 @@ func buildDepGraph(
 		seeds[id] = struct{}{}
 	}
 
-	// Build forward adjacency by inverting the reverse graph.
-	// out.Graph[id] = set of packages that depend on id
-	// → forward[dep] = set of packages that dep depends on
-	forward := make(map[string]map[string]struct{}, len(out.Graph))
-	for id, dependents := range out.Graph {
+	rootGraph, err := buildSingleDepGraph(rootName, rootVersion, seeds, forward, wsPkgs)
+	if err != nil {
+		return nil, fmt.Errorf("building root dep graph: %w", err)
+	}
+
+	graphs := []*godepgraph.DepGraph{rootGraph}
+
+	// One dep graph per workspace package. Each stops at other workspace
+	// packages so their subtrees are not duplicated.
+	for wsID := range wsPkgs {
+		name, version := splitPkgID(wsID)
+
+		wsSeeds := make(map[string]struct{}, len(forward[wsID]))
+		for dep := range forward[wsID] {
+			wsSeeds[dep] = struct{}{}
+		}
+
+		// Stop at other workspace packages; wsID itself is the root here, not a dep.
+		otherWS := make(map[string]struct{}, len(wsPkgs))
+		for id := range wsPkgs {
+			if id != wsID {
+				otherWS[id] = struct{}{}
+			}
+		}
+
+		wsGraph, err := buildSingleDepGraph(name, version, wsSeeds, forward, otherWS)
+		if err != nil {
+			return nil, fmt.Errorf("building dep graph for %s: %w", wsID, err)
+		}
+
+		graphs = append(graphs, wsGraph)
+	}
+
+	return graphs, nil
+}
+
+// buildSingleDepGraph constructs one dep graph rooted at rootName/rootVersion.
+// It DFS-walks from seeds through forward adjacency, stopping at any node in
+// stopAt (adding it as a leaf but not recursing into its dependencies).
+func buildSingleDepGraph(
+	rootName, rootVersion string,
+	seeds map[string]struct{},
+	forward map[string]map[string]struct{},
+	stopAt map[string]struct{},
+) (*godepgraph.DepGraph, error) {
+	builder, err := godepgraph.NewBuilder(
+		&godepgraph.PkgManager{Name: pkgManager},
+		&godepgraph.PkgInfo{Name: rootName, Version: rootVersion},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating dep graph builder: %w", err)
+	}
+
+	rootNodeID := builder.GetRootNode().NodeID
+	visited := make(map[string]bool)
+
+	for id := range seeds {
+		if err := addNode(builder, rootNodeID, id, forward, stopAt, visited); err != nil {
+			return nil, err
+		}
+	}
+
+	return builder.Build(), nil
+}
+
+// addNode adds id to the dep graph (if not already visited) and connects it to
+// parentID. If id is in stopAt, its subtree is not walked — it appears as a
+// leaf only. Called recursively for all of id's forward dependencies.
+func addNode(
+	builder *godepgraph.Builder,
+	parentID, id string,
+	forward map[string]map[string]struct{},
+	stopAt map[string]struct{},
+	visited map[string]bool,
+) error {
+	connectNode := func() error {
+		if err := builder.ConnectNodes(parentID, id); err != nil {
+			return fmt.Errorf("connecting %s → %s: %w", parentID, id, err)
+		}
+		return nil
+	}
+
+	if !visited[id] {
+		visited[id] = true
+
+		name, version := splitPkgID(id)
+		builder.AddNode(id, &godepgraph.PkgInfo{Name: name, Version: version})
+
+		if _, stop := stopAt[id]; stop {
+			// Don't walk deps of stop-set nodes; they are roots of their own dep graphs.
+			// but ensure that we do connect them.
+			return connectNode()
+		}
+		for dep := range forward[id] {
+			if err := addNode(builder, id, dep, forward, stopAt, visited); err != nil {
+				return err
+			}
+		}
+	}
+
+	return connectNode()
+}
+
+// buildForward inverts the reverse graph into a forward adjacency map.
+// forward[A] = {B, C} means A directly depends on B and C.
+func buildForward(graph reverseGraph) map[string]map[string]struct{} {
+	forward := make(map[string]map[string]struct{}, len(graph))
+	for id, dependents := range graph {
 		if forward[id] == nil {
 			forward[id] = make(map[string]struct{})
 		}
@@ -46,54 +151,22 @@ func buildDepGraph(
 		}
 	}
 
-	builder, err := godepgraph.NewBuilder(
-		&godepgraph.PkgManager{Name: pkgManager},
-		&godepgraph.PkgInfo{Name: rootName, Version: rootVersion},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("creating dep graph builder: %w", err)
-	}
-
-	rootNodeID := builder.GetRootNode().NodeID
-	visited := make(map[string]bool)
-
-	for id := range seeds {
-		if err := addNode(builder, rootNodeID, id, forward, visited); err != nil {
-			return nil, err
-		}
-	}
-
-	return builder.Build(), nil
+	return forward
 }
 
-// addNode adds id to the dep graph (if not already visited) and connects it to parentID.
-// It then recursively adds all of id's forward dependencies.
-func addNode(
-	builder *godepgraph.Builder,
-	parentID, id string,
-	forward map[string]map[string]struct{},
-	visited map[string]bool,
-) error {
-	if !visited[id] {
-		visited[id] = true
+// workspacePkgs returns the set of package IDs whose version starts with
+// "workspace:", identifying them as local workspace packages.
+func workspacePkgs(graph reverseGraph) map[string]struct{} {
+	ws := make(map[string]struct{})
 
-		name, version := splitPkgID(id)
-		builder.AddNode(id, &godepgraph.PkgInfo{Name: name, Version: version})
-
-		for dep := range forward[id] {
-			if err := addNode(builder, id, dep, forward, visited); err != nil {
-				return err
-			}
+	for id := range graph {
+		_, version := splitPkgID(id)
+		if strings.HasPrefix(version, "workspace:") {
+			ws[id] = struct{}{}
 		}
 	}
 
-	// Connect parentID → id even when id was already visited: the same node
-	// may be reachable from multiple parents, each requiring its own edge.
-	if err := builder.ConnectNodes(parentID, id); err != nil {
-		return fmt.Errorf("connecting %s → %s: %w", parentID, id, err)
-	}
-
-	return nil
+	return ws
 }
 
 // splitPkgID splits a full package ID ("name@version") at the last '@' that is
@@ -113,4 +186,3 @@ func splitPkgID(id string) (name, version string) {
 
 	return id[:i], id[i+1:]
 }
-

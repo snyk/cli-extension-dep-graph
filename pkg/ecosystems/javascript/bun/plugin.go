@@ -25,8 +25,9 @@ type Plugin struct {
 // Compile-time check that Plugin implements the SCAPlugin interface.
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
-// BuildDepGraphsFromDir discovers bun.lock files under dir and produces a
-// "mega dep graph" for each one — a single SCAResult covering the full workspace.
+// BuildDepGraphsFromDir discovers bun.lock files under dir and produces dep
+// graphs for each one. Workspace projects yield one SCAResult per workspace
+// package plus one for the root; non-workspace projects yield a single result.
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context,
 	log logger.Logger,
@@ -57,14 +58,16 @@ func (p Plugin) BuildDepGraphsFromDir(
 	for _, file := range files {
 		lockFileAbsDir := filepath.Dir(file.Path)
 
-		result := p.buildResult(ctx, log, file.RelPath, lockFileAbsDir, exec, options)
-		if result.Error != nil {
-			log.Error(ctx, "Failed to build bun dependency graph",
-				logger.Attr(logFieldLockFile, file.RelPath),
-				logger.Err(result.Error),
-			)
+		fileResults := p.buildResults(ctx, log, file.RelPath, lockFileAbsDir, exec)
+		for _, r := range fileResults {
+			if r.Error != nil {
+				log.Error(ctx, "Failed to build bun dependency graph",
+					logger.Attr(logFieldLockFile, file.RelPath),
+					logger.Err(r.Error),
+				)
+			}
 		}
-		results = append(results, result)
+		results = append(results, fileResults...)
 		processedFiles = append(processedFiles, file.RelPath)
 	}
 
@@ -74,25 +77,28 @@ func (p Plugin) BuildDepGraphsFromDir(
 	}, nil
 }
 
-func (p Plugin) buildResult(
+func (p Plugin) buildResults(
 	ctx context.Context,
 	log logger.Logger,
 	lockFileRelPath, lockFileAbsDir string,
 	exec bunWhyRunner,
-	options *ecosystems.SCAPluginOptions,
-) ecosystems.SCAResult {
+) []ecosystems.SCAResult {
 	meta := ecosystems.Metadata{TargetFile: lockFileRelPath}
+
+	errResult := func(err error) []ecosystems.SCAResult {
+		return []ecosystems.SCAResult{{Metadata: meta, Error: err}}
+	}
 
 	log.Info(ctx, "Building bun dependency graph", logger.Attr(logFieldLockFile, lockFileRelPath))
 
 	pkgJSON, err := readPackageJSON(lockFileAbsDir)
 	if err != nil {
-		return ecosystems.SCAResult{Metadata: meta, Error: fmt.Errorf("reading package.json: %w", err)}
+		return errResult(fmt.Errorf("reading package.json: %w", err))
 	}
 
 	output, err := exec.Run(ctx, lockFileAbsDir)
 	if err != nil {
-		return ecosystems.SCAResult{Metadata: meta, Error: p.wrapRunError(err)}
+		return errResult(p.wrapRunError(err))
 	}
 
 	out, err := parseWhyOutput(ctx, log, output)
@@ -101,22 +107,24 @@ func (p Plugin) buildResult(
 		if _, drainErr := io.Copy(io.Discard, output); drainErr != nil {
 			log.Debug(ctx, "draining reader after parse error", logger.Err(drainErr))
 		}
-		return ecosystems.SCAResult{Metadata: meta, Error: fmt.Errorf("parsing bun why output: %w", err)}
+		return errResult(fmt.Errorf("parsing bun why output: %w", err))
 	}
 
 	log.Debug(ctx, "Parsed bun why output", logger.Attr(logFieldLockFile, lockFileRelPath), logger.Attr("packages", len(out.Graph)))
 
-	depGraph, err := buildDepGraph(pkgJSON.Name, pkgJSON.Version, out)
+	graphs, err := buildDepGraphs(pkgJSON.Name, pkgJSON.Version, out)
 	if err != nil {
-		return ecosystems.SCAResult{Metadata: meta, Error: fmt.Errorf("building dep graph: %w", err)}
+		return errResult(fmt.Errorf("building dep graphs: %w", err))
 	}
 
-	log.Info(ctx, "Successfully built bun dependency graph", logger.Attr(logFieldLockFile, lockFileRelPath), logger.Attr("packages", len(depGraph.Pkgs)))
+	log.Info(ctx, "Successfully built bun dependency graphs", logger.Attr(logFieldLockFile, lockFileRelPath), logger.Attr("graphs", len(graphs)))
 
-	return ecosystems.SCAResult{
-		DepGraph: depGraph,
-		Metadata: meta,
+	results := make([]ecosystems.SCAResult, len(graphs))
+	for i, g := range graphs {
+		results[i] = ecosystems.SCAResult{DepGraph: g, Metadata: meta}
 	}
+
+	return results
 }
 
 // wrapRunError converts errors from RunBunWhy into user-facing messages.
