@@ -1,0 +1,13 @@
+{
+  "name": "my-workspace",
+  "version": "1.0.0",
+  "workspaces": ["packages/*"],
+  "dependencies": {
+    "@workspace/logger": "workspace:*",
+    "@workspace/utils": "workspace:*",
+    "debug": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
