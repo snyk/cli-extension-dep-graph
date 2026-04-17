@@ -70,10 +70,14 @@ func resolvePython(ctx context.Context, enhancedLogger *zerolog.Logger, dir stri
 
 	result := ecosystems.PluginResult{}
 
-	result.Results = append(result.Results, pipResults.Results...)
-	result.Results = append(result.Results, pipenvResults.Results...)
-	result.ProcessedFiles = append(result.ProcessedFiles, pipResults.ProcessedFiles...)
-	result.ProcessedFiles = append(result.ProcessedFiles, pipenvResults.ProcessedFiles...)
+	if pipResults != nil {
+		result.Results = append(result.Results, pipResults.Results...)
+		result.ProcessedFiles = append(result.ProcessedFiles, pipResults.ProcessedFiles...)
+	}
+	if pipenvResults != nil {
+		result.Results = append(result.Results, pipenvResults.Results...)
+		result.ProcessedFiles = append(result.ProcessedFiles, pipenvResults.ProcessedFiles...)
+	}
 
 	return result
 }
@@ -98,6 +102,10 @@ func LegacyFallback(
 	cmdArgs := append([]string(nil), options.Global.RawFlags...)
 	cmdArgs = append(cmdArgs, "--print-effective-graph-with-errors")
 
+	for i := range processedFiles {
+		_, fileName := path.Split(processedFiles[i])
+		processedFiles[i] = fileName
+	}
 	if len(processedFiles) > 0 {
 		cmdArgs = append(cmdArgs, "--exclude="+strings.Join(processedFiles, ","))
 	}

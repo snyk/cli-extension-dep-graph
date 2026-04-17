@@ -130,9 +130,13 @@ func (p Plugin) discoverPipfiles(ctx context.Context, dir string, options *ecosy
 		}
 	case options.Global.AllProjects:
 		// Find all Pipfile files recursively
+		defaultExcludes := []string{".*", "__pycache__", "*.egg-info", "dist", "build", "venv"}
+		excludes := make([]string, 0, len(defaultExcludes)+len(options.Global.Exclude))
+		excludes = append(excludes, defaultExcludes...)
+		excludes = append(excludes, options.Global.Exclude...)
 		findOpts = []discovery.FindOption{
 			discovery.WithInclude(pipfileFile),
-			discovery.WithExcludes(".*", "__pycache__", "*.egg-info", "dist", "build", "venv"),
+			discovery.WithExcludes(excludes...),
 		}
 	default:
 		// Default: find Pipfile at root only

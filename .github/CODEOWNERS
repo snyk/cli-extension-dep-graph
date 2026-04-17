@@ -1,5 +1,5 @@
-* @snyk/unify @snyk/codesec_unify @snyk/open-source_composition-analysis
+* @snyk/unify @snyk/codesec_unify @snyk/open-source_composition-analysis 
 
-/pkg/ecosystems/ @snyk/open-source_composition-analysis
+/pkg/ecosystems/ @snyk/open-source_composition-analysis 
 /pkg/depgraph @snyk/unify @snyk/codesec_unify 
 /pkg/sca_plugin @snyk/unify @snyk/codesec_unify 
