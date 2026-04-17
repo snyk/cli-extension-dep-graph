@@ -1,0 +1,43 @@
+name: Bun why output stability
+
+# Runs daily against the latest bun release to detect breaking changes in
+# `bun why '*' --top` output format before they affect production users.
+# Also supports manual triggers for ad-hoc checks after a bun release.
+
+on:
+  schedule:
+    - cron: '17 8 * * *' # 08:17 UTC daily
+  workflow_dispatch:
+
+jobs:
+  stability:
+    name: bun why output stability
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install latest bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Log bun version
+        run: bun --version
+
+      - name: Install bun deps in fixture directories
+        # Run `bun install` in every fixture directory that has a bun.lock.
+        # Workspace sub-packages don't have their own lockfile so are covered
+        # by their parent's install. We intentionally do NOT use --frozen-lockfile
+        # so that bun can regenerate the lockfile if its format changed — that
+        # scenario is exactly what this test is designed to detect.
+        run: |
+          find pkg/ecosystems/javascript/bun/testdata -name "bun.lock" -execdir bun install \;
+
+      - name: Run stability tests
+        run: go test -v -count=1 -run TestBunWhyOutputStability ./pkg/ecosystems/javascript/bun/...

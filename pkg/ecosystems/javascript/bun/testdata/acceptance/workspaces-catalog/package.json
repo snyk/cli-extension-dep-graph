@@ -1,0 +1,15 @@
+{
+  "name": "my-catalog-monorepo",
+  "version": "1.0.0",
+  "workspaces": {
+    "packages": ["packages/*"],
+    "catalog": {
+      "ms": "^2.1.0"
+    },
+    "catalogs": {
+      "utils": {
+        "debug": "^4.0.0"
+      }
+    }
+  }
+}
