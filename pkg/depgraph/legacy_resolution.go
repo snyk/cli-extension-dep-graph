@@ -12,6 +12,11 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 )
 
+const (
+	printGraphCliArg                 = "--print-graph"
+	printOutputJsonlWithErrorsCliArg = "--print-output-jsonl-with-errors"
+)
+
 var legacyWorkflowID = workflow.NewWorkflowIdentifier(legacyCLIWorkflowIDStr)
 
 func handleLegacyResolution(ctx workflow.InvocationContext, config configuration.Configuration, logger *zerolog.Logger) ([]workflow.Data, error) {
@@ -53,7 +58,11 @@ func chooseGraphArgument(config configuration.Configuration) (string, parsers.Ou
 		return "--print-effective-graph-with-errors", parsers.NewJSONL()
 	}
 
-	return "--print-graph", parsers.NewPlainText()
+	if config.GetBool(FlagPrintOutputJsonlWithErrors) {
+		return printOutputJsonlWithErrorsCliArg, parsers.NewJSONL()
+	}
+
+	return printGraphCliArg, parsers.NewPlainText()
 }
 
 func mapToWorkflowData(depGraphs []parsers.DepGraphOutput, logger *zerolog.Logger) []workflow.Data {
@@ -90,6 +99,10 @@ func prepareLegacyFlags(argument string, cfg configuration.Configuration, logger
 
 	if allProjects := cfg.GetBool("all-projects"); allProjects {
 		cmdArgs = append(cmdArgs, "--all-projects")
+	}
+
+	if cfg.GetBool(FlagPrintOutputJsonlWithErrors) {
+		cmdArgs = append(cmdArgs, printOutputJsonlWithErrorsCliArg)
 	}
 
 	if cfg.GetBool(FlagFailFast) {

@@ -12,6 +12,8 @@ import (
 	"github.com/snyk/go-application-framework/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 )
 
 //go:embed testdata/legacy_cli_output
@@ -208,6 +210,35 @@ func Test_LegacyResolution(t *testing.T) {
 		})
 	}
 
+	t.Run("GIVEN FlagPrintOutputJsonlWithErrors is set WHEN prepareLegacyFlags THEN arg is included in cmd args", func(t *testing.T) {
+		// GIVEN: a fresh config with only the new flag enabled
+		isolatedConfig := configuration.New()
+		isolatedConfig.Set(FlagPrintOutputJsonlWithErrors, true)
+
+		nopLog := zerolog.Nop()
+		// WHEN
+		prepareLegacyFlags("--print-output-jsonl-with-errors", isolatedConfig, &nopLog)
+
+		// THEN
+		cmdArgs, ok := isolatedConfig.Get(configuration.RAW_CMD_ARGS).([]string)
+		require.True(t, ok, "RAW_CMD_ARGS should be a []string")
+		assert.Contains(t, cmdArgs, "--print-output-jsonl-with-errors")
+	})
+
+	t.Run("GIVEN FlagPrintOutputJsonlWithErrors is NOT set WHEN prepareLegacyFlags THEN arg is NOT included in cmd args", func(t *testing.T) {
+		// GIVEN: a fresh config without the flag
+		isolatedConfig := configuration.New()
+
+		nopLog := zerolog.Nop()
+		// WHEN
+		prepareLegacyFlags("--print-graph", isolatedConfig, &nopLog)
+
+		// THEN
+		cmdArgs, ok := isolatedConfig.Get(configuration.RAW_CMD_ARGS).([]string)
+		require.True(t, ok, "RAW_CMD_ARGS should be a []string")
+		assert.NotContains(t, cmdArgs, "--print-output-jsonl-with-errors")
+	})
+
 	t.Run("should not include target directory if file flag provided", func(t *testing.T) {
 		config.Set(FlagFile, "path/to/target/file.js")
 		config.Set("targetDirectory", "path/to/target")
@@ -336,4 +367,59 @@ func verifyMeta(t *testing.T, data workflow.Data, key, expectedValue string) {
 	value, err := data.GetMetaData(key)
 	require.NoError(t, err)
 	assert.Equal(t, expectedValue, value)
+}
+
+func Test_chooseGraphArgument(t *testing.T) {
+	t.Run("GIVEN FlagPrintOutputJsonlWithErrors is set WHEN chooseGraphArgument THEN returns correct arg with JSONL parser", func(t *testing.T) {
+		// GIVEN
+		config := configuration.New()
+		config.Set(FlagPrintOutputJsonlWithErrors, true)
+
+		// WHEN
+		arg, parser := chooseGraphArgument(config)
+
+		// THEN
+		assert.Equal(t, "--print-output-jsonl-with-errors", arg)
+		assert.IsType(t, &parsers.JSONLOutputParser{}, parser)
+	})
+
+	t.Run("GIVEN no flags are set WHEN chooseGraphArgument is called THEN returns default --print-graph with PlainText parser", func(t *testing.T) {
+		// GIVEN
+		config := configuration.New()
+
+		// WHEN
+		arg, parser := chooseGraphArgument(config)
+
+		// THEN
+		assert.Equal(t, "--print-graph", arg)
+		assert.IsType(t, &parsers.PlainTextOutputParser{}, parser)
+	})
+
+	t.Run("GIVEN FlagPrintEffectiveGraph and FlagPrintOutputJsonlWithErrors both set WHEN chooseGraphArgument THEN effective-graph wins", func(t *testing.T) {
+		// GIVEN
+		config := configuration.New()
+		config.Set(FlagPrintEffectiveGraph, true)
+		config.Set(FlagPrintOutputJsonlWithErrors, true)
+
+		// WHEN
+		arg, parser := chooseGraphArgument(config)
+
+		// THEN
+		assert.Equal(t, "--print-effective-graph", arg)
+		assert.IsType(t, &parsers.JSONLOutputParser{}, parser)
+	})
+
+	t.Run("GIVEN FlagPrintEffectiveGraphWithErrors set alongside JSONL flag WHEN chooseGraphArgument THEN WithErrors wins", func(t *testing.T) {
+		// GIVEN
+		config := configuration.New()
+		config.Set(FlagPrintEffectiveGraphWithErrors, true)
+		config.Set(FlagPrintOutputJsonlWithErrors, true)
+
+		// WHEN
+		arg, parser := chooseGraphArgument(config)
+
+		// THEN
+		assert.Equal(t, "--print-effective-graph-with-errors", arg)
+		assert.IsType(t, &parsers.JSONLOutputParser{}, parser)
+	})
 }
