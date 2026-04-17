@@ -120,6 +120,23 @@ func TestParse_StringFlags(t *testing.T) {
 			rawFlags: []string{"--string"},
 			wantErr:  true,
 		},
+		{
+			name:     "string flag with equals syntax",
+			rawFlags: []string{"--string=test-value"},
+			check: func(t *testing.T, opts *TestOptions) {
+				t.Helper()
+				assert.Equal(t, "test-value", opts.StringFlag)
+			},
+		},
+		{
+			name:     "string pointer flag with equals syntax",
+			rawFlags: []string{"--string-ptr=ptr-value"},
+			check: func(t *testing.T, opts *TestOptions) {
+				t.Helper()
+				assert.NotNil(t, opts.StringPtr)
+				assert.Equal(t, "ptr-value", *opts.StringPtr)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -166,6 +183,16 @@ func TestParse_SliceFlags(t *testing.T) {
 			rawFlags: []string{"--slice", "--bool-flag"},
 			expected: []string{},
 		},
+		{
+			name:     "single value with equals syntax",
+			rawFlags: []string{"--slice=val1"},
+			expected: []string{"val1"},
+		},
+		{
+			name:     "multiple values with equals syntax (single string)",
+			rawFlags: []string{"--slice=val1,val2,val3"},
+			expected: []string{"val1,val2,val3"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -198,6 +225,16 @@ func TestParse_CustomTypeWithUnmarshalText(t *testing.T) {
 			name:     "empty value",
 			rawFlags: []string{"--custom", ""},
 			expected: []string{""},
+		},
+		{
+			name:     "comma-separated values with equals syntax",
+			rawFlags: []string{"--custom=a,b,c"},
+			expected: []string{"a", "b", "c"},
+		},
+		{
+			name:     "single value with equals syntax",
+			rawFlags: []string{"--custom=single"},
+			expected: []string{"single"},
 		},
 	}
 

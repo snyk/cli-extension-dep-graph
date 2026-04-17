@@ -67,12 +67,24 @@ func Parse(rawFlags []string, dest interface{}) error { //nolint:gocyclo // Comp
 
 	// Parse the raw flags
 	for i := 0; i < len(rawFlags); i++ {
-		flag := rawFlags[i] //nolint:gosec // G602: i is bounded by loop condition
+		flag := rawFlags[i]
+		var flagValue string
+		var hasEqualsSyntax bool
+
+		// Handle --flag=value syntax
+		if strings.HasPrefix(flag, "-") && strings.Contains(flag, "=") {
+			parts := strings.SplitN(flag, "=", 2)
+			flag = parts[0]
+			if len(parts) == 2 {
+				flagValue = parts[1]
+				hasEqualsSyntax = true
+			}
+		}
 
 		info, known := flagMap[flag]
 		if !known {
 			// Unknown flag - skip it and potentially its value
-			if strings.HasPrefix(flag, "-") && i+1 < len(rawFlags) && !strings.HasPrefix(rawFlags[i+1], "-") {
+			if !hasEqualsSyntax && strings.HasPrefix(flag, "-") && i+1 < len(rawFlags) && !strings.HasPrefix(rawFlags[i+1], "-") {
 				i++ // Skip potential value
 			}
 			continue
@@ -86,16 +98,8 @@ func Parse(rawFlags []string, dest interface{}) error { //nolint:gocyclo // Comp
 
 		// Check if the field implements encoding.TextUnmarshaler
 		if field.CanAddr() && field.Addr().Type().Implements(reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()) {
-			if i+1 >= len(rawFlags) {
-				return fmt.Errorf(errRequiresValue, flag)
-			}
-			i++
-			unmarshaler, ok := field.Addr().Interface().(encoding.TextUnmarshaler)
-			if !ok {
-				continue
-			}
-			if err := unmarshaler.UnmarshalText([]byte(rawFlags[i])); err != nil {
-				return fmt.Errorf("failed to unmarshal %s: %w", flag, err)
+			if err := handleTextUnmarshaler(field, flag, flagValue, hasEqualsSyntax, rawFlags, &i); err != nil {
+				return err
 			}
 			continue
 		}
@@ -105,29 +109,45 @@ func Parse(rawFlags []string, dest interface{}) error { //nolint:gocyclo // Comp
 			field.SetBool(true)
 
 		case reflect.String:
-			if i+1 >= len(rawFlags) {
-				return fmt.Errorf(errRequiresValue, flag)
-			}
-			i++
-			field.SetString(rawFlags[i])
-
-		case reflect.Ptr:
-			if info.fieldType.Elem().Kind() == reflect.String {
+			var value string
+			if hasEqualsSyntax {
+				value = flagValue
+			} else {
 				if i+1 >= len(rawFlags) {
 					return fmt.Errorf(errRequiresValue, flag)
 				}
 				i++
-				str := rawFlags[i]
-				field.Set(reflect.ValueOf(&str))
+				value = rawFlags[i]
+			}
+			field.SetString(value)
+
+		case reflect.Ptr:
+			if info.fieldType.Elem().Kind() == reflect.String {
+				var value string
+				if hasEqualsSyntax {
+					value = flagValue
+				} else {
+					if i+1 >= len(rawFlags) {
+						return fmt.Errorf(errRequiresValue, flag)
+					}
+					i++
+					value = rawFlags[i]
+				}
+				field.Set(reflect.ValueOf(&value))
 			}
 
 		case reflect.Slice:
 			if info.fieldType.Elem().Kind() == reflect.String {
 				// Collect all space-separated non-flag values
 				values := []string{}
-				for i+1 < len(rawFlags) && !strings.HasPrefix(rawFlags[i+1], "-") {
-					i++
-					values = append(values, rawFlags[i])
+				if hasEqualsSyntax {
+					// For equals syntax, only use the single value
+					values = append(values, flagValue)
+				} else {
+					for i+1 < len(rawFlags) && !strings.HasPrefix(rawFlags[i+1], "-") {
+						i++
+						values = append(values, rawFlags[i])
+					}
 				}
 				field.Set(reflect.ValueOf(values))
 			}
@@ -143,6 +163,28 @@ func Parse(rawFlags []string, dest interface{}) error { //nolint:gocyclo // Comp
 type fieldInfo struct {
 	fieldPath []int
 	fieldType reflect.Type
+}
+
+// handleTextUnmarshaler handles fields that implement encoding.TextUnmarshaler.
+func handleTextUnmarshaler(field reflect.Value, flag, flagValue string, hasEqualsSyntax bool, rawFlags []string, i *int) error {
+	var value string
+	if hasEqualsSyntax {
+		value = flagValue
+	} else {
+		if *i+1 >= len(rawFlags) {
+			return fmt.Errorf(errRequiresValue, flag)
+		}
+		*i++
+		value = rawFlags[*i]
+	}
+	unmarshaler, ok := field.Addr().Interface().(encoding.TextUnmarshaler)
+	if !ok {
+		return nil
+	}
+	if err := unmarshaler.UnmarshalText([]byte(value)); err != nil {
+		return fmt.Errorf("failed to unmarshal %s: %w", flag, err)
+	}
+	return nil
 }
 
 // buildFlagMap recursively builds a map of flag names to field paths, handling embedded structs.

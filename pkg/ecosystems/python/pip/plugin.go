@@ -127,9 +127,13 @@ func (p Plugin) discoverRequirementsFiles(ctx context.Context, dir string, optio
 	case options.Global.AllProjects:
 		// Find all requirements.txt files recursively
 		// Exclude common directories to avoid scanning unnecessary paths
+		defaultExcludes := []string{".*", "__pycache__", "*.egg-info", "dist", "build", "venv"}
+		excludes := make([]string, 0, len(defaultExcludes)+len(options.Global.Exclude))
+		excludes = append(excludes, defaultExcludes...)
+		excludes = append(excludes, options.Global.Exclude...)
 		findOpts = []discovery.FindOption{
 			discovery.WithInclude(requirementsFile),
-			discovery.WithExcludes(".*", "__pycache__", "*.egg-info", "dist", "build", "venv"),
+			discovery.WithExcludes(excludes...),
 		}
 	default:
 		// Default: find requirements.txt at root only
