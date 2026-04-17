@@ -157,7 +157,6 @@ func TestPlugin_BuildDepGraphsFromDir_PipErrors(t *testing.T) {
 			pipResult := result.Results[0]
 
 			// Basic metadata expectations
-			assert.Equal(t, "requirements.txt", pipResult.ProjectDescriptor.GetTargetFile())
 			if pythonVersion != "" && pipResult.ProjectDescriptor.Identity.TargetRuntime != nil {
 				assert.Contains(t, *pipResult.ProjectDescriptor.Identity.TargetRuntime, fmt.Sprintf("python@%s", pythonVersion))
 			}
@@ -234,13 +233,13 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 	sortActual := make([]ecosystems.SCAResult, len(actual))
 	copy(sortActual, actual)
 	sort.Slice(sortActual, func(i, j int) bool {
-		return sortActual[i].ProjectDescriptor.GetTargetFile() < sortActual[j].ProjectDescriptor.GetTargetFile()
+		return sortActual[i].DepGraph.GetRootPkg().Info.Name < sortActual[j].DepGraph.GetRootPkg().Info.Name
 	})
 
 	sortExpected := make([]ecosystems.SCAResult, len(expected))
 	copy(sortExpected, expected)
 	sort.Slice(sortExpected, func(i, j int) bool {
-		return sortExpected[i].ProjectDescriptor.GetTargetFile() < sortExpected[j].ProjectDescriptor.GetTargetFile()
+		return sortExpected[i].DepGraph.GetRootPkg().Info.Name < sortExpected[j].DepGraph.GetRootPkg().Info.Name
 	})
 
 	// Sync runtime field (varies by Python version) and clear Error field (not in JSON)

@@ -65,7 +65,8 @@ func getNodeID(item *InstallItem) string {
 // ToDependencyGraph converts a pip install Report into a DepGraph using the dep-graph builder.
 // The root node represents the project and points to all direct dependencies.
 // The pkgManager parameter specifies the package manager name (e.g., PkgManagerPip, PkgManagerPipenv).
-func (r *Report) ToDependencyGraph(ctx context.Context, log logger.Logger, pkgManager PkgManagerName) (*depgraph.DepGraph, error) {
+// The projectName parameter sets the root package name (defaults to "root" if empty).
+func (r *Report) ToDependencyGraph(ctx context.Context, log logger.Logger, pkgManager PkgManagerName, projectName string) (*depgraph.DepGraph, error) {
 	if r == nil {
 		return nil, fmt.Errorf("report cannot be nil")
 	}
@@ -73,10 +74,15 @@ func (r *Report) ToDependencyGraph(ctx context.Context, log logger.Logger, pkgMa
 	numPackages := len(r.Install)
 	log.Debug(ctx, "Converting pip report to dependency graph", logger.Attr("total_packages", numPackages))
 
+	// Use provided project name or default to "root"
+	if projectName == "" {
+		projectName = "root"
+	}
+
 	// Create a builder with the specified package manager and a root package
 	builder, err := depgraph.NewBuilder(
 		&depgraph.PkgManager{Name: pkgManager.String()},
-		&depgraph.PkgInfo{Name: "root", Version: "0.0.0"},
+		&depgraph.PkgInfo{Name: projectName, Version: "0.0.0"},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create depgraph builder: %w", err)

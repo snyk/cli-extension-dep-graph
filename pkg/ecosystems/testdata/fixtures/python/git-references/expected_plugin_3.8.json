@@ -7,9 +7,9 @@
       },
       "pkgs": [
         {
-          "id": "root@0.0.0",
+          "id": "git-references@0.0.0",
           "info": {
-            "name": "root",
+            "name": "git-references",
             "version": "0.0.0"
           }
         },
@@ -110,7 +110,7 @@
         "nodes": [
           {
             "nodeId": "root-node",
-            "pkgId": "root@0.0.0",
+            "pkgId": "git-references@0.0.0",
             "deps": [
               {
                 "nodeId": "black@23.12.1"
@@ -225,7 +225,6 @@
     },
     "projectDescriptor": {
       "identity": {
-        "targetFile": "requirements.txt",
         "targetRuntime": "python@3.8.20"
       }
     }

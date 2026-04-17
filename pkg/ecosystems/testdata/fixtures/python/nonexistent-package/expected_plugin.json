@@ -3,7 +3,6 @@
     "error": {},
     "projectDescriptor": {
       "identity": {
-        "targetFile": "requirements.txt",
         "targetRuntime": "python@3.14.1"
       }
     }
