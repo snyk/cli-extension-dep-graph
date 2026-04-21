@@ -59,7 +59,7 @@ func chooseGraphArgument(config configuration.Configuration) (string, parsers.Ou
 	}
 
 	if config.GetBool(FlagPrintOutputJsonlWithErrors) {
-		return printOutputJsonlWithErrorsCliArg, parsers.NewJSONL()
+		return printGraphCliArg, parsers.NewJSONL()
 	}
 
 	return printGraphCliArg, parsers.NewPlainText()

@@ -379,7 +379,7 @@ func Test_chooseGraphArgument(t *testing.T) {
 		arg, parser := chooseGraphArgument(config)
 
 		// THEN
-		assert.Equal(t, "--print-output-jsonl-with-errors", arg)
+		assert.Equal(t, "--print-graph", arg)
 		assert.IsType(t, &parsers.JSONLOutputParser{}, parser)
 	})
 
