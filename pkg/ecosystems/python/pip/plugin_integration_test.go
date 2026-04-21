@@ -245,8 +245,8 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 	// Sync runtime field (varies by Python version) and clear Error field (not in JSON)
 	for i := range sortExpected {
 		sortExpected[i].ProjectDescriptor.Identity.TargetRuntime = sortActual[i].ProjectDescriptor.Identity.TargetRuntime
-		sortActual[i].ProjectDescriptor.Identity.Type = "" // Clear type since fixtures are shared
-		sortActual[i].Error = nil                          // Error field isn't in expected JSON
+		sortActual[i].ProjectDescriptor.Identity.ProjectType = "" // Clear type since fixtures are shared
+		sortActual[i].Error = nil                                 // Error field isn't in expected JSON
 	}
 
 	// Compare by JSON representation to ignore internal unexported fields in depgraph.DepGraph

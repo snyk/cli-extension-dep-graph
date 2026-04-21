@@ -220,7 +220,7 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 	for i := range sortExpected {
 		sortExpected[i].ProjectDescriptor.Identity.TargetRuntime = sortActual[i].ProjectDescriptor.Identity.TargetRuntime
 		sortExpected[i].ProjectDescriptor.Identity.TargetFile = sortActual[i].ProjectDescriptor.Identity.TargetFile
-		sortActual[i].ProjectDescriptor.Identity.Type = "" // Clear type since fixtures are shared
+		sortActual[i].ProjectDescriptor.Identity.ProjectType = "" // Clear type since fixtures are shared
 		if sortExpected[i].DepGraph != nil && sortActual[i].DepGraph != nil {
 			sortExpected[i].DepGraph.PkgManager = sortActual[i].DepGraph.PkgManager
 		}

@@ -8,14 +8,16 @@ type ProjectDescriptor struct {
 
 // ProjectIdentity defines the core identifying characteristics of a project.
 type ProjectIdentity struct {
-	// Type specifies the project type (e.g., "npm", "maven", "pip")
-	Type string `json:"type,omitempty"`
+	// ProjectType specifies the project type (e.g., "npm", "maven", "pip")
+	ProjectType string `json:"type,omitempty"`
 	// BaseNameOverride allows overriding the default base name for the project
 	BaseNameOverride *string `json:"baseNameOverride,omitempty"`
 	// TargetFile specifies the manifest or build file for the project
 	TargetFile *string `json:"targetFile,omitempty"`
 	// TargetRuntime specifies the runtime environment for the project
 	TargetRuntime *string `json:"targetRuntime,omitempty"`
+	// RootComponentName specifies the component's name that is at the root of the project
+	RootComponentName string `json:"rootComponentName,omitempty"`
 }
 
 // GetTargetFile extracts the target file from a ProjectDescriptor.
