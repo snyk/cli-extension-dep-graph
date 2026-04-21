@@ -13,6 +13,7 @@ import (
 type SCAPluginOptions struct {
 	Global GlobalOptions
 	Python PythonOptions
+	Gradle GradleOptions
 }
 
 // GlobalOptions contains options that apply globally across all SCA plugins.
@@ -43,6 +44,22 @@ type PythonOptions struct {
 	NoBuildIsolation bool `arg:"--no-build-isolation"`
 }
 
+// GradleOptions contains Gradle-specific options for dependency graph generation.
+type GradleOptions struct {
+	// ConfigurationMatching is a regex to select only matching Gradle configurations.
+	ConfigurationMatching string `arg:"--configuration-matching"`
+	// SubProject restricts scanning to a single named Gradle sub-project.
+	SubProject string `arg:"--gradle-sub-project"`
+	// AllSubProjects scans all sub-projects in a multi-project build.
+	AllSubProjects bool `arg:"--all-sub-projects"`
+	// InitScript overrides the built-in init script with a user-supplied path.
+	InitScript string `arg:"--init-script"`
+	// Note: --gradle-normalize-deps is intentionally not supported here.
+	// It requires full JAR downloading for fingerprinting, which is incompatible
+	// with the metadata-only resolution approach used by this plugin.
+	// The flag is still forwarded to the legacy CLI as a fallback.
+}
+
 func NewPluginOptions() *SCAPluginOptions {
 	return &SCAPluginOptions{
 		Python: PythonOptions{},
@@ -53,6 +70,7 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 	var args struct {
 		GlobalOptions
 		PythonOptions
+		GradleOptions
 		StrictOutOfSync *string `arg:"--strict-out-of-sync"`
 	}
 
@@ -71,6 +89,7 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 	return &SCAPluginOptions{
 		Global: args.GlobalOptions,
 		Python: args.PythonOptions,
+		Gradle: args.GradleOptions,
 	}, nil
 }
 
@@ -126,5 +145,25 @@ func (o *SCAPluginOptions) WithForceIncludeWorkspacePackages(forceIncludeWorkspa
 
 func (o *SCAPluginOptions) WithProjectName(projectName string) *SCAPluginOptions {
 	o.Global.ProjectName = &projectName
+	return o
+}
+
+func (o *SCAPluginOptions) WithGradleConfigurationMatching(pattern string) *SCAPluginOptions {
+	o.Gradle.ConfigurationMatching = pattern
+	return o
+}
+
+func (o *SCAPluginOptions) WithGradleSubProject(subProject string) *SCAPluginOptions {
+	o.Gradle.SubProject = subProject
+	return o
+}
+
+func (o *SCAPluginOptions) WithGradleAllSubProjects(all bool) *SCAPluginOptions {
+	o.Gradle.AllSubProjects = all
+	return o
+}
+
+func (o *SCAPluginOptions) WithGradleInitScript(initScript string) *SCAPluginOptions {
+	o.Gradle.InitScript = initScript
 	return o
 }

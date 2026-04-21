@@ -1,0 +1,236 @@
+// Snyk Dependency Extraction Init Script
+// Usage: gradle --init-script snyk-deps-init.gradle snykDependencyGraph
+//
+// Produces: build/reports/snyk-dependency-graph.json
+//
+// Uses Gradle's ResolutionResult API (Gradle 4.4+) to programmatically
+// walk the resolved dependency graph per-project, per-configuration.
+// Output is clean JSON written directly to file — no stdout parsing needed.
+//
+// Compatibility: Gradle 5.0+ (uses fully qualified groovy.json.JsonOutput to avoid init script classloading issues)
+// Configuration Cache: Not compatible (streaming for memory efficiency on large projects)
+// Build Files: Auto-detects build.gradle and build.gradle.kts
+// Memory: Optimized for large projects (streaming JSON, minimal data retention)
+
+gradle.projectsEvaluated { g ->
+    def root = g.rootProject
+
+    root.task('snykDependencyGraph') {
+        group = 'reporting'
+        description = 'Generate machine-readable dependency graph JSON for all projects'
+
+        // Not configuration cache compatible due to streaming approach for memory efficiency
+        try {
+            notCompatibleWithConfigurationCache("Streaming dependency resolution for large projects")
+        } catch (Exception ignored) {
+            // Older Gradle versions don't have this method
+        }
+
+        doLast {
+            // Compatible with Gradle 6-9: try new API first, fallback to deprecated API
+            def outputDir
+            try {
+                outputDir = root.layout.buildDirectory.dir("reports").get().asFile
+            } catch (Exception e) {
+                outputDir = file("${root.buildDir}/reports")
+            }
+            outputDir.mkdirs()
+            def outputFile = file("${outputDir}/snyk-dependency-graph.json")
+
+            // Stream JSON output to avoid memory accumulation for large projects
+            outputFile.withWriter('UTF-8') { writer ->
+                writer.println('{')
+
+                // Write metadata first
+                writer.print('  "metadata": ')
+                writer.println(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(buildMetadata(root))).replaceAll('(?m)^', '  '))
+                writer.println(',')
+
+                // Stream projects one by one
+                writer.println('  "projects": {')
+                def first = true
+                root.allprojects.each { proj ->
+                    def projEntry = buildProjectEntry(proj)
+                    if (projEntry != null) {
+                        if (!first) {
+                            writer.println(',')
+                        }
+
+                        // Write project key and entry
+                        writer.print("    ${groovy.json.JsonOutput.toJson(proj.path)}: ")
+                        def projJson = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(projEntry))
+                        writer.println(projJson.replaceAll('(?m)^', '    '))
+
+                        first = false
+                        projEntry = null  // Release memory immediately
+                    }
+                }
+                writer.println()
+                writer.println('  }')
+                writer.println('}')
+            }
+            println "SNYK_DEPS_JSON ${outputFile.absolutePath}"
+        }
+    }
+}
+
+// ── Metadata ────────────────────────────────────────────────────────
+
+def buildMetadata(rootProject) {
+    def runtime = Runtime.getRuntime()
+    [
+        gradleVersion   : gradle.gradleVersion,
+        javaVersion     : System.getProperty('java.version'),
+        javaVendor      : System.getProperty('java.vendor'),
+        javaHome        : System.getProperty('java.home'),
+        os              : "${System.getProperty('os.name')} ${System.getProperty('os.arch')}",
+        generatedAt     : new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+        rootProject     : [
+            name   : rootProject.name,
+            group  : rootProject.group?.toString() ?: '',
+            version: rootProject.version?.toString() ?: 'unspecified',
+            path   : rootProject.projectDir.absolutePath,
+        ],
+        maxMemoryMB     : runtime.maxMemory() / (1024 * 1024) as long,
+    ]
+}
+
+// ── Per-project entry ───────────────────────────────────────────────
+
+def buildProjectEntry(project) {
+    def resolvableConfigs = project.configurations.matching { it.canBeResolved }
+
+    def gav = "${project.group}:${project.name}:${project.version}"
+
+    def entry = [
+        name      : project.name,
+        group     : project.group?.toString() ?: '',
+        version   : project.version?.toString() ?: 'unspecified',
+        path      : project.path,
+        gav       : gav,
+        buildFile : getBuildFilePath(project),
+        plugins   : project.plugins.collect { it.class.name.replaceAll('_Decorated$', '') },
+        configurations: [:],
+    ]
+
+    resolvableConfigs.each { config ->
+        try {
+            def configEntry = resolveConfiguration(config, project)
+            if (configEntry != null) {
+                entry.configurations[config.name] = configEntry
+            }
+        } catch (Exception e) {
+            entry.configurations[config.name] = [
+                error: e.message,
+            ]
+        }
+    }
+
+    return entry
+}
+
+// ── Configuration resolution ────────────────────────────────────────
+
+def resolveConfiguration(config, project) {
+    def resolutionResult = config.incoming.resolutionResult
+    def rootComponent = resolutionResult.root
+
+    def rootId = componentId(rootComponent)
+    def seen = new HashSet<String>()
+    def tree = walkDependencies(rootComponent, seen)
+
+    return [
+        description  : config.description ?: '',
+        root         : [
+            id          : rootId,
+            dependencies: tree,
+        ],
+        // Flat list of all resolved components for quick lookups
+        allDependencies: collectAllDependencies(resolutionResult),
+    ]
+}
+
+// ── Recursive tree walk ─────────────────────────────────────────────
+
+def walkDependencies(component, Set<String> seen) {
+    def children = []
+
+    component.dependencies.each { dep ->
+        // Use duck typing rather than instanceof — Gradle API classes are not on the
+        // classpath when the init script compiles, so instanceof causes a parse error.
+        def selected = dep.hasProperty('selected') ? dep.selected : null
+        if (selected != null) {
+            // ResolvedDependencyResult
+            def id = componentId(selected)
+
+            if (seen.contains(id)) {
+                // Circular or already-visited — record but don't recurse
+                children << [
+                    id      : id,
+                    circular: true,
+                ]
+            } else {
+                seen.add(id)
+                children << [
+                    id          : id,
+                    // Omit 'requested' field to reduce memory usage
+                    dependencies: walkDependencies(selected, seen),
+                ]
+            }
+        } else if (dep.hasProperty('attempted')) {
+            // UnresolvedDependencyResult
+            children << [
+                id        : dep.attempted.toString(),
+                unresolved: true,
+                reason    : dep.failure?.message ?: 'unknown',
+            ]
+        }
+    }
+
+    return children
+}
+
+// ── Flat dependency collection ──────────────────────────────────────
+
+def collectAllDependencies(resolutionResult) {
+    def all = []
+
+    resolutionResult.allComponents.each { component ->
+        all << [
+            id: componentId(component),
+        ]
+    }
+
+    return all
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────
+
+def getBuildFilePath(project) {
+    try {
+        if (project.hasProperty('layout') && project.layout.hasProperty('projectDirectory')) {
+            def projectDir = project.layout.projectDirectory.asFile
+            ['build.gradle', 'build.gradle.kts'].each { fileName ->
+                def buildFile = new File(projectDir, fileName)
+                if (buildFile.exists()) {
+                    return buildFile.absolutePath
+                }
+            }
+            return new File(projectDir, 'build.gradle').absolutePath
+        }
+    } catch (Exception e) {
+        // Fallback for older Gradle versions or API failures
+    }
+    
+    // Fallback to deprecated API for compatibility with Gradle < 6
+    return project.buildFile?.absolutePath ?: ''
+}
+
+def componentId(component) {
+    def mv = component.moduleVersion
+    if (mv != null && mv.group && mv.name) {
+        return "${mv.group}:${mv.name}:${mv.version}"
+    }
+    // Fallback for project components
+    return component.id.toString()
+}
