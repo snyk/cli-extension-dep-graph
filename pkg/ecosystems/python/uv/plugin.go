@@ -71,8 +71,8 @@ func (p Plugin) BuildDepGraphsFromDir(
 			errorResult := scaecosystems.SCAResult{
 				ProjectDescriptor: identity.ProjectDescriptor{
 					Identity: identity.ProjectIdentity{
-						Type:       "uv",
-						TargetFile: &lockFilePath,
+						ProjectType: "uv",
+						TargetFile:  &lockFilePath,
 					},
 				},
 				Error: wrappedErr,
@@ -118,8 +118,8 @@ func (p Plugin) buildResults(
 			Results: []scaecosystems.SCAResult{{
 				ProjectDescriptor: identity.ProjectDescriptor{
 					Identity: identity.ProjectIdentity{
-						Type:       "uv",
-						TargetFile: &lockFilePath,
+						ProjectType: "uv",
+						TargetFile:  &lockFilePath,
 					},
 				},
 				Error: noRootErr,
@@ -170,8 +170,8 @@ func (p Plugin) buildResults(
 			DepGraph: depGraph,
 			ProjectDescriptor: identity.ProjectDescriptor{
 				Identity: identity.ProjectIdentity{
-					Type:       "uv",
-					TargetFile: &manifestFile,
+					ProjectType: "uv",
+					TargetFile:  &manifestFile,
 				},
 			},
 		}

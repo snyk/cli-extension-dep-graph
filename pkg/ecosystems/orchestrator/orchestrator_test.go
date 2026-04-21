@@ -19,7 +19,7 @@ func TestLegacyFallback_MapsProjectType(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 
-	assert.Equal(t, "npm", results[0].ProjectDescriptor.Identity.Type)
+	assert.Equal(t, "npm", results[0].ProjectDescriptor.Identity.ProjectType)
 }
 
 func TestLegacyFallback_MapsTargetFramework(t *testing.T) {
@@ -160,4 +160,12 @@ func runLegacyFallback(t *testing.T, testBody string) ([]ecosystems.SCAResult, e
 			nil)
 
 	return LegacyFallback(ictx, *opts, nil)
+}
+
+func TestLegacyFallback_MapsRootComponentName(t *testing.T) {
+	results, err := runLegacyFallback(t, `{"depGraph":{"pkgManager":{"name":"nuget"},"pkgs":[{"id":"my-project@","info":{"name":"my-project"}}],"graph":{"rootNodeId":"root","nodes":[{"nodeId":"root","pkgId":"my-project@"}]}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json","target":{}}`) //nolint:lll // This is fine.
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	assert.Equal(t, "my-project", results[0].ProjectDescriptor.Identity.RootComponentName)
 }

@@ -212,7 +212,8 @@ func depGraphOutputToSCAResult(output *parsers.DepGraphOutput, ictx workflow.Inv
 	result := ecosystems.SCAResult{
 		ProjectDescriptor: identity.ProjectDescriptor{
 			Identity: identity.ProjectIdentity{
-				TargetFile: &output.NormalisedTargetFile,
+				TargetFile:    &output.NormalisedTargetFile,
+				TargetRuntime: output.TargetRuntime,
 			},
 		},
 	}
@@ -240,12 +241,11 @@ func depGraphOutputToSCAResult(output *parsers.DepGraphOutput, ictx workflow.Inv
 		}
 
 		result.DepGraph = &dg
+		result.ProjectDescriptor.Identity.ProjectType = dg.PkgManager.Name
+		result.ProjectDescriptor.Identity.TargetFile = getProjectTargetFileBasedOnType(dg.PkgManager.Name, output.NormalisedTargetFile, output.Workspace != nil)
 
-		if dg.PkgManager.Name != "" {
-			result.ProjectDescriptor.Identity.Type = dg.PkgManager.Name
-			result.ProjectDescriptor.Identity.TargetFile = getProjectTargetFileBasedOnType(dg.PkgManager.Name, output.NormalisedTargetFile, output.Workspace != nil)
-			// Extract runtime from depgraph if available
-			result.ProjectDescriptor.Identity.TargetRuntime = output.TargetRuntime
+		if rootPkg := dg.GetRootPkg(); rootPkg != nil {
+			result.ProjectDescriptor.Identity.RootComponentName = rootPkg.Info.Name
 		}
 	}
 

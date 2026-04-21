@@ -87,7 +87,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 				result = ecosystems.SCAResult{
 					ProjectDescriptor: identity.ProjectDescriptor{
 						Identity: identity.ProjectIdentity{
-							Type:             "pip",
+							ProjectType:      "pip",
 							TargetFile:       &file.RelPath,
 							BaseNameOverride: options.Global.ProjectName,
 						},
@@ -213,7 +213,7 @@ func (p Plugin) buildDepGraphFromPipfile(
 		DepGraph: depGraph,
 		ProjectDescriptor: identity.ProjectDescriptor{
 			Identity: identity.ProjectIdentity{
-				Type:             "pip",
+				ProjectType:      "pip",
 				TargetFile:       &file.RelPath,
 				BaseNameOverride: baseNameOverride,
 			},
