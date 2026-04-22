@@ -122,6 +122,7 @@
     },
     "projectDescriptor": {
       "identity": {
+        "rootComponentName": "with-version-specifiers",
         "targetRuntime": "python@3.14.1"
       }
     }

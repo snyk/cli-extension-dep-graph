@@ -104,6 +104,7 @@
     },
     "projectDescriptor": {
       "identity": {
+        "rootComponentName": "simple",
         "targetRuntime": "python@3.14.1"
       }
     }

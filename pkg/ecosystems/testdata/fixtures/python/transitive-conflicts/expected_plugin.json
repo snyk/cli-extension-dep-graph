@@ -227,6 +227,7 @@
     },
     "projectDescriptor": {
       "identity": {
+        "rootComponentName": "transitive-conflicts",
         "targetRuntime": "python@3.14.1"
       }
     }

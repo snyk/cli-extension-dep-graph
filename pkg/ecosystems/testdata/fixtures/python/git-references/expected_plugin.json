@@ -195,6 +195,7 @@
     },
     "projectDescriptor": {
       "identity": {
+        "rootComponentName": "git-references",
         "targetRuntime": "python@3.14.1"
       }
     }
