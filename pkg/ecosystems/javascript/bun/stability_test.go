@@ -16,9 +16,7 @@ package bun_test
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,14 +36,7 @@ import (
 // incomplete graph — e.g. if bun changes indentation or tree characters so that
 // depth-1 lines no longer match the regex.
 func TestBunWhyOutputStability(t *testing.T) {
-	if _, err := exec.LookPath("bun"); err != nil {
-		t.Skip("bun not found in PATH — skipping stability test")
-	}
-
-	// Log the bun version prominently so CI failure logs are easy to diagnose.
-	if out, err := exec.Command("bun", "--version").Output(); err == nil {
-		t.Logf("bun version: %s", strings.TrimSpace(string(out)))
-	}
+	requireBun(t)
 
 	plugin := bun.Plugin{}
 	opts := &ecosystems.SCAPluginOptions{}
