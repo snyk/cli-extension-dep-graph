@@ -95,8 +95,8 @@ func (p Plugin) buildResults(
 		return []ecosystems.SCAResult{{
 			ProjectDescriptor: identity.ProjectDescriptor{
 				Identity: identity.ProjectIdentity{
-					Type:       pkgManager,
-					TargetFile: &rootTargetFile,
+					ProjectType: pkgManager,
+					TargetFile:  &rootTargetFile,
 				},
 			},
 			Error: err,
@@ -142,8 +142,8 @@ func (p Plugin) buildResults(
 			DepGraph: gr.graph,
 			ProjectDescriptor: identity.ProjectDescriptor{
 				Identity: identity.ProjectIdentity{
-					Type:       pkgManager,
-					TargetFile: &tf,
+					ProjectType: pkgManager,
+					TargetFile:  &tf,
 				},
 			},
 		}

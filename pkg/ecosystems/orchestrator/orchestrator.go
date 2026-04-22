@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -89,10 +90,14 @@ func resolvePython(ctx context.Context, enhancedLogger *zerolog.Logger, dir stri
 
 	result := ecosystems.PluginResult{}
 
-	result.Results = append(result.Results, pipResults.Results...)
-	result.Results = append(result.Results, pipenvResults.Results...)
-	result.ProcessedFiles = append(result.ProcessedFiles, pipResults.ProcessedFiles...)
-	result.ProcessedFiles = append(result.ProcessedFiles, pipenvResults.ProcessedFiles...)
+	if pipResults != nil {
+		result.Results = append(result.Results, pipResults.Results...)
+		result.ProcessedFiles = append(result.ProcessedFiles, pipResults.ProcessedFiles...)
+	}
+	if pipenvResults != nil {
+		result.Results = append(result.Results, pipenvResults.Results...)
+		result.ProcessedFiles = append(result.ProcessedFiles, pipenvResults.ProcessedFiles...)
+	}
 
 	return result
 }
@@ -104,6 +109,11 @@ func LegacyFallback(
 	options ecosystems.SCAPluginOptions,
 	processedFiles []string,
 ) ([]ecosystems.SCAResult, error) {
+	// if we already processed files, and we're not in all-projects mode, we can skip the fallback
+	if len(processedFiles) > 0 && !options.Global.AllProjects {
+		return nil, nil
+	}
+
 	log := ictx.GetEnhancedLogger()
 	config := ictx.GetConfiguration()
 	engine := ictx.GetEngine()
@@ -112,6 +122,10 @@ func LegacyFallback(
 	cmdArgs := append([]string(nil), options.Global.RawFlags...)
 	cmdArgs = append(cmdArgs, "--print-effective-graph-with-errors")
 
+	for i := range processedFiles {
+		_, fileName := path.Split(processedFiles[i])
+		processedFiles[i] = fileName
+	}
 	if len(processedFiles) > 0 {
 		cmdArgs = append(cmdArgs, "--exclude="+strings.Join(processedFiles, ","))
 	}
@@ -218,7 +232,8 @@ func depGraphOutputToSCAResult(output *parsers.DepGraphOutput, ictx workflow.Inv
 	result := ecosystems.SCAResult{
 		ProjectDescriptor: identity.ProjectDescriptor{
 			Identity: identity.ProjectIdentity{
-				TargetFile: &output.NormalisedTargetFile,
+				TargetFile:    &output.NormalisedTargetFile,
+				TargetRuntime: output.TargetRuntime,
 			},
 		},
 	}
@@ -246,13 +261,45 @@ func depGraphOutputToSCAResult(output *parsers.DepGraphOutput, ictx workflow.Inv
 		}
 
 		result.DepGraph = &dg
+		result.ProjectDescriptor.Identity.ProjectType = dg.PkgManager.Name
+		result.ProjectDescriptor.Identity.TargetFile = getProjectTargetFileBasedOnType(dg.PkgManager.Name, output.NormalisedTargetFile, output.Workspace != nil)
 
-		if dg.PkgManager.Name != "" {
-			result.ProjectDescriptor.Identity.Type = dg.PkgManager.Name
-			// Extract runtime from depgraph if available
-			result.ProjectDescriptor.Identity.TargetRuntime = output.TargetRuntime
+		if rootPkg := dg.GetRootPkg(); rootPkg != nil {
+			result.ProjectDescriptor.Identity.RootComponentName = rootPkg.Info.Name
 		}
 	}
 
 	return result, nil
+}
+
+// getProjectTargetFileBasedOnType determines if a plugin sets targetFile based on package manager type.
+func getProjectTargetFileBasedOnType(projectType, file string, isWorkspace bool) *string {
+	switch projectType {
+	case "pip":
+		_, fileName := path.Split(file)
+		// snyk-python-plugin sets targetFile for Pipfile and setup.py, but not for requirements.txt
+		if strings.HasSuffix(fileName, "requirements.txt") {
+			return nil
+		}
+		return &file
+	case "gradle":
+		_, fileName := path.Split(file)
+		// snyk-gradle-plugin sets targetFile for build.gradle.kts but not for build.gradle
+		if strings.HasSuffix(fileName, "build.gradle.kts") {
+			return &file
+		}
+		return nil
+	case "poetry", "gomodules", "golangdep", "nuget", "paket", "composer", "cocoapods", "hex", "swift":
+		// These plugins set relative path to provided targetFile
+		return &file
+	case "npm", "yarn", "pnpm":
+		if isWorkspace {
+			return &file
+		}
+		return nil
+	case "maven", "sbt", "rubygems":
+		// These plugins do not set plugin.targetFile
+		return nil
+	}
+	return nil
 }

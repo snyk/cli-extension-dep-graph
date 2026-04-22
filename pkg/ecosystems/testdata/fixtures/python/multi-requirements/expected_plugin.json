@@ -7,9 +7,9 @@
       },
       "pkgs": [
         {
-          "id": "root@0.0.0",
+          "id": "frontend@0.0.0",
           "info": {
-            "name": "root",
+            "name": "frontend",
             "version": "0.0.0"
           }
         },
@@ -33,7 +33,7 @@
         "nodes": [
           {
             "nodeId": "root-node",
-            "pkgId": "root@0.0.0",
+            "pkgId": "frontend@0.0.0",
             "deps": [
               {
                 "nodeId": "jinja2@3.1.2"
@@ -58,10 +58,7 @@
       }
     },
     "projectDescriptor": {
-      "identity": {
-        "targetFile": "frontend/requirements.txt",
-        "targetRuntime": "python@3.14.1"
-      }
+      "identity": {}
     }
   },
   {
@@ -72,9 +69,9 @@
       },
       "pkgs": [
         {
-          "id": "root@0.0.0",
+          "id": "multi-requirements@0.0.0",
           "info": {
-            "name": "root",
+            "name": "multi-requirements",
             "version": "0.0.0"
           }
         },
@@ -119,7 +116,7 @@
         "nodes": [
           {
             "nodeId": "root-node",
-            "pkgId": "root@0.0.0",
+            "pkgId": "multi-requirements@0.0.0",
             "deps": [
               {
                 "nodeId": "requests@2.31.0"
@@ -168,10 +165,7 @@
       }
     },
     "projectDescriptor": {
-      "identity": {
-        "targetFile": "requirements.txt",
-        "targetRuntime": "python@3.14.0"
-      }
+      "identity": {}
     }
   },
   {
@@ -182,9 +176,9 @@
       },
       "pkgs": [
         {
-          "id": "root@0.0.0",
+          "id": "backend@0.0.0",
           "info": {
-            "name": "root",
+            "name": "backend",
             "version": "0.0.0"
           }
         },
@@ -243,7 +237,7 @@
         "nodes": [
           {
             "nodeId": "root-node",
-            "pkgId": "root@0.0.0",
+            "pkgId": "backend@0.0.0",
             "deps": [
               {
                 "nodeId": "flask@3.0.0"
@@ -323,10 +317,7 @@
       }
     },
     "projectDescriptor": {
-      "identity": {
-        "targetFile": "backend/requirements.txt",
-        "targetRuntime": "python@3.14.0"
-      }
+      "identity": {}
     }
   }
 ]

@@ -7,9 +7,9 @@
       },
       "pkgs": [
         {
-          "id": "root@0.0.0",
+          "id": "multiple-deps@0.0.0",
           "info": {
-            "name": "root",
+            "name": "multiple-deps",
             "version": "0.0.0"
           }
         },
@@ -61,7 +61,7 @@
         "nodes": [
           {
             "nodeId": "root-node",
-            "pkgId": "root@0.0.0",
+            "pkgId": "multiple-deps@0.0.0",
             "deps": [
               {
                 "nodeId": "click@8.1.7"
@@ -119,7 +119,6 @@
     },
     "projectDescriptor": {
       "identity": {
-        "targetFile": "requirements.txt",
         "targetRuntime": "python@3.14.1"
       }
     }

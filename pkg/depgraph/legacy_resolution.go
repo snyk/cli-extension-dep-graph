@@ -58,7 +58,8 @@ func chooseGraphArgument(config configuration.Configuration) (string, parsers.Ou
 
 func mapToWorkflowData(depGraphs []parsers.DepGraphOutput, logger *zerolog.Logger) []workflow.Data {
 	depGraphList := make([]workflow.Data, 0, len(depGraphs))
-	for _, depGraph := range depGraphs {
+	for i := range depGraphs {
+		depGraph := &depGraphs[i]
 		data := workflow.NewData(DataTypeID, contentTypeJSON, depGraph.DepGraph)
 		data.SetMetaData(contentLocationKey, depGraph.NormalisedTargetFile)
 		data.SetMetaData(MetaKeyNormalisedTargetFile, depGraph.NormalisedTargetFile)

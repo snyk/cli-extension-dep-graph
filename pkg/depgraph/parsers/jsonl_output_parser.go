@@ -24,6 +24,7 @@ type jsonLine struct {
 	TargetRuntime        *string         `json:"targetRuntime"`
 	Target               json.RawMessage `json:"target"`
 	Error                json.RawMessage `json:"error"`
+	Workspace            json.RawMessage `json:"workspace"`
 }
 
 // ParseOutput parses JSONL formatted dependency graph output.
@@ -50,6 +51,7 @@ func (j *JSONLOutputParser) ParseOutput(data []byte) ([]DepGraphOutput, error) {
 			Target:               parsed.Target,
 			TargetRuntime:        parsed.TargetRuntime,
 			DepGraph:             parsed.DepGraph,
+			Workspace:            parsed.Workspace,
 			Error:                parsed.Error,
 		})
 	}

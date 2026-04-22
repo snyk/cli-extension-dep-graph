@@ -141,6 +141,30 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "only exclude with single value",
+			rawFlags: []string{
+				"--exclude=Pipfile",
+			},
+			expected: &SCAPluginOptions{
+				Global: GlobalOptions{
+					Exclude: []string{"Pipfile"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "exclude with multiple comma-separated values using equals syntax",
+			rawFlags: []string{
+				"--exclude=test1,test2,test3",
+			},
+			expected: &SCAPluginOptions{
+				Global: GlobalOptions{
+					Exclude: []string{"test1", "test2", "test3"},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "only no-build-isolation",
 			rawFlags: []string{
 				"--no-build-isolation",

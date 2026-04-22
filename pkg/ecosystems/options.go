@@ -25,6 +25,7 @@ type GlobalOptions struct {
 	AllowOutOfSync                bool                 // Derived from --strict-out-of-sync (inverted); parsed in NewPluginOptionsFromRawFlags.
 	ForceSingleGraph              bool                 `arg:"--force-single-graph"`
 	ForceIncludeWorkspacePackages bool                 `arg:"--internal-uv-workspace-packages"`
+	ProjectName                   *string              `arg:"--project-name"`
 	RawFlags                      []string
 }
 
@@ -120,5 +121,10 @@ func (o *SCAPluginOptions) WithForceSingleGraph(forceSingleGraph bool) *SCAPlugi
 
 func (o *SCAPluginOptions) WithForceIncludeWorkspacePackages(forceIncludeWorkspacePackages bool) *SCAPluginOptions {
 	o.Global.ForceIncludeWorkspacePackages = forceIncludeWorkspacePackages
+	return o
+}
+
+func (o *SCAPluginOptions) WithProjectName(projectName string) *SCAPluginOptions {
+	o.Global.ProjectName = &projectName
 	return o
 }

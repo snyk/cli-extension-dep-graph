@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -65,7 +66,8 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	for _, file := range files {
 		g.Go(func() error {
-			result, err := p.buildDepGraphFromFile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation)
+			projectName := GetProjectName(file.RelPath, dir)
+			result, err := p.buildDepGraphFromFile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation, projectName, options.Global.ProjectName)
 			if err != nil {
 				attrs := []logger.Field{
 					logger.Attr(logFieldFile, file.RelPath),
@@ -82,8 +84,8 @@ func (p Plugin) BuildDepGraphsFromDir(
 				result = ecosystems.SCAResult{
 					ProjectDescriptor: identity.ProjectDescriptor{
 						Identity: identity.ProjectIdentity{
-							Type:       "pip",
-							TargetFile: &file.RelPath,
+							ProjectType:      "pip",
+							BaseNameOverride: options.Global.ProjectName,
 						},
 					},
 					Error: err,
@@ -101,9 +103,9 @@ func (p Plugin) BuildDepGraphsFromDir(
 		return nil, fmt.Errorf("error building dependency graphs: %w", err)
 	}
 
-	processedFiles := make([]string, 0, len(results))
-	for _, result := range results {
-		processedFiles = append(processedFiles, result.ProjectDescriptor.GetTargetFile())
+	processedFiles := make([]string, 0, len(files))
+	for _, file := range files {
+		processedFiles = append(processedFiles, file.RelPath)
 	}
 
 	return &ecosystems.PluginResult{
@@ -125,9 +127,13 @@ func (p Plugin) discoverRequirementsFiles(ctx context.Context, dir string, optio
 	case options.Global.AllProjects:
 		// Find all requirements.txt files recursively
 		// Exclude common directories to avoid scanning unnecessary paths
+		defaultExcludes := []string{".*", "__pycache__", "*.egg-info", "dist", "build", "venv"}
+		excludes := make([]string, 0, len(defaultExcludes)+len(options.Global.Exclude))
+		excludes = append(excludes, defaultExcludes...)
+		excludes = append(excludes, options.Global.Exclude...)
 		findOpts = []discovery.FindOption{
 			discovery.WithInclude(requirementsFile),
-			discovery.WithExcludes(".*", "__pycache__", "*.egg-info", "dist", "build", "venv"),
+			discovery.WithExcludes(excludes...),
 		}
 	default:
 		// Default: find requirements.txt at root only
@@ -143,6 +149,24 @@ func (p Plugin) discoverRequirementsFiles(ctx context.Context, dir string, optio
 	return files, nil
 }
 
+// GetProjectName determines the project name based on the file path.
+// It uses the directory name containing the file. For example:
+//   - "project/test/requirements.txt" -> "test"
+//   - "project/requirements.txt" -> "project"
+//   - "requirements.txt" (with scanDir="/path/to/myproject") -> "myproject"
+func GetProjectName(filePath, scanDir string) string {
+	// Extract the directory name from the file path
+	dir := filepath.Dir(filePath)
+	projectName := filepath.Base(dir)
+
+	// If we're at the root or the directory name is ".", use the scan directory name
+	if projectName == "." || projectName == "/" || projectName == "" {
+		return filepath.Base(scanDir)
+	}
+
+	return projectName
+}
+
 // buildDepGraphFromFile builds a dependency graph from a requirements.txt file.
 func (p Plugin) buildDepGraphFromFile(
 	ctx context.Context,
@@ -150,10 +174,13 @@ func (p Plugin) buildDepGraphFromFile(
 	file discovery.FindResult,
 	pythonVersion string,
 	noBuildIsolation bool,
+	projectName string,
+	baseNameOverride *string,
 ) (ecosystems.SCAResult, error) {
 	log.Debug(ctx, "Building dependency graph",
 		logger.Attr(logFieldFile, file.RelPath),
-		logger.Attr("python_version", pythonVersion))
+		logger.Attr("python_version", pythonVersion),
+		logger.Attr("project_name", projectName))
 
 	// Get pip install report (dry-run, no actual installation)
 	report, err := GetInstallReport(ctx, log, file.Path, noBuildIsolation)
@@ -162,7 +189,7 @@ func (p Plugin) buildDepGraphFromFile(
 	}
 
 	// Convert report to dependency graph
-	depGraph, err := report.ToDependencyGraph(ctx, log, PkgManagerPip)
+	depGraph, err := report.ToDependencyGraph(ctx, log, PkgManagerPip, projectName)
 	if err != nil {
 		return ecosystems.SCAResult{}, fmt.Errorf("failed to convert pip report to dependency graph for %s: %w", file.RelPath, err)
 	}
@@ -174,8 +201,8 @@ func (p Plugin) buildDepGraphFromFile(
 		DepGraph: depGraph,
 		ProjectDescriptor: identity.ProjectDescriptor{
 			Identity: identity.ProjectIdentity{
-				Type:       "pip",
-				TargetFile: &file.RelPath,
+				ProjectType:      "pip",
+				BaseNameOverride: baseNameOverride,
 			},
 		},
 	}, nil
