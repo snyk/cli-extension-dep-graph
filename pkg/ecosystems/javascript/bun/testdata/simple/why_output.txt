@@ -1,0 +1,20 @@
+my-app@
+  └─ No dependents found
+
+@types/bun@1.3.11
+  └─ dev my-app (requires latest)
+
+@types/node@25.5.2
+  └─ @types/bun@1.3.11 (requires 1.3.11)
+
+bun-types@1.3.11
+  └─ @types/bun@1.3.11 (requires 1.3.11)
+
+debug@4.4.3
+  └─ my-app (requires ^4.4.3)
+
+ms@2.1.3
+  └─ debug@4.4.3 (requires ^2.1.3)
+
+undici-types@7.18.2
+  └─ @types/node@25.5.2 (requires ~7.18.0)
