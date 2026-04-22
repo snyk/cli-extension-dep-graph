@@ -37,31 +37,26 @@ type acceptanceFixture struct {
 var testBunVersionRe = regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
 
 // requireBun fails the test immediately if bun is absent from PATH or older
-// than v1.2.19. It also logs the detected version for CI diagnostics.
+// than v1.2.19, and logs the detected version for CI diagnostics.
 func requireBun(t *testing.T) {
 	t.Helper()
-
 	bunPath, err := exec.LookPath("bun")
 	if err != nil {
 		t.Fatal("bun not found in PATH — install bun >= 1.2.19 to run these tests")
 	}
-
 	out, err := exec.Command(bunPath, "--version").Output()
 	if err != nil {
 		t.Fatalf("failed to get bun version: %v", err)
 	}
-
 	raw := strings.TrimSpace(string(out))
 	m := testBunVersionRe.FindStringSubmatch(raw)
 	if m == nil {
 		t.Fatalf("could not parse bun version from %q", raw)
 	}
-
 	ver := "v" + m[1] + "." + m[2] + "." + m[3]
 	if semver.Compare(ver, "v1.2.19") < 0 {
 		t.Fatalf("bun %s is below the required minimum v1.2.19", ver)
 	}
-
 	t.Logf("bun version: %s", ver)
 }
 
