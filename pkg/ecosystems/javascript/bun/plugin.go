@@ -69,6 +69,11 @@ func (p Plugin) BuildDepGraphsFromDir(
 		}
 		results = append(results, fileResults...)
 		processedFiles = append(processedFiles, file.RelPath)
+		for _, r := range fileResults {
+			if tf := r.ProjectDescriptor.GetTargetFile(); tf != "" {
+				processedFiles = append(processedFiles, tf)
+			}
+		}
 	}
 
 	return &ecosystems.PluginResult{
@@ -103,6 +108,9 @@ func (p Plugin) buildResults(
 	pkgJSON, err := readPackageJSON(lockFileAbsDir)
 	if err != nil {
 		return errResult(fmt.Errorf("reading package.json: %w", err))
+	}
+	if pkgJSON.Name == "" {
+		return errResult(fmt.Errorf(`package.json is missing a "name" field; bun dep graph requires a named root package`))
 	}
 
 	output, err := exec.Run(ctx, lockFileAbsDir)

@@ -63,8 +63,7 @@ func TestPlugin_Simple(t *testing.T) {
 	result, err := plugin.BuildDepGraphsFromDir(context.Background(), logger.Nop(), "testdata/simple", opts)
 	require.NoError(t, err)
 	require.Len(t, result.Results, 1)
-	require.Len(t, result.ProcessedFiles, 1)
-	assert.Equal(t, "bun.lock", result.ProcessedFiles[0])
+	assert.ElementsMatch(t, []string{"bun.lock", "package.json"}, result.ProcessedFiles)
 
 	scaResult := result.Results[0]
 	require.NoError(t, scaResult.Error)
@@ -110,6 +109,15 @@ func TestPlugin_Workspace_MultipleDepGraphs(t *testing.T) {
 	assert.Equal(t, "package.json", rootResult.ProjectDescriptor.GetTargetFile())
 	assert.Equal(t, "packages/logger/package.json", loggerResult.ProjectDescriptor.GetTargetFile())
 	assert.Equal(t, "packages/utils/package.json", utilsResult.ProjectDescriptor.GetTargetFile())
+
+	// All package.jsons (root + workspace members) plus bun.lock must be marked processed
+	// so that other plugins (npm/yarn) don't re-scan them.
+	assert.ElementsMatch(t, []string{
+		"bun.lock",
+		"package.json",
+		"packages/logger/package.json",
+		"packages/utils/package.json",
+	}, result.ProcessedFiles)
 
 	// Root graph: workspace packages are leaves; their transitive deps absent.
 	rootGraph := rootResult.DepGraph
@@ -315,6 +323,26 @@ func TestPlugin_AllProjects_WorkspacesWithSubpackages(t *testing.T) {
 		assert.NotContains(t, tf, "bun.lock",
 			"TargetFile must never be a lockfile path")
 	}
+}
+
+// TestPlugin_NoName_ReturnsError verifies that a root package.json without a "name" field
+// produces an error result rather than a broken dep graph. bun cannot reference an unnamed
+// root in why output, so direct root deps would be invisible and the graph would be wrong.
+func TestPlugin_NoName_ReturnsError(t *testing.T) {
+	tmp := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(tmp, "bun.lock"), nil, 0o600))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(tmp, "package.json"),
+		[]byte(`{"version":"1.0.0"}`), // no name field
+		0o600,
+	))
+
+	plugin := newPlugin(&fakeExecutor{}) // executor is never reached
+	result, err := plugin.BuildDepGraphsFromDir(context.Background(), logger.Nop(), tmp, ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, result.Results, 1)
+	assert.Error(t, result.Results[0].Error)
+	assert.Contains(t, result.Results[0].Error.Error(), `"name"`)
 }
 
 // TestParseWhyOutput_ReaderInterface confirms parseWhyOutput works with strings.NewReader.

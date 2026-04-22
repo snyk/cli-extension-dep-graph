@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	snykecosystems "github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
+	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 )
 
 const (
@@ -25,16 +28,21 @@ func readPackageJSON(dir string) (*packageJSON, error) {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, snykecosystems.NewUnprocessableFileError(
+				fmt.Sprintf("%s not found: %v", packageJSONFile, err),
+				snyk_errors.WithCause(err),
+			)
+		}
 		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
 
 	var p packageJSON
 	if err := json.Unmarshal(data, &p); err != nil {
-		return nil, fmt.Errorf("parsing %s: %w", path, err)
-	}
-
-	if p.Name == "" {
-		return nil, fmt.Errorf("%s: missing required 'name' field", path)
+		return nil, snykecosystems.NewUnparseableManifestError(
+			fmt.Sprintf("Failed to parse %s: %v", packageJSONFile, err),
+			snyk_errors.WithCause(err),
+		)
 	}
 
 	if p.Version == "" {
