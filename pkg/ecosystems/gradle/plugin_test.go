@@ -158,23 +158,8 @@ func TestResolveProjectDir(t *testing.T) {
 // ── resolveInitScript ─────────────────────────────────────────────────────────
 
 func TestResolveInitScript(t *testing.T) {
-	t.Run("returns user path directly when provided", func(t *testing.T) {
-		dir := t.TempDir()
-		userScript := filepath.Join(dir, "custom.gradle")
-		require.NoError(t, os.WriteFile(userScript, []byte("// custom"), 0o644))
-
-		path, cleanup, err := resolveInitScript(userScript)
-		require.NoError(t, err)
-		assert.Equal(t, userScript, path)
-
-		// cleanup should be a no-op (user's file must not be deleted).
-		cleanup()
-		_, statErr := os.Stat(userScript)
-		require.NoError(t, statErr, "user-provided init script should not be deleted by cleanup")
-	})
-
-	t.Run("creates temp file with embedded script content when no user path", func(t *testing.T) {
-		path, cleanup, err := resolveInitScript("")
+	t.Run("always creates temp file with embedded script content", func(t *testing.T) {
+		path, cleanup, err := resolveInitScript()
 		require.NoError(t, err)
 		require.NotEmpty(t, path)
 
@@ -188,5 +173,87 @@ func TestResolveInitScript(t *testing.T) {
 		cleanup()
 		_, statErr := os.Stat(path)
 		assert.True(t, os.IsNotExist(statErr), "temp init script should be removed by cleanup")
+	})
+}
+
+// ── buildExtraArgs ───────────────────────────────────────────────────────────
+
+func TestBuildExtraArgs(t *testing.T) {
+	t.Run("returns empty args when no user init script provided", func(t *testing.T) {
+		dir := t.TempDir()
+		opts := &ecosystems.SCAPluginOptions{}
+
+		args, err := buildExtraArgs(dir, opts)
+		require.NoError(t, err)
+		assert.Empty(t, args)
+	})
+
+	t.Run("adds user init script as --init-script flag when provided", func(t *testing.T) {
+		dir := t.TempDir()
+		userScript := filepath.Join(dir, "custom.gradle")
+		require.NoError(t, os.WriteFile(userScript, []byte("// custom"), 0o644))
+
+		opts := &ecosystems.SCAPluginOptions{
+			Gradle: ecosystems.GradleOptions{InitScript: userScript},
+		}
+
+		args, err := buildExtraArgs(dir, opts)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"--init-script", userScript}, args)
+	})
+
+	t.Run("resolves relative user init script path against project dir", func(t *testing.T) {
+		dir := t.TempDir()
+		userScript := filepath.Join(dir, "scripts", "custom.gradle")
+		require.NoError(t, os.MkdirAll(filepath.Dir(userScript), 0o755))
+		require.NoError(t, os.WriteFile(userScript, []byte("// custom"), 0o644))
+
+		opts := &ecosystems.SCAPluginOptions{
+			Gradle: ecosystems.GradleOptions{InitScript: "scripts/custom.gradle"},
+		}
+
+		args, err := buildExtraArgs(dir, opts)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"--init-script", userScript}, args)
+	})
+
+	t.Run("returns error when user init script does not exist", func(t *testing.T) {
+		dir := t.TempDir()
+		opts := &ecosystems.SCAPluginOptions{
+			Gradle: ecosystems.GradleOptions{InitScript: "nonexistent.gradle"},
+		}
+
+		_, err := buildExtraArgs(dir, opts)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "user init script not found")
+		assert.Contains(t, err.Error(), "nonexistent.gradle")
+	})
+
+	t.Run("returns error when user init script is a directory", func(t *testing.T) {
+		dir := t.TempDir()
+		scriptDir := filepath.Join(dir, "scripts")
+		require.NoError(t, os.Mkdir(scriptDir, 0o755))
+
+		opts := &ecosystems.SCAPluginOptions{
+			Gradle: ecosystems.GradleOptions{InitScript: scriptDir},
+		}
+
+		_, err := buildExtraArgs(dir, opts)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "user init script is a directory")
+	})
+
+	t.Run("returns error when user init script is not readable", func(t *testing.T) {
+		dir := t.TempDir()
+		userScript := filepath.Join(dir, "unreadable.gradle")
+		require.NoError(t, os.WriteFile(userScript, []byte("// custom"), 0o000)) // no read permission
+
+		opts := &ecosystems.SCAPluginOptions{
+			Gradle: ecosystems.GradleOptions{InitScript: userScript},
+		}
+
+		_, err := buildExtraArgs(dir, opts)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "user init script cannot be read")
 	})
 }

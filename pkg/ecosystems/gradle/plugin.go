@@ -43,9 +43,10 @@ func NewPlugin() Plugin {
 //   - Otherwise the plugin looks for build.gradle or build.gradle.kts at the
 //     top level of dir.  If neither exists, an empty result is returned so
 //     that the caller can fall back to the legacy CLI.
-//   - The embedded snyk-deps-init.gradle is written to a temp file, then
-//     passed to Gradle via --init-script.  Users can override this with
-//     --init-script.
+//   - The embedded snyk-deps-init.gradle is always written to a temp file and
+//     passed to Gradle via --init-script (required for dependency graph generation).
+//     Users can provide additional init scripts via --init-script which are passed
+//     as supplementary --init-script flags.
 //   - The Gradle invocation always uses --no-daemon, --no-parallel and the
 //     recommended GRADLE_OPTS flags for predictable, isolated execution.
 //   - The init script traverses all sub-projects automatically; each sub-project
@@ -68,13 +69,16 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	log.Debug(ctx, "Gradle project root resolved", logger.Attr(logAttrProjectDir, projectDir))
 
-	initScriptPath, cleanup, err := resolveInitScript(options.Gradle.InitScript)
+	initScriptPath, cleanup, err := resolveInitScript()
 	if err != nil {
 		return nil, fmt.Errorf("gradle: failed to prepare init script: %w", err)
 	}
 	defer cleanup()
 
-	extraArgs := buildExtraArgs(options)
+	extraArgs, err := buildExtraArgs(projectDir, options)
+	if err != nil {
+		return nil, fmt.Errorf("gradle: %w", err)
+	}
 	log.Debug(ctx, "Running Gradle dependency resolution",
 		logger.Attr(logAttrProjectDir, projectDir),
 		logger.Attr("init_script", initScriptPath))
@@ -212,15 +216,10 @@ func relativeTargetFile(dir, absFile string) string {
 	return rel
 }
 
-// resolveInitScript returns the path to the init script to use.
-// If userPath is non-empty it is used directly (--init-script override).
-// Otherwise the embedded script is written to a temp file and a cleanup func
-// is returned that removes it.
-func resolveInitScript(userPath string) (path string, cleanup func(), err error) {
-	if userPath != "" {
-		return userPath, func() {}, nil
-	}
-
+// resolveInitScript writes the embedded Snyk init script to a temp file.
+// This script is always required for dependency graph generation.
+// Additional user init scripts should be handled via --init-script flags in buildExtraArgs.
+func resolveInitScript() (path string, cleanup func(), err error) {
 	f, err := os.CreateTemp("", "snyk-deps-init-*.gradle")
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to create temp init script: %w", err)
@@ -240,10 +239,39 @@ func resolveInitScript(userPath string) (path string, cleanup func(), err error)
 }
 
 // buildExtraArgs assembles any additional Gradle command-line arguments derived
-// from plugin options (e.g. configuration-matching passed as a project property).
-func buildExtraArgs(_ *ecosystems.SCAPluginOptions) []string {
+// from plugin options (e.g. user-provided init scripts, configuration flags).
+func buildExtraArgs(projectDir string, options *ecosystems.SCAPluginOptions) ([]string, error) {
+	var args []string
+
+	// Add user-provided init script as an additional --init-script flag.
+	// The embedded Snyk init script is always used; this allows users to provide
+	// supplementary init scripts needed to make their Gradle build work.
+	if userInitScript := options.Gradle.InitScript; userInitScript != "" {
+		// Resolve relative paths against the project directory
+		initPath := userInitScript
+		if !filepath.IsAbs(userInitScript) {
+			initPath = filepath.Join(projectDir, userInitScript)
+		}
+
+		// Defensive validation: ensure the init script exists and is readable
+		info, err := os.Stat(initPath)
+		if err != nil {
+			return nil, fmt.Errorf("user init script not found: %s: %w", userInitScript, err)
+		}
+		if info.IsDir() {
+			return nil, fmt.Errorf("user init script is a directory, not a file: %s", userInitScript)
+		}
+
+		// Test readability
+		if _, err := os.Open(initPath); err != nil {
+			return nil, fmt.Errorf("user init script cannot be read: %s: %w", userInitScript, err)
+		}
+
+		args = append(args, "--init-script", initPath)
+	}
+
 	// Reserved for future flag forwarding (e.g. --configuration, -P flags).
-	return nil
+	return args, nil
 }
 
 // isBuildFile reports whether path refers to a Gradle build file.
