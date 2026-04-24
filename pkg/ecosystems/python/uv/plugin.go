@@ -166,12 +166,18 @@ func (p Plugin) buildResults(
 			result.ProcessedFiles = append(result.ProcessedFiles, filepath.Join(packagePath, name))
 		}
 
+		var rootName string
+		if rootPkg := depGraph.GetRootPkg(); rootPkg != nil {
+			rootName = rootPkg.Info.Name
+		}
+
 		res := scaecosystems.SCAResult{
 			DepGraph: depGraph,
 			ProjectDescriptor: identity.ProjectDescriptor{
 				Identity: identity.ProjectIdentity{
-					ProjectType: "uv",
-					TargetFile:  &manifestFile,
+					ProjectType:       "uv",
+					TargetFile:        &manifestFile,
+					RootComponentName: rootName,
 				},
 			},
 		}

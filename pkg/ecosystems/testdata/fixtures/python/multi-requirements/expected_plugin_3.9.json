@@ -58,7 +58,9 @@
       }
     },
     "projectDescriptor": {
-      "identity": {}
+      "identity": {
+        "rootComponentName": "frontend"
+      }
     }
   },
   {
@@ -165,7 +167,9 @@
       }
     },
     "projectDescriptor": {
-      "identity": {}
+      "identity": {
+        "rootComponentName": "multi-requirements"
+      }
     }
   },
   {
@@ -362,7 +366,9 @@
       }
     },
     "projectDescriptor": {
-      "identity": {}
+      "identity": {
+        "rootComponentName": "backend"
+      }
     }
   }
 ]

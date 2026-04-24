@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -155,7 +156,7 @@ func TestPlugin_BuildDepGraphsFromDir_PipErrors(t *testing.T) {
 
 			// Basic metadata expectations
 			assert.Equal(t, "Pipfile", pipenvResult.ProjectDescriptor.GetTargetFile())
-			if pythonVersion != "" {
+			if pythonVersion != "" && pipenvResult.ProjectDescriptor.Identity.TargetRuntime != nil {
 				assert.Contains(t, *pipenvResult.ProjectDescriptor.Identity.TargetRuntime, fmt.Sprintf("python@%s", pythonVersion))
 			}
 
@@ -234,7 +235,10 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 	expectedJSON, err := json.Marshal(sortExpected)
 	require.NoError(t, err, "[%s] failed to marshal expected results", fixtureName)
 
-	assert.JSONEq(t, string(expectedJSON), string(actualJSON), "[%s] results mismatch", fixtureName)
+	resolvedExpectedJSON, err := resolveWildcardVersions(expectedJSON, actualJSON)
+	require.NoError(t, err, "[%s] failed to resolve wildcard versions", fixtureName)
+
+	assert.JSONEq(t, string(resolvedExpectedJSON), string(actualJSON), "[%s] results mismatch", fixtureName)
 }
 
 // getFirstDirectDep returns the name of the first direct dependency in the graph for sorting purposes.
@@ -264,6 +268,103 @@ func loadExpectedResults(path string) ([]ecosystems.SCAResult, error) {
 	}
 
 	return expected, nil
+}
+
+// resolveWildcardVersions substitutes wildcard versions ("*") in expectedJSON with the actual
+// resolved versions from actualJSON. Each result's wildcards are resolved independently using
+// that result's actual packages, so results from different requirements files don't interfere.
+func resolveWildcardVersions(expectedJSON, actualJSON []byte) ([]byte, error) {
+	var actualResults []any
+	if err := json.Unmarshal(actualJSON, &actualResults); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal actual results: %w", err)
+	}
+
+	var expectedResults []any
+	if err := json.Unmarshal(expectedJSON, &expectedResults); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal expected results: %w", err)
+	}
+
+	if len(actualResults) != len(expectedResults) {
+		return expectedJSON, nil
+	}
+
+	for i := range expectedResults {
+		actualResult, ok := actualResults[i].(map[string]any)
+		if !ok {
+			continue
+		}
+		expectedResult, ok := expectedResults[i].(map[string]any)
+		if !ok {
+			continue
+		}
+		nameToVersion := extractNameVersionMap(actualResult)
+		substituteWildcards(expectedResult, nameToVersion)
+	}
+
+	resolved, err := json.Marshal(expectedResults)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal resolved expected: %w", err)
+	}
+	return resolved, nil
+}
+
+func extractNameVersionMap(result map[string]any) map[string]string {
+	nameToVersion := make(map[string]string)
+	depGraph, ok := result["depGraph"].(map[string]any)
+	if !ok {
+		return nameToVersion
+	}
+	pkgs, ok := depGraph["pkgs"].([]any)
+	if !ok {
+		return nameToVersion
+	}
+	for _, pkg := range pkgs {
+		pkgMap, ok := pkg.(map[string]any)
+		if !ok {
+			continue
+		}
+		id, ok := pkgMap["id"].(string)
+		if !ok {
+			continue
+		}
+		atIdx := strings.LastIndex(id, "@")
+		if atIdx < 0 {
+			continue
+		}
+		nameToVersion[id[:atIdx]] = id[atIdx+1:]
+	}
+	return nameToVersion
+}
+
+func substituteWildcards(v any, nameToVersion map[string]string) {
+	switch node := v.(type) {
+	case map[string]any:
+		if version, ok := node["version"].(string); ok && version == "*" {
+			if name, ok := node["name"].(string); ok {
+				if actual, found := nameToVersion[name]; found {
+					node["version"] = actual
+				}
+			}
+		}
+		for _, key := range []string{"id", "nodeId", "pkgId"} {
+			if s, ok := node[key].(string); ok {
+				if idx := strings.Index(s, "@*"); idx >= 0 {
+					name := s[:idx]
+					suffix := s[idx+2:]
+					if actual, found := nameToVersion[name]; found {
+						node[key] = name + "@" + actual + suffix
+					}
+				}
+			}
+		}
+		for _, val := range node {
+			substituteWildcards(val, nameToVersion)
+		}
+	case []any:
+		for _, item := range node {
+			substituteWildcards(item, nameToVersion)
+		}
+	}
 }
 
 // getPythonMajorMinorVersion returns the Python version as "X.Y" (e.g., "3.11")

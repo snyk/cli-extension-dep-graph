@@ -104,6 +104,7 @@
     },
     "projectDescriptor": {
       "identity": {
+        "rootComponentName": "env-markers",
         "targetRuntime": "python@3.14.1"
       }
     }
