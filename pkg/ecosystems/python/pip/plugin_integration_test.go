@@ -242,9 +242,10 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 		return sortExpected[i].DepGraph.GetRootPkg().Info.Name < sortExpected[j].DepGraph.GetRootPkg().Info.Name
 	})
 
-	// Sync runtime field (varies by Python version) and clear Error field (not in JSON)
+	// Sync fields that vary between pip and pipenv or by environment (allows sharing fixtures)
 	for i := range sortExpected {
 		sortExpected[i].ProjectDescriptor.Identity.TargetRuntime = sortActual[i].ProjectDescriptor.Identity.TargetRuntime
+		sortExpected[i].ProjectDescriptor.Identity.TargetFile = sortActual[i].ProjectDescriptor.Identity.TargetFile
 		sortActual[i].ProjectDescriptor.Identity.ProjectType = "" // Clear type since fixtures are shared
 		sortActual[i].Error = nil                                 // Error field isn't in expected JSON
 	}

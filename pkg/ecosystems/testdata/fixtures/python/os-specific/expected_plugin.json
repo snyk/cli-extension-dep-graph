@@ -104,6 +104,7 @@
     },
     "projectDescriptor": {
       "identity": {
+        "rootComponentName": "os-specific",
         "targetRuntime": "python@3.14.1"
       }
     }

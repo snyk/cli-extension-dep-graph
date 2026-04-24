@@ -10,8 +10,6 @@ type ProjectDescriptor struct {
 type ProjectIdentity struct {
 	// ProjectType specifies the project type (e.g., "npm", "maven", "pip")
 	ProjectType string `json:"type,omitempty"`
-	// BaseNameOverride allows overriding the default base name for the project
-	BaseNameOverride *string `json:"baseNameOverride,omitempty"`
 	// TargetFile specifies the manifest or build file for the project
 	TargetFile *string `json:"targetFile,omitempty"`
 	// TargetRuntime specifies the runtime environment for the project

@@ -119,6 +119,7 @@
     },
     "projectDescriptor": {
       "identity": {
+        "rootComponentName": "multiple-deps",
         "targetRuntime": "python@3.14.1"
       }
     }

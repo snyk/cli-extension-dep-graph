@@ -66,8 +66,8 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	for _, file := range files {
 		g.Go(func() error {
-			projectName := GetProjectName(file.RelPath, dir)
-			result, err := p.buildDepGraphFromFile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation, projectName, options.Global.ProjectName)
+			projectName := GetProjectName(file.RelPath, dir, options.Global.ProjectName)
+			result, err := p.buildDepGraphFromFile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation, projectName)
 			if err != nil {
 				attrs := []logger.Field{
 					logger.Attr(logFieldFile, file.RelPath),
@@ -84,8 +84,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 				result = ecosystems.SCAResult{
 					ProjectDescriptor: identity.ProjectDescriptor{
 						Identity: identity.ProjectIdentity{
-							ProjectType:      "pip",
-							BaseNameOverride: options.Global.ProjectName,
+							ProjectType: "pip",
 						},
 					},
 					Error: err,
@@ -154,7 +153,11 @@ func (p Plugin) discoverRequirementsFiles(ctx context.Context, dir string, optio
 //   - "project/test/requirements.txt" -> "test"
 //   - "project/requirements.txt" -> "project"
 //   - "requirements.txt" (with scanDir="/path/to/myproject") -> "myproject"
-func GetProjectName(filePath, scanDir string) string {
+func GetProjectName(filePath, scanDir string, override *string) string {
+	if override != nil && *override != "" {
+		return *override
+	}
+
 	// Extract the directory name from the file path
 	dir := filepath.Dir(filePath)
 	projectName := filepath.Base(dir)
@@ -175,7 +178,6 @@ func (p Plugin) buildDepGraphFromFile(
 	pythonVersion string,
 	noBuildIsolation bool,
 	projectName string,
-	baseNameOverride *string,
 ) (ecosystems.SCAResult, error) {
 	log.Debug(ctx, "Building dependency graph",
 		logger.Attr(logFieldFile, file.RelPath),
@@ -197,12 +199,18 @@ func (p Plugin) buildDepGraphFromFile(
 	log.Debug(ctx, "Successfully built dependency graph",
 		logger.Attr(logFieldFile, file.RelPath))
 
+	var rootName string
+	if rootPkg := depGraph.GetRootPkg(); rootPkg != nil {
+		rootName = rootPkg.Info.Name
+	}
+
 	return ecosystems.SCAResult{
 		DepGraph: depGraph,
 		ProjectDescriptor: identity.ProjectDescriptor{
 			Identity: identity.ProjectIdentity{
-				ProjectType:      "pip",
-				BaseNameOverride: baseNameOverride,
+				ProjectType:       "pip",
+				TargetFile:        &file.RelPath,
+				RootComponentName: rootName,
 			},
 		},
 	}, nil
