@@ -66,7 +66,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	for _, file := range files {
 		g.Go(func() error {
-			projectName := GetProjectName(file.RelPath, dir)
+			projectName := GetProjectName(file.RelPath, dir, options.Global.ProjectName)
 			result, err := p.buildDepGraphFromFile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation, projectName)
 			if err != nil {
 				attrs := []logger.Field{
@@ -153,7 +153,11 @@ func (p Plugin) discoverRequirementsFiles(ctx context.Context, dir string, optio
 //   - "project/test/requirements.txt" -> "test"
 //   - "project/requirements.txt" -> "project"
 //   - "requirements.txt" (with scanDir="/path/to/myproject") -> "myproject"
-func GetProjectName(filePath, scanDir string) string {
+func GetProjectName(filePath, scanDir string, override *string) string {
+	if override != nil && *override != "" {
+		return *override
+	}
+
 	// Extract the directory name from the file path
 	dir := filepath.Dir(filePath)
 	projectName := filepath.Base(dir)

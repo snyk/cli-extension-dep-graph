@@ -68,7 +68,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	for _, file := range files {
 		g.Go(func() error {
-			projectName := pip.GetProjectName(file.RelPath, dir)
+			projectName := pip.GetProjectName(file.RelPath, dir, options.Global.ProjectName)
 			result, err := p.buildDepGraphFromPipfile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation,
 				options.Global.IncludeDev, projectName)
 			if err != nil {
