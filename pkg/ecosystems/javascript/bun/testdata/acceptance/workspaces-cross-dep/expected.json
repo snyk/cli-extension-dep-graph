@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "bun"
+  },
+  "pkgs": [
+    {
+      "id": "my-monorepo@1.0.0",
+      "info": {
+        "name": "my-monorepo",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "b@workspace:packages/b",
+      "info": {
+        "name": "b",
+        "version": "workspace:packages/b"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "my-monorepo@1.0.0",
+        "deps": [
+          {
+            "nodeId": "b@workspace:packages/b"
+          }
+        ]
+      },
+      {
+        "nodeId": "b@workspace:packages/b",
+        "pkgId": "b@workspace:packages/b",
+        "deps": []
+      }
+    ]
+  }
+}

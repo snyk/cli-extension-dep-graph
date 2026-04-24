@@ -1,0 +1,3249 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "bun"
+  },
+  "pkgs": [
+    {
+      "id": "override-with-dep@1.0.0",
+      "info": {
+        "name": "override-with-dep",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "proxy-agent@6.5.0",
+      "info": {
+        "name": "proxy-agent",
+        "version": "6.5.0"
+      }
+    },
+    {
+      "id": "https-proxy-agent@7.0.6",
+      "info": {
+        "name": "https-proxy-agent",
+        "version": "7.0.6"
+      }
+    },
+    {
+      "id": "debug@4.4.3",
+      "info": {
+        "name": "debug",
+        "version": "4.4.3"
+      }
+    },
+    {
+      "id": "ms@2.1.3",
+      "info": {
+        "name": "ms",
+        "version": "2.1.3"
+      }
+    },
+    {
+      "id": "agent-base@7.1.4",
+      "info": {
+        "name": "agent-base",
+        "version": "7.1.4"
+      }
+    },
+    {
+      "id": "http-proxy-agent@7.0.2",
+      "info": {
+        "name": "http-proxy-agent",
+        "version": "7.0.2"
+      }
+    },
+    {
+      "id": "pac-proxy-agent@7.2.0",
+      "info": {
+        "name": "pac-proxy-agent",
+        "version": "7.2.0"
+      }
+    },
+    {
+      "id": "get-uri@6.0.5",
+      "info": {
+        "name": "get-uri",
+        "version": "6.0.5"
+      }
+    },
+    {
+      "id": "data-uri-to-buffer@6.0.2",
+      "info": {
+        "name": "data-uri-to-buffer",
+        "version": "6.0.2"
+      }
+    },
+    {
+      "id": "basic-ftp@5.2.2",
+      "info": {
+        "name": "basic-ftp",
+        "version": "5.2.2"
+      }
+    },
+    {
+      "id": "pac-resolver@7.0.1",
+      "info": {
+        "name": "pac-resolver",
+        "version": "7.0.1"
+      }
+    },
+    {
+      "id": "degenerator@5.0.1",
+      "info": {
+        "name": "degenerator",
+        "version": "5.0.1"
+      }
+    },
+    {
+      "id": "escodegen@2.1.0",
+      "info": {
+        "name": "escodegen",
+        "version": "2.1.0"
+      }
+    },
+    {
+      "id": "esutils@2.0.3",
+      "info": {
+        "name": "esutils",
+        "version": "2.0.3"
+      }
+    },
+    {
+      "id": "estraverse@5.3.0",
+      "info": {
+        "name": "estraverse",
+        "version": "5.3.0"
+      }
+    },
+    {
+      "id": "source-map@0.6.1",
+      "info": {
+        "name": "source-map",
+        "version": "0.6.1"
+      }
+    },
+    {
+      "id": "esprima@4.0.1",
+      "info": {
+        "name": "esprima",
+        "version": "4.0.1"
+      }
+    },
+    {
+      "id": "ast-types@0.13.4",
+      "info": {
+        "name": "ast-types",
+        "version": "0.13.4"
+      }
+    },
+    {
+      "id": "tslib@2.8.1",
+      "info": {
+        "name": "tslib",
+        "version": "2.8.1"
+      }
+    },
+    {
+      "id": "netmask@2.1.1",
+      "info": {
+        "name": "netmask",
+        "version": "2.1.1"
+      }
+    },
+    {
+      "id": "socks-proxy-agent@8.0.5",
+      "info": {
+        "name": "socks-proxy-agent",
+        "version": "8.0.5"
+      }
+    },
+    {
+      "id": "socks@2.8.7",
+      "info": {
+        "name": "socks",
+        "version": "2.8.7"
+      }
+    },
+    {
+      "id": "smart-buffer@4.2.0",
+      "info": {
+        "name": "smart-buffer",
+        "version": "4.2.0"
+      }
+    },
+    {
+      "id": "ip-address@10.1.0",
+      "info": {
+        "name": "ip-address",
+        "version": "10.1.0"
+      }
+    },
+    {
+      "id": "@tootallnate/quickjs-emscripten@0.23.0",
+      "info": {
+        "name": "@tootallnate/quickjs-emscripten",
+        "version": "0.23.0"
+      }
+    },
+    {
+      "id": "proxy-from-env@1.1.0",
+      "info": {
+        "name": "proxy-from-env",
+        "version": "1.1.0"
+      }
+    },
+    {
+      "id": "lru-cache@7.18.3",
+      "info": {
+        "name": "lru-cache",
+        "version": "7.18.3"
+      }
+    },
+    {
+      "id": "@commitlint/cli@18.6.1",
+      "info": {
+        "name": "@commitlint/cli",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "resolve-global@1.0.0",
+      "info": {
+        "name": "resolve-global",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "global-dirs@0.1.1",
+      "info": {
+        "name": "global-dirs",
+        "version": "0.1.1"
+      }
+    },
+    {
+      "id": "ini@1.3.8",
+      "info": {
+        "name": "ini",
+        "version": "1.3.8"
+      }
+    },
+    {
+      "id": "yargs@17.7.2",
+      "info": {
+        "name": "yargs",
+        "version": "17.7.2"
+      }
+    },
+    {
+      "id": "cliui@8.0.1",
+      "info": {
+        "name": "cliui",
+        "version": "8.0.1"
+      }
+    },
+    {
+      "id": "string-width@4.2.3",
+      "info": {
+        "name": "string-width",
+        "version": "4.2.3"
+      }
+    },
+    {
+      "id": "emoji-regex@8.0.0",
+      "info": {
+        "name": "emoji-regex",
+        "version": "8.0.0"
+      }
+    },
+    {
+      "id": "strip-ansi@6.0.1",
+      "info": {
+        "name": "strip-ansi",
+        "version": "6.0.1"
+      }
+    },
+    {
+      "id": "ansi-regex@5.0.1",
+      "info": {
+        "name": "ansi-regex",
+        "version": "5.0.1"
+      }
+    },
+    {
+      "id": "is-fullwidth-code-point@3.0.0",
+      "info": {
+        "name": "is-fullwidth-code-point",
+        "version": "3.0.0"
+      }
+    },
+    {
+      "id": "wrap-ansi@7.0.0",
+      "info": {
+        "name": "wrap-ansi",
+        "version": "7.0.0"
+      }
+    },
+    {
+      "id": "ansi-styles@4.3.0",
+      "info": {
+        "name": "ansi-styles",
+        "version": "4.3.0"
+      }
+    },
+    {
+      "id": "color-convert@2.0.1",
+      "info": {
+        "name": "color-convert",
+        "version": "2.0.1"
+      }
+    },
+    {
+      "id": "color-name@1.1.4",
+      "info": {
+        "name": "color-name",
+        "version": "1.1.4"
+      }
+    },
+    {
+      "id": "yargs-parser@21.1.1",
+      "info": {
+        "name": "yargs-parser",
+        "version": "21.1.1"
+      }
+    },
+    {
+      "id": "get-caller-file@2.0.5",
+      "info": {
+        "name": "get-caller-file",
+        "version": "2.0.5"
+      }
+    },
+    {
+      "id": "y18n@5.0.8",
+      "info": {
+        "name": "y18n",
+        "version": "5.0.8"
+      }
+    },
+    {
+      "id": "escalade@3.2.0",
+      "info": {
+        "name": "escalade",
+        "version": "3.2.0"
+      }
+    },
+    {
+      "id": "require-directory@2.1.1",
+      "info": {
+        "name": "require-directory",
+        "version": "2.1.1"
+      }
+    },
+    {
+      "id": "lodash.isfunction@3.0.9",
+      "info": {
+        "name": "lodash.isfunction",
+        "version": "3.0.9"
+      }
+    },
+    {
+      "id": "@commitlint/load@18.6.1",
+      "info": {
+        "name": "@commitlint/load",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "@commitlint/resolve-extends@18.6.1",
+      "info": {
+        "name": "@commitlint/resolve-extends",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "import-fresh@3.3.1",
+      "info": {
+        "name": "import-fresh",
+        "version": "3.3.1"
+      }
+    },
+    {
+      "id": "resolve-from@4.0.0",
+      "info": {
+        "name": "resolve-from",
+        "version": "4.0.0"
+      }
+    },
+    {
+      "id": "parent-module@1.0.1",
+      "info": {
+        "name": "parent-module",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "id": "callsites@3.1.0",
+      "info": {
+        "name": "callsites",
+        "version": "3.1.0"
+      }
+    },
+    {
+      "id": "@commitlint/config-validator@18.6.1",
+      "info": {
+        "name": "@commitlint/config-validator",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "@commitlint/types@18.6.1",
+      "info": {
+        "name": "@commitlint/types",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "chalk@4.1.2",
+      "info": {
+        "name": "chalk",
+        "version": "4.1.2"
+      }
+    },
+    {
+      "id": "supports-color@7.2.0",
+      "info": {
+        "name": "supports-color",
+        "version": "7.2.0"
+      }
+    },
+    {
+      "id": "has-flag@4.0.0",
+      "info": {
+        "name": "has-flag",
+        "version": "4.0.0"
+      }
+    },
+    {
+      "id": "ajv@8.18.0",
+      "info": {
+        "name": "ajv",
+        "version": "8.18.0"
+      }
+    },
+    {
+      "id": "fast-uri@3.1.0",
+      "info": {
+        "name": "fast-uri",
+        "version": "3.1.0"
+      }
+    },
+    {
+      "id": "require-from-string@2.0.2",
+      "info": {
+        "name": "require-from-string",
+        "version": "2.0.2"
+      }
+    },
+    {
+      "id": "json-schema-traverse@1.0.0",
+      "info": {
+        "name": "json-schema-traverse",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "fast-deep-equal@3.1.3",
+      "info": {
+        "name": "fast-deep-equal",
+        "version": "3.1.3"
+      }
+    },
+    {
+      "id": "resolve-from@5.0.0",
+      "info": {
+        "name": "resolve-from",
+        "version": "5.0.0"
+      }
+    },
+    {
+      "id": "lodash.mergewith@4.6.2",
+      "info": {
+        "name": "lodash.mergewith",
+        "version": "4.6.2"
+      }
+    },
+    {
+      "id": "cosmiconfig@8.3.6",
+      "info": {
+        "name": "cosmiconfig",
+        "version": "8.3.6"
+      }
+    },
+    {
+      "id": "parse-json@5.2.0",
+      "info": {
+        "name": "parse-json",
+        "version": "5.2.0"
+      }
+    },
+    {
+      "id": "lines-and-columns@1.2.4",
+      "info": {
+        "name": "lines-and-columns",
+        "version": "1.2.4"
+      }
+    },
+    {
+      "id": "@babel/code-frame@7.29.0",
+      "info": {
+        "name": "@babel/code-frame",
+        "version": "7.29.0"
+      }
+    },
+    {
+      "id": "picocolors@1.1.1",
+      "info": {
+        "name": "picocolors",
+        "version": "1.1.1"
+      }
+    },
+    {
+      "id": "@babel/helper-validator-identifier@7.28.5",
+      "info": {
+        "name": "@babel/helper-validator-identifier",
+        "version": "7.28.5"
+      }
+    },
+    {
+      "id": "js-tokens@4.0.0",
+      "info": {
+        "name": "js-tokens",
+        "version": "4.0.0"
+      }
+    },
+    {
+      "id": "json-parse-even-better-errors@2.3.1",
+      "info": {
+        "name": "json-parse-even-better-errors",
+        "version": "2.3.1"
+      }
+    },
+    {
+      "id": "error-ex@1.3.4",
+      "info": {
+        "name": "error-ex",
+        "version": "1.3.4"
+      }
+    },
+    {
+      "id": "is-arrayish@0.2.1",
+      "info": {
+        "name": "is-arrayish",
+        "version": "0.2.1"
+      }
+    },
+    {
+      "id": "path-type@4.0.0",
+      "info": {
+        "name": "path-type",
+        "version": "4.0.0"
+      }
+    },
+    {
+      "id": "js-yaml@4.1.1",
+      "info": {
+        "name": "js-yaml",
+        "version": "4.1.1"
+      }
+    },
+    {
+      "id": "argparse@2.0.1",
+      "info": {
+        "name": "argparse",
+        "version": "2.0.1"
+      }
+    },
+    {
+      "id": "lodash.isplainobject@4.0.6",
+      "info": {
+        "name": "lodash.isplainobject",
+        "version": "4.0.6"
+      }
+    },
+    {
+      "id": "lodash.merge@4.6.2",
+      "info": {
+        "name": "lodash.merge",
+        "version": "4.6.2"
+      }
+    },
+    {
+      "id": "@commitlint/execute-rule@18.6.1",
+      "info": {
+        "name": "@commitlint/execute-rule",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "lodash.uniq@4.5.0",
+      "info": {
+        "name": "lodash.uniq",
+        "version": "4.5.0"
+      }
+    },
+    {
+      "id": "cosmiconfig-typescript-loader@5.1.0",
+      "info": {
+        "name": "cosmiconfig-typescript-loader",
+        "version": "5.1.0"
+      }
+    },
+    {
+      "id": "@types/node@25.6.0",
+      "info": {
+        "name": "@types/node",
+        "version": "25.6.0"
+      }
+    },
+    {
+      "id": "undici-types@7.19.2",
+      "info": {
+        "name": "undici-types",
+        "version": "7.19.2"
+      }
+    },
+    {
+      "id": "jiti@1.21.7",
+      "info": {
+        "name": "jiti",
+        "version": "1.21.7"
+      }
+    },
+    {
+      "id": "typescript@6.0.2",
+      "info": {
+        "name": "typescript",
+        "version": "6.0.2"
+      }
+    },
+    {
+      "id": "@commitlint/format@18.6.1",
+      "info": {
+        "name": "@commitlint/format",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "execa@5.1.1",
+      "info": {
+        "name": "execa",
+        "version": "5.1.1"
+      }
+    },
+    {
+      "id": "merge-stream@2.0.0",
+      "info": {
+        "name": "merge-stream",
+        "version": "2.0.0"
+      }
+    },
+    {
+      "id": "signal-exit@3.0.7",
+      "info": {
+        "name": "signal-exit",
+        "version": "3.0.7"
+      }
+    },
+    {
+      "id": "cross-spawn@7.0.6",
+      "info": {
+        "name": "cross-spawn",
+        "version": "7.0.6"
+      }
+    },
+    {
+      "id": "path-key@3.1.1",
+      "info": {
+        "name": "path-key",
+        "version": "3.1.1"
+      }
+    },
+    {
+      "id": "shebang-command@2.0.0",
+      "info": {
+        "name": "shebang-command",
+        "version": "2.0.0"
+      }
+    },
+    {
+      "id": "shebang-regex@3.0.0",
+      "info": {
+        "name": "shebang-regex",
+        "version": "3.0.0"
+      }
+    },
+    {
+      "id": "which@2.0.2",
+      "info": {
+        "name": "which",
+        "version": "2.0.2"
+      }
+    },
+    {
+      "id": "isexe@2.0.0",
+      "info": {
+        "name": "isexe",
+        "version": "2.0.0"
+      }
+    },
+    {
+      "id": "strip-final-newline@2.0.0",
+      "info": {
+        "name": "strip-final-newline",
+        "version": "2.0.0"
+      }
+    },
+    {
+      "id": "onetime@5.1.2",
+      "info": {
+        "name": "onetime",
+        "version": "5.1.2"
+      }
+    },
+    {
+      "id": "mimic-fn@2.1.0",
+      "info": {
+        "name": "mimic-fn",
+        "version": "2.1.0"
+      }
+    },
+    {
+      "id": "is-stream@2.0.1",
+      "info": {
+        "name": "is-stream",
+        "version": "2.0.1"
+      }
+    },
+    {
+      "id": "npm-run-path@4.0.1",
+      "info": {
+        "name": "npm-run-path",
+        "version": "4.0.1"
+      }
+    },
+    {
+      "id": "human-signals@2.1.0",
+      "info": {
+        "name": "human-signals",
+        "version": "2.1.0"
+      }
+    },
+    {
+      "id": "get-stream@6.0.1",
+      "info": {
+        "name": "get-stream",
+        "version": "6.0.1"
+      }
+    },
+    {
+      "id": "@commitlint/lint@18.6.1",
+      "info": {
+        "name": "@commitlint/lint",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "@commitlint/is-ignored@18.6.1",
+      "info": {
+        "name": "@commitlint/is-ignored",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "semver@7.5.2",
+      "info": {
+        "name": "semver",
+        "version": "7.5.2"
+      }
+    },
+    {
+      "id": "lru-cache@6.0.0",
+      "info": {
+        "name": "lru-cache",
+        "version": "6.0.0"
+      }
+    },
+    {
+      "id": "yallist@4.0.0",
+      "info": {
+        "name": "yallist",
+        "version": "4.0.0"
+      }
+    },
+    {
+      "id": "@commitlint/parse@18.6.1",
+      "info": {
+        "name": "@commitlint/parse",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "conventional-commits-parser@5.0.0",
+      "info": {
+        "name": "conventional-commits-parser",
+        "version": "5.0.0"
+      }
+    },
+    {
+      "id": "meow@12.1.1",
+      "info": {
+        "name": "meow",
+        "version": "12.1.1"
+      }
+    },
+    {
+      "id": "is-text-path@2.0.0",
+      "info": {
+        "name": "is-text-path",
+        "version": "2.0.0"
+      }
+    },
+    {
+      "id": "text-extensions@2.4.0",
+      "info": {
+        "name": "text-extensions",
+        "version": "2.4.0"
+      }
+    },
+    {
+      "id": "split2@4.2.0",
+      "info": {
+        "name": "split2",
+        "version": "4.2.0"
+      }
+    },
+    {
+      "id": "JSONStream@1.3.5",
+      "info": {
+        "name": "JSONStream",
+        "version": "1.3.5"
+      }
+    },
+    {
+      "id": "through@2.3.8",
+      "info": {
+        "name": "through",
+        "version": "2.3.8"
+      }
+    },
+    {
+      "id": "jsonparse@1.3.1",
+      "info": {
+        "name": "jsonparse",
+        "version": "1.3.1"
+      }
+    },
+    {
+      "id": "conventional-changelog-angular@7.0.0",
+      "info": {
+        "name": "conventional-changelog-angular",
+        "version": "7.0.0"
+      }
+    },
+    {
+      "id": "compare-func@2.0.0",
+      "info": {
+        "name": "compare-func",
+        "version": "2.0.0"
+      }
+    },
+    {
+      "id": "dot-prop@5.3.0",
+      "info": {
+        "name": "dot-prop",
+        "version": "5.3.0"
+      }
+    },
+    {
+      "id": "is-obj@2.0.0",
+      "info": {
+        "name": "is-obj",
+        "version": "2.0.0"
+      }
+    },
+    {
+      "id": "array-ify@1.0.0",
+      "info": {
+        "name": "array-ify",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "@commitlint/rules@18.6.1",
+      "info": {
+        "name": "@commitlint/rules",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "@commitlint/message@18.6.1",
+      "info": {
+        "name": "@commitlint/message",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "@commitlint/to-lines@18.6.1",
+      "info": {
+        "name": "@commitlint/to-lines",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "@commitlint/ensure@18.6.1",
+      "info": {
+        "name": "@commitlint/ensure",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "lodash.kebabcase@4.1.1",
+      "info": {
+        "name": "lodash.kebabcase",
+        "version": "4.1.1"
+      }
+    },
+    {
+      "id": "lodash.snakecase@4.1.1",
+      "info": {
+        "name": "lodash.snakecase",
+        "version": "4.1.1"
+      }
+    },
+    {
+      "id": "lodash.upperfirst@4.3.1",
+      "info": {
+        "name": "lodash.upperfirst",
+        "version": "4.3.1"
+      }
+    },
+    {
+      "id": "lodash.camelcase@4.3.0",
+      "info": {
+        "name": "lodash.camelcase",
+        "version": "4.3.0"
+      }
+    },
+    {
+      "id": "lodash.startcase@4.4.0",
+      "info": {
+        "name": "lodash.startcase",
+        "version": "4.4.0"
+      }
+    },
+    {
+      "id": "@commitlint/read@18.6.1",
+      "info": {
+        "name": "@commitlint/read",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "git-raw-commits@2.0.11",
+      "info": {
+        "name": "git-raw-commits",
+        "version": "2.0.11"
+      }
+    },
+    {
+      "id": "split2@3.2.2",
+      "info": {
+        "name": "split2",
+        "version": "3.2.2"
+      }
+    },
+    {
+      "id": "readable-stream@3.6.2",
+      "info": {
+        "name": "readable-stream",
+        "version": "3.6.2"
+      }
+    },
+    {
+      "id": "inherits@2.0.4",
+      "info": {
+        "name": "inherits",
+        "version": "2.0.4"
+      }
+    },
+    {
+      "id": "string_decoder@1.3.0",
+      "info": {
+        "name": "string_decoder",
+        "version": "1.3.0"
+      }
+    },
+    {
+      "id": "safe-buffer@5.2.1",
+      "info": {
+        "name": "safe-buffer",
+        "version": "5.2.1"
+      }
+    },
+    {
+      "id": "util-deprecate@1.0.2",
+      "info": {
+        "name": "util-deprecate",
+        "version": "1.0.2"
+      }
+    },
+    {
+      "id": "dargs@7.0.0",
+      "info": {
+        "name": "dargs",
+        "version": "7.0.0"
+      }
+    },
+    {
+      "id": "lodash@4.18.1",
+      "info": {
+        "name": "lodash",
+        "version": "4.18.1"
+      }
+    },
+    {
+      "id": "meow@8.1.2",
+      "info": {
+        "name": "meow",
+        "version": "8.1.2"
+      }
+    },
+    {
+      "id": "yargs-parser@20.2.9",
+      "info": {
+        "name": "yargs-parser",
+        "version": "20.2.9"
+      }
+    },
+    {
+      "id": "hard-rejection@2.1.0",
+      "info": {
+        "name": "hard-rejection",
+        "version": "2.1.0"
+      }
+    },
+    {
+      "id": "camelcase-keys@6.2.2",
+      "info": {
+        "name": "camelcase-keys",
+        "version": "6.2.2"
+      }
+    },
+    {
+      "id": "map-obj@4.3.0",
+      "info": {
+        "name": "map-obj",
+        "version": "4.3.0"
+      }
+    },
+    {
+      "id": "camelcase@5.3.1",
+      "info": {
+        "name": "camelcase",
+        "version": "5.3.1"
+      }
+    },
+    {
+      "id": "quick-lru@4.0.1",
+      "info": {
+        "name": "quick-lru",
+        "version": "4.0.1"
+      }
+    },
+    {
+      "id": "trim-newlines@3.0.1",
+      "info": {
+        "name": "trim-newlines",
+        "version": "3.0.1"
+      }
+    },
+    {
+      "id": "@types/minimist@1.2.5",
+      "info": {
+        "name": "@types/minimist",
+        "version": "1.2.5"
+      }
+    },
+    {
+      "id": "normalize-package-data@3.0.3",
+      "info": {
+        "name": "normalize-package-data",
+        "version": "3.0.3"
+      }
+    },
+    {
+      "id": "is-core-module@2.16.1",
+      "info": {
+        "name": "is-core-module",
+        "version": "2.16.1"
+      }
+    },
+    {
+      "id": "hasown@2.0.2",
+      "info": {
+        "name": "hasown",
+        "version": "2.0.2"
+      }
+    },
+    {
+      "id": "function-bind@1.1.2",
+      "info": {
+        "name": "function-bind",
+        "version": "1.1.2"
+      }
+    },
+    {
+      "id": "validate-npm-package-license@3.0.4",
+      "info": {
+        "name": "validate-npm-package-license",
+        "version": "3.0.4"
+      }
+    },
+    {
+      "id": "spdx-correct@3.2.0",
+      "info": {
+        "name": "spdx-correct",
+        "version": "3.2.0"
+      }
+    },
+    {
+      "id": "spdx-expression-parse@3.0.1",
+      "info": {
+        "name": "spdx-expression-parse",
+        "version": "3.0.1"
+      }
+    },
+    {
+      "id": "spdx-exceptions@2.5.0",
+      "info": {
+        "name": "spdx-exceptions",
+        "version": "2.5.0"
+      }
+    },
+    {
+      "id": "spdx-license-ids@3.0.23",
+      "info": {
+        "name": "spdx-license-ids",
+        "version": "3.0.23"
+      }
+    },
+    {
+      "id": "hosted-git-info@4.1.0",
+      "info": {
+        "name": "hosted-git-info",
+        "version": "4.1.0"
+      }
+    },
+    {
+      "id": "redent@3.0.0",
+      "info": {
+        "name": "redent",
+        "version": "3.0.0"
+      }
+    },
+    {
+      "id": "indent-string@4.0.0",
+      "info": {
+        "name": "indent-string",
+        "version": "4.0.0"
+      }
+    },
+    {
+      "id": "strip-indent@3.0.0",
+      "info": {
+        "name": "strip-indent",
+        "version": "3.0.0"
+      }
+    },
+    {
+      "id": "min-indent@1.0.1",
+      "info": {
+        "name": "min-indent",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "id": "minimist-options@4.1.0",
+      "info": {
+        "name": "minimist-options",
+        "version": "4.1.0"
+      }
+    },
+    {
+      "id": "is-plain-obj@1.1.0",
+      "info": {
+        "name": "is-plain-obj",
+        "version": "1.1.0"
+      }
+    },
+    {
+      "id": "arrify@1.0.1",
+      "info": {
+        "name": "arrify",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "id": "kind-of@6.0.3",
+      "info": {
+        "name": "kind-of",
+        "version": "6.0.3"
+      }
+    },
+    {
+      "id": "decamelize-keys@1.1.1",
+      "info": {
+        "name": "decamelize-keys",
+        "version": "1.1.1"
+      }
+    },
+    {
+      "id": "map-obj@1.0.1",
+      "info": {
+        "name": "map-obj",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "id": "decamelize@1.2.0",
+      "info": {
+        "name": "decamelize",
+        "version": "1.2.0"
+      }
+    },
+    {
+      "id": "read-pkg-up@7.0.1",
+      "info": {
+        "name": "read-pkg-up",
+        "version": "7.0.1"
+      }
+    },
+    {
+      "id": "type-fest@0.8.1",
+      "info": {
+        "name": "type-fest",
+        "version": "0.8.1"
+      }
+    },
+    {
+      "id": "read-pkg@5.2.0",
+      "info": {
+        "name": "read-pkg",
+        "version": "5.2.0"
+      }
+    },
+    {
+      "id": "@types/normalize-package-data@2.4.4",
+      "info": {
+        "name": "@types/normalize-package-data",
+        "version": "2.4.4"
+      }
+    },
+    {
+      "id": "type-fest@0.6.0",
+      "info": {
+        "name": "type-fest",
+        "version": "0.6.0"
+      }
+    },
+    {
+      "id": "normalize-package-data@2.5.0",
+      "info": {
+        "name": "normalize-package-data",
+        "version": "2.5.0"
+      }
+    },
+    {
+      "id": "resolve@1.22.11",
+      "info": {
+        "name": "resolve",
+        "version": "1.22.11"
+      }
+    },
+    {
+      "id": "path-parse@1.0.7",
+      "info": {
+        "name": "path-parse",
+        "version": "1.0.7"
+      }
+    },
+    {
+      "id": "supports-preserve-symlinks-flag@1.0.0",
+      "info": {
+        "name": "supports-preserve-symlinks-flag",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "hosted-git-info@2.8.9",
+      "info": {
+        "name": "hosted-git-info",
+        "version": "2.8.9"
+      }
+    },
+    {
+      "id": "find-up@4.1.0",
+      "info": {
+        "name": "find-up",
+        "version": "4.1.0"
+      }
+    },
+    {
+      "id": "locate-path@5.0.0",
+      "info": {
+        "name": "locate-path",
+        "version": "5.0.0"
+      }
+    },
+    {
+      "id": "p-locate@4.1.0",
+      "info": {
+        "name": "p-locate",
+        "version": "4.1.0"
+      }
+    },
+    {
+      "id": "p-limit@2.3.0",
+      "info": {
+        "name": "p-limit",
+        "version": "2.3.0"
+      }
+    },
+    {
+      "id": "p-try@2.2.0",
+      "info": {
+        "name": "p-try",
+        "version": "2.2.0"
+      }
+    },
+    {
+      "id": "path-exists@4.0.0",
+      "info": {
+        "name": "path-exists",
+        "version": "4.0.0"
+      }
+    },
+    {
+      "id": "type-fest@0.18.1",
+      "info": {
+        "name": "type-fest",
+        "version": "0.18.1"
+      }
+    },
+    {
+      "id": "through2@4.0.2",
+      "info": {
+        "name": "through2",
+        "version": "4.0.2"
+      }
+    },
+    {
+      "id": "@commitlint/top-level@18.6.1",
+      "info": {
+        "name": "@commitlint/top-level",
+        "version": "18.6.1"
+      }
+    },
+    {
+      "id": "find-up@5.0.0",
+      "info": {
+        "name": "find-up",
+        "version": "5.0.0"
+      }
+    },
+    {
+      "id": "locate-path@6.0.0",
+      "info": {
+        "name": "locate-path",
+        "version": "6.0.0"
+      }
+    },
+    {
+      "id": "p-locate@5.0.0",
+      "info": {
+        "name": "p-locate",
+        "version": "5.0.0"
+      }
+    },
+    {
+      "id": "p-limit@3.1.0",
+      "info": {
+        "name": "p-limit",
+        "version": "3.1.0"
+      }
+    },
+    {
+      "id": "yocto-queue@0.1.0",
+      "info": {
+        "name": "yocto-queue",
+        "version": "0.1.0"
+      }
+    },
+    {
+      "id": "minimist@1.2.8",
+      "info": {
+        "name": "minimist",
+        "version": "1.2.8"
+      }
+    },
+    {
+      "id": "make-dir@4.0.0",
+      "info": {
+        "name": "make-dir",
+        "version": "4.0.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "override-with-dep@1.0.0",
+        "deps": [
+          {
+            "nodeId": "proxy-agent@6.5.0"
+          },
+          {
+            "nodeId": "@commitlint/cli@18.6.1"
+          },
+          {
+            "nodeId": "make-dir@4.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "proxy-agent@6.5.0",
+        "pkgId": "proxy-agent@6.5.0",
+        "deps": [
+          {
+            "nodeId": "https-proxy-agent@7.0.6"
+          },
+          {
+            "nodeId": "http-proxy-agent@7.0.2"
+          },
+          {
+            "nodeId": "pac-proxy-agent@7.2.0"
+          },
+          {
+            "nodeId": "agent-base@7.1.4"
+          },
+          {
+            "nodeId": "socks-proxy-agent@8.0.5"
+          },
+          {
+            "nodeId": "proxy-from-env@1.1.0"
+          },
+          {
+            "nodeId": "debug@4.4.3"
+          },
+          {
+            "nodeId": "lru-cache@7.18.3"
+          }
+        ]
+      },
+      {
+        "nodeId": "https-proxy-agent@7.0.6",
+        "pkgId": "https-proxy-agent@7.0.6",
+        "deps": [
+          {
+            "nodeId": "debug@4.4.3"
+          },
+          {
+            "nodeId": "agent-base@7.1.4"
+          }
+        ]
+      },
+      {
+        "nodeId": "debug@4.4.3",
+        "pkgId": "debug@4.4.3",
+        "deps": [
+          {
+            "nodeId": "ms@2.1.3"
+          }
+        ]
+      },
+      {
+        "nodeId": "ms@2.1.3",
+        "pkgId": "ms@2.1.3",
+        "deps": []
+      },
+      {
+        "nodeId": "agent-base@7.1.4",
+        "pkgId": "agent-base@7.1.4",
+        "deps": []
+      },
+      {
+        "nodeId": "http-proxy-agent@7.0.2",
+        "pkgId": "http-proxy-agent@7.0.2",
+        "deps": [
+          {
+            "nodeId": "debug@4.4.3"
+          },
+          {
+            "nodeId": "agent-base@7.1.4"
+          }
+        ]
+      },
+      {
+        "nodeId": "pac-proxy-agent@7.2.0",
+        "pkgId": "pac-proxy-agent@7.2.0",
+        "deps": [
+          {
+            "nodeId": "http-proxy-agent@7.0.2"
+          },
+          {
+            "nodeId": "get-uri@6.0.5"
+          },
+          {
+            "nodeId": "agent-base@7.1.4"
+          },
+          {
+            "nodeId": "pac-resolver@7.0.1"
+          },
+          {
+            "nodeId": "socks-proxy-agent@8.0.5"
+          },
+          {
+            "nodeId": "@tootallnate/quickjs-emscripten@0.23.0"
+          },
+          {
+            "nodeId": "debug@4.4.3"
+          },
+          {
+            "nodeId": "https-proxy-agent@7.0.6"
+          }
+        ]
+      },
+      {
+        "nodeId": "get-uri@6.0.5",
+        "pkgId": "get-uri@6.0.5",
+        "deps": [
+          {
+            "nodeId": "debug@4.4.3"
+          },
+          {
+            "nodeId": "data-uri-to-buffer@6.0.2"
+          },
+          {
+            "nodeId": "basic-ftp@5.2.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "data-uri-to-buffer@6.0.2",
+        "pkgId": "data-uri-to-buffer@6.0.2",
+        "deps": []
+      },
+      {
+        "nodeId": "basic-ftp@5.2.2",
+        "pkgId": "basic-ftp@5.2.2",
+        "deps": []
+      },
+      {
+        "nodeId": "pac-resolver@7.0.1",
+        "pkgId": "pac-resolver@7.0.1",
+        "deps": [
+          {
+            "nodeId": "degenerator@5.0.1"
+          },
+          {
+            "nodeId": "netmask@2.1.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "degenerator@5.0.1",
+        "pkgId": "degenerator@5.0.1",
+        "deps": [
+          {
+            "nodeId": "escodegen@2.1.0"
+          },
+          {
+            "nodeId": "esprima@4.0.1"
+          },
+          {
+            "nodeId": "ast-types@0.13.4"
+          }
+        ]
+      },
+      {
+        "nodeId": "escodegen@2.1.0",
+        "pkgId": "escodegen@2.1.0",
+        "deps": [
+          {
+            "nodeId": "esutils@2.0.3"
+          },
+          {
+            "nodeId": "estraverse@5.3.0"
+          },
+          {
+            "nodeId": "source-map@0.6.1"
+          },
+          {
+            "nodeId": "esprima@4.0.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "esutils@2.0.3",
+        "pkgId": "esutils@2.0.3",
+        "deps": []
+      },
+      {
+        "nodeId": "estraverse@5.3.0",
+        "pkgId": "estraverse@5.3.0",
+        "deps": []
+      },
+      {
+        "nodeId": "source-map@0.6.1",
+        "pkgId": "source-map@0.6.1",
+        "deps": []
+      },
+      {
+        "nodeId": "esprima@4.0.1",
+        "pkgId": "esprima@4.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "ast-types@0.13.4",
+        "pkgId": "ast-types@0.13.4",
+        "deps": [
+          {
+            "nodeId": "tslib@2.8.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "tslib@2.8.1",
+        "pkgId": "tslib@2.8.1",
+        "deps": []
+      },
+      {
+        "nodeId": "netmask@2.1.1",
+        "pkgId": "netmask@2.1.1",
+        "deps": []
+      },
+      {
+        "nodeId": "socks-proxy-agent@8.0.5",
+        "pkgId": "socks-proxy-agent@8.0.5",
+        "deps": [
+          {
+            "nodeId": "socks@2.8.7"
+          },
+          {
+            "nodeId": "agent-base@7.1.4"
+          },
+          {
+            "nodeId": "debug@4.4.3"
+          }
+        ]
+      },
+      {
+        "nodeId": "socks@2.8.7",
+        "pkgId": "socks@2.8.7",
+        "deps": [
+          {
+            "nodeId": "smart-buffer@4.2.0"
+          },
+          {
+            "nodeId": "ip-address@10.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "smart-buffer@4.2.0",
+        "pkgId": "smart-buffer@4.2.0",
+        "deps": []
+      },
+      {
+        "nodeId": "ip-address@10.1.0",
+        "pkgId": "ip-address@10.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "@tootallnate/quickjs-emscripten@0.23.0",
+        "pkgId": "@tootallnate/quickjs-emscripten@0.23.0",
+        "deps": []
+      },
+      {
+        "nodeId": "proxy-from-env@1.1.0",
+        "pkgId": "proxy-from-env@1.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lru-cache@7.18.3",
+        "pkgId": "lru-cache@7.18.3",
+        "deps": []
+      },
+      {
+        "nodeId": "@commitlint/cli@18.6.1",
+        "pkgId": "@commitlint/cli@18.6.1",
+        "deps": [
+          {
+            "nodeId": "resolve-global@1.0.0"
+          },
+          {
+            "nodeId": "yargs@17.7.2"
+          },
+          {
+            "nodeId": "lodash.isfunction@3.0.9"
+          },
+          {
+            "nodeId": "@commitlint/load@18.6.1"
+          },
+          {
+            "nodeId": "@commitlint/types@18.6.1"
+          },
+          {
+            "nodeId": "resolve-from@5.0.0"
+          },
+          {
+            "nodeId": "@commitlint/format@18.6.1"
+          },
+          {
+            "nodeId": "execa@5.1.1"
+          },
+          {
+            "nodeId": "@commitlint/lint@18.6.1"
+          },
+          {
+            "nodeId": "@commitlint/read@18.6.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "resolve-global@1.0.0",
+        "pkgId": "resolve-global@1.0.0",
+        "deps": [
+          {
+            "nodeId": "global-dirs@0.1.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "global-dirs@0.1.1",
+        "pkgId": "global-dirs@0.1.1",
+        "deps": [
+          {
+            "nodeId": "ini@1.3.8"
+          }
+        ]
+      },
+      {
+        "nodeId": "ini@1.3.8",
+        "pkgId": "ini@1.3.8",
+        "deps": []
+      },
+      {
+        "nodeId": "yargs@17.7.2",
+        "pkgId": "yargs@17.7.2",
+        "deps": [
+          {
+            "nodeId": "cliui@8.0.1"
+          },
+          {
+            "nodeId": "yargs-parser@21.1.1"
+          },
+          {
+            "nodeId": "get-caller-file@2.0.5"
+          },
+          {
+            "nodeId": "string-width@4.2.3"
+          },
+          {
+            "nodeId": "y18n@5.0.8"
+          },
+          {
+            "nodeId": "escalade@3.2.0"
+          },
+          {
+            "nodeId": "require-directory@2.1.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "cliui@8.0.1",
+        "pkgId": "cliui@8.0.1",
+        "deps": [
+          {
+            "nodeId": "string-width@4.2.3"
+          },
+          {
+            "nodeId": "strip-ansi@6.0.1"
+          },
+          {
+            "nodeId": "wrap-ansi@7.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "string-width@4.2.3",
+        "pkgId": "string-width@4.2.3",
+        "deps": [
+          {
+            "nodeId": "emoji-regex@8.0.0"
+          },
+          {
+            "nodeId": "strip-ansi@6.0.1"
+          },
+          {
+            "nodeId": "is-fullwidth-code-point@3.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "emoji-regex@8.0.0",
+        "pkgId": "emoji-regex@8.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "strip-ansi@6.0.1",
+        "pkgId": "strip-ansi@6.0.1",
+        "deps": [
+          {
+            "nodeId": "ansi-regex@5.0.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "ansi-regex@5.0.1",
+        "pkgId": "ansi-regex@5.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "is-fullwidth-code-point@3.0.0",
+        "pkgId": "is-fullwidth-code-point@3.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "wrap-ansi@7.0.0",
+        "pkgId": "wrap-ansi@7.0.0",
+        "deps": [
+          {
+            "nodeId": "string-width@4.2.3"
+          },
+          {
+            "nodeId": "strip-ansi@6.0.1"
+          },
+          {
+            "nodeId": "ansi-styles@4.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "ansi-styles@4.3.0",
+        "pkgId": "ansi-styles@4.3.0",
+        "deps": [
+          {
+            "nodeId": "color-convert@2.0.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "color-convert@2.0.1",
+        "pkgId": "color-convert@2.0.1",
+        "deps": [
+          {
+            "nodeId": "color-name@1.1.4"
+          }
+        ]
+      },
+      {
+        "nodeId": "color-name@1.1.4",
+        "pkgId": "color-name@1.1.4",
+        "deps": []
+      },
+      {
+        "nodeId": "yargs-parser@21.1.1",
+        "pkgId": "yargs-parser@21.1.1",
+        "deps": []
+      },
+      {
+        "nodeId": "get-caller-file@2.0.5",
+        "pkgId": "get-caller-file@2.0.5",
+        "deps": []
+      },
+      {
+        "nodeId": "y18n@5.0.8",
+        "pkgId": "y18n@5.0.8",
+        "deps": []
+      },
+      {
+        "nodeId": "escalade@3.2.0",
+        "pkgId": "escalade@3.2.0",
+        "deps": []
+      },
+      {
+        "nodeId": "require-directory@2.1.1",
+        "pkgId": "require-directory@2.1.1",
+        "deps": []
+      },
+      {
+        "nodeId": "lodash.isfunction@3.0.9",
+        "pkgId": "lodash.isfunction@3.0.9",
+        "deps": []
+      },
+      {
+        "nodeId": "@commitlint/load@18.6.1",
+        "pkgId": "@commitlint/load@18.6.1",
+        "deps": [
+          {
+            "nodeId": "@commitlint/resolve-extends@18.6.1"
+          },
+          {
+            "nodeId": "cosmiconfig@8.3.6"
+          },
+          {
+            "nodeId": "chalk@4.1.2"
+          },
+          {
+            "nodeId": "lodash.isplainobject@4.0.6"
+          },
+          {
+            "nodeId": "lodash.merge@4.6.2"
+          },
+          {
+            "nodeId": "@commitlint/execute-rule@18.6.1"
+          },
+          {
+            "nodeId": "@commitlint/types@18.6.1"
+          },
+          {
+            "nodeId": "resolve-from@5.0.0"
+          },
+          {
+            "nodeId": "lodash.uniq@4.5.0"
+          },
+          {
+            "nodeId": "@commitlint/config-validator@18.6.1"
+          },
+          {
+            "nodeId": "cosmiconfig-typescript-loader@5.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "@commitlint/resolve-extends@18.6.1",
+        "pkgId": "@commitlint/resolve-extends@18.6.1",
+        "deps": [
+          {
+            "nodeId": "import-fresh@3.3.1"
+          },
+          {
+            "nodeId": "resolve-global@1.0.0"
+          },
+          {
+            "nodeId": "@commitlint/config-validator@18.6.1"
+          },
+          {
+            "nodeId": "@commitlint/types@18.6.1"
+          },
+          {
+            "nodeId": "resolve-from@5.0.0"
+          },
+          {
+            "nodeId": "lodash.mergewith@4.6.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "import-fresh@3.3.1",
+        "pkgId": "import-fresh@3.3.1",
+        "deps": [
+          {
+            "nodeId": "resolve-from@4.0.0"
+          },
+          {
+            "nodeId": "parent-module@1.0.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "resolve-from@4.0.0",
+        "pkgId": "resolve-from@4.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "parent-module@1.0.1",
+        "pkgId": "parent-module@1.0.1",
+        "deps": [
+          {
+            "nodeId": "callsites@3.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "callsites@3.1.0",
+        "pkgId": "callsites@3.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "@commitlint/config-validator@18.6.1",
+        "pkgId": "@commitlint/config-validator@18.6.1",
+        "deps": [
+          {
+            "nodeId": "@commitlint/types@18.6.1"
+          },
+          {
+            "nodeId": "ajv@8.18.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "@commitlint/types@18.6.1",
+        "pkgId": "@commitlint/types@18.6.1",
+        "deps": [
+          {
+            "nodeId": "chalk@4.1.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "chalk@4.1.2",
+        "pkgId": "chalk@4.1.2",
+        "deps": [
+          {
+            "nodeId": "supports-color@7.2.0"
+          },
+          {
+            "nodeId": "ansi-styles@4.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "supports-color@7.2.0",
+        "pkgId": "supports-color@7.2.0",
+        "deps": [
+          {
+            "nodeId": "has-flag@4.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "has-flag@4.0.0",
+        "pkgId": "has-flag@4.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "ajv@8.18.0",
+        "pkgId": "ajv@8.18.0",
+        "deps": [
+          {
+            "nodeId": "fast-uri@3.1.0"
+          },
+          {
+            "nodeId": "require-from-string@2.0.2"
+          },
+          {
+            "nodeId": "json-schema-traverse@1.0.0"
+          },
+          {
+            "nodeId": "fast-deep-equal@3.1.3"
+          }
+        ]
+      },
+      {
+        "nodeId": "fast-uri@3.1.0",
+        "pkgId": "fast-uri@3.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "require-from-string@2.0.2",
+        "pkgId": "require-from-string@2.0.2",
+        "deps": []
+      },
+      {
+        "nodeId": "json-schema-traverse@1.0.0",
+        "pkgId": "json-schema-traverse@1.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "fast-deep-equal@3.1.3",
+        "pkgId": "fast-deep-equal@3.1.3",
+        "deps": []
+      },
+      {
+        "nodeId": "resolve-from@5.0.0",
+        "pkgId": "resolve-from@5.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lodash.mergewith@4.6.2",
+        "pkgId": "lodash.mergewith@4.6.2",
+        "deps": []
+      },
+      {
+        "nodeId": "cosmiconfig@8.3.6",
+        "pkgId": "cosmiconfig@8.3.6",
+        "deps": [
+          {
+            "nodeId": "parse-json@5.2.0"
+          },
+          {
+            "nodeId": "path-type@4.0.0"
+          },
+          {
+            "nodeId": "js-yaml@4.1.1"
+          },
+          {
+            "nodeId": "import-fresh@3.3.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "parse-json@5.2.0",
+        "pkgId": "parse-json@5.2.0",
+        "deps": [
+          {
+            "nodeId": "lines-and-columns@1.2.4"
+          },
+          {
+            "nodeId": "@babel/code-frame@7.29.0"
+          },
+          {
+            "nodeId": "json-parse-even-better-errors@2.3.1"
+          },
+          {
+            "nodeId": "error-ex@1.3.4"
+          }
+        ]
+      },
+      {
+        "nodeId": "lines-and-columns@1.2.4",
+        "pkgId": "lines-and-columns@1.2.4",
+        "deps": []
+      },
+      {
+        "nodeId": "@babel/code-frame@7.29.0",
+        "pkgId": "@babel/code-frame@7.29.0",
+        "deps": [
+          {
+            "nodeId": "picocolors@1.1.1"
+          },
+          {
+            "nodeId": "@babel/helper-validator-identifier@7.28.5"
+          },
+          {
+            "nodeId": "js-tokens@4.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "picocolors@1.1.1",
+        "pkgId": "picocolors@1.1.1",
+        "deps": []
+      },
+      {
+        "nodeId": "@babel/helper-validator-identifier@7.28.5",
+        "pkgId": "@babel/helper-validator-identifier@7.28.5",
+        "deps": []
+      },
+      {
+        "nodeId": "js-tokens@4.0.0",
+        "pkgId": "js-tokens@4.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "json-parse-even-better-errors@2.3.1",
+        "pkgId": "json-parse-even-better-errors@2.3.1",
+        "deps": []
+      },
+      {
+        "nodeId": "error-ex@1.3.4",
+        "pkgId": "error-ex@1.3.4",
+        "deps": [
+          {
+            "nodeId": "is-arrayish@0.2.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "is-arrayish@0.2.1",
+        "pkgId": "is-arrayish@0.2.1",
+        "deps": []
+      },
+      {
+        "nodeId": "path-type@4.0.0",
+        "pkgId": "path-type@4.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "js-yaml@4.1.1",
+        "pkgId": "js-yaml@4.1.1",
+        "deps": [
+          {
+            "nodeId": "argparse@2.0.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "argparse@2.0.1",
+        "pkgId": "argparse@2.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "lodash.isplainobject@4.0.6",
+        "pkgId": "lodash.isplainobject@4.0.6",
+        "deps": []
+      },
+      {
+        "nodeId": "lodash.merge@4.6.2",
+        "pkgId": "lodash.merge@4.6.2",
+        "deps": []
+      },
+      {
+        "nodeId": "@commitlint/execute-rule@18.6.1",
+        "pkgId": "@commitlint/execute-rule@18.6.1",
+        "deps": []
+      },
+      {
+        "nodeId": "lodash.uniq@4.5.0",
+        "pkgId": "lodash.uniq@4.5.0",
+        "deps": []
+      },
+      {
+        "nodeId": "cosmiconfig-typescript-loader@5.1.0",
+        "pkgId": "cosmiconfig-typescript-loader@5.1.0",
+        "deps": [
+          {
+            "nodeId": "@types/node@25.6.0"
+          },
+          {
+            "nodeId": "jiti@1.21.7"
+          },
+          {
+            "nodeId": "cosmiconfig@8.3.6"
+          },
+          {
+            "nodeId": "typescript@6.0.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "@types/node@25.6.0",
+        "pkgId": "@types/node@25.6.0",
+        "deps": [
+          {
+            "nodeId": "undici-types@7.19.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "undici-types@7.19.2",
+        "pkgId": "undici-types@7.19.2",
+        "deps": []
+      },
+      {
+        "nodeId": "jiti@1.21.7",
+        "pkgId": "jiti@1.21.7",
+        "deps": []
+      },
+      {
+        "nodeId": "typescript@6.0.2",
+        "pkgId": "typescript@6.0.2",
+        "deps": []
+      },
+      {
+        "nodeId": "@commitlint/format@18.6.1",
+        "pkgId": "@commitlint/format@18.6.1",
+        "deps": [
+          {
+            "nodeId": "@commitlint/types@18.6.1"
+          },
+          {
+            "nodeId": "chalk@4.1.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "execa@5.1.1",
+        "pkgId": "execa@5.1.1",
+        "deps": [
+          {
+            "nodeId": "merge-stream@2.0.0"
+          },
+          {
+            "nodeId": "signal-exit@3.0.7"
+          },
+          {
+            "nodeId": "cross-spawn@7.0.6"
+          },
+          {
+            "nodeId": "strip-final-newline@2.0.0"
+          },
+          {
+            "nodeId": "onetime@5.1.2"
+          },
+          {
+            "nodeId": "is-stream@2.0.1"
+          },
+          {
+            "nodeId": "npm-run-path@4.0.1"
+          },
+          {
+            "nodeId": "human-signals@2.1.0"
+          },
+          {
+            "nodeId": "get-stream@6.0.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "merge-stream@2.0.0",
+        "pkgId": "merge-stream@2.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "signal-exit@3.0.7",
+        "pkgId": "signal-exit@3.0.7",
+        "deps": []
+      },
+      {
+        "nodeId": "cross-spawn@7.0.6",
+        "pkgId": "cross-spawn@7.0.6",
+        "deps": [
+          {
+            "nodeId": "path-key@3.1.1"
+          },
+          {
+            "nodeId": "shebang-command@2.0.0"
+          },
+          {
+            "nodeId": "which@2.0.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "path-key@3.1.1",
+        "pkgId": "path-key@3.1.1",
+        "deps": []
+      },
+      {
+        "nodeId": "shebang-command@2.0.0",
+        "pkgId": "shebang-command@2.0.0",
+        "deps": [
+          {
+            "nodeId": "shebang-regex@3.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "shebang-regex@3.0.0",
+        "pkgId": "shebang-regex@3.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "which@2.0.2",
+        "pkgId": "which@2.0.2",
+        "deps": [
+          {
+            "nodeId": "isexe@2.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "isexe@2.0.0",
+        "pkgId": "isexe@2.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "strip-final-newline@2.0.0",
+        "pkgId": "strip-final-newline@2.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "onetime@5.1.2",
+        "pkgId": "onetime@5.1.2",
+        "deps": [
+          {
+            "nodeId": "mimic-fn@2.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "mimic-fn@2.1.0",
+        "pkgId": "mimic-fn@2.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "is-stream@2.0.1",
+        "pkgId": "is-stream@2.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "npm-run-path@4.0.1",
+        "pkgId": "npm-run-path@4.0.1",
+        "deps": [
+          {
+            "nodeId": "path-key@3.1.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "human-signals@2.1.0",
+        "pkgId": "human-signals@2.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "get-stream@6.0.1",
+        "pkgId": "get-stream@6.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "@commitlint/lint@18.6.1",
+        "pkgId": "@commitlint/lint@18.6.1",
+        "deps": [
+          {
+            "nodeId": "@commitlint/is-ignored@18.6.1"
+          },
+          {
+            "nodeId": "@commitlint/parse@18.6.1"
+          },
+          {
+            "nodeId": "@commitlint/types@18.6.1"
+          },
+          {
+            "nodeId": "@commitlint/rules@18.6.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "@commitlint/is-ignored@18.6.1",
+        "pkgId": "@commitlint/is-ignored@18.6.1",
+        "deps": [
+          {
+            "nodeId": "@commitlint/types@18.6.1"
+          },
+          {
+            "nodeId": "semver@7.5.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "semver@7.5.2",
+        "pkgId": "semver@7.5.2",
+        "deps": [
+          {
+            "nodeId": "lru-cache@6.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "lru-cache@6.0.0",
+        "pkgId": "lru-cache@6.0.0",
+        "deps": [
+          {
+            "nodeId": "yallist@4.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "yallist@4.0.0",
+        "pkgId": "yallist@4.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "@commitlint/parse@18.6.1",
+        "pkgId": "@commitlint/parse@18.6.1",
+        "deps": [
+          {
+            "nodeId": "conventional-commits-parser@5.0.0"
+          },
+          {
+            "nodeId": "conventional-changelog-angular@7.0.0"
+          },
+          {
+            "nodeId": "@commitlint/types@18.6.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "conventional-commits-parser@5.0.0",
+        "pkgId": "conventional-commits-parser@5.0.0",
+        "deps": [
+          {
+            "nodeId": "meow@12.1.1"
+          },
+          {
+            "nodeId": "is-text-path@2.0.0"
+          },
+          {
+            "nodeId": "split2@4.2.0"
+          },
+          {
+            "nodeId": "JSONStream@1.3.5"
+          }
+        ]
+      },
+      {
+        "nodeId": "meow@12.1.1",
+        "pkgId": "meow@12.1.1",
+        "deps": []
+      },
+      {
+        "nodeId": "is-text-path@2.0.0",
+        "pkgId": "is-text-path@2.0.0",
+        "deps": [
+          {
+            "nodeId": "text-extensions@2.4.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "text-extensions@2.4.0",
+        "pkgId": "text-extensions@2.4.0",
+        "deps": []
+      },
+      {
+        "nodeId": "split2@4.2.0",
+        "pkgId": "split2@4.2.0",
+        "deps": []
+      },
+      {
+        "nodeId": "JSONStream@1.3.5",
+        "pkgId": "JSONStream@1.3.5",
+        "deps": [
+          {
+            "nodeId": "through@2.3.8"
+          },
+          {
+            "nodeId": "jsonparse@1.3.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "through@2.3.8",
+        "pkgId": "through@2.3.8",
+        "deps": []
+      },
+      {
+        "nodeId": "jsonparse@1.3.1",
+        "pkgId": "jsonparse@1.3.1",
+        "deps": []
+      },
+      {
+        "nodeId": "conventional-changelog-angular@7.0.0",
+        "pkgId": "conventional-changelog-angular@7.0.0",
+        "deps": [
+          {
+            "nodeId": "compare-func@2.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "compare-func@2.0.0",
+        "pkgId": "compare-func@2.0.0",
+        "deps": [
+          {
+            "nodeId": "dot-prop@5.3.0"
+          },
+          {
+            "nodeId": "array-ify@1.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "dot-prop@5.3.0",
+        "pkgId": "dot-prop@5.3.0",
+        "deps": [
+          {
+            "nodeId": "is-obj@2.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "is-obj@2.0.0",
+        "pkgId": "is-obj@2.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "array-ify@1.0.0",
+        "pkgId": "array-ify@1.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "@commitlint/rules@18.6.1",
+        "pkgId": "@commitlint/rules@18.6.1",
+        "deps": [
+          {
+            "nodeId": "@commitlint/message@18.6.1"
+          },
+          {
+            "nodeId": "@commitlint/types@18.6.1"
+          },
+          {
+            "nodeId": "@commitlint/to-lines@18.6.1"
+          },
+          {
+            "nodeId": "@commitlint/ensure@18.6.1"
+          },
+          {
+            "nodeId": "execa@5.1.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "@commitlint/message@18.6.1",
+        "pkgId": "@commitlint/message@18.6.1",
+        "deps": []
+      },
+      {
+        "nodeId": "@commitlint/to-lines@18.6.1",
+        "pkgId": "@commitlint/to-lines@18.6.1",
+        "deps": []
+      },
+      {
+        "nodeId": "@commitlint/ensure@18.6.1",
+        "pkgId": "@commitlint/ensure@18.6.1",
+        "deps": [
+          {
+            "nodeId": "lodash.kebabcase@4.1.1"
+          },
+          {
+            "nodeId": "lodash.snakecase@4.1.1"
+          },
+          {
+            "nodeId": "@commitlint/types@18.6.1"
+          },
+          {
+            "nodeId": "lodash.upperfirst@4.3.1"
+          },
+          {
+            "nodeId": "lodash.camelcase@4.3.0"
+          },
+          {
+            "nodeId": "lodash.startcase@4.4.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "lodash.kebabcase@4.1.1",
+        "pkgId": "lodash.kebabcase@4.1.1",
+        "deps": []
+      },
+      {
+        "nodeId": "lodash.snakecase@4.1.1",
+        "pkgId": "lodash.snakecase@4.1.1",
+        "deps": []
+      },
+      {
+        "nodeId": "lodash.upperfirst@4.3.1",
+        "pkgId": "lodash.upperfirst@4.3.1",
+        "deps": []
+      },
+      {
+        "nodeId": "lodash.camelcase@4.3.0",
+        "pkgId": "lodash.camelcase@4.3.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lodash.startcase@4.4.0",
+        "pkgId": "lodash.startcase@4.4.0",
+        "deps": []
+      },
+      {
+        "nodeId": "@commitlint/read@18.6.1",
+        "pkgId": "@commitlint/read@18.6.1",
+        "deps": [
+          {
+            "nodeId": "git-raw-commits@2.0.11"
+          },
+          {
+            "nodeId": "@commitlint/top-level@18.6.1"
+          },
+          {
+            "nodeId": "@commitlint/types@18.6.1"
+          },
+          {
+            "nodeId": "minimist@1.2.8"
+          }
+        ]
+      },
+      {
+        "nodeId": "git-raw-commits@2.0.11",
+        "pkgId": "git-raw-commits@2.0.11",
+        "deps": [
+          {
+            "nodeId": "split2@3.2.2"
+          },
+          {
+            "nodeId": "dargs@7.0.0"
+          },
+          {
+            "nodeId": "lodash@4.18.1"
+          },
+          {
+            "nodeId": "meow@8.1.2"
+          },
+          {
+            "nodeId": "through2@4.0.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "split2@3.2.2",
+        "pkgId": "split2@3.2.2",
+        "deps": [
+          {
+            "nodeId": "readable-stream@3.6.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "readable-stream@3.6.2",
+        "pkgId": "readable-stream@3.6.2",
+        "deps": [
+          {
+            "nodeId": "inherits@2.0.4"
+          },
+          {
+            "nodeId": "string_decoder@1.3.0"
+          },
+          {
+            "nodeId": "util-deprecate@1.0.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "inherits@2.0.4",
+        "pkgId": "inherits@2.0.4",
+        "deps": []
+      },
+      {
+        "nodeId": "string_decoder@1.3.0",
+        "pkgId": "string_decoder@1.3.0",
+        "deps": [
+          {
+            "nodeId": "safe-buffer@5.2.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "safe-buffer@5.2.1",
+        "pkgId": "safe-buffer@5.2.1",
+        "deps": []
+      },
+      {
+        "nodeId": "util-deprecate@1.0.2",
+        "pkgId": "util-deprecate@1.0.2",
+        "deps": []
+      },
+      {
+        "nodeId": "dargs@7.0.0",
+        "pkgId": "dargs@7.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lodash@4.18.1",
+        "pkgId": "lodash@4.18.1",
+        "deps": []
+      },
+      {
+        "nodeId": "meow@8.1.2",
+        "pkgId": "meow@8.1.2",
+        "deps": [
+          {
+            "nodeId": "yargs-parser@20.2.9"
+          },
+          {
+            "nodeId": "hard-rejection@2.1.0"
+          },
+          {
+            "nodeId": "camelcase-keys@6.2.2"
+          },
+          {
+            "nodeId": "trim-newlines@3.0.1"
+          },
+          {
+            "nodeId": "@types/minimist@1.2.5"
+          },
+          {
+            "nodeId": "normalize-package-data@3.0.3"
+          },
+          {
+            "nodeId": "redent@3.0.0"
+          },
+          {
+            "nodeId": "minimist-options@4.1.0"
+          },
+          {
+            "nodeId": "decamelize-keys@1.1.1"
+          },
+          {
+            "nodeId": "read-pkg-up@7.0.1"
+          },
+          {
+            "nodeId": "type-fest@0.18.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "yargs-parser@20.2.9",
+        "pkgId": "yargs-parser@20.2.9",
+        "deps": []
+      },
+      {
+        "nodeId": "hard-rejection@2.1.0",
+        "pkgId": "hard-rejection@2.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "camelcase-keys@6.2.2",
+        "pkgId": "camelcase-keys@6.2.2",
+        "deps": [
+          {
+            "nodeId": "map-obj@4.3.0"
+          },
+          {
+            "nodeId": "camelcase@5.3.1"
+          },
+          {
+            "nodeId": "quick-lru@4.0.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "map-obj@4.3.0",
+        "pkgId": "map-obj@4.3.0",
+        "deps": []
+      },
+      {
+        "nodeId": "camelcase@5.3.1",
+        "pkgId": "camelcase@5.3.1",
+        "deps": []
+      },
+      {
+        "nodeId": "quick-lru@4.0.1",
+        "pkgId": "quick-lru@4.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "trim-newlines@3.0.1",
+        "pkgId": "trim-newlines@3.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "@types/minimist@1.2.5",
+        "pkgId": "@types/minimist@1.2.5",
+        "deps": []
+      },
+      {
+        "nodeId": "normalize-package-data@3.0.3",
+        "pkgId": "normalize-package-data@3.0.3",
+        "deps": [
+          {
+            "nodeId": "is-core-module@2.16.1"
+          },
+          {
+            "nodeId": "semver@7.5.2"
+          },
+          {
+            "nodeId": "validate-npm-package-license@3.0.4"
+          },
+          {
+            "nodeId": "hosted-git-info@4.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "is-core-module@2.16.1",
+        "pkgId": "is-core-module@2.16.1",
+        "deps": [
+          {
+            "nodeId": "hasown@2.0.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "hasown@2.0.2",
+        "pkgId": "hasown@2.0.2",
+        "deps": [
+          {
+            "nodeId": "function-bind@1.1.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "function-bind@1.1.2",
+        "pkgId": "function-bind@1.1.2",
+        "deps": []
+      },
+      {
+        "nodeId": "validate-npm-package-license@3.0.4",
+        "pkgId": "validate-npm-package-license@3.0.4",
+        "deps": [
+          {
+            "nodeId": "spdx-correct@3.2.0"
+          },
+          {
+            "nodeId": "spdx-expression-parse@3.0.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "spdx-correct@3.2.0",
+        "pkgId": "spdx-correct@3.2.0",
+        "deps": [
+          {
+            "nodeId": "spdx-expression-parse@3.0.1"
+          },
+          {
+            "nodeId": "spdx-license-ids@3.0.23"
+          }
+        ]
+      },
+      {
+        "nodeId": "spdx-expression-parse@3.0.1",
+        "pkgId": "spdx-expression-parse@3.0.1",
+        "deps": [
+          {
+            "nodeId": "spdx-exceptions@2.5.0"
+          },
+          {
+            "nodeId": "spdx-license-ids@3.0.23"
+          }
+        ]
+      },
+      {
+        "nodeId": "spdx-exceptions@2.5.0",
+        "pkgId": "spdx-exceptions@2.5.0",
+        "deps": []
+      },
+      {
+        "nodeId": "spdx-license-ids@3.0.23",
+        "pkgId": "spdx-license-ids@3.0.23",
+        "deps": []
+      },
+      {
+        "nodeId": "hosted-git-info@4.1.0",
+        "pkgId": "hosted-git-info@4.1.0",
+        "deps": [
+          {
+            "nodeId": "lru-cache@6.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "redent@3.0.0",
+        "pkgId": "redent@3.0.0",
+        "deps": [
+          {
+            "nodeId": "indent-string@4.0.0"
+          },
+          {
+            "nodeId": "strip-indent@3.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "indent-string@4.0.0",
+        "pkgId": "indent-string@4.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "strip-indent@3.0.0",
+        "pkgId": "strip-indent@3.0.0",
+        "deps": [
+          {
+            "nodeId": "min-indent@1.0.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "min-indent@1.0.1",
+        "pkgId": "min-indent@1.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "minimist-options@4.1.0",
+        "pkgId": "minimist-options@4.1.0",
+        "deps": [
+          {
+            "nodeId": "is-plain-obj@1.1.0"
+          },
+          {
+            "nodeId": "arrify@1.0.1"
+          },
+          {
+            "nodeId": "kind-of@6.0.3"
+          }
+        ]
+      },
+      {
+        "nodeId": "is-plain-obj@1.1.0",
+        "pkgId": "is-plain-obj@1.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "arrify@1.0.1",
+        "pkgId": "arrify@1.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "kind-of@6.0.3",
+        "pkgId": "kind-of@6.0.3",
+        "deps": []
+      },
+      {
+        "nodeId": "decamelize-keys@1.1.1",
+        "pkgId": "decamelize-keys@1.1.1",
+        "deps": [
+          {
+            "nodeId": "map-obj@1.0.1"
+          },
+          {
+            "nodeId": "decamelize@1.2.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "map-obj@1.0.1",
+        "pkgId": "map-obj@1.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "decamelize@1.2.0",
+        "pkgId": "decamelize@1.2.0",
+        "deps": []
+      },
+      {
+        "nodeId": "read-pkg-up@7.0.1",
+        "pkgId": "read-pkg-up@7.0.1",
+        "deps": [
+          {
+            "nodeId": "type-fest@0.8.1"
+          },
+          {
+            "nodeId": "read-pkg@5.2.0"
+          },
+          {
+            "nodeId": "find-up@4.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "type-fest@0.8.1",
+        "pkgId": "type-fest@0.8.1",
+        "deps": []
+      },
+      {
+        "nodeId": "read-pkg@5.2.0",
+        "pkgId": "read-pkg@5.2.0",
+        "deps": [
+          {
+            "nodeId": "parse-json@5.2.0"
+          },
+          {
+            "nodeId": "@types/normalize-package-data@2.4.4"
+          },
+          {
+            "nodeId": "type-fest@0.6.0"
+          },
+          {
+            "nodeId": "normalize-package-data@2.5.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "@types/normalize-package-data@2.4.4",
+        "pkgId": "@types/normalize-package-data@2.4.4",
+        "deps": []
+      },
+      {
+        "nodeId": "type-fest@0.6.0",
+        "pkgId": "type-fest@0.6.0",
+        "deps": []
+      },
+      {
+        "nodeId": "normalize-package-data@2.5.0",
+        "pkgId": "normalize-package-data@2.5.0",
+        "deps": [
+          {
+            "nodeId": "resolve@1.22.11"
+          },
+          {
+            "nodeId": "semver@7.5.2"
+          },
+          {
+            "nodeId": "hosted-git-info@2.8.9"
+          },
+          {
+            "nodeId": "validate-npm-package-license@3.0.4"
+          }
+        ]
+      },
+      {
+        "nodeId": "resolve@1.22.11",
+        "pkgId": "resolve@1.22.11",
+        "deps": [
+          {
+            "nodeId": "is-core-module@2.16.1"
+          },
+          {
+            "nodeId": "path-parse@1.0.7"
+          },
+          {
+            "nodeId": "supports-preserve-symlinks-flag@1.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "path-parse@1.0.7",
+        "pkgId": "path-parse@1.0.7",
+        "deps": []
+      },
+      {
+        "nodeId": "supports-preserve-symlinks-flag@1.0.0",
+        "pkgId": "supports-preserve-symlinks-flag@1.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "hosted-git-info@2.8.9",
+        "pkgId": "hosted-git-info@2.8.9",
+        "deps": []
+      },
+      {
+        "nodeId": "find-up@4.1.0",
+        "pkgId": "find-up@4.1.0",
+        "deps": [
+          {
+            "nodeId": "locate-path@5.0.0"
+          },
+          {
+            "nodeId": "path-exists@4.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "locate-path@5.0.0",
+        "pkgId": "locate-path@5.0.0",
+        "deps": [
+          {
+            "nodeId": "p-locate@4.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "p-locate@4.1.0",
+        "pkgId": "p-locate@4.1.0",
+        "deps": [
+          {
+            "nodeId": "p-limit@2.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "p-limit@2.3.0",
+        "pkgId": "p-limit@2.3.0",
+        "deps": [
+          {
+            "nodeId": "p-try@2.2.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "p-try@2.2.0",
+        "pkgId": "p-try@2.2.0",
+        "deps": []
+      },
+      {
+        "nodeId": "path-exists@4.0.0",
+        "pkgId": "path-exists@4.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "type-fest@0.18.1",
+        "pkgId": "type-fest@0.18.1",
+        "deps": []
+      },
+      {
+        "nodeId": "through2@4.0.2",
+        "pkgId": "through2@4.0.2",
+        "deps": [
+          {
+            "nodeId": "readable-stream@3.6.2"
+          }
+        ]
+      },
+      {
+        "nodeId": "@commitlint/top-level@18.6.1",
+        "pkgId": "@commitlint/top-level@18.6.1",
+        "deps": [
+          {
+            "nodeId": "find-up@5.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "find-up@5.0.0",
+        "pkgId": "find-up@5.0.0",
+        "deps": [
+          {
+            "nodeId": "locate-path@6.0.0"
+          },
+          {
+            "nodeId": "path-exists@4.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "locate-path@6.0.0",
+        "pkgId": "locate-path@6.0.0",
+        "deps": [
+          {
+            "nodeId": "p-locate@5.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "p-locate@5.0.0",
+        "pkgId": "p-locate@5.0.0",
+        "deps": [
+          {
+            "nodeId": "p-limit@3.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "p-limit@3.1.0",
+        "pkgId": "p-limit@3.1.0",
+        "deps": [
+          {
+            "nodeId": "yocto-queue@0.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "yocto-queue@0.1.0",
+        "pkgId": "yocto-queue@0.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "minimist@1.2.8",
+        "pkgId": "minimist@1.2.8",
+        "deps": []
+      },
+      {
+        "nodeId": "make-dir@4.0.0",
+        "pkgId": "make-dir@4.0.0",
+        "deps": [
+          {
+            "nodeId": "semver@7.5.2"
+          }
+        ]
+      }
+    ]
+  }
+}
