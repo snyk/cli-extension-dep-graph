@@ -12,13 +12,6 @@
       }
     },
     {
-      "id": "@scope/my-local-pkg@../local-pkg",
-      "info": {
-        "name": "@scope/my-local-pkg",
-        "version": "../local-pkg"
-      }
-    },
-    {
       "id": "react@18.0.0",
       "info": {
         "name": "react",
@@ -38,6 +31,13 @@
         "name": "js-tokens",
         "version": "4.0.0"
       }
+    },
+    {
+      "id": "@scope/my-local-pkg@../local-pkg",
+      "info": {
+        "name": "@scope/my-local-pkg",
+        "version": "../local-pkg"
+      }
     }
   ],
   "graph": {
@@ -48,17 +48,12 @@
         "pkgId": "local-pkg-without-workspace@1.0.0",
         "deps": [
           {
-            "nodeId": "@scope/my-local-pkg@../local-pkg"
+            "nodeId": "react@18.0.0"
           },
           {
-            "nodeId": "react@18.0.0"
+            "nodeId": "@scope/my-local-pkg@../local-pkg"
           }
         ]
-      },
-      {
-        "nodeId": "@scope/my-local-pkg@../local-pkg",
-        "pkgId": "@scope/my-local-pkg@../local-pkg",
-        "deps": []
       },
       {
         "nodeId": "react@18.0.0",
@@ -81,6 +76,11 @@
       {
         "nodeId": "js-tokens@4.0.0",
         "pkgId": "js-tokens@4.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "@scope/my-local-pkg@../local-pkg",
+        "pkgId": "@scope/my-local-pkg@../local-pkg",
         "deps": []
       }
     ]

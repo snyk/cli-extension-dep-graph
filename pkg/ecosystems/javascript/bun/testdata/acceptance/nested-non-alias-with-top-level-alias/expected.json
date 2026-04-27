@@ -40,10 +40,108 @@
       }
     },
     {
+      "id": "@types/command-line-usage@5.0.4",
+      "info": {
+        "name": "@types/command-line-usage",
+        "version": "5.0.4"
+      }
+    },
+    {
+      "id": "json-bignum@0.0.3",
+      "info": {
+        "name": "json-bignum",
+        "version": "0.0.3"
+      }
+    },
+    {
+      "id": "command-line-args@5.2.1",
+      "info": {
+        "name": "command-line-args",
+        "version": "5.2.1"
+      }
+    },
+    {
+      "id": "find-replace@3.0.0",
+      "info": {
+        "name": "find-replace",
+        "version": "3.0.0"
+      }
+    },
+    {
+      "id": "array-back@3.1.0",
+      "info": {
+        "name": "array-back",
+        "version": "3.1.0"
+      }
+    },
+    {
+      "id": "typical@4.0.0",
+      "info": {
+        "name": "typical",
+        "version": "4.0.0"
+      }
+    },
+    {
+      "id": "lodash.camelcase@4.3.0",
+      "info": {
+        "name": "lodash.camelcase",
+        "version": "4.3.0"
+      }
+    },
+    {
+      "id": "tslib@2.8.1",
+      "info": {
+        "name": "tslib",
+        "version": "2.8.1"
+      }
+    },
+    {
+      "id": "flatbuffers@24.12.23",
+      "info": {
+        "name": "flatbuffers",
+        "version": "24.12.23"
+      }
+    },
+    {
+      "id": "@types/node@20.19.39",
+      "info": {
+        "name": "@types/node",
+        "version": "20.19.39"
+      }
+    },
+    {
+      "id": "undici-types@6.21.0",
+      "info": {
+        "name": "undici-types",
+        "version": "6.21.0"
+      }
+    },
+    {
+      "id": "@swc/helpers@0.5.21",
+      "info": {
+        "name": "@swc/helpers",
+        "version": "0.5.21"
+      }
+    },
+    {
       "id": "command-line-usage@7.0.4",
       "info": {
         "name": "command-line-usage",
         "version": "7.0.4"
+      }
+    },
+    {
+      "id": "table-layout@4.1.1",
+      "info": {
+        "name": "table-layout",
+        "version": "4.1.1"
+      }
+    },
+    {
+      "id": "wordwrapjs@5.1.1",
+      "info": {
+        "name": "wordwrapjs",
+        "version": "5.1.1"
       }
     },
     {
@@ -110,108 +208,10 @@
       }
     },
     {
-      "id": "table-layout@4.1.1",
-      "info": {
-        "name": "table-layout",
-        "version": "4.1.1"
-      }
-    },
-    {
-      "id": "wordwrapjs@5.1.1",
-      "info": {
-        "name": "wordwrapjs",
-        "version": "5.1.1"
-      }
-    },
-    {
-      "id": "tslib@2.8.1",
-      "info": {
-        "name": "tslib",
-        "version": "2.8.1"
-      }
-    },
-    {
-      "id": "@swc/helpers@0.5.21",
-      "info": {
-        "name": "@swc/helpers",
-        "version": "0.5.21"
-      }
-    },
-    {
       "id": "@types/command-line-args@5.2.3",
       "info": {
         "name": "@types/command-line-args",
         "version": "5.2.3"
-      }
-    },
-    {
-      "id": "command-line-args@5.2.1",
-      "info": {
-        "name": "command-line-args",
-        "version": "5.2.1"
-      }
-    },
-    {
-      "id": "lodash.camelcase@4.3.0",
-      "info": {
-        "name": "lodash.camelcase",
-        "version": "4.3.0"
-      }
-    },
-    {
-      "id": "array-back@3.1.0",
-      "info": {
-        "name": "array-back",
-        "version": "3.1.0"
-      }
-    },
-    {
-      "id": "typical@4.0.0",
-      "info": {
-        "name": "typical",
-        "version": "4.0.0"
-      }
-    },
-    {
-      "id": "find-replace@3.0.0",
-      "info": {
-        "name": "find-replace",
-        "version": "3.0.0"
-      }
-    },
-    {
-      "id": "flatbuffers@24.12.23",
-      "info": {
-        "name": "flatbuffers",
-        "version": "24.12.23"
-      }
-    },
-    {
-      "id": "@types/command-line-usage@5.0.4",
-      "info": {
-        "name": "@types/command-line-usage",
-        "version": "5.0.4"
-      }
-    },
-    {
-      "id": "@types/node@20.19.39",
-      "info": {
-        "name": "@types/node",
-        "version": "20.19.39"
-      }
-    },
-    {
-      "id": "undici-types@6.21.0",
-      "info": {
-        "name": "undici-types",
-        "version": "6.21.0"
-      }
-    },
-    {
-      "id": "json-bignum@0.0.3",
-      "info": {
-        "name": "json-bignum",
-        "version": "0.0.3"
       }
     },
     {
@@ -278,31 +278,116 @@
         "pkgId": "apache-arrow@17.0.0",
         "deps": [
           {
-            "nodeId": "command-line-usage@7.0.4"
+            "nodeId": "@types/command-line-usage@5.0.4"
           },
           {
-            "nodeId": "tslib@2.8.1"
-          },
-          {
-            "nodeId": "@swc/helpers@0.5.21"
-          },
-          {
-            "nodeId": "@types/command-line-args@5.2.3"
+            "nodeId": "json-bignum@0.0.3"
           },
           {
             "nodeId": "command-line-args@5.2.1"
           },
           {
-            "nodeId": "flatbuffers@24.12.23"
+            "nodeId": "tslib@2.8.1"
           },
           {
-            "nodeId": "@types/command-line-usage@5.0.4"
+            "nodeId": "flatbuffers@24.12.23"
           },
           {
             "nodeId": "@types/node@20.19.39"
           },
           {
-            "nodeId": "json-bignum@0.0.3"
+            "nodeId": "@swc/helpers@0.5.21"
+          },
+          {
+            "nodeId": "command-line-usage@7.0.4"
+          },
+          {
+            "nodeId": "@types/command-line-args@5.2.3"
+          }
+        ]
+      },
+      {
+        "nodeId": "@types/command-line-usage@5.0.4",
+        "pkgId": "@types/command-line-usage@5.0.4",
+        "deps": []
+      },
+      {
+        "nodeId": "json-bignum@0.0.3",
+        "pkgId": "json-bignum@0.0.3",
+        "deps": []
+      },
+      {
+        "nodeId": "command-line-args@5.2.1",
+        "pkgId": "command-line-args@5.2.1",
+        "deps": [
+          {
+            "nodeId": "find-replace@3.0.0"
+          },
+          {
+            "nodeId": "typical@4.0.0"
+          },
+          {
+            "nodeId": "array-back@3.1.0"
+          },
+          {
+            "nodeId": "lodash.camelcase@4.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "find-replace@3.0.0",
+        "pkgId": "find-replace@3.0.0",
+        "deps": [
+          {
+            "nodeId": "array-back@3.1.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "array-back@3.1.0",
+        "pkgId": "array-back@3.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "typical@4.0.0",
+        "pkgId": "typical@4.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lodash.camelcase@4.3.0",
+        "pkgId": "lodash.camelcase@4.3.0",
+        "deps": []
+      },
+      {
+        "nodeId": "tslib@2.8.1",
+        "pkgId": "tslib@2.8.1",
+        "deps": []
+      },
+      {
+        "nodeId": "flatbuffers@24.12.23",
+        "pkgId": "flatbuffers@24.12.23",
+        "deps": []
+      },
+      {
+        "nodeId": "@types/node@20.19.39",
+        "pkgId": "@types/node@20.19.39",
+        "deps": [
+          {
+            "nodeId": "undici-types@6.21.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "undici-types@6.21.0",
+        "pkgId": "undici-types@6.21.0",
+        "deps": []
+      },
+      {
+        "nodeId": "@swc/helpers@0.5.21",
+        "pkgId": "@swc/helpers@0.5.21",
+        "deps": [
+          {
+            "nodeId": "tslib@2.8.1"
           }
         ]
       },
@@ -311,18 +396,35 @@
         "pkgId": "command-line-usage@7.0.4",
         "deps": [
           {
-            "nodeId": "array-back@6.2.3"
+            "nodeId": "table-layout@4.1.1"
           },
           {
             "nodeId": "chalk-template@0.4.0"
           },
           {
-            "nodeId": "typical@7.3.0"
+            "nodeId": "array-back@6.2.3"
           },
           {
-            "nodeId": "table-layout@4.1.1"
+            "nodeId": "typical@7.3.0"
           }
         ]
+      },
+      {
+        "nodeId": "table-layout@4.1.1",
+        "pkgId": "table-layout@4.1.1",
+        "deps": [
+          {
+            "nodeId": "wordwrapjs@5.1.1"
+          },
+          {
+            "nodeId": "array-back@6.2.3"
+          }
+        ]
+      },
+      {
+        "nodeId": "wordwrapjs@5.1.1",
+        "pkgId": "wordwrapjs@5.1.1",
+        "deps": []
       },
       {
         "nodeId": "array-back@6.2.3",
@@ -393,110 +495,8 @@
         "deps": []
       },
       {
-        "nodeId": "table-layout@4.1.1",
-        "pkgId": "table-layout@4.1.1",
-        "deps": [
-          {
-            "nodeId": "array-back@6.2.3"
-          },
-          {
-            "nodeId": "wordwrapjs@5.1.1"
-          }
-        ]
-      },
-      {
-        "nodeId": "wordwrapjs@5.1.1",
-        "pkgId": "wordwrapjs@5.1.1",
-        "deps": []
-      },
-      {
-        "nodeId": "tslib@2.8.1",
-        "pkgId": "tslib@2.8.1",
-        "deps": []
-      },
-      {
-        "nodeId": "@swc/helpers@0.5.21",
-        "pkgId": "@swc/helpers@0.5.21",
-        "deps": [
-          {
-            "nodeId": "tslib@2.8.1"
-          }
-        ]
-      },
-      {
         "nodeId": "@types/command-line-args@5.2.3",
         "pkgId": "@types/command-line-args@5.2.3",
-        "deps": []
-      },
-      {
-        "nodeId": "command-line-args@5.2.1",
-        "pkgId": "command-line-args@5.2.1",
-        "deps": [
-          {
-            "nodeId": "lodash.camelcase@4.3.0"
-          },
-          {
-            "nodeId": "array-back@3.1.0"
-          },
-          {
-            "nodeId": "typical@4.0.0"
-          },
-          {
-            "nodeId": "find-replace@3.0.0"
-          }
-        ]
-      },
-      {
-        "nodeId": "lodash.camelcase@4.3.0",
-        "pkgId": "lodash.camelcase@4.3.0",
-        "deps": []
-      },
-      {
-        "nodeId": "array-back@3.1.0",
-        "pkgId": "array-back@3.1.0",
-        "deps": []
-      },
-      {
-        "nodeId": "typical@4.0.0",
-        "pkgId": "typical@4.0.0",
-        "deps": []
-      },
-      {
-        "nodeId": "find-replace@3.0.0",
-        "pkgId": "find-replace@3.0.0",
-        "deps": [
-          {
-            "nodeId": "array-back@3.1.0"
-          }
-        ]
-      },
-      {
-        "nodeId": "flatbuffers@24.12.23",
-        "pkgId": "flatbuffers@24.12.23",
-        "deps": []
-      },
-      {
-        "nodeId": "@types/command-line-usage@5.0.4",
-        "pkgId": "@types/command-line-usage@5.0.4",
-        "deps": []
-      },
-      {
-        "nodeId": "@types/node@20.19.39",
-        "pkgId": "@types/node@20.19.39",
-        "deps": [
-          {
-            "nodeId": "undici-types@6.21.0"
-          }
-        ]
-      },
-      {
-        "nodeId": "undici-types@6.21.0",
-        "pkgId": "undici-types@6.21.0",
-        "deps": []
-      },
-      {
-        "nodeId": "json-bignum@0.0.3",
-        "pkgId": "json-bignum@0.0.3",
         "deps": []
       },
       {
