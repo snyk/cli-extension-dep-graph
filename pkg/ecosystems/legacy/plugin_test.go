@@ -1,4 +1,5 @@
-package orchestrator
+//nolint:lll // Large JSON fixtures inlined in this file.
+package legacy_test
 
 import (
 	"testing"
@@ -12,25 +13,32 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/legacy"
 )
 
-func TestLegacyFallback_MapsProjectType(t *testing.T) {
-	results, err := runLegacyFallback(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","targetFileFromPlugin":"package.json","target":{}}`) //nolint:lll // This is fine.
-	require.NoError(t, err)
-	require.Len(t, results, 1)
+func TestResolver_MapsProjectType(t *testing.T) {
+	ictx, opts := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","targetFileFromPlugin":"package.json","target":{}}`)
+	resolver := legacy.NewLegacyResolver(ictx, nil)
 
-	assert.Equal(t, "npm", results[0].ProjectDescriptor.Identity.ProjectType)
+	results, err := resolver.BuildDepGraphsFromDir(t.Context(), nil, "", opts)
+	require.NoError(t, err)
+
+	require.Len(t, results.Results, 1)
+	assert.Equal(t, "npm", results.Results[0].ProjectDescriptor.Identity.ProjectType)
 }
 
-func TestLegacyFallback_MapsTargetFramework(t *testing.T) {
-	results, err := runLegacyFallback(t, `{"depGraph":{"pkgManager":{"name":"nuget"}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json","target":{},"targetRuntime":"net6.0"}`) //nolint:lll // This is fine.
-	require.NoError(t, err)
-	require.Len(t, results, 1)
+func TestResolver_MapsTargetFramework(t *testing.T) {
+	ictx, opts := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"nuget"}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json","target":{},"targetRuntime":"net6.0"}`)
+	resolver := legacy.NewLegacyResolver(ictx, nil)
 
-	assert.Equal(t, "net6.0", *results[0].ProjectDescriptor.Identity.TargetRuntime)
+	results, err := resolver.BuildDepGraphsFromDir(t.Context(), nil, "", opts)
+	require.NoError(t, err)
+
+	require.Len(t, results.Results, 1)
+	assert.Equal(t, "net6.0", *results.Results[0].ProjectDescriptor.Identity.TargetRuntime)
 }
 
-func TestLegacyFallback_MapsTargetFile(t *testing.T) {
+func TestResolver_MapsTargetFile(t *testing.T) {
 	tests := map[string]struct {
 		body               string
 		expectedTargetFile string
@@ -123,17 +131,41 @@ func TestLegacyFallback_MapsTargetFile(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			results, err := runLegacyFallback(t, test.body)
+			ictx, opts := setupLegacyCLI(t, test.body)
+			resolver := legacy.NewLegacyResolver(ictx, nil)
 
+			res, err := resolver.BuildDepGraphsFromDir(t.Context(), nil, "", opts)
 			require.NoError(t, err)
-			require.Len(t, results, 1)
 
-			assert.Equal(t, test.expectedTargetFile, results[0].ProjectDescriptor.GetTargetFile())
+			require.Len(t, res.Results, 1)
+			assert.Equal(t, test.expectedTargetFile, res.Results[0].ProjectDescriptor.GetTargetFile())
 		})
 	}
 }
 
-func runLegacyFallback(t *testing.T, testBody string) ([]ecosystems.SCAResult, error) {
+func TestResolver_MapsRootComponentName(t *testing.T) {
+	ictx, opts := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"nuget"},"pkgs":[{"id":"my-project@","info":{"name":"my-project"}}],"graph":{"rootNodeId":"root","nodes":[{"nodeId":"root","pkgId":"my-project@"}]}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json","target":{}}`)
+	resolver := legacy.NewLegacyResolver(ictx, nil)
+
+	res, err := resolver.BuildDepGraphsFromDir(t.Context(), nil, "", opts)
+	require.NoError(t, err)
+
+	require.Len(t, res.Results, 1)
+	assert.Equal(t, "my-project", res.Results[0].ProjectDescriptor.Identity.RootComponentName)
+}
+
+func TestResolver_ReturnsProcessedFiles(t *testing.T) {
+	ictx, opts := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"nuget"}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json","target":{}}`)
+
+	resolver := legacy.NewLegacyResolver(ictx, nil)
+
+	res, err := resolver.BuildDepGraphsFromDir(t.Context(), nil, "", opts)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"project.assets.json"}, res.ProcessedFiles)
+}
+
+func setupLegacyCLI(t *testing.T, testBody string) (workflow.InvocationContext, *ecosystems.SCAPluginOptions) {
 	t.Helper()
 
 	ctrl := gomock.NewController(t)
@@ -153,19 +185,13 @@ func runLegacyFallback(t *testing.T, testBody string) ([]ecosystems.SCAResult, e
 		Return(
 			[]workflow.Data{
 				workflow.NewData(
-					workflow.NewTypeIdentifier(legacyCLIWorkflowID, "application/text"),
+					workflow.NewTypeIdentifier(
+						workflow.NewWorkflowIdentifier("legacycli"),
+						"application/text"),
 					"application/text",
 					[]byte(testBody)),
 			},
 			nil)
 
-	return LegacyFallback(ictx, *opts, nil)
-}
-
-func TestLegacyFallback_MapsRootComponentName(t *testing.T) {
-	results, err := runLegacyFallback(t, `{"depGraph":{"pkgManager":{"name":"nuget"},"pkgs":[{"id":"my-project@","info":{"name":"my-project"}}],"graph":{"rootNodeId":"root","nodes":[{"nodeId":"root","pkgId":"my-project@"}]}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json","target":{}}`) //nolint:lll // This is fine.
-	require.NoError(t, err)
-	require.Len(t, results, 1)
-
-	assert.Equal(t, "my-project", results[0].ProjectDescriptor.Identity.RootComponentName)
+	return ictx, opts
 }
