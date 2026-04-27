@@ -29,12 +29,15 @@ var (
 	// depth1LineRe matches a direct-dependent line produced by `bun why '*' --top`
 	// where the dependent is a versioned package (not the root project).
 	//
-	// Format: "  [└├]─ [dev |peer |optional ]name@version[ (requires ...)]"
+	// Format: "  [└├]─ [dev ][optional ][peer ]name@version[ (requires ...)]"
+	//
+	// The modifier prefix handles all combinations bun emits: dev, optional, peer,
+	// dev peer, optional peer (e.g. "  ├─ optional peer pkg@1.0.0 (requires ^1)").
 	//
 	// Group 1: "name@version" of the dependent package.
 	//   Root project references (e.g. "my-app (requires ^4)") have no version component,
 	//   so they never match — they are caught by depth1RootRe instead.
-	depth1LineRe = regexp.MustCompile(`^  [└├]─ (?:dev |peer |optional )?(@?[^@\s(]+@\S+?)(?:\s+\(requires[^)]+\))?$`)
+	depth1LineRe = regexp.MustCompile(`^  [└├]─ (?:(?:dev |optional )?(?:peer )?)?(@?[^@\s(]+@\S+?)(?:\s+\(requires[^)]+\))?$`)
 
 	// depth1RootRe matches a depth-1 line where the dependent is the root project.
 	// The dependent has no @version component — bun prints just the project name.
@@ -49,12 +52,13 @@ var (
 	// such lines must NOT be recorded as root-direct deps.
 	//
 	// Examples (where "my-app" is the root):
-	//   "  └─ my-app (requires ^4)"              → group 1: "",     group 3: " (requires ^4)"
-	//   "  └─ dev my-app (requires latest)"      → group 1: "dev ", group 3: " (requires latest)"
-	//   "  └─ peer my-app (requires ^5)"         → group 1: "",     group 3: " (requires ^5)"
-	//   "  └─ my-app"                            → group 1: "",     group 3: ""  (implicit workspace member, skip)
-	//   "  └─ No dependents found"               → no match (contains spaces)
-	depth1RootRe = regexp.MustCompile(`^  [└├]─ (dev )?(?:peer |optional )?(@?[^@\s(]+)(\s+\(requires[^)]+\))?$`)
+	//   "  └─ my-app (requires ^4)"                    → group 1: "",     group 3: " (requires ^4)"
+	//   "  └─ dev my-app (requires latest)"            → group 1: "dev ", group 3: " (requires latest)"
+	//   "  └─ peer my-app (requires ^5)"               → group 1: "",     group 3: " (requires ^5)"
+	//   "  └─ optional peer my-app (requires >=1.0)"   → group 1: "",     group 3: " (requires >=1.0)"
+	//   "  └─ my-app"                                  → group 1: "",     group 3: ""  (implicit workspace member, skip)
+	//   "  └─ No dependents found"                     → no match (contains spaces)
+	depth1RootRe = regexp.MustCompile(`^  [└├]─ (dev )?(?:optional )?(?:peer )?(@?[^@\s(]+)(\s+\(requires[^)]+\))?$`)
 )
 
 // whyParser holds the mutable state accumulated while scanning `bun why '*' --top` output.

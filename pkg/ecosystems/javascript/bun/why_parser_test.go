@@ -196,6 +196,32 @@ func TestParseWhyOutput_MultipleVersionsSamePackage(t *testing.T) {
 	assert.Empty(t, out.Graph["ms@2.0.0"])
 }
 
+func TestParseWhyOutput_OptionalPeerDeps(t *testing.T) {
+	// bun why prefixes optional peer dependent lines with "optional peer ".
+	// The parser must handle the combined modifier for both versioned dependents
+	// and root-project references.
+	input := strings.NewReader(
+		// versioned dependent with "optional peer" prefix
+		"picocolors@1.0.0\n" +
+			"  ├─ optional peer exact-mirror@0.2.7 (requires ^0.34.15)\n\n" +
+			// root project reference with "optional peer" prefix
+			"hono@4.0.0\n" +
+			"  └─ optional peer elysia (requires >= 1.2.0)\n",
+	)
+
+	out, err := parseWhyOutput(context.Background(), logger.Nop(), input)
+	require.NoError(t, err)
+
+	assert.Contains(t, out.Graph, "picocolors@1.0.0")
+	assert.Contains(t, out.Graph, "hono@4.0.0")
+
+	// exact-mirror@0.2.7 optionally peer-depends on picocolors → picocolors's dependents include it.
+	assert.Contains(t, out.Graph["picocolors@1.0.0"], "exact-mirror@0.2.7")
+
+	// hono@4.0.0 is an optional peer dep of root (elysia) → treated as prod dep.
+	assert.Contains(t, out.ProdDeps, "hono@4.0.0")
+}
+
 func TestParseWhyOutput_OptionalDeps(t *testing.T) {
 	// bun why prefixes optional dependent lines with "optional ".
 	// The parser must treat these identically to regular versioned dependents.
