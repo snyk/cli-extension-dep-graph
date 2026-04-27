@@ -33,7 +33,6 @@ func buildDepGraph(proj *gradleProject) (*depgraph.DepGraph, error) {
 	}
 
 	rootNodeID := builder.GetRootNode().NodeID
-	seen := make(map[string]bool)
 
 	// Merge all configurations into a single graph.  Per-configuration
 	// filtering (e.g. --configuration-matching, preferring runtimeClasspath)
@@ -42,6 +41,7 @@ func buildDepGraph(proj *gradleProject) (*depgraph.DepGraph, error) {
 		if cfg.Error != "" {
 			continue
 		}
+		seen := make(map[string]bool) // Fresh seen map per configuration
 		for _, dep := range cfg.Root.Dependencies {
 			if err := addDep(builder, dep, rootNodeID, seen); err != nil {
 				return nil, fmt.Errorf("project %s: %w", proj.Path, err)

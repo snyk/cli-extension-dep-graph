@@ -200,6 +200,54 @@ func TestBuildDepGraph(t *testing.T) {
 		assert.True(t, ids["com.example:c@1.0.0"], "shared dep should appear in graph")
 		assert.False(t, ids["com.example:c@1.0.0:pruned"], "shared dep should NOT be pruned when it is not circular")
 	})
+
+	t.Run("preserves different versions of same transitive dependency across configurations", func(t *testing.T) {
+		// This test ensures we avoid the cross-configuration contamination issue where
+		// different configurations with different resolved versions of the same transitive
+		// dependency would interfere with each other.
+		proj := makeProject("com.example", "app", "1.0.0", map[string]gradleConfig{
+			"runtimeClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{
+				makeDep("com.example:lib:1.2.3",
+					makeDep("com.fasterxml.jackson.core:jackson-core:2.19.0")),
+			}),
+			"intellijPlatformTestClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{
+				makeDep("com.example:lib:1.2.3",
+					makeDep("com.fasterxml.jackson.core:jackson-core:2.17.0")),
+			}),
+		})
+
+		dg, err := buildDepGraph(&proj)
+		require.NoError(t, err)
+
+		ids := nodeIDSet(dg)
+
+		// Both configurations should contribute their dependencies
+		assert.True(t, ids["com.example:lib@1.2.3"], "direct dependency should be present")
+		assert.True(t, ids["com.fasterxml.jackson.core:jackson-core@2.19.0"], "jackson 2.19.0 from runtimeClasspath should be present")
+		assert.True(t, ids["com.fasterxml.jackson.core:jackson-core@2.17.0"], "jackson 2.17.0 from intellijPlatformTestClasspath should be present")
+
+		// Verify neither version was pruned due to cross-configuration contamination
+		assert.False(t, ids["com.fasterxml.jackson.core:jackson-core@2.19.0:pruned"], "jackson 2.19.0 should not be pruned")
+		assert.False(t, ids["com.fasterxml.jackson.core:jackson-core@2.17.0:pruned"], "jackson 2.17.0 should not be pruned")
+
+		// Verify both jackson versions are children of lib - this is the key behavior that would
+		// demonstrate the cross-configuration merging issue if it existed
+		var libNode *depgraph.Node
+		for _, node := range dg.Graph.Nodes {
+			if node.NodeID == "com.example:lib@1.2.3" {
+				libNode = &node
+				break
+			}
+		}
+		require.NotNil(t, libNode, "lib node should exist")
+		
+		libChildren := make(map[string]bool)
+		for _, dep := range libNode.Deps {
+			libChildren[dep.NodeID] = true
+		}
+		assert.True(t, libChildren["com.fasterxml.jackson.core:jackson-core@2.19.0"], "jackson 2.19.0 should be child of lib")
+		assert.True(t, libChildren["com.fasterxml.jackson.core:jackson-core@2.17.0"], "jackson 2.17.0 should be child of lib")
+	})
 }
 
 // ── depNodeParts ──────────────────────────────────────────────────────────────
