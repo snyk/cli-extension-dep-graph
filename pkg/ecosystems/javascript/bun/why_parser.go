@@ -108,6 +108,52 @@ func (p *whyParser) setCurrentPackage(match []string) {
 	p.out.Graph[p.currentID] = make(map[string]struct{})
 }
 
+// processLine classifies the current line and updates parser state.
+// Returns an error only for malformed input (ambiguous regex match or missing
+// current-package context).
+func (p *whyParser) processLine(ctx context.Context) error {
+	// Classify the line. The three regexes are anchored to mutually exclusive
+	// prefixes ("  └─/├─" vs no leading whitespace), so at most one match is
+	// non-nil.
+	d1m := depth1LineRe.FindStringSubmatch(p.currentLine)  // "  └─ name@version [...]"
+	d1rm := depth1RootRe.FindStringSubmatch(p.currentLine) // "  └─ [dev ]project-name [...]"
+	rm := rootLineRe.FindStringSubmatch(p.currentLine)     // "name@version"
+
+	matchCount := 0
+	if d1m != nil {
+		matchCount++
+	}
+	if d1rm != nil {
+		matchCount++
+	}
+	if rm != nil {
+		matchCount++
+	}
+
+	switch {
+	case matchCount > 1:
+		return fmt.Errorf("ambiguous line matched %d regexes: %s", matchCount, p.currentLine)
+	case rm != nil:
+		p.setCurrentPackage(rm)
+	case d1rm != nil:
+		// Only record when there is an explicit "(requires ...)" clause.
+		// A missing clause means the package is an implicit workspace member
+		// (in the `workspaces` field but not `dependencies`) — skip silently.
+		if d1rm[3] != "" {
+			return p.recordRootPackageDependency(d1rm[1] == "dev ")
+		}
+	case d1m != nil:
+		return p.recordVersionedPackageDependency(d1m[1])
+	case strings.HasSuffix(p.currentLine, "No dependents found"):
+		// bun emits "  └─ No dependents found" for root-project entries with no
+		// package dependents. Silently skip — it carries no graph information.
+	default:
+		p.log.Debug(ctx, "Skipping unrecognized bun why output line", logger.Attr("line", p.currentLine))
+	}
+
+	return nil
+}
+
 // parse scans r line by line, updating the parser's state, and returns the
 // completed whyOutput after applying workspace-version normalisation.
 func (p *whyParser) parse(ctx context.Context, r io.Reader) (*whyOutput, error) {
@@ -119,47 +165,8 @@ func (p *whyParser) parse(ctx context.Context, r io.Reader) (*whyOutput, error) 
 			continue
 		}
 
-		// Classify the line. The three regexes are anchored to mutually exclusive
-		// prefixes ("  └─/├─" vs no leading whitespace), so at most one match is
-		// non-nil.
-		d1m := depth1LineRe.FindStringSubmatch(p.currentLine)  // "  └─ name@version [...]"
-		d1rm := depth1RootRe.FindStringSubmatch(p.currentLine) // "  └─ [dev ]project-name [...]"
-		rm := rootLineRe.FindStringSubmatch(p.currentLine)     // "name@version"
-
-		matchCount := 0
-		if d1m != nil {
-			matchCount++
-		}
-		if d1rm != nil {
-			matchCount++
-		}
-		if rm != nil {
-			matchCount++
-		}
-
-		switch {
-		case matchCount > 1:
-			return nil, fmt.Errorf("ambiguous line matched %d regexes: %s", matchCount, p.currentLine)
-		case rm != nil:
-			p.setCurrentPackage(rm)
-		case d1rm != nil:
-			// Only record when there is an explicit "(requires ...)" clause.
-			// A missing clause means the package is an implicit workspace member
-			// (in the `workspaces` field but not `dependencies`) — skip silently.
-			if d1rm[3] != "" {
-				if err := p.recordRootPackageDependency(d1rm[1] == "dev "); err != nil {
-					return nil, err
-				}
-			}
-		case d1m != nil:
-			if err := p.recordVersionedPackageDependency(d1m[1]); err != nil {
-				return nil, err
-			}
-		case strings.HasSuffix(p.currentLine, "No dependents found"):
-			// bun emits "  └─ No dependents found" for root-project entries with no
-			// package dependents. Silently skip — it carries no graph information.
-		default:
-			p.log.Debug(ctx, "Skipping unrecognized bun why output line", logger.Attr("line", p.currentLine))
+		if err := p.processLine(ctx); err != nil {
+			return nil, err
 		}
 	}
 
