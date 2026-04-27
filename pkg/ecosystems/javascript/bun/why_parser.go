@@ -155,6 +155,9 @@ func (p *whyParser) parse(ctx context.Context, r io.Reader) (*whyOutput, error) 
 			if err := p.recordVersionedPackageDependency(d1m[1]); err != nil {
 				return nil, err
 			}
+		case strings.HasSuffix(p.currentLine, "No dependents found"):
+			// bun emits "  └─ No dependents found" for root-project entries with no
+			// package dependents. Silently skip — it carries no graph information.
 		default:
 			p.log.Debug(ctx, "Skipping unrecognized bun why output line", logger.Attr("line", p.currentLine))
 		}

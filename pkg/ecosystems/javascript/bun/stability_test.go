@@ -59,13 +59,16 @@ func TestBunWhyOutputStability(t *testing.T) {
 		testedAtLeastOne = true
 
 		t.Run(entry.Name(), func(t *testing.T) {
-			result, err := plugin.BuildDepGraphsFromDir(t.Context(), nil, dir, opts)
+			log := &recordingLogger{}
+			result, err := plugin.BuildDepGraphsFromDir(t.Context(), log, dir, opts)
 			require.NoError(t, err, "BuildDepGraphsFromDir returned an unexpected error")
 			require.NotEmpty(t, result.Results, "plugin produced no results for %s", entry.Name())
 
 			for i, r := range result.Results {
 				assert.NoError(t, r.Error, "result[%d] for %s contains an error", i, entry.Name())
 			}
+
+			log.assertNoUnrecognizedLines(t)
 
 			// Verify every package in bun.lock is present in some dep graph.
 			// A non-empty missing list is the primary signal of a parser regression.
