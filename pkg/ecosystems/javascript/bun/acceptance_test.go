@@ -9,14 +9,17 @@ package bun_test
 // Run with `go test -v ./pkg/ecosystems/javascript/bun/... -run TestAcceptance`.
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,6 +30,7 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/javascript/bun"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
 
 type acceptanceFixture struct {
@@ -392,6 +396,56 @@ func normalizedJSON(dg *depgraph.DepGraph) string {
 	}
 
 	return string(data)
+}
+
+// TestAcceptanceNoUnrecognizedLines verifies that real `bun why '*' --top`
+// output never hits the parser's default (skip) branch. A line falling through
+// to that branch means a regex gap that silently drops dependency information.
+func TestAcceptanceNoUnrecognizedLines(t *testing.T) {
+	requireBun(t)
+
+	plugin := bun.Plugin{}
+
+	for _, fx := range discoverFixtures(t, filepath.Join("testdata", "acceptance")) {
+		t.Run(fx.name, func(t *testing.T) {
+			log := &recordingLogger{}
+			_, err := plugin.BuildDepGraphsFromDir(t.Context(), log, fx.dir, &ecosystems.SCAPluginOptions{})
+			require.NoError(t, err)
+			log.assertNoUnrecognizedLines(t)
+		})
+	}
+}
+
+// recordingLogger captures "Skipping unrecognized" debug messages from the
+// bun why parser so tests can assert none were emitted.
+type recordingLogger struct {
+	mu      sync.Mutex
+	skipped []string
+}
+
+func (r *recordingLogger) Info(_ context.Context, _ string, _ ...logger.Field)  {}
+func (r *recordingLogger) Error(_ context.Context, _ string, _ ...logger.Field) {}
+
+func (r *recordingLogger) Debug(_ context.Context, msg string, fields ...logger.Field) {
+	if msg != "Skipping unrecognized bun why output line" {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, f := range fields {
+		if f.Key == "line" {
+			r.skipped = append(r.skipped, fmt.Sprint(f.Value))
+		}
+	}
+}
+
+func (r *recordingLogger) assertNoUnrecognizedLines(t *testing.T) {
+	t.Helper()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, line := range r.skipped {
+		t.Errorf("unrecognized bun why line: %q", line)
+	}
 }
 
 // discoverFixtures finds all fixture directories under base that have both a

@@ -29,12 +29,15 @@ var (
 	// depth1LineRe matches a direct-dependent line produced by `bun why '*' --top`
 	// where the dependent is a versioned package (not the root project).
 	//
-	// Format: "  [└├]─ [dev |peer |optional ]name@version[ (requires ...)]"
+	// Format: "  [└├]─ [dev ][optional ][peer ]name@version[ (requires ...)]"
+	//
+	// The modifier prefix handles all combinations bun emits: dev, optional, peer,
+	// dev peer, optional peer (e.g. "  ├─ optional peer pkg@1.0.0 (requires ^1)").
 	//
 	// Group 1: "name@version" of the dependent package.
 	//   Root project references (e.g. "my-app (requires ^4)") have no version component,
 	//   so they never match — they are caught by depth1RootRe instead.
-	depth1LineRe = regexp.MustCompile(`^  [└├]─ (?:dev |peer |optional )?(@?[^@\s(]+@\S+?)(?:\s+\(requires[^)]+\))?$`)
+	depth1LineRe = regexp.MustCompile(`^  [└├]─ (?:(?:dev |optional )?(?:peer )?)?(@?[^@\s(]+@\S+?)(?:\s+\(requires[^)]+\))?$`)
 
 	// depth1RootRe matches a depth-1 line where the dependent is the root project.
 	// The dependent has no @version component — bun prints just the project name.
@@ -49,12 +52,13 @@ var (
 	// such lines must NOT be recorded as root-direct deps.
 	//
 	// Examples (where "my-app" is the root):
-	//   "  └─ my-app (requires ^4)"              → group 1: "",     group 3: " (requires ^4)"
-	//   "  └─ dev my-app (requires latest)"      → group 1: "dev ", group 3: " (requires latest)"
-	//   "  └─ peer my-app (requires ^5)"         → group 1: "",     group 3: " (requires ^5)"
-	//   "  └─ my-app"                            → group 1: "",     group 3: ""  (implicit workspace member, skip)
-	//   "  └─ No dependents found"               → no match (contains spaces)
-	depth1RootRe = regexp.MustCompile(`^  [└├]─ (dev )?(?:peer |optional )?(@?[^@\s(]+)(\s+\(requires[^)]+\))?$`)
+	//   "  └─ my-app (requires ^4)"                    → group 1: "",     group 3: " (requires ^4)"
+	//   "  └─ dev my-app (requires latest)"            → group 1: "dev ", group 3: " (requires latest)"
+	//   "  └─ peer my-app (requires ^5)"               → group 1: "",     group 3: " (requires ^5)"
+	//   "  └─ optional peer my-app (requires >=1.0)"   → group 1: "",     group 3: " (requires >=1.0)"
+	//   "  └─ my-app"                                  → group 1: "",     group 3: ""  (implicit workspace member, skip)
+	//   "  └─ No dependents found"                     → no match (contains spaces)
+	depth1RootRe = regexp.MustCompile(`^  [└├]─ (dev )?(?:optional )?(?:peer )?(@?[^@\s(]+)(\s+\(requires[^)]+\))?$`)
 )
 
 // whyParser holds the mutable state accumulated while scanning `bun why '*' --top` output.
@@ -104,6 +108,52 @@ func (p *whyParser) setCurrentPackage(match []string) {
 	p.out.Graph[p.currentID] = make(map[string]struct{})
 }
 
+// processLine classifies the current line and updates parser state.
+// Returns an error only for malformed input (ambiguous regex match or missing
+// current-package context).
+func (p *whyParser) processLine(ctx context.Context) error {
+	// Classify the line. The three regexes are anchored to mutually exclusive
+	// prefixes ("  └─/├─" vs no leading whitespace), so at most one match is
+	// non-nil.
+	d1m := depth1LineRe.FindStringSubmatch(p.currentLine)  // "  └─ name@version [...]"
+	d1rm := depth1RootRe.FindStringSubmatch(p.currentLine) // "  └─ [dev ]project-name [...]"
+	rm := rootLineRe.FindStringSubmatch(p.currentLine)     // "name@version"
+
+	matchCount := 0
+	if d1m != nil {
+		matchCount++
+	}
+	if d1rm != nil {
+		matchCount++
+	}
+	if rm != nil {
+		matchCount++
+	}
+
+	switch {
+	case matchCount > 1:
+		return fmt.Errorf("ambiguous line matched %d regexes: %s", matchCount, p.currentLine)
+	case rm != nil:
+		p.setCurrentPackage(rm)
+	case d1rm != nil:
+		// Only record when there is an explicit "(requires ...)" clause.
+		// A missing clause means the package is an implicit workspace member
+		// (in the `workspaces` field but not `dependencies`) — skip silently.
+		if d1rm[3] != "" {
+			return p.recordRootPackageDependency(d1rm[1] == "dev ")
+		}
+	case d1m != nil:
+		return p.recordVersionedPackageDependency(d1m[1])
+	case strings.HasSuffix(p.currentLine, "No dependents found"):
+		// bun emits "  └─ No dependents found" for root-project entries with no
+		// package dependents. Silently skip — it carries no graph information.
+	default:
+		p.log.Debug(ctx, "Skipping unrecognized bun why output line", logger.Attr("line", p.currentLine))
+	}
+
+	return nil
+}
+
 // parse scans r line by line, updating the parser's state, and returns the
 // completed whyOutput after applying workspace-version normalisation.
 func (p *whyParser) parse(ctx context.Context, r io.Reader) (*whyOutput, error) {
@@ -115,44 +165,8 @@ func (p *whyParser) parse(ctx context.Context, r io.Reader) (*whyOutput, error) 
 			continue
 		}
 
-		// Classify the line. The three regexes are anchored to mutually exclusive
-		// prefixes ("  └─/├─" vs no leading whitespace), so at most one match is
-		// non-nil.
-		d1m := depth1LineRe.FindStringSubmatch(p.currentLine)  // "  └─ name@version [...]"
-		d1rm := depth1RootRe.FindStringSubmatch(p.currentLine) // "  └─ [dev ]project-name [...]"
-		rm := rootLineRe.FindStringSubmatch(p.currentLine)     // "name@version"
-
-		matchCount := 0
-		if d1m != nil {
-			matchCount++
-		}
-		if d1rm != nil {
-			matchCount++
-		}
-		if rm != nil {
-			matchCount++
-		}
-
-		switch {
-		case matchCount > 1:
-			return nil, fmt.Errorf("ambiguous line matched %d regexes: %s", matchCount, p.currentLine)
-		case rm != nil:
-			p.setCurrentPackage(rm)
-		case d1rm != nil:
-			// Only record when there is an explicit "(requires ...)" clause.
-			// A missing clause means the package is an implicit workspace member
-			// (in the `workspaces` field but not `dependencies`) — skip silently.
-			if d1rm[3] != "" {
-				if err := p.recordRootPackageDependency(d1rm[1] == "dev "); err != nil {
-					return nil, err
-				}
-			}
-		case d1m != nil:
-			if err := p.recordVersionedPackageDependency(d1m[1]); err != nil {
-				return nil, err
-			}
-		default:
-			p.log.Debug(ctx, "Skipping unrecognized bun why output line", logger.Attr("line", p.currentLine))
+		if err := p.processLine(ctx); err != nil {
+			return nil, err
 		}
 	}
 
