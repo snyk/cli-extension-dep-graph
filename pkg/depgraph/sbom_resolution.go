@@ -295,7 +295,13 @@ func executeLegacyWorkflow(
 ) ([]workflow.Data, error) {
 	legacyConfig := config.Clone()
 	legacyConfig.Unset(FlagPrintEffectiveGraph)
-	legacyConfig.Set(FlagPrintEffectiveGraphWithErrors, true)
+
+	if config.GetBool(FlagPrintOutputJsonlWithErrors) {
+		legacyConfig.Set(FlagPrintOutputJsonlWithErrors, true)
+		legacyConfig.Set(FlagPrintEffectiveGraphWithErrors, false)
+	} else {
+		legacyConfig.Set(FlagPrintEffectiveGraphWithErrors, true)
+	}
 
 	legacyData, err := depGraphWorkflowFunc(ctx, legacyConfig, logger)
 	if err == nil {

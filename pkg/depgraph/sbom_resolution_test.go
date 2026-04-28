@@ -1519,6 +1519,90 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 }
 
+func Test_executeLegacyWorkflow_FlagPrintOutputJsonlWithErrors(t *testing.T) {
+	t.Run("GIVEN FlagPrintOutputJsonlWithErrors set WHEN executeLegacyWorkflow THEN disables effective-graph-with-errors in legacy config", func(t *testing.T) {
+		// GIVEN
+		ctx := setupTestContext(t, false)
+		ctx.config.Set(FlagPrintOutputJsonlWithErrors, true)
+
+		resolutionHandler := NewCalledResolutionHandlerFunc([]workflow.Data{}, nil)
+		mockPlugin := &mockScaPlugin{}
+
+		// WHEN
+		_, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]ecosystems.SCAPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		// THEN
+		require.NoError(t, err)
+		require.True(t, resolutionHandler.Called, "legacy resolution handler should have been called")
+		assert.True(t, resolutionHandler.Config.GetBool(FlagPrintOutputJsonlWithErrors),
+			"FlagPrintOutputJsonlWithErrors should be forwarded to legacy config")
+		assert.False(t, resolutionHandler.Config.GetBool(FlagPrintEffectiveGraphWithErrors),
+			"FlagPrintEffectiveGraphWithErrors must be disabled when FlagPrintOutputJsonlWithErrors is used")
+		assert.False(t, resolutionHandler.Config.GetBool(FlagPrintEffectiveGraph),
+			"FlagPrintEffectiveGraph should be unset in legacy config")
+	})
+
+	t.Run("GIVEN FlagPrintOutputJsonlWithErrors not set WHEN executeLegacyWorkflow THEN enables effective-graph-with-errors by default", func(t *testing.T) {
+		// GIVEN
+		ctx := setupTestContext(t, false)
+		// FlagPrintOutputJsonlWithErrors is false by default
+
+		resolutionHandler := NewCalledResolutionHandlerFunc([]workflow.Data{}, nil)
+		mockPlugin := &mockScaPlugin{}
+
+		// WHEN
+		_, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]ecosystems.SCAPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+
+		// THEN
+		require.NoError(t, err)
+		require.True(t, resolutionHandler.Called, "legacy resolution handler should have been called")
+		assert.True(t, resolutionHandler.Config.GetBool(FlagPrintEffectiveGraphWithErrors),
+			"FlagPrintEffectiveGraphWithErrors must be enabled by default for SBOM resolution")
+		assert.False(t, resolutionHandler.Config.GetBool(FlagPrintOutputJsonlWithErrors),
+			"FlagPrintOutputJsonlWithErrors should remain false when not explicitly set")
+		assert.False(t, resolutionHandler.Config.GetBool(FlagPrintEffectiveGraph),
+			"FlagPrintEffectiveGraph should be unset in legacy config")
+	})
+
+	t.Run("GIVEN FlagPrintOutputJsonlWithErrors is set WHEN executeLegacyWorkflow runs THEN parent config is not mutated", func(t *testing.T) {
+		// GIVEN
+		ctx := setupTestContext(t, false)
+		ctx.config.Set(FlagPrintOutputJsonlWithErrors, true)
+		ctx.config.Set(FlagPrintEffectiveGraph, true)
+
+		resolutionHandler := NewCalledResolutionHandlerFunc([]workflow.Data{}, nil)
+		mockPlugin := &mockScaPlugin{}
+
+		// WHEN
+		_, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]ecosystems.SCAPlugin{mockPlugin},
+			resolutionHandler.Func(),
+		)
+		require.NoError(t, err)
+
+		// THEN: original config should not be modified
+		assert.True(t, ctx.config.GetBool(FlagPrintEffectiveGraph),
+			"parent config FlagPrintEffectiveGraph should remain unchanged after executeLegacyWorkflow")
+		assert.True(t, ctx.config.GetBool(FlagPrintOutputJsonlWithErrors),
+			"parent config FlagPrintOutputJsonlWithErrors should remain unchanged after executeLegacyWorkflow")
+	})
+}
+
 func Test_parseExcludeFlag(t *testing.T) {
 	testCases := []struct {
 		name     string
