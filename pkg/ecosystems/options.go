@@ -54,7 +54,9 @@ type GradleOptions struct {
 	AllSubProjects bool `arg:"--all-sub-projects"`
 	// InitScript overrides the built-in init script with a user-supplied path.
 	InitScript string `arg:"--init-script"`
-	// Note: --gradle-normalize-deps is intentionally not supported here.
+	// SkipWrapper bypasses gradlew discovery and forces use of the gradle command.
+	SkipWrapper bool `arg:"--gradle-skip-wrapper"`
+	// Note: --gradle-normalize-deps is intentionally not yet supported here.
 	// It requires full JAR downloading for fingerprinting, which is incompatible
 	// with the metadata-only resolution approach used by this plugin.
 	// The flag is still forwarded to the legacy CLI as a fallback.
@@ -165,5 +167,10 @@ func (o *SCAPluginOptions) WithGradleAllSubProjects(all bool) *SCAPluginOptions 
 
 func (o *SCAPluginOptions) WithGradleInitScript(initScript string) *SCAPluginOptions {
 	o.Gradle.InitScript = initScript
+	return o
+}
+
+func (o *SCAPluginOptions) WithGradleSkipWrapper(skipWrapper bool) *SCAPluginOptions {
+	o.Gradle.SkipWrapper = skipWrapper
 	return o
 }

@@ -240,7 +240,7 @@ func TestBuildDepGraph(t *testing.T) {
 			}
 		}
 		require.NotNil(t, libNode, "lib node should exist")
-		
+
 		libChildren := make(map[string]bool)
 		for _, dep := range libNode.Deps {
 			libChildren[dep.NodeID] = true

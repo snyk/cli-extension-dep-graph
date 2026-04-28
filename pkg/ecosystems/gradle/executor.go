@@ -19,52 +19,26 @@ const (
 	fallbackReportPath = "build/reports/snyk-dependency-graph.json"
 )
 
-// gradleBinary returns the gradle executable to use for a given project directory.
-// It prefers the Gradle wrapper (gradlew / gradlew.bat) when present, because
-// wrappers ensure the correct Gradle version is used for the project.
-func gradleBinary(projectDir string) string {
-	for _, wrapper := range []string{"gradlew", "gradlew.bat"} {
-		path := filepath.Join(projectDir, wrapper)
-		if isExecutable(path) {
-			return path
-		}
-	}
-	return "gradle"
-}
-
-func isExecutable(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir() && info.Mode()&0o111 != 0
-}
-
 // runInitScript runs `gradle snykDependencyGraph` with the embedded init script
 // and returns the raw JSON bytes from the generated output file.
 //
-// Fixed flags applied on every invocation (matching GRADLE_OPTS in the Docker image):
+// Fixed flags applied on every invocation:
 //
 //	--no-daemon          avoid background daemon processes
 //	--no-parallel        required for correctness on certain multi-project builds
 //	--console=plain      suppress progress animations that pollute output
-//	-Dorg.gradle.daemon=false        belt-and-suspenders daemon guard
 //	-Dorg.gradle.welcome=never       suppress "Welcome to Gradle" banner
-//	-Dorg.gradle.caching=false       disable the build cache
-//	-Dorg.gradle.parallel=false      matches --no-parallel for older Gradle versions
-func runInitScript(ctx context.Context, projectDir, initScriptPath string, extraArgs []string) ([]byte, error) {
-	gradle := gradleBinary(projectDir)
-
+func runInitScript(ctx context.Context, projectDir, gradleBinary, initScriptPath string, extraArgs []string) ([]byte, error) {
 	args := append([]string{
 		"--init-script", initScriptPath,
 		"--no-daemon",
 		"--no-parallel",
 		"--console=plain",
-		"-Dorg.gradle.daemon=false",
 		"-Dorg.gradle.welcome=never",
-		"-Dorg.gradle.caching=false",
-		"-Dorg.gradle.parallel=false",
 		"snykDependencyGraph",
 	}, extraArgs...)
 
-	cmd := exec.CommandContext(ctx, gradle, args...)
+	cmd := exec.CommandContext(ctx, gradleBinary, args...)
 	cmd.Dir = projectDir
 
 	var stdout, stderr bytes.Buffer

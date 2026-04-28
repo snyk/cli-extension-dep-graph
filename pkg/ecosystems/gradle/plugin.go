@@ -79,11 +79,21 @@ func (p Plugin) BuildDepGraphsFromDir(
 	if err != nil {
 		return nil, fmt.Errorf("gradle: %w", err)
 	}
+	gradleBinary, err := ResolveGradleBinary(projectDir, options.Gradle.SkipWrapper)
+	if err != nil {
+		log.Error(ctx, "Gradle binary resolution failed",
+			logger.Attr(logAttrProjectDir, projectDir),
+			logger.Err(err))
+		errResult := gradleErrorResult(dir, projectDir, err)
+		return &ecosystems.PluginResult{Results: []ecosystems.SCAResult{errResult}}, nil
+	}
+
 	log.Debug(ctx, "Running Gradle dependency resolution",
 		logger.Attr(logAttrProjectDir, projectDir),
-		logger.Attr("init_script", initScriptPath))
+		logger.Attr("init_script", initScriptPath),
+		logger.Attr("gradle_binary", gradleBinary))
 
-	data, err := runInitScript(ctx, projectDir, initScriptPath, extraArgs)
+	data, err := runInitScript(ctx, projectDir, gradleBinary, initScriptPath, extraArgs)
 	if err != nil {
 		log.Error(ctx, "Gradle execution failed",
 			logger.Attr(logAttrProjectDir, projectDir),
@@ -189,13 +199,18 @@ func (p Plugin) convertProjects(
 		log.Debug(ctx, "Built dep graph for Gradle project",
 			logger.Attr("project_path", projPath))
 
+		var rootName string
+		if rootPkg := depGraph.GetRootPkg(); rootPkg != nil {
+			rootName = rootPkg.Info.Name
+		}
+
 		results = append(results, ecosystems.SCAResult{
 			DepGraph: depGraph,
 			ProjectDescriptor: identity.ProjectDescriptor{
 				Identity: identity.ProjectIdentity{
-					ProjectType:      "gradle",
-					TargetFile:       &relFile,
-					BaseNameOverride: options.Global.ProjectName,
+					ProjectType:       "gradle",
+					TargetFile:        &relFile,
+					RootComponentName: rootName,
 				},
 			},
 		})
