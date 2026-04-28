@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
 )
@@ -18,8 +21,6 @@ var embeddedInitScript []byte
 const (
 	// logAttrProjectDir is the structured-log key used when logging the Gradle project directory.
 	logAttrProjectDir = "project_dir"
-	// defaultBuildFile is the conventional Gradle build file name.
-	defaultBuildFile = "build.gradle"
 )
 
 // Plugin is the Gradle SCA plugin.  It has no exported fields; all
@@ -47,8 +48,8 @@ func NewPlugin() Plugin {
 //     passed to Gradle via --init-script (required for dependency graph generation).
 //     Users can provide additional init scripts via --init-script which are passed
 //     as supplementary --init-script flags.
-//   - The Gradle invocation always uses --no-daemon, --no-parallel and the
-//     recommended GRADLE_OPTS flags for predictable, isolated execution.
+//   - The Gradle invocation always uses --no-daemon, --no-parallel for predictable,
+//     isolated execution.
 //   - The init script traverses all sub-projects automatically; each sub-project
 //     yields one SCAResult.  Use --gradle-sub-project to filter to a single one.
 func (p Plugin) BuildDepGraphsFromDir(
@@ -58,93 +59,201 @@ func (p Plugin) BuildDepGraphsFromDir(
 		log = logger.Nop()
 	}
 
-	projectDir, err := p.resolveProjectDir(dir, options)
+	files, err := p.discoverGradleFiles(ctx, dir, options)
 	if err != nil {
-		return nil, fmt.Errorf("gradle: %w", err)
+		return nil, fmt.Errorf("gradle: failed to discover files: %w", err)
 	}
-	if projectDir == "" {
-		log.Info(ctx, "No Gradle build file found, skipping", logger.Attr("dir", dir))
+	if len(files) == 0 {
+		log.Debug(ctx, "No Gradle files found, skipping", logger.Attr("dir", dir))
 		return &ecosystems.PluginResult{}, nil
 	}
 
-	log.Debug(ctx, "Gradle project root resolved", logger.Attr(logAttrProjectDir, projectDir))
-
-	initScriptPath, cleanup, err := resolveInitScript()
+	allResults, allProcessedFiles, err := p.processGradleFiles(ctx, log, files, dir, options)
 	if err != nil {
-		return nil, fmt.Errorf("gradle: failed to prepare init script: %w", err)
+		return nil, err
 	}
-	defer cleanup()
-
-	extraArgs, err := buildExtraArgs(projectDir, options)
-	if err != nil {
-		return nil, fmt.Errorf("gradle: %w", err)
-	}
-	gradleBinary, err := ResolveGradleBinary(projectDir, options.Gradle.SkipWrapper)
-	if err != nil {
-		log.Error(ctx, "Gradle binary resolution failed",
-			logger.Attr(logAttrProjectDir, projectDir),
-			logger.Err(err))
-		errResult := gradleErrorResult(dir, projectDir, err)
-		return &ecosystems.PluginResult{Results: []ecosystems.SCAResult{errResult}}, nil
-	}
-
-	log.Debug(ctx, "Running Gradle dependency resolution",
-		logger.Attr(logAttrProjectDir, projectDir),
-		logger.Attr("init_script", initScriptPath),
-		logger.Attr("gradle_binary", gradleBinary))
-
-	data, err := runInitScript(ctx, projectDir, gradleBinary, initScriptPath, extraArgs)
-	if err != nil {
-		log.Error(ctx, "Gradle execution failed",
-			logger.Attr(logAttrProjectDir, projectDir),
-			logger.Err(err))
-		// Surface as an error result rather than a hard failure so the caller
-		// can still fall back to the legacy CLI for other ecosystems.
-		errResult := gradleErrorResult(dir, projectDir, err)
-		return &ecosystems.PluginResult{Results: []ecosystems.SCAResult{errResult}}, nil
-	}
-
-	parsed, err := parseDependencyGraphJSON(data)
-	if err != nil {
-		return nil, fmt.Errorf("gradle: failed to parse init script output: %w", err)
-	}
-
-	results, processedFiles := p.convertProjects(ctx, log, parsed, dir, projectDir, options)
 
 	return &ecosystems.PluginResult{
-		Results:        results,
-		ProcessedFiles: processedFiles,
+		Results:        allResults,
+		ProcessedFiles: allProcessedFiles,
 	}, nil
 }
 
-// resolveProjectDir determines the Gradle project root to scan.
-// Returns ("", nil) when no Gradle project is found.
-func (p Plugin) resolveProjectDir(dir string, options *ecosystems.SCAPluginOptions) (string, error) {
-	if options.Global.TargetFile != nil {
-		tf := *options.Global.TargetFile
-		if !isBuildFile(tf) {
-			// --target-file refers to a non-Gradle file; nothing to do.
-			return "", nil
+// discoverGradleFiles discovers Gradle build files based on the provided options.
+func (p Plugin) discoverGradleFiles(ctx context.Context, dir string, options *ecosystems.SCAPluginOptions) ([]discovery.FindResult, error) {
+	switch {
+	case options.Global.TargetFile != nil:
+		// Validate target file is a Gradle build file
+		if !isBuildFile(*options.Global.TargetFile) {
+			return nil, nil // Not a Gradle build file, skip
 		}
-		absPath := tf
-		if !filepath.IsAbs(tf) {
-			absPath = filepath.Join(dir, tf)
+		files, err := discovery.FindFiles(ctx, dir, discovery.WithTargetFile(*options.Global.TargetFile))
+		if err != nil {
+			return nil, fmt.Errorf("failed to find target file: %w", err)
 		}
-		if _, err := os.Stat(absPath); err != nil {
-			return "", fmt.Errorf("target file %s not found: %w", tf, err)
-		}
+		return files, nil
 
-		return filepath.Dir(absPath), nil
+	case options.Global.AllProjects:
+		return p.discoverAllGradleProjects(ctx, dir, options)
+
+	default:
+		// Find best build file in root directory (priority order)
+		return p.findBestBuildFile(dir)
+	}
+}
+
+// findBestBuildFile finds the highest priority Gradle file in the root directory only.
+// Priority order: build.gradle, build.gradle.kts, settings.gradle, settings.gradle.kts
+// Build files are scan targets; settings files indicate project root for multi-project builds.
+func (p Plugin) findBestBuildFile(dir string) ([]discovery.FindResult, error) {
+	// Check all files in priority order
+	gradleFiles := []string{"build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"}
+
+	for _, filename := range gradleFiles {
+		filePath := filepath.Join(dir, filename)
+		if _, err := os.Stat(filePath); err == nil {
+			return []discovery.FindResult{{
+				Path:    filePath,
+				RelPath: filename,
+			}}, nil
+		}
 	}
 
-	// No target file — scan the top level of dir for a Gradle build file.
-	for _, name := range []string{defaultBuildFile, "build.gradle.kts"} {
-		if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
-			return dir, nil
-		}
+	return nil, nil // No Gradle files found
+}
+
+// processGradleFiles processes all discovered Gradle files with directory-based deduplication.
+func (p Plugin) processGradleFiles(
+	ctx context.Context,
+	log logger.Logger,
+	files []discovery.FindResult,
+	dir string,
+	options *ecosystems.SCAPluginOptions,
+) ([]ecosystems.SCAResult, []string, error) {
+	// Sort by path depth to process parent directories first
+	sort.Slice(files, func(i, j int) bool {
+		depthI := strings.Count(files[i].Path, string(filepath.Separator))
+		depthJ := strings.Count(files[j].Path, string(filepath.Separator))
+		return depthI < depthJ
+	})
+
+	var allResults []ecosystems.SCAResult
+	var allProcessedFiles []string
+	processedDirs := make(map[string]bool)
+
+	initScriptPath, cleanup, err := resolveInitScript()
+	if err != nil {
+		return nil, nil, fmt.Errorf("gradle: failed to prepare init script: %w", err)
+	}
+	defer cleanup()
+
+	// Build extra args once upfront - user init scripts should be relative to original scan directory
+	extraArgs, err := buildExtraArgs(dir, options)
+	if err != nil {
+		return nil, nil, fmt.Errorf("gradle: %w", err)
 	}
 
-	return "", nil
+	for _, discoveredFile := range files {
+		projectDir := filepath.Dir(discoveredFile.Path)
+
+		// Skip if we've already processed this directory
+		if processedDirs[projectDir] {
+			log.Debug(ctx, "Skipping already processed directory",
+				logger.Attr("dir", projectDir),
+				logger.Attr("file", discoveredFile.RelPath))
+			continue
+		}
+
+		// Try to resolve Gradle binary first - if it fails, add error result and mark as processed
+		gradleBinary, err := ResolveGradleBinary(projectDir, options.Gradle.SkipWrapper)
+		if err != nil {
+			log.Error(ctx, "Gradle binary resolution failed",
+				logger.Attr(logAttrProjectDir, projectDir),
+				logger.Err(err))
+			// Add error result and mark directory as processed (failed)
+			errResult := gradleErrorResult(dir, discoveredFile.Path, fmt.Errorf("binary resolution failed: %w", err))
+			allResults = append(allResults, errResult)
+			processedDirs[projectDir] = true
+			continue // Skip to next file
+		}
+
+		// Check if we discovered a settings file (project root) vs build file (scan target)
+		isSettingsFile := isSettingsFile(discoveredFile.RelPath)
+		if isSettingsFile {
+			log.Debug(ctx, "Gradle settings file found, will scan sub-projects",
+				logger.Attr("settings_file", discoveredFile.RelPath))
+		}
+
+		log.Debug(ctx, "Processing Gradle project",
+			logger.Attr(logAttrProjectDir, projectDir),
+			logger.Attr("file", discoveredFile.RelPath))
+
+		log.Debug(ctx, "Running Gradle dependency resolution",
+			logger.Attr(logAttrProjectDir, projectDir),
+			logger.Attr("init_script", initScriptPath),
+			logger.Attr("gradle_binary", gradleBinary))
+
+		data, err := runInitScript(ctx, projectDir, gradleBinary, initScriptPath, extraArgs)
+		if err != nil {
+			log.Error(ctx, "Gradle execution failed",
+				logger.Attr(logAttrProjectDir, projectDir),
+				logger.Err(err))
+			// Surface as an error result rather than a hard failure
+			errResult := gradleErrorResult(dir, discoveredFile.Path, err)
+			allResults = append(allResults, errResult)
+			continue
+		}
+
+		parsed, err := parseDependencyGraphJSON(data)
+		if err != nil {
+			return nil, nil, fmt.Errorf("gradle: failed to parse init script output: %w", err)
+		}
+
+		// For settings files, don't pass them as build file fallback since they're not scan targets
+		buildFileForFallback := discoveredFile.Path
+		if isSettingsFile {
+			buildFileForFallback = "" // Let Gradle init script determine actual build files
+		}
+
+		results, processedFiles := p.convertProjects(ctx, log, parsed, dir, buildFileForFallback, options)
+
+		allResults = append(allResults, results...)
+		allProcessedFiles = append(allProcessedFiles, processedFiles...)
+
+		// Mark all directories that were processed by this Gradle run
+		for _, processedFile := range processedFiles {
+			processedDir := filepath.Dir(processedFile)
+			processedDirs[processedDir] = true
+		}
+
+		// Also mark the directory we ran from as processed
+		processedDirs[projectDir] = true
+	}
+
+	return allResults, allProcessedFiles, nil
+}
+
+// discoverAllGradleProjects finds all Gradle files recursively for --all-projects.
+// Uses simple discovery with runtime deduplication to avoid complex filtering logic.
+func (p Plugin) discoverAllGradleProjects(ctx context.Context, dir string, options *ecosystems.SCAPluginOptions) ([]discovery.FindResult, error) {
+	// Find all Gradle files recursively (build files and settings files)
+	findOpts := []discovery.FindOption{
+		discovery.WithInclude("build.gradle"),
+		discovery.WithInclude("build.gradle.kts"),
+		discovery.WithInclude("settings.gradle"),
+		discovery.WithInclude("settings.gradle.kts"),
+		discovery.WithCommonExcludes(),
+	}
+
+	if len(options.Global.Exclude) > 0 {
+		findOpts = append(findOpts, discovery.WithExcludes(options.Global.Exclude...))
+	}
+
+	files, err := discovery.FindFiles(ctx, dir, findOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find gradle files: %w", err)
+	}
+	return files, nil
 }
 
 // convertProjects maps every gradleProject from the parsed JSON into an
@@ -158,7 +267,7 @@ func (p Plugin) convertProjects(
 	log logger.Logger,
 	parsed *dependencyGraphJSON,
 	dir string,
-	projectDir string,
+	discoveredBuildFile string,
 	options *ecosystems.SCAPluginOptions,
 ) (results []ecosystems.SCAResult, processedFiles []string) {
 	subProject := options.Gradle.SubProject
@@ -174,7 +283,7 @@ func (p Plugin) convertProjects(
 		// result matches what the legacy snyk-gradle-plugin returns.
 		absFile := proj.BuildFile
 		if absFile == "" {
-			absFile = filepath.Join(projectDir, defaultBuildFile)
+			absFile = discoveredBuildFile
 		}
 		relFile := relativeTargetFile(dir, absFile)
 
@@ -268,18 +377,13 @@ func buildExtraArgs(projectDir string, options *ecosystems.SCAPluginOptions) ([]
 			initPath = filepath.Join(projectDir, userInitScript)
 		}
 
-		// Defensive validation: ensure the init script exists and is readable
+		// Defensive validation: ensure the init script exists and is a file
 		info, err := os.Stat(initPath)
 		if err != nil {
 			return nil, fmt.Errorf("user init script not found: %s: %w", userInitScript, err)
 		}
 		if info.IsDir() {
 			return nil, fmt.Errorf("user init script is a directory, not a file: %s", userInitScript)
-		}
-
-		// Test readability
-		if _, err := os.Open(initPath); err != nil {
-			return nil, fmt.Errorf("user init script cannot be read: %s: %w", userInitScript, err)
 		}
 
 		args = append(args, "--init-script", initPath)
@@ -292,7 +396,13 @@ func buildExtraArgs(projectDir string, options *ecosystems.SCAPluginOptions) ([]
 // isBuildFile reports whether path refers to a Gradle build file.
 func isBuildFile(path string) bool {
 	name := filepath.Base(path)
-	return name == defaultBuildFile || name == "build.gradle.kts"
+	return name == "build.gradle" || name == "build.gradle.kts"
+}
+
+// isSettingsFile reports whether path refers to a Gradle settings file.
+func isSettingsFile(path string) bool {
+	name := filepath.Base(path)
+	return name == "settings.gradle" || name == "settings.gradle.kts"
 }
 
 // matchesSubProject returns true when the Gradle project path or name matches
@@ -307,8 +417,8 @@ func matchesSubProject(projPath, projName, selector string) bool {
 // gradleErrorResult wraps a gradle execution error in an SCAResult so the
 // caller can surface it as a warning rather than a hard failure.
 // The target file is expressed relative to dir (the original scan root).
-func gradleErrorResult(dir, projectDir string, err error) ecosystems.SCAResult {
-	buildFile := relativeTargetFile(dir, filepath.Join(projectDir, defaultBuildFile))
+func gradleErrorResult(dir, buildFilePath string, err error) ecosystems.SCAResult {
+	buildFile := relativeTargetFile(dir, buildFilePath)
 	return ecosystems.SCAResult{
 		ProjectDescriptor: identity.ProjectDescriptor{
 			Identity: identity.ProjectIdentity{

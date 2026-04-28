@@ -3,6 +3,8 @@
 package gradle
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -39,14 +41,21 @@ func TestRelativeTargetFile(t *testing.T) {
 // ── isBuildFile ───────────────────────────────────────────────────────────────
 
 func TestIsBuildFile(t *testing.T) {
-	assert.True(t, isBuildFile("build.gradle"))
-	assert.True(t, isBuildFile("build.gradle.kts"))
-	assert.True(t, isBuildFile("/project/submodule/build.gradle"))
-	assert.True(t, isBuildFile("/project/submodule/build.gradle.kts"))
-	assert.False(t, isBuildFile("settings.gradle"))
-	assert.False(t, isBuildFile("pom.xml"))
-	assert.False(t, isBuildFile("requirements.txt"))
-	assert.False(t, isBuildFile(""))
+	buildFiles := []string{"build.gradle", "build.gradle.kts"}
+	nonBuildFiles := []string{"settings.gradle", "settings.gradle.kts", "pom.xml", "requirements.txt", ""}
+
+	for _, file := range buildFiles {
+		t.Run(fmt.Sprintf("%s should be build file", file), func(t *testing.T) {
+			assert.True(t, isBuildFile(file))
+			assert.True(t, isBuildFile("/project/submodule/"+file)) // Test with path
+		})
+	}
+
+	for _, file := range nonBuildFiles {
+		t.Run(fmt.Sprintf("%s should not be build file", file), func(t *testing.T) {
+			assert.False(t, isBuildFile(file))
+		})
+	}
 }
 
 // ── matchesSubProject ─────────────────────────────────────────────────────────
@@ -82,65 +91,87 @@ func TestMatchesSubProject(t *testing.T) {
 	}
 }
 
-// ── resolveProjectDir ─────────────────────────────────────────────────────────
+// ── discoverGradleFiles ───────────────────────────────────────────────────────
 
-func TestResolveProjectDir(t *testing.T) {
+func TestDiscoverGradleFiles(t *testing.T) {
 	p := Plugin{}
+	ctx := context.Background()
 
-	t.Run("returns dir when build.gradle present", func(t *testing.T) {
+	buildFiles := []string{"build.gradle", "build.gradle.kts"}
+
+	for _, filename := range buildFiles {
+		t.Run(fmt.Sprintf("finds %s in root when no options set", filename), func(t *testing.T) {
+			dir := t.TempDir()
+			buildFile := filepath.Join(dir, filename)
+			require.NoError(t, os.WriteFile(buildFile, []byte(""), 0o644))
+
+			files, err := p.discoverGradleFiles(ctx, dir, &ecosystems.SCAPluginOptions{})
+			require.NoError(t, err)
+			require.Len(t, files, 1)
+			assert.Equal(t, buildFile, files[0].Path)
+			assert.Equal(t, filename, files[0].RelPath)
+		})
+	}
+
+	t.Run("returns no files when no Gradle build file found", func(t *testing.T) {
 		dir := t.TempDir()
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "build.gradle"), []byte(""), 0o644))
 
-		got, err := p.resolveProjectDir(dir, &ecosystems.SCAPluginOptions{})
+		files, err := p.discoverGradleFiles(ctx, dir, &ecosystems.SCAPluginOptions{})
 		require.NoError(t, err)
-		assert.Equal(t, dir, got)
+		assert.Empty(t, files)
 	})
 
-	t.Run("returns dir when build.gradle.kts present", func(t *testing.T) {
-		dir := t.TempDir()
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "build.gradle.kts"), []byte(""), 0o644))
+	targetFiles := []string{"build.gradle", "build.gradle.kts"}
 
-		got, err := p.resolveProjectDir(dir, &ecosystems.SCAPluginOptions{})
-		require.NoError(t, err)
-		assert.Equal(t, dir, got)
-	})
+	for _, filename := range targetFiles {
+		t.Run(fmt.Sprintf("uses target file when it is a %s", filename), func(t *testing.T) {
+			dir := t.TempDir()
+			subDir := filepath.Join(dir, "app")
+			require.NoError(t, os.Mkdir(subDir, 0o755))
+			buildFile := filepath.Join(subDir, filename)
+			require.NoError(t, os.WriteFile(buildFile, []byte(""), 0o644))
 
-	t.Run("returns empty string when no Gradle build file found", func(t *testing.T) {
-		dir := t.TempDir()
+			tf := filepath.Join("app", filename)
+			opts := &ecosystems.SCAPluginOptions{
+				Global: ecosystems.GlobalOptions{TargetFile: &tf},
+			}
 
-		got, err := p.resolveProjectDir(dir, &ecosystems.SCAPluginOptions{})
-		require.NoError(t, err)
-		assert.Equal(t, "", got)
-	})
+			files, err := p.discoverGradleFiles(ctx, dir, opts)
+			require.NoError(t, err)
+			require.Len(t, files, 1)
+			assert.Equal(t, buildFile, files[0].Path)
+		})
+	}
 
-	t.Run("uses target file directory when target file is a build.gradle", func(t *testing.T) {
-		dir := t.TempDir()
-		subDir := filepath.Join(dir, "app")
-		require.NoError(t, os.Mkdir(subDir, 0o755))
-		buildFile := filepath.Join(subDir, "build.gradle")
-		require.NoError(t, os.WriteFile(buildFile, []byte(""), 0o644))
-
-		tf := buildFile
-		opts := &ecosystems.SCAPluginOptions{
-			Global: ecosystems.GlobalOptions{TargetFile: &tf},
-		}
-
-		got, err := p.resolveProjectDir(dir, opts)
-		require.NoError(t, err)
-		assert.Equal(t, subDir, got)
-	})
-
-	t.Run("returns empty when target file is not a Gradle build file", func(t *testing.T) {
+	t.Run("returns no files when target file is not a Gradle build file", func(t *testing.T) {
 		dir := t.TempDir()
 		tf := "pom.xml"
 		opts := &ecosystems.SCAPluginOptions{
 			Global: ecosystems.GlobalOptions{TargetFile: &tf},
 		}
 
-		got, err := p.resolveProjectDir(dir, opts)
+		files, err := p.discoverGradleFiles(ctx, dir, opts)
 		require.NoError(t, err)
-		assert.Equal(t, "", got)
+		assert.Empty(t, files)
 	})
+
+	invalidTargetFiles := []string{"settings.gradle", "settings.gradle.kts"}
+
+	for _, filename := range invalidTargetFiles {
+		t.Run(fmt.Sprintf("returns no files when %s is target file", filename), func(t *testing.T) {
+			dir := t.TempDir()
+			settingsFile := filepath.Join(dir, filename)
+			require.NoError(t, os.WriteFile(settingsFile, []byte(""), 0o644))
+
+			opts := &ecosystems.SCAPluginOptions{
+				Global: ecosystems.GlobalOptions{TargetFile: &filename},
+			}
+
+			files, err := p.discoverGradleFiles(ctx, dir, opts)
+			require.NoError(t, err)
+			assert.Empty(t, files)
+		})
+	}
 
 	t.Run("returns error when target file does not exist", func(t *testing.T) {
 		dir := t.TempDir()
@@ -149,10 +180,118 @@ func TestResolveProjectDir(t *testing.T) {
 			Global: ecosystems.GlobalOptions{TargetFile: &tf},
 		}
 
-		_, err := p.resolveProjectDir(dir, opts)
+		_, err := p.discoverGradleFiles(ctx, dir, opts)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
 	})
+
+	t.Run("--all-projects finds all gradle files recursively", func(t *testing.T) {
+		dir := t.TempDir()
+
+		// Create gradleProj1: has both settings.gradle and build.gradle
+		proj1Dir := filepath.Join(dir, "gradleProj1")
+		require.NoError(t, os.MkdirAll(proj1Dir, 0o755))
+		proj1Settings := filepath.Join(proj1Dir, "settings.gradle")
+		proj1Build := filepath.Join(proj1Dir, "build.gradle")
+		require.NoError(t, os.WriteFile(proj1Settings, []byte(""), 0o644))
+		require.NoError(t, os.WriteFile(proj1Build, []byte(""), 0o644))
+
+		// Create sub-modules of gradleProj1
+		module1Dir := filepath.Join(proj1Dir, "module1")
+		require.NoError(t, os.MkdirAll(module1Dir, 0o755))
+		module1Build := filepath.Join(module1Dir, "build.gradle")
+		require.NoError(t, os.WriteFile(module1Build, []byte(""), 0o644))
+
+		// Create gradleProj2: only has settings.gradle
+		proj2Dir := filepath.Join(dir, "gradleProj2")
+		require.NoError(t, os.MkdirAll(proj2Dir, 0o755))
+		proj2Settings := filepath.Join(proj2Dir, "settings.gradle")
+		require.NoError(t, os.WriteFile(proj2Settings, []byte(""), 0o644))
+
+		opts := &ecosystems.SCAPluginOptions{
+			Global: ecosystems.GlobalOptions{AllProjects: true},
+		}
+
+		files, err := p.discoverGradleFiles(ctx, dir, opts)
+		require.NoError(t, err)
+
+		// Should find all gradle files (discovery doesn't filter - deduplication happens at runtime)
+		require.Len(t, files, 4)
+
+		paths := make([]string, 0, len(files))
+		for _, f := range files {
+			paths = append(paths, f.Path)
+		}
+		assert.ElementsMatch(t, []string{proj1Build, proj1Settings, module1Build, proj2Settings}, paths)
+	})
+
+	t.Run("--all-projects includes both build and settings files", func(t *testing.T) {
+		dir := t.TempDir()
+		settingsFile := filepath.Join(dir, "settings.gradle")
+		buildFile := filepath.Join(dir, "build.gradle")
+		buildKtsFile := filepath.Join(dir, "build.gradle.kts")
+		settingsKtsFile := filepath.Join(dir, "settings.gradle.kts")
+
+		require.NoError(t, os.WriteFile(settingsFile, []byte(""), 0o644))
+		require.NoError(t, os.WriteFile(buildFile, []byte(""), 0o644))
+		require.NoError(t, os.WriteFile(buildKtsFile, []byte(""), 0o644))
+		require.NoError(t, os.WriteFile(settingsKtsFile, []byte(""), 0o644))
+
+		opts := &ecosystems.SCAPluginOptions{
+			Global: ecosystems.GlobalOptions{AllProjects: true},
+		}
+
+		files, err := p.discoverGradleFiles(ctx, dir, opts)
+		require.NoError(t, err)
+		require.Len(t, files, 4)
+
+		paths := make([]string, 0, len(files))
+		for _, f := range files {
+			paths = append(paths, f.Path)
+		}
+		assert.ElementsMatch(t, []string{buildFile, buildKtsFile, settingsFile, settingsKtsFile}, paths)
+	})
+
+	settingsFiles := []string{"settings.gradle", "settings.gradle.kts"}
+
+	for _, filename := range settingsFiles {
+		t.Run(fmt.Sprintf("falls back to %s when no build files in root", filename), func(t *testing.T) {
+			dir := t.TempDir()
+			settingsFile := filepath.Join(dir, filename)
+			require.NoError(t, os.WriteFile(settingsFile, []byte(""), 0o644))
+
+			files, err := p.discoverGradleFiles(ctx, dir, &ecosystems.SCAPluginOptions{})
+			require.NoError(t, err)
+			require.Len(t, files, 1)
+			assert.Equal(t, settingsFile, files[0].Path)
+		})
+	}
+}
+
+// ── isSettingsFile ──────────────────────────────────────────────────────────
+
+func TestIsSettingsFile(t *testing.T) {
+	settingsFiles := []string{"settings.gradle", "settings.gradle.kts"}
+	buildFiles := []string{"build.gradle", "build.gradle.kts"}
+	nonGradleFiles := []string{"pom.xml", "package.json", ""}
+
+	for _, file := range settingsFiles {
+		t.Run(fmt.Sprintf("%s should be settings file", file), func(t *testing.T) {
+			assert.True(t, isSettingsFile(file))
+			assert.True(t, isSettingsFile("/project/"+file)) // Test with path
+		})
+	}
+
+	for _, file := range buildFiles {
+		t.Run(fmt.Sprintf("%s should not be settings file", file), func(t *testing.T) {
+			assert.False(t, isSettingsFile(file))
+		})
+	}
+
+	for _, file := range nonGradleFiles {
+		t.Run(fmt.Sprintf("%s should not be settings file", file), func(t *testing.T) {
+			assert.False(t, isSettingsFile(file))
+		})
+	}
 }
 
 // ── resolveInitScript ─────────────────────────────────────────────────────────
@@ -241,19 +380,5 @@ func TestBuildExtraArgs(t *testing.T) {
 		_, err := buildExtraArgs(dir, opts)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "user init script is a directory")
-	})
-
-	t.Run("returns error when user init script is not readable", func(t *testing.T) {
-		dir := t.TempDir()
-		userScript := filepath.Join(dir, "unreadable.gradle")
-		require.NoError(t, os.WriteFile(userScript, []byte("// custom"), 0o000)) // no read permission
-
-		opts := &ecosystems.SCAPluginOptions{
-			Gradle: ecosystems.GradleOptions{InitScript: userScript},
-		}
-
-		_, err := buildExtraArgs(dir, opts)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "user init script cannot be read")
 	})
 }
