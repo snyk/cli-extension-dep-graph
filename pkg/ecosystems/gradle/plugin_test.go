@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -380,5 +382,220 @@ func TestBuildExtraArgs(t *testing.T) {
 		_, err := buildExtraArgs(dir, opts)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "user init script is a directory")
+	})
+}
+
+// ── Target file filtering behavior demonstration ──────────────────────────────
+
+func TestTargetFileFiltering_MockedOutput(t *testing.T) {
+	ctx := context.Background()
+	log := logger.Nop()
+	p := NewPlugin()
+
+	// Simulate the JSON that would be returned by Gradle's :snykDependencyGraph task
+	// This represents a multi-project build with root, app, and lib subprojects
+	mockMultiProjectJSON := `{
+  "metadata": {
+    "gradleVersion": "8.0",
+    "javaVersion": "17.0.1",
+    "generatedAt": "2023-01-01T12:00:00Z",
+    "rootProject": {
+      "name": "myproject",
+      "group": "com.example",
+      "version": "1.0.0",
+      "path": "/project"
+    }
+  },
+  "projects": {
+    ":": {
+      "name": "myproject",
+      "group": "com.example",
+      "version": "1.0.0",
+      "path": ":",
+      "gav": "com.example:myproject:1.0.0",
+      "buildFile": "/project/build.gradle",
+      "plugins": ["java"],
+      "configurations": {
+        "compileClasspath": {
+          "description": "Compile classpath",
+          "root": {
+            "id": "com.example:myproject:1.0.0",
+            "dependencies": []
+          },
+          "allDependencies": []
+        }
+      }
+    },
+    ":app": {
+      "name": "app",
+      "group": "com.example",
+      "version": "1.0.0",
+      "path": ":app",
+      "gav": "com.example:app:1.0.0",
+      "buildFile": "/project/app/build.gradle",
+      "plugins": ["java", "application"],
+      "configurations": {
+        "compileClasspath": {
+          "description": "Compile classpath",
+          "root": {
+            "id": "com.example:app:1.0.0",
+            "dependencies": [
+              {
+                "id": "org.slf4j:slf4j-api:1.7.36",
+                "dependencies": []
+              }
+            ]
+          },
+          "allDependencies": [
+            { "id": "org.slf4j:slf4j-api:1.7.36" }
+          ]
+        }
+      }
+    },
+    ":lib": {
+      "name": "lib",
+      "group": "com.example", 
+      "version": "1.0.0",
+      "path": ":lib",
+      "gav": "com.example:lib:1.0.0",
+      "buildFile": "/project/lib/build.gradle",
+      "plugins": ["java-library"],
+      "configurations": {
+        "compileClasspath": {
+          "description": "Compile classpath",
+          "root": {
+            "id": "com.example:lib:1.0.0",
+            "dependencies": [
+              {
+                "id": "com.google.guava:guava:31.1-jre",
+                "dependencies": []
+              }
+            ]
+          },
+          "allDependencies": [
+            { "id": "com.google.guava:guava:31.1-jre" }
+          ]
+        }
+      }
+    }
+  }
+}`
+
+	t.Run("demonstrates multi-project output gets filtered to single project", func(t *testing.T) {
+		// Parse the mock JSON as if it came from Gradle
+		parsed, err := parseDependencyGraphJSON([]byte(mockMultiProjectJSON))
+		require.NoError(t, err)
+
+		// Without target file - should get all 3 projects
+		optsAll := &ecosystems.SCAPluginOptions{
+			Global: ecosystems.GlobalOptions{},
+		}
+
+		allResults, allFiles := p.convertProjects(ctx, log, parsed, "/project", "", optsAll)
+		assert.Len(t, allResults, 3, "Without target file, should return all projects")
+		assert.Len(t, allFiles, 3)
+
+		// Extract project names for verification
+		allProjectNames := make([]string, len(allResults))
+		for i, result := range allResults {
+			if result.DepGraph != nil && result.DepGraph.GetRootPkg() != nil {
+				allProjectNames[i] = result.DepGraph.GetRootPkg().Info.Name
+			}
+		}
+		assert.Contains(t, allProjectNames, "com.example:myproject") // root
+		assert.Contains(t, allProjectNames, "com.example:app")       // app subproject  
+		assert.Contains(t, allProjectNames, "com.example:lib")       // lib subproject
+
+		// With target file - should get only the matching project
+		targetFile := "app/build.gradle"
+		optsTargeted := &ecosystems.SCAPluginOptions{
+			Global: ecosystems.GlobalOptions{TargetFile: &targetFile},
+		}
+
+		targetedResults, targetedFiles := p.convertProjects(ctx, log, parsed, "/project", "", optsTargeted)
+		assert.Len(t, targetedResults, 1, "With target file, should return only matching project")
+		assert.Len(t, targetedFiles, 1)
+
+		// Verify it's the correct project
+		result := targetedResults[0]
+		assert.NotNil(t, result.DepGraph)
+		assert.Equal(t, "com.example:app", result.DepGraph.GetRootPkg().Info.Name)
+
+		// Verify it has the expected dependency (slf4j-api from the mock)
+		depGraph := result.DepGraph
+		
+		// Check that slf4j-api exists somewhere in the dependency graph
+		nodeIDs := make(map[string]bool)
+		for _, node := range depGraph.Graph.Nodes {
+			nodeIDs[node.NodeID] = true
+		}
+		
+		var hasSlf4j bool
+		for nodeID := range nodeIDs {
+			if strings.Contains(nodeID, "slf4j-api") {
+				hasSlf4j = true
+				break
+			}
+		}
+		assert.True(t, hasSlf4j, "dependency graph should contain slf4j-api")
+
+		// Verify target file in result
+		assert.Equal(t, &targetFile, result.ProjectDescriptor.Identity.TargetFile)
+	})
+
+	t.Run("demonstrates filtering works with absolute paths", func(t *testing.T) {
+		parsed, err := parseDependencyGraphJSON([]byte(mockMultiProjectJSON))
+		require.NoError(t, err)
+
+		// Use absolute path for lib project
+		targetFile := "/project/lib/build.gradle"
+		opts := &ecosystems.SCAPluginOptions{
+			Global: ecosystems.GlobalOptions{TargetFile: &targetFile},
+		}
+
+		results, files := p.convertProjects(ctx, log, parsed, "/project", "", opts)
+		assert.Len(t, results, 1, "Should return only the lib project")
+		assert.Len(t, files, 1)
+
+		// Verify it's the lib project with its specific dependency (guava)
+		result := results[0]
+		assert.NotNil(t, result.DepGraph)
+		assert.Equal(t, "com.example:lib", result.DepGraph.GetRootPkg().Info.Name)
+
+		// Verify it has the expected dependency (guava from the mock)
+		depGraph := result.DepGraph
+		
+		// Check that guava exists somewhere in the dependency graph
+		nodeIDs := make(map[string]bool)
+		for _, node := range depGraph.Graph.Nodes {
+			nodeIDs[node.NodeID] = true
+		}
+		
+		var hasGuava bool
+		for nodeID := range nodeIDs {
+			if strings.Contains(nodeID, "guava") {
+				hasGuava = true
+				break
+			}
+		}
+		assert.True(t, hasGuava, "dependency graph should contain guava")
+
+		// Target file should be converted to relative path in result
+		expectedRelative := "lib/build.gradle"
+		assert.Equal(t, &expectedRelative, result.ProjectDescriptor.Identity.TargetFile)
+	})
+
+	t.Run("demonstrates no results when target file doesn't match", func(t *testing.T) {
+		parsed, err := parseDependencyGraphJSON([]byte(mockMultiProjectJSON))
+		require.NoError(t, err)
+
+		targetFile := "nonexistent/build.gradle"
+		opts := &ecosystems.SCAPluginOptions{
+			Global: ecosystems.GlobalOptions{TargetFile: &targetFile},
+		}
+
+		results, files := p.convertProjects(ctx, log, parsed, "/project", "", opts)
+		assert.Len(t, results, 0, "Should return no results when no project matches")
+		assert.Len(t, files, 0)
 	})
 }

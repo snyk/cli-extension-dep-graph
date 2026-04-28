@@ -155,9 +155,10 @@ func (p Plugin) processGradleFiles(
 
 	for _, discoveredFile := range files {
 		projectDir := filepath.Dir(discoveredFile.Path)
+		relativeProjectDir := filepath.Dir(discoveredFile.RelPath)
 
 		// Skip if we've already processed this directory
-		if processedDirs[projectDir] {
+		if processedDirs[relativeProjectDir] {
 			log.Debug(ctx, "Skipping already processed directory",
 				logger.Attr("dir", projectDir),
 				logger.Attr("file", discoveredFile.RelPath))
@@ -173,7 +174,7 @@ func (p Plugin) processGradleFiles(
 			// Add error result and mark directory as processed (failed)
 			errResult := gradleErrorResult(dir, discoveredFile.Path, fmt.Errorf("binary resolution failed: %w", err))
 			allResults = append(allResults, errResult)
-			processedDirs[projectDir] = true
+			processedDirs[relativeProjectDir] = true
 			continue // Skip to next file
 		}
 
@@ -227,7 +228,7 @@ func (p Plugin) processGradleFiles(
 		}
 
 		// Also mark the directory we ran from as processed
-		processedDirs[projectDir] = true
+		processedDirs[relativeProjectDir] = true
 	}
 
 	return allResults, allProcessedFiles, nil
@@ -272,10 +273,32 @@ func (p Plugin) convertProjects(
 ) (results []ecosystems.SCAResult, processedFiles []string) {
 	subProject := options.Gradle.SubProject
 
+	// Convert target file to absolute path for comparison when filtering
+	var targetFileAbs string
+	if options.Global.TargetFile != nil {
+		if filepath.IsAbs(*options.Global.TargetFile) {
+			targetFileAbs = *options.Global.TargetFile
+		} else {
+			targetFileAbs = filepath.Join(dir, *options.Global.TargetFile)
+		}
+	}
+
 	for projPath, proj := range parsed.Projects {
 		// Apply --gradle-sub-project filter when specified.
 		if subProject != "" && !matchesSubProject(projPath, proj.Name, subProject) {
 			continue
+		}
+
+		// Apply --target-file filter when specified.
+		// Only return the project whose build file matches the target file.
+		if targetFileAbs != "" {
+			absFile := proj.BuildFile
+			if absFile == "" {
+				absFile = discoveredBuildFile
+			}
+			if absFile != targetFileAbs {
+				continue
+			}
 		}
 
 		// Gradle reports each project's build file as an absolute path.

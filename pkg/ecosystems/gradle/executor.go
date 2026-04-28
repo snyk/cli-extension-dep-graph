@@ -19,8 +19,11 @@ const (
 	fallbackReportPath = "build/reports/snyk-dependency-graph.json"
 )
 
-// runInitScript runs `gradle snykDependencyGraph` with the embedded init script
+// runInitScript runs `gradle :snykDependencyGraph` with the embedded init script
 // and returns the raw JSON bytes from the generated output file.
+//
+// Always uses `:snykDependencyGraph` to run the task on the root project since
+// the task only exists at the root level.
 //
 // Fixed flags applied on every invocation:
 //
@@ -35,7 +38,7 @@ func runInitScript(ctx context.Context, projectDir, gradleBinary, initScriptPath
 		"--no-parallel",
 		"--console=plain",
 		"-Dorg.gradle.welcome=never",
-		"snykDependencyGraph",
+		":snykDependencyGraph",
 	}, extraArgs...)
 
 	cmd := exec.CommandContext(ctx, gradleBinary, args...)
