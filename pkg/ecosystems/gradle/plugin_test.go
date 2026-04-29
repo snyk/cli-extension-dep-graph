@@ -503,7 +503,7 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 			}
 		}
 		assert.Contains(t, allProjectNames, "com.example:myproject") // root
-		assert.Contains(t, allProjectNames, "com.example:app")       // app subproject  
+		assert.Contains(t, allProjectNames, "com.example:app")       // app subproject
 		assert.Contains(t, allProjectNames, "com.example:lib")       // lib subproject
 
 		// With target file - should get only the matching project
@@ -523,13 +523,13 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 
 		// Verify it has the expected dependency (slf4j-api from the mock)
 		depGraph := result.DepGraph
-		
+
 		// Check that slf4j-api exists somewhere in the dependency graph
 		nodeIDs := make(map[string]bool)
 		for _, node := range depGraph.Graph.Nodes {
 			nodeIDs[node.NodeID] = true
 		}
-		
+
 		var hasSlf4j bool
 		for nodeID := range nodeIDs {
 			if strings.Contains(nodeID, "slf4j-api") {
@@ -564,13 +564,13 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 
 		// Verify it has the expected dependency (guava from the mock)
 		depGraph := result.DepGraph
-		
+
 		// Check that guava exists somewhere in the dependency graph
 		nodeIDs := make(map[string]bool)
 		for _, node := range depGraph.Graph.Nodes {
 			nodeIDs[node.NodeID] = true
 		}
-		
+
 		var hasGuava bool
 		for nodeID := range nodeIDs {
 			if strings.Contains(nodeID, "guava") {

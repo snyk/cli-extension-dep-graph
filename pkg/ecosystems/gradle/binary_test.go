@@ -12,10 +12,50 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// setupFakeGradle creates a fake gradle binary in a temporary directory
+// and adds it to PATH for the duration of the test
+func setupFakeGradle(t *testing.T) func() {
+	t.Helper()
+
+	// Create temporary directory for fake gradle
+	tmpDir := t.TempDir()
+
+	// Create fake gradle executable
+	gradlePath := filepath.Join(tmpDir, "gradle")
+	if runtime.GOOS == "windows" {
+		gradlePath += ".exe"
+	}
+
+	// Write a simple script/executable
+	content := "#!/bin/sh\necho 'fake gradle'\n"
+	if runtime.GOOS == "windows" {
+		content = "@echo off\necho fake gradle\n"
+	}
+
+	require.NoError(t, os.WriteFile(gradlePath, []byte(content), 0o755))
+
+	// Save original PATH and modify it
+	originalPath := os.Getenv("PATH")
+	separator := ":"
+	if runtime.GOOS == "windows" {
+		separator = ";"
+	}
+	newPath := tmpDir + separator + originalPath
+	require.NoError(t, os.Setenv("PATH", newPath))
+
+	// Return cleanup function
+	return func() {
+		os.Setenv("PATH", originalPath)
+	}
+}
+
 // ── ResolveGradleBinary ──────────────────────────────────────────────────────
 
 func TestResolveGradleBinary(t *testing.T) {
 	t.Run("returns system gradle when no wrapper present", func(t *testing.T) {
+		cleanup := setupFakeGradle(t)
+		defer cleanup()
+
 		dir := t.TempDir()
 		binary, err := ResolveGradleBinary(dir, false)
 		require.NoError(t, err)
@@ -34,6 +74,9 @@ func TestResolveGradleBinary(t *testing.T) {
 	})
 
 	t.Run("falls back to gradle when gradlew is not executable", func(t *testing.T) {
+		cleanup := setupFakeGradle(t)
+		defer cleanup()
+
 		dir := t.TempDir()
 		wrapperPath := filepath.Join(dir, "gradlew")
 		require.NoError(t, os.WriteFile(wrapperPath, []byte("#!/bin/sh"), 0o644)) // not executable
@@ -62,6 +105,9 @@ func TestResolveGradleBinary(t *testing.T) {
 	})
 
 	t.Run("skip wrapper flag bypasses wrapper discovery", func(t *testing.T) {
+		cleanup := setupFakeGradle(t)
+		defer cleanup()
+
 		dir := t.TempDir()
 		wrapperPath := filepath.Join(dir, "gradlew")
 		require.NoError(t, os.WriteFile(wrapperPath, []byte("#!/bin/sh"), 0o755))
@@ -98,8 +144,16 @@ func TestResolveGradleBinary(t *testing.T) {
 	})
 
 	t.Run("returns error when gradle not found and no wrapper", func(t *testing.T) {
-		// This test would need to mock exec.LookPath to simulate gradle not being available
-		// For now, we'll skip this as it requires more complex mocking setup
-		t.Skip("Requires mocking exec.LookPath to simulate gradle not found")
+		// Save original PATH and set it to empty to simulate gradle not found
+		originalPath := os.Getenv("PATH")
+		require.NoError(t, os.Setenv("PATH", ""))
+		defer os.Setenv("PATH", originalPath)
+
+		dir := t.TempDir()
+		binary, err := ResolveGradleBinary(dir, false)
+
+		assert.Error(t, err)
+		assert.Equal(t, errGradleNotFound, err)
+		assert.Empty(t, binary)
 	})
 }
