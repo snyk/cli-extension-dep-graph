@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 )
 
@@ -14,9 +13,6 @@ const (
 	// snykDepsMarker is the prefix the init script prints on the line that
 	// contains the absolute path to the generated JSON output file.
 	snykDepsMarker = "SNYK_DEPS_JSON "
-
-	// fallbackReportPath is used when the marker line is not found in stdout.
-	fallbackReportPath = "build/reports/snyk-dependency-graph.json"
 )
 
 // runInitScript runs `gradle :snykDependencyGraph` with the embedded init script
@@ -57,7 +53,10 @@ func runInitScript(ctx context.Context, projectDir, gradleBinary, initScriptPath
 
 	outputFile := parseSnykDepsMarker(stdout.String())
 	if outputFile == "" {
-		outputFile = filepath.Join(projectDir, fallbackReportPath)
+		return nil, fmt.Errorf(
+			"gradle task ran successfully but did not output expected marker line %q\nstdout:\n%s",
+			snykDepsMarker, stdout.String(),
+		)
 	}
 
 	data, err := os.ReadFile(outputFile)
