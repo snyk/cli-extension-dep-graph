@@ -19,6 +19,8 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
 )
 
+const PluginName = "uv"
+
 type Plugin struct {
 	client        Client
 	snykClient    *snykclient.SnykClient
@@ -31,6 +33,10 @@ func NewPlugin(client Client, snykClient *snykclient.SnykClient, remoteRepoURL s
 		snykClient:    snykClient,
 		remoteRepoURL: remoteRepoURL,
 	}
+}
+
+func (p Plugin) GetName() string {
+	return PluginName
 }
 
 func (p Plugin) BuildDepGraphsFromDir(

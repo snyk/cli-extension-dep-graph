@@ -22,6 +22,7 @@ import (
 )
 
 const (
+	PluginName            = "pipenv"
 	pipfileFile           = "Pipfile"
 	pipfileLockFile       = "Pipfile.lock"
 	maxConcurrentInstalls = 5
@@ -33,6 +34,10 @@ type Plugin struct{}
 
 // Compile-time check to ensure Plugin implements SCAPlugin interface.
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
+
+func (p Plugin) GetName() string {
+	return PluginName
+}
 
 // BuildDepGraphsFromDir discovers and builds dependency graphs for Pipenv projects.
 func (p Plugin) BuildDepGraphsFromDir(

@@ -13,7 +13,10 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
 )
 
-const logFieldLockFile = "lockFile"
+const (
+	PluginName       = "bun"
+	logFieldLockFile = "lockFile"
+)
 
 // Plugin implements ecosystems.SCAPlugin for Bun projects.
 // It uses `bun why '*' --top` to resolve the full dependency graph without
@@ -24,6 +27,10 @@ type Plugin struct {
 
 // Compile-time check that Plugin implements the SCAPlugin interface.
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
+
+func (p Plugin) GetName() string {
+	return PluginName
+}
 
 // BuildDepGraphsFromDir discovers bun.lock files under dir and produces dep
 // graphs for each one. Workspace projects yield one SCAResult per workspace
