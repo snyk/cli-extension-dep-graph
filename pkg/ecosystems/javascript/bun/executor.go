@@ -54,7 +54,7 @@ func (e *bunCmdExecutor) Run(ctx context.Context, dir string) (io.ReadCloser, er
 		return nil, err
 	}
 
-	cmd := exec.CommandContext(ctx, resolved, "why", "*", "--top")
+	cmd := exec.CommandContext(ctx, resolved, "--no-env-file", "why", "*", "--top")
 	cmd.Dir = dir
 	cmd.Env = append(cmd.Environ(), "NO_COLOR=1")
 
