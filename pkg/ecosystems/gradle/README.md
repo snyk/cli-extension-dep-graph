@@ -123,3 +123,30 @@ Gradle execution uses several flags for predictable, isolated behaviour:
 - `--no-parallel`: Currently used but undesirable; planned improvements should remove this limitation to allow parallel execution for better performance, with particular benefits expected for `TargetFile` invocation scenarios
 
 `GRADLE_OPTS` configuration is left for invoking system to handle, following standard Gradle conventions rather than prescriptive memory tuning.
+
+## Integration Tests
+
+Real Gradle invocations are exercised by the integration suite under `pkg/ecosystems/gradle/plugin_integration_test.go`, gated behind the `integration,gradle` build tags. The fixtures live in `pkg/ecosystems/testdata/fixtures/gradle/`.
+
+### Running locally
+
+The tests need a working Gradle on `PATH` (or a wrapper inside the fixture). With those in place:
+
+```sh
+make test-gradle-integration
+```
+
+### Updating expected snapshots
+
+Each fixture stores its expected `[]ecosystems.SCAResult` as `expected_plugin*.json`. After changing the plugin's output shape or adding a new fixture, regenerate the snapshots and inspect the diff before committing:
+
+```sh
+make update-gradle-fixtures
+git diff pkg/ecosystems/testdata/fixtures/gradle/
+```
+
+This invokes the same suite with `UPDATE_FIXTURES=1`, which makes each test write the captured results back to disk instead of asserting.
+
+### CI matrix
+
+CircleCI runs the suite across `(gradle, jdk)` pairs `[(6, 11), (7, 17), (8, 21), (9, 25)]` whenever a PR touches files under `pkg/ecosystems/gradle/` or `pkg/ecosystems/testdata/fixtures/gradle/`. See `.circleci/continue-config.yml` for the job definition; each pair uses the official `gradle:<X>-jdk<Y>` Docker image.

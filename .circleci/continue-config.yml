@@ -10,6 +10,9 @@ parameters:
   run-python-tests:
     type: boolean
     default: false
+  run-gradle-tests:
+    type: boolean
+    default: false
 
 metadata:
   resource_class: small
@@ -172,6 +175,57 @@ jobs:
           paths:
             - ~/.devpi/server
 
+  gradle_integration_test:
+    parameters:
+      gradle_version:
+        type: string
+      jdk_version:
+        type: string
+    resource_class: medium
+    docker:
+      - image: gradle:<< parameters.gradle_version >>-jdk<< parameters.jdk_version >>
+        # The gradle image runs as the unprivileged `gradle` user; running as
+        # root keeps things simple for installing Go and managing caches.
+        user: root
+    working_directory: /home/gradle/project
+    environment:
+      # Pin the Gradle user home to a known path so we can persist it via
+      # CircleCI's cache (default would be /root/.gradle which is fine, but
+      # being explicit guards against future image changes).
+      GRADLE_USER_HOME: /home/gradle/.gradle
+    steps:
+      - checkout
+      - run:
+          name: Install Go
+          command: |
+            wget -qO- https://go.dev/dl/go<< pipeline.parameters.go_version >>.0.linux-amd64.tar.gz | tar -C /usr/local -xz
+            echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
+            source $BASH_ENV
+            go version
+      - restore_cache:
+          name: Restore Gradle cache
+          keys:
+            - gradle-cache-v1-g<< parameters.gradle_version >>-j<< parameters.jdk_version >>-{{ checksum "pkg/ecosystems/gradle/init/snyk-deps-init.gradle" }}
+            - gradle-cache-v1-g<< parameters.gradle_version >>-j<< parameters.jdk_version >>-
+            - gradle-cache-v1-g<< parameters.gradle_version >>-
+      - run:
+          name: Verify toolchain
+          command: |
+            go version
+            java -version
+            gradle --version
+            echo "GRADLE_USER_HOME: $GRADLE_USER_HOME"
+            mkdir -p "$GRADLE_USER_HOME"
+      - run:
+          name: Run Gradle integration tests
+          command: make test-gradle-integration
+      - save_cache:
+          name: Save Gradle cache
+          key: gradle-cache-v1-g<< parameters.gradle_version >>-j<< parameters.jdk_version >>-{{ checksum "pkg/ecosystems/gradle/init/snyk-deps-init.gradle" }}
+          paths:
+            - /home/gradle/.gradle/caches
+            - /home/gradle/.gradle/wrapper
+
   security-scans:
     <<: *go_image
     resource_class: small
@@ -297,4 +351,31 @@ workflows:
           matrix:
             parameters:
               python_version: [ "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14" ]
+          <<: *filters_pr_only
+
+  # Conditional workflow for Gradle integration tests (only runs when Gradle files changed).
+  # Gradle / JDK pairs are enumerated explicitly because CircleCI's matrix axes are
+  # independent and we only want a small set of supported combinations.
+  gradle-integration:
+    when: << pipeline.parameters.run-gradle-tests >>
+    jobs:
+      - gradle_integration_test:
+          name: gradle_6_jdk_11
+          gradle_version: "6"
+          jdk_version: "11"
+          <<: *filters_pr_only
+      - gradle_integration_test:
+          name: gradle_7_jdk_17
+          gradle_version: "7"
+          jdk_version: "17"
+          <<: *filters_pr_only
+      - gradle_integration_test:
+          name: gradle_8_jdk_21
+          gradle_version: "8"
+          jdk_version: "21"
+          <<: *filters_pr_only
+      - gradle_integration_test:
+          name: gradle_9_jdk_25
+          gradle_version: "9"
+          jdk_version: "25"
           <<: *filters_pr_only

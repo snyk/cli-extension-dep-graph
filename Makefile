@@ -30,4 +30,10 @@ test:
 test-python-integration:
 	$(GOTEST) -v -tags="integration,python" -timeout=10m ./pkg/ecosystems/python/pip/ -coverprofile cp.out
 
-.PHONY: install-req fmt test test-python-integration lint tidy imports
+test-gradle-integration:
+	$(GOTEST) -v -tags="integration,gradle" -timeout=15m ./pkg/ecosystems/gradle/ -coverprofile cp.out
+
+update-gradle-fixtures:
+	UPDATE_FIXTURES=1 $(GOTEST) -v -tags="integration,gradle" -timeout=15m ./pkg/ecosystems/gradle/
+
+.PHONY: install-req fmt test test-python-integration test-gradle-integration update-gradle-fixtures lint tidy imports
