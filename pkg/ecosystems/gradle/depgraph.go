@@ -2,6 +2,7 @@ package gradle
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
@@ -34,16 +35,55 @@ func buildDepGraph(proj *gradleProject) (*depgraph.DepGraph, error) {
 
 	rootNodeID := builder.GetRootNode().NodeID
 
+	// edges tracks (parent → set of children) across the entire merged graph
+	// so that an edge contributed by more than one configuration is added to
+	// the dep-graph builder exactly once. The dep-graph schema treats Deps as
+	// a set of edges, but depgraph.Builder.ConnectNodes is not idempotent —
+	// without this guard, a dep present in N configurations would appear as
+	// N parallel edges from the same parent.
+	edges := make(map[string]map[string]bool)
+	connectOnce := func(parentID, childID string) error {
+		children := edges[parentID]
+		if children == nil {
+			children = make(map[string]bool)
+			edges[parentID] = children
+		}
+		if children[childID] {
+			return nil
+		}
+		children[childID] = true
+		if err := builder.ConnectNodes(parentID, childID); err != nil {
+			return fmt.Errorf("failed to connect %s -> %s: %w", parentID, childID, err)
+		}
+		return nil
+	}
+
 	// Merge all configurations into a single graph.  Per-configuration
 	// filtering (e.g. --configuration-matching, preferring runtimeClasspath)
 	// will be added when feature parity work begins.
-	for _, cfg := range proj.Configurations {
+	//
+	// Iterate configurations in lexical order so the resulting graph is
+	// deterministic — Go map iteration is randomized, and downstream
+	// consumers (and snapshot tests) need a stable ordering of edges
+	// between root and its direct deps. Lexical order also matches the order
+	// `gradle dependencies` itself uses to print configurations, so when the
+	// same edge appears in multiple configurations its position in the
+	// merged graph is taken from the lexically-first configuration that
+	// contributes it.
+	configNames := make([]string, 0, len(proj.Configurations))
+	for name := range proj.Configurations {
+		configNames = append(configNames, name)
+	}
+	sort.Strings(configNames)
+
+	for _, name := range configNames {
+		cfg := proj.Configurations[name]
 		if cfg.Error != "" {
 			continue
 		}
 		seen := make(map[string]bool) // Fresh seen map per configuration
 		for _, dep := range cfg.Root.Dependencies {
-			if err := addDep(builder, dep, rootNodeID, seen); err != nil {
+			if err := addDep(builder, dep, rootNodeID, seen, connectOnce); err != nil {
 				return nil, fmt.Errorf("project %s: %w", proj.Path, err)
 			}
 		}
@@ -54,7 +94,9 @@ func buildDepGraph(proj *gradleProject) (*depgraph.DepGraph, error) {
 
 // addDep recursively adds a resolved dependency node and its children to the builder.
 // Circular dependencies (already present in seen) are added as pruned leaf nodes.
-func addDep(builder *depgraph.Builder, dep gradleDep, parentID string, seen map[string]bool) error {
+// connectOnce wraps depgraph.Builder.ConnectNodes with deduplication so that the
+// same (parent, child) edge is only added once across the entire merged graph.
+func addDep(builder *depgraph.Builder, dep gradleDep, parentID string, seen map[string]bool, connectOnce func(parentID, childID string) error) error {
 	if dep.ID == "" || dep.Unresolved {
 		return nil
 	}
@@ -70,21 +112,17 @@ func addDep(builder *depgraph.Builder, dep gradleDep, parentID string, seen map[
 				Labels: map[string]string{"pruned": "true"},
 			}),
 		)
-		if err := builder.ConnectNodes(parentID, prunedID); err != nil {
-			return fmt.Errorf("failed to connect pruned node %s -> %s: %w", parentID, prunedID, err)
-		}
-
-		return nil
+		return connectOnce(parentID, prunedID)
 	}
 
 	builder.AddNode(nodeID, &depgraph.PkgInfo{Name: name, Version: version})
-	if err := builder.ConnectNodes(parentID, nodeID); err != nil {
-		return fmt.Errorf("failed to connect %s -> %s: %w", parentID, nodeID, err)
+	if err := connectOnce(parentID, nodeID); err != nil {
+		return err
 	}
 
 	seen[nodeID] = true
 	for _, child := range dep.Dependencies {
-		if err := addDep(builder, child, nodeID, seen); err != nil {
+		if err := addDep(builder, child, nodeID, seen, connectOnce); err != nil {
 			return err
 		}
 	}

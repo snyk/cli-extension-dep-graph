@@ -59,6 +59,12 @@ This results in both versions appearing in the merged graph, potentially causing
 
 **Future considerations**: Per-configuration filtering will likely be added when feature parity work begins, allowing clients to request specific configuration scopes.
 
+#### Edge deduplication and ordering
+
+When the same `(parent, child)` edge is contributed by more than one configuration (for example a direct dependency that appears in `compileClasspath`, `runtimeClasspath`, `testCompileClasspath` and `testRuntimeClasspath`), the merged graph contains the edge **exactly once** rather than once per contributing configuration. The dep-graph schema treats each parent's `Deps` as a set of edges, so multi-edges would be schema violations and would inflate downstream vulnerable-path counts.
+
+Configurations are walked in **lexical order**, matching the order `gradle dependencies` itself uses to print configurations. When the same edge appears in multiple configurations, its position in the parent's `Deps` slice is taken from the lexically-first configuration that contributes it. This makes the merged graph deterministic across runs and across JDK / Gradle versions, but it does mean that cross-configuration edge ordering is not semantically meaningful — clients that need a specific declaration order (for example, to surface a specific "nearest" path for a CVE) should request a single configuration via `--configuration-matching` once that lands.
+
 ### Classifier Handling
 
 **Current decision: Classifiers not captured**

@@ -250,6 +250,114 @@ func TestBuildDepGraph(t *testing.T) {
 	})
 }
 
+// TestBuildDepGraph_DoesNotDuplicateEdges asserts that when the same
+// (parent, child) edge is contributed by multiple Gradle configurations
+// (e.g. a dep present in compileClasspath, runtimeClasspath,
+// testCompileClasspath and testRuntimeClasspath), the merged graph contains
+// the edge exactly once.
+func TestBuildDepGraph_DoesNotDuplicateEdges(t *testing.T) {
+	proj := makeProject("com.example", "app", "1.0.0", map[string]gradleConfig{
+		"compileClasspath":     makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("com.google.guava:guava:32.1.2-jre")}),
+		"runtimeClasspath":     makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("com.google.guava:guava:32.1.2-jre")}),
+		"testCompileClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("com.google.guava:guava:32.1.2-jre")}),
+		"testRuntimeClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("com.google.guava:guava:32.1.2-jre")}),
+	})
+
+	dg, err := buildDepGraph(&proj)
+	require.NoError(t, err)
+
+	rootNode := findNodeByID(t, dg, "root-node")
+	guavaEdges := countEdgesTo(rootNode, "com.google.guava:guava@32.1.2-jre")
+	assert.Equal(t, 1, guavaEdges,
+		"shared dep should appear exactly once on root despite being present in %d configurations", len(proj.Configurations))
+}
+
+// findNodeByID returns the node with the given ID, failing the test if it is
+// not present.
+func findNodeByID(t *testing.T, dg *depgraph.DepGraph, id string) *depgraph.Node {
+	t.Helper()
+	for i := range dg.Graph.Nodes {
+		if dg.Graph.Nodes[i].NodeID == id {
+			return &dg.Graph.Nodes[i]
+		}
+	}
+	require.Failf(t, "node not found", "node %q not present in graph", id)
+	return nil
+}
+
+// countEdgesTo returns how many times childID appears as a direct child of node.
+func countEdgesTo(node *depgraph.Node, childID string) int {
+	count := 0
+	for _, dep := range node.Deps {
+		if dep.NodeID == childID {
+			count++
+		}
+	}
+	return count
+}
+
+// TestBuildDepGraph_EdgePositionFromLexicallyFirstConfig asserts that when an
+// edge is contributed by multiple configurations, its position in the parent's
+// Deps slice is taken from the lexically-first configuration that contributes
+// it. This documents the merge rule: configurations are walked in lexical
+// order and an edge keeps the position it was first inserted at.
+func TestBuildDepGraph_EdgePositionFromLexicallyFirstConfig(t *testing.T) {
+	// guava is declared first in compileClasspath and last in runtimeClasspath.
+	// compileClasspath sorts before runtimeClasspath, so guava should appear
+	// in position 0 of the merged root deps.
+	proj := makeProject("com.example", "app", "1.0.0", map[string]gradleConfig{
+		"compileClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{
+			makeDep("com.google.guava:guava:32.1.2-jre"),
+			makeDep("org.apache.commons:commons-lang3:3.14.0"),
+		}),
+		"runtimeClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{
+			makeDep("org.apache.commons:commons-lang3:3.14.0"),
+			makeDep("com.google.guava:guava:32.1.2-jre"),
+		}),
+	})
+
+	dg, err := buildDepGraph(&proj)
+	require.NoError(t, err)
+
+	rootNode := findNodeByID(t, dg, "root-node")
+	require.Len(t, rootNode.Deps, 2, "duplicates across configs should be merged")
+	assert.Equal(t, "com.google.guava:guava@32.1.2-jre", rootNode.Deps[0].NodeID,
+		"position should be taken from compileClasspath (lexically first)")
+	assert.Equal(t, "org.apache.commons:commons-lang3@3.14.0", rootNode.Deps[1].NodeID)
+}
+
+// TestBuildDepGraph_StableConfigurationOrder asserts that two builds of the
+// same project produce the same edge ordering, even though Configurations is a
+// Go map (whose iteration order is randomized).
+func TestBuildDepGraph_StableConfigurationOrder(t *testing.T) {
+	configs := map[string]gradleConfig{
+		"alpha":   makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("a:a:1.0")}),
+		"bravo":   makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("b:b:1.0")}),
+		"charlie": makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("c:c:1.0")}),
+		"delta":   makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("d:d:1.0")}),
+	}
+
+	first, err := buildDepGraph(&gradleProject{
+		Name: "app", Group: "com.example", Version: "1.0.0", Path: ":",
+		GAV: "com.example:app:1.0.0", BuildFile: "build.gradle",
+		Configurations: configs,
+	})
+	require.NoError(t, err)
+
+	for i := 0; i < 10; i++ {
+		next, err := buildDepGraph(&gradleProject{
+			Name: "app", Group: "com.example", Version: "1.0.0", Path: ":",
+			GAV: "com.example:app:1.0.0", BuildFile: "build.gradle",
+			Configurations: configs,
+		})
+		require.NoError(t, err)
+
+		firstRoot := findNodeByID(t, first, "root-node")
+		nextRoot := findNodeByID(t, next, "root-node")
+		assert.Equal(t, firstRoot.Deps, nextRoot.Deps, "root deps order should be stable across builds (iteration %d)", i)
+	}
+}
+
 // ── depNodeParts ──────────────────────────────────────────────────────────────
 
 func TestDepNodeParts(t *testing.T) {
