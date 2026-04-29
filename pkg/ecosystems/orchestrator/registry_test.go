@@ -40,9 +40,9 @@ func TestPluginRegistry_OrderPreservedWithoutDependencies(t *testing.T) {
 		plugins: make([]ecosystems.SCAPlugin, 0),
 	}
 
-	r.register(mockPlugin{name: "plugin-a"})
-	r.register(mockPlugin{name: "plugin-b"})
-	r.register(mockPlugin{name: "plugin-c"})
+	require.NoError(t, r.register(mockPlugin{name: "plugin-a"}))
+	require.NoError(t, r.register(mockPlugin{name: "plugin-b"}))
+	require.NoError(t, r.register(mockPlugin{name: "plugin-c"}))
 
 	require.Len(t, r.plugins, 3)
 	assert.Equal(t, "plugin-a", r.plugins[0].GetName())
@@ -56,9 +56,12 @@ func TestPluginRegistry_DependenciesRespected(t *testing.T) {
 		plugins: make([]ecosystems.SCAPlugin, 0),
 	}
 
-	r.register(mockPlugin{name: "plugin-c"}, "plugin-a")
-	r.register(mockPlugin{name: "plugin-b"}, "plugin-a")
-	r.register(mockPlugin{name: "plugin-a"})
+	err := r.register(mockPlugin{name: "plugin-c"}, "plugin-a")
+	require.NoError(t, err)
+	err = r.register(mockPlugin{name: "plugin-b"}, "plugin-a")
+	require.NoError(t, err)
+	err = r.register(mockPlugin{name: "plugin-a"})
+	require.NoError(t, err)
 
 	require.Len(t, r.plugins, 3)
 	assert.Equal(t, "plugin-a", r.plugins[0].GetName())
@@ -72,9 +75,12 @@ func TestPluginRegistry_ChainedDependencies(t *testing.T) {
 		plugins: make([]ecosystems.SCAPlugin, 0),
 	}
 
-	r.register(mockPlugin{name: "plugin-c"}, "plugin-b")
-	r.register(mockPlugin{name: "plugin-b"}, "plugin-a")
-	r.register(mockPlugin{name: "plugin-a"})
+	err := r.register(mockPlugin{name: "plugin-c"}, "plugin-b")
+	require.NoError(t, err)
+	err = r.register(mockPlugin{name: "plugin-b"}, "plugin-a")
+	require.NoError(t, err)
+	err = r.register(mockPlugin{name: "plugin-a"})
+	require.NoError(t, err)
 
 	require.Len(t, r.plugins, 3)
 	assert.Equal(t, "plugin-a", r.plugins[0].GetName())
@@ -83,7 +89,8 @@ func TestPluginRegistry_ChainedDependencies(t *testing.T) {
 }
 
 func TestPluginRegistry_DefaultRegistryOrder(t *testing.T) {
-	r := NewDefaultPluginRegistry()
+	r, err := NewDefaultPluginRegistry()
+	require.NoError(t, err)
 
 	require.Len(t, r.plugins, 4)
 	assert.Equal(t, "bun", r.plugins[0].GetName())
@@ -92,16 +99,27 @@ func TestPluginRegistry_DefaultRegistryOrder(t *testing.T) {
 	assert.Equal(t, "pipenv", r.plugins[3].GetName())
 }
 
-func TestPluginRegistry_CircularDependencyReturnsNil(t *testing.T) {
+func TestPluginRegistry_DefaultRegistryHasNoCircularDependencies(t *testing.T) {
+	// This test ensures NewDefaultPluginRegistry doesn't error due to circular dependencies
+	r, err := NewDefaultPluginRegistry()
+	require.NoError(t, err, "NewDefaultPluginRegistry should not return error for valid dependency graph")
+	assert.NotNil(t, r)
+	assert.NotNil(t, r.plugins, "plugins should be successfully sorted without circular dependencies")
+	assert.Len(t, r.plugins, 4, "all 4 plugins should be registered")
+}
+
+func TestPluginRegistry_CircularDependencyReturnsError(t *testing.T) {
 	r := &PluginRegistry{
 		entries: make([]pluginEntry, 0),
 		plugins: make([]ecosystems.SCAPlugin, 0),
 	}
 
-	r.register(mockPlugin{name: "plugin-a"}, "plugin-b")
-	r.register(mockPlugin{name: "plugin-b"}, "plugin-a")
-
-	assert.Nil(t, r.plugins, "circular dependencies should result in nil plugins list")
+	err := r.register(mockPlugin{name: "plugin-a"}, "plugin-b")
+	require.NoError(t, err)
+	err = r.register(mockPlugin{name: "plugin-b"}, "plugin-a")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "circular dependency detected")
+	assert.Contains(t, err.Error(), "plugin-b")
 }
 
 func TestPluginRegistry_NonExistentDependencyIgnored(t *testing.T) {
@@ -110,8 +128,10 @@ func TestPluginRegistry_NonExistentDependencyIgnored(t *testing.T) {
 		plugins: make([]ecosystems.SCAPlugin, 0),
 	}
 
-	r.register(mockPlugin{name: "plugin-a"})
-	r.register(mockPlugin{name: "plugin-b"}, "non-existent-plugin")
+	err := r.register(mockPlugin{name: "plugin-a"})
+	require.NoError(t, err)
+	err = r.register(mockPlugin{name: "plugin-b"}, "non-existent-plugin")
+	require.NoError(t, err)
 
 	require.Len(t, r.plugins, 2)
 
@@ -130,12 +150,30 @@ func TestPluginRegistry_DependencyAddedLater(t *testing.T) {
 		plugins: make([]ecosystems.SCAPlugin, 0),
 	}
 
-	r.register(mockPlugin{name: "plugin-b"}, "plugin-a")
-	r.register(mockPlugin{name: "plugin-a"})
+	err := r.register(mockPlugin{name: "plugin-b"}, "plugin-a")
+	require.NoError(t, err)
+	err = r.register(mockPlugin{name: "plugin-a"})
+	require.NoError(t, err)
 
 	require.Len(t, r.plugins, 2)
 	assert.Equal(t, "plugin-a", r.plugins[0].GetName())
 	assert.Equal(t, "plugin-b", r.plugins[1].GetName())
+}
+
+func TestPluginRegistry_CircularDependencyError(t *testing.T) {
+	r := &PluginRegistry{
+		entries: make([]pluginEntry, 0),
+		plugins: make([]ecosystems.SCAPlugin, 0),
+	}
+
+	err := r.register(mockPlugin{name: "plugin-a"}, "plugin-b")
+	require.NoError(t, err)
+	err = r.register(mockPlugin{name: "plugin-b"}, "plugin-c")
+	require.NoError(t, err)
+	err = r.register(mockPlugin{name: "plugin-c"}, "plugin-a")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "circular dependency detected")
+	assert.Contains(t, err.Error(), "plugin-c")
 }
 
 func TestPluginRegistry_ResolveDepgraphs_AllProjectsMode(t *testing.T) {
@@ -146,16 +184,16 @@ func TestPluginRegistry_ResolveDepgraphs_AllProjectsMode(t *testing.T) {
 		plugins: make([]ecosystems.SCAPlugin, 0),
 	}
 
-	r.register(mockPlugin{
+	require.NoError(t, r.register(mockPlugin{
 		name:           "plugin-a",
 		processedFiles: []string{"file-a.txt"},
 		results:        []ecosystems.SCAResult{{ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-a"}}}},
-	})
-	r.register(mockPlugin{
+	}))
+	require.NoError(t, r.register(mockPlugin{
 		name:           "plugin-b",
 		processedFiles: []string{"file-b.txt"},
 		results:        []ecosystems.SCAResult{{ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-b"}}}},
-	})
+	}))
 
 	opts := ecosystems.NewPluginOptions()
 	opts.Global.AllProjects = true
@@ -175,16 +213,16 @@ func TestPluginRegistry_ResolveDepgraphs_StopsAfterFirstResult(t *testing.T) {
 		plugins: make([]ecosystems.SCAPlugin, 0),
 	}
 
-	r.register(mockPlugin{
+	require.NoError(t, r.register(mockPlugin{
 		name:           "plugin-a",
 		processedFiles: []string{"file-a.txt"},
 		results:        []ecosystems.SCAResult{{ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-a"}}}},
-	})
-	r.register(mockPlugin{
+	}))
+	require.NoError(t, r.register(mockPlugin{
 		name:           "plugin-b",
 		processedFiles: []string{"file-b.txt"},
 		results:        []ecosystems.SCAResult{{ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-b"}}}},
-	})
+	}))
 
 	opts := ecosystems.NewPluginOptions()
 	opts.Global.AllProjects = false
@@ -205,16 +243,16 @@ func TestPluginRegistry_ResolveDepgraphs_ContinuesWhenNoResults(t *testing.T) {
 		plugins: make([]ecosystems.SCAPlugin, 0),
 	}
 
-	r.register(mockPlugin{
+	require.NoError(t, r.register(mockPlugin{
 		name:           "plugin-a",
 		processedFiles: []string{},
 		results:        []ecosystems.SCAResult{},
-	})
-	r.register(mockPlugin{
+	}))
+	require.NoError(t, r.register(mockPlugin{
 		name:           "plugin-b",
 		processedFiles: []string{"file-b.txt"},
 		results:        []ecosystems.SCAResult{{ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-b"}}}},
-	})
+	}))
 
 	opts := ecosystems.NewPluginOptions()
 	opts.Global.AllProjects = false

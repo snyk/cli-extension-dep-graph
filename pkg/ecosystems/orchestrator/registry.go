@@ -26,20 +26,28 @@ type PluginRegistry struct {
 	plugins []ecosystems.SCAPlugin
 }
 
-func NewDefaultPluginRegistry() *PluginRegistry {
+func NewDefaultPluginRegistry() (*PluginRegistry, error) {
 	r := &PluginRegistry{
 		entries: make([]pluginEntry, 0),
 		plugins: make([]ecosystems.SCAPlugin, 0),
 	}
 
 	// javascript
-	r.register(bun.Plugin{})
+	if err := r.register(bun.Plugin{}); err != nil {
+		return nil, fmt.Errorf("failed to register bun plugin: %w", err)
+	}
 	// python
-	r.register(uv.Plugin{})
-	r.register(pip.Plugin{}, uv.PluginName)
-	r.register(pipenv.Plugin{}, uv.PluginName)
+	if err := r.register(uv.Plugin{}); err != nil {
+		return nil, fmt.Errorf("failed to register uv plugin: %w", err)
+	}
+	if err := r.register(pip.Plugin{}, uv.PluginName); err != nil {
+		return nil, fmt.Errorf("failed to register pip plugin: %w", err)
+	}
+	if err := r.register(pipenv.Plugin{}, uv.PluginName); err != nil {
+		return nil, fmt.Errorf("failed to register pipenv plugin: %w", err)
+	}
 
-	return r
+	return r, nil
 }
 
 func (r *PluginRegistry) ResolveDepgraphs(ictx workflow.InvocationContext, dir string, opts *ecosystems.SCAPluginOptions) <-chan ecosystems.SCAResult {
@@ -79,12 +87,17 @@ func (r *PluginRegistry) ResolveDepgraphs(ictx workflow.InvocationContext, dir s
 	return resultsChan
 }
 
-func (r *PluginRegistry) register(plugin ecosystems.SCAPlugin, dependencies ...string) {
+func (r *PluginRegistry) register(plugin ecosystems.SCAPlugin, dependencies ...string) error {
 	r.entries = append(r.entries, pluginEntry{
 		plugin:       plugin,
 		dependencies: dependencies,
 	})
-	r.plugins = r.sortPlugins()
+	sorted := r.sortPlugins()
+	if sorted == nil {
+		return fmt.Errorf("circular dependency detected involving plugin: %s", plugin.GetName())
+	}
+	r.plugins = sorted
+	return nil
 }
 
 func (r *PluginRegistry) sortPlugins() []ecosystems.SCAPlugin {
