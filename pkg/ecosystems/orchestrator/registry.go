@@ -8,6 +8,7 @@ import (
 	"github.com/snyk/go-application-framework/pkg/workflow"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/bazel"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/gradle"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/javascript/bun"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/legacy"
@@ -33,12 +34,16 @@ func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry,
 		plugins: make([]ecosystems.SCAPlugin, 0),
 	}
 
+	// bazel, a dependency of every other plugin because it's a build tool that can build any other language.
+	if err := r.register(bazel.Plugin{}, withFeatureFlagCheck(FlagBazelResolver)); err != nil {
+		return nil, fmt.Errorf("failed to register bazel plugin: %w", err)
+	}
 	// javascript
-	if err := r.register(bun.Plugin{}); err != nil {
+	if err := r.register(bun.Plugin{}, withFeatureFlagCheck(FlagBunResolver), withPluginDependencies("bazel")); err != nil {
 		return nil, fmt.Errorf("failed to register bun plugin: %w", err)
 	}
 	// gradle (opt-in via feature flag)
-	if err := r.register(gradle.Plugin{}, withFeatureFlagCheck(FlagNewGradleResolver)); err != nil {
+	if err := r.register(gradle.Plugin{}, withFeatureFlagCheck(FlagNewGradleResolver), withPluginDependencies("bazel")); err != nil {
 		return nil, fmt.Errorf("failed to register gradle plugin: %w", err)
 	}
 

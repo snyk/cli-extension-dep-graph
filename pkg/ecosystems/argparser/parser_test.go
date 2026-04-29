@@ -18,6 +18,10 @@ type TestOptions struct {
 	StringFlag string  `arg:"--string"`
 	StringPtr  *string `arg:"--string-ptr"`
 
+	// Int flags
+	IntFlag int  `arg:"--int"`
+	IntPtr  *int `arg:"--int-ptr"`
+
 	// Slice flags
 	SliceFlag []string `arg:"--slice"`
 
@@ -136,6 +140,92 @@ func TestParse_StringFlags(t *testing.T) {
 				assert.NotNil(t, opts.StringPtr)
 				assert.Equal(t, "ptr-value", *opts.StringPtr)
 			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := &TestOptions{}
+			err := Parse(tt.rawFlags, opts)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			if tt.check != nil {
+				tt.check(t, opts)
+			}
+		})
+	}
+}
+
+func TestParse_IntFlags(t *testing.T) {
+	tests := []struct {
+		name     string
+		rawFlags []string
+		check    func(*testing.T, *TestOptions)
+		wantErr  bool
+	}{
+		{
+			name:     "int flag with value",
+			rawFlags: []string{"--int", "42"},
+			check: func(t *testing.T, opts *TestOptions) {
+				t.Helper()
+				assert.Equal(t, 42, opts.IntFlag)
+			},
+		},
+		{
+			name:     "int flag with equals syntax",
+			rawFlags: []string{"--int=7"},
+			check: func(t *testing.T, opts *TestOptions) {
+				t.Helper()
+				assert.Equal(t, 7, opts.IntFlag)
+			},
+		},
+		{
+			name:     "int pointer flag with value",
+			rawFlags: []string{"--int-ptr", "100"},
+			check: func(t *testing.T, opts *TestOptions) {
+				t.Helper()
+				assert.NotNil(t, opts.IntPtr)
+				assert.Equal(t, 100, *opts.IntPtr)
+			},
+		},
+		{
+			name:     "int pointer flag with equals syntax and zero",
+			rawFlags: []string{"--int-ptr=0"},
+			check: func(t *testing.T, opts *TestOptions) {
+				t.Helper()
+				assert.NotNil(t, opts.IntPtr)
+				assert.Equal(t, 0, *opts.IntPtr)
+			},
+		},
+		{
+			name: "int pointer is nil when flag absent",
+			check: func(t *testing.T, opts *TestOptions) {
+				t.Helper()
+				assert.Nil(t, opts.IntPtr)
+			},
+		},
+		{
+			name:     "negative int value",
+			rawFlags: []string{"--int", "-5"},
+			check: func(t *testing.T, opts *TestOptions) {
+				t.Helper()
+				assert.Equal(t, -5, opts.IntFlag)
+			},
+		},
+		{
+			name:     "non-integer value errors",
+			rawFlags: []string{"--int", "not-a-number"},
+			wantErr:  true,
+		},
+		{
+			name:     "int flag without value errors",
+			rawFlags: []string{"--int"},
+			wantErr:  true,
 		},
 	}
 

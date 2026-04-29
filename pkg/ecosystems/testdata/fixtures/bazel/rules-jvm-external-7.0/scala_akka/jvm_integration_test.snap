@@ -1,0 +1,555 @@
+
+[TestPlugin_BuildDepGraphsFromDir_ScalaBinary_MatchJSON - 1]
+{
+ "processedFiles": [],
+ "results": [
+  {
+   "depGraph": {
+    "graph": {
+     "nodes": [
+      {
+       "deps": [
+        {
+         "nodeId": "//:lib"
+        }
+       ],
+       "nodeId": "root-node",
+       "pkgId": "//:app@"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:com_chuusai_shapeless_2_12"
+        },
+        {
+         "nodeId": "@maven//:com_github_pureconfig_pureconfig_2_12"
+        },
+        {
+         "nodeId": "@maven//:com_github_pureconfig_pureconfig_core_2_12"
+        },
+        {
+         "nodeId": "@maven//:com_github_pureconfig_pureconfig_generic_2_12"
+        },
+        {
+         "nodeId": "@maven//:com_github_pureconfig_pureconfig_macros_2_12"
+        },
+        {
+         "nodeId": "@maven//:com_typesafe_akka_akka_actor_2_12"
+        },
+        {
+         "nodeId": "@maven//:com_typesafe_akka_akka_http_2_12"
+        },
+        {
+         "nodeId": "@maven//:com_typesafe_akka_akka_http_core_2_12"
+        },
+        {
+         "nodeId": "@maven//:com_typesafe_akka_akka_stream_2_12"
+        },
+        {
+         "nodeId": "@maven//:com_typesafe_config"
+        },
+        {
+         "nodeId": "@maven//:com_typesafe_scala_logging_scala_logging_2_12"
+        },
+        {
+         "nodeId": "@maven//:org_scalaz_scalaz_core_2_12"
+        },
+        {
+         "nodeId": "@maven//:org_scalaz_scalaz_concurrent_2_12"
+        },
+        {
+         "nodeId": "@maven//:org_slf4j_slf4j_api"
+        },
+        {
+         "nodeId": "@maven//:org_slf4j_slf4j_simple"
+        }
+       ],
+       "nodeId": "//:lib",
+       "pkgId": "//:lib@"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        },
+        {
+         "nodeId": "@maven//:org_typelevel_macro_compat_2_12"
+        }
+       ],
+       "nodeId": "@maven//:com_chuusai_shapeless_2_12",
+       "pkgId": "com.chuusai:shapeless_2.12@2.3.3"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:com_github_pureconfig_pureconfig_core_2_12"
+        },
+        {
+         "nodeId": "@maven//:com_github_pureconfig_pureconfig_generic_2_12"
+        },
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:com_github_pureconfig_pureconfig_2_12",
+       "pkgId": "com.github.pureconfig:pureconfig_2.12@0.10.2"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:com_github_pureconfig_pureconfig_macros_2_12"
+        },
+        {
+         "nodeId": "@maven//:com_typesafe_config"
+        },
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:com_github_pureconfig_pureconfig_core_2_12",
+       "pkgId": "com.github.pureconfig:pureconfig-core_2.12@0.10.2"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:com_chuusai_shapeless_2_12"
+        },
+        {
+         "nodeId": "@maven//:com_github_pureconfig_pureconfig_core_2_12"
+        },
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:com_github_pureconfig_pureconfig_generic_2_12",
+       "pkgId": "com.github.pureconfig:pureconfig-generic_2.12@0.10.2"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:com_github_pureconfig_pureconfig_macros_2_12",
+       "pkgId": "com.github.pureconfig:pureconfig-macros_2.12@0.10.2"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:com_typesafe_config"
+        },
+        {
+         "nodeId": "@maven//:org_scala_lang_modules_scala_java8_compat_2_12"
+        },
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:com_typesafe_akka_akka_actor_2_12",
+       "pkgId": "com.typesafe.akka:akka-actor_2.12@2.5.22"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:com_typesafe_akka_akka_http_core_2_12"
+        },
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:com_typesafe_akka_akka_http_2_12",
+       "pkgId": "com.typesafe.akka:akka-http_2.12@10.1.8"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:com_typesafe_akka_akka_parsing_2_12"
+        },
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:com_typesafe_akka_akka_http_core_2_12",
+       "pkgId": "com.typesafe.akka:akka-http-core_2.12@10.1.8"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:com_typesafe_akka_akka_actor_2_12"
+        },
+        {
+         "nodeId": "@maven//:com_typesafe_akka_akka_protobuf_2_12"
+        },
+        {
+         "nodeId": "@maven//:com_typesafe_ssl_config_core_2_12"
+        },
+        {
+         "nodeId": "@maven//:org_reactivestreams_reactive_streams"
+        },
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:com_typesafe_akka_akka_stream_2_12",
+       "pkgId": "com.typesafe.akka:akka-stream_2.12@2.5.22"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_typesafe_config",
+       "pkgId": "com.typesafe:config@1.3.3"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        },
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_reflect"
+        },
+        {
+         "nodeId": "@maven//:org_slf4j_slf4j_api"
+        }
+       ],
+       "nodeId": "@maven//:com_typesafe_scala_logging_scala_logging_2_12",
+       "pkgId": "com.typesafe.scala-logging:scala-logging_2.12@3.9.2"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:org_scalaz_scalaz_core_2_12",
+       "pkgId": "org.scalaz:scalaz-core_2.12@7.2.27"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        },
+        {
+         "nodeId": "@maven//:org_scalaz_scalaz_core_2_12"
+        },
+        {
+         "nodeId": "@maven//:org_scalaz_scalaz_effect_2_12"
+        }
+       ],
+       "nodeId": "@maven//:org_scalaz_scalaz_concurrent_2_12",
+       "pkgId": "org.scalaz:scalaz-concurrent_2.12@7.2.27"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:org_slf4j_slf4j_api",
+       "pkgId": "org.slf4j:slf4j-api@1.7.26"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:org_slf4j_slf4j_api"
+        }
+       ],
+       "nodeId": "@maven//:org_slf4j_slf4j_simple",
+       "pkgId": "org.slf4j:slf4j-simple@1.7.26"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:org_scala_lang_scala_library",
+       "pkgId": "org.scala-lang:scala-library@2.12.13"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:org_typelevel_macro_compat_2_12",
+       "pkgId": "org.typelevel:macro-compat_2.12@1.1.1"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:org_scala_lang_modules_scala_java8_compat_2_12",
+       "pkgId": "org.scala-lang.modules:scala-java8-compat_2.12@0.8.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:com_typesafe_akka_akka_parsing_2_12",
+       "pkgId": "com.typesafe.akka:akka-parsing_2.12@10.1.8"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:com_typesafe_akka_akka_protobuf_2_12",
+       "pkgId": "com.typesafe.akka:akka-protobuf_2.12@2.5.22"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:com_typesafe_config"
+        },
+        {
+         "nodeId": "@maven//:org_scala_lang_modules_scala_parser_combinators_2_12"
+        },
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:com_typesafe_ssl_config_core_2_12",
+       "pkgId": "com.typesafe:ssl-config-core_2.12@0.3.7"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:org_reactivestreams_reactive_streams",
+       "pkgId": "org.reactivestreams:reactive-streams@1.0.2"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:org_scala_lang_scala_reflect",
+       "pkgId": "org.scala-lang:scala-reflect@2.12.13"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        },
+        {
+         "nodeId": "@maven//:org_scalaz_scalaz_core_2_12"
+        }
+       ],
+       "nodeId": "@maven//:org_scalaz_scalaz_effect_2_12",
+       "pkgId": "org.scalaz:scalaz-effect_2.12@7.2.27"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:org_scala_lang_scala_library"
+        }
+       ],
+       "nodeId": "@maven//:org_scala_lang_modules_scala_parser_combinators_2_12",
+       "pkgId": "org.scala-lang.modules:scala-parser-combinators_2.12@1.1.1"
+      }
+     ],
+     "rootNodeId": "root-node"
+    },
+    "pkgManager": {
+     "name": "maven"
+    },
+    "pkgs": [
+     {
+      "id": "//:app@",
+      "info": {
+       "name": "//:app"
+      }
+     },
+     {
+      "id": "//:lib@",
+      "info": {
+       "name": "//:lib"
+      }
+     },
+     {
+      "id": "com.chuusai:shapeless_2.12@2.3.3",
+      "info": {
+       "name": "com.chuusai:shapeless_2.12",
+       "version": "2.3.3"
+      }
+     },
+     {
+      "id": "com.github.pureconfig:pureconfig_2.12@0.10.2",
+      "info": {
+       "name": "com.github.pureconfig:pureconfig_2.12",
+       "version": "0.10.2"
+      }
+     },
+     {
+      "id": "com.github.pureconfig:pureconfig-core_2.12@0.10.2",
+      "info": {
+       "name": "com.github.pureconfig:pureconfig-core_2.12",
+       "version": "0.10.2"
+      }
+     },
+     {
+      "id": "com.github.pureconfig:pureconfig-generic_2.12@0.10.2",
+      "info": {
+       "name": "com.github.pureconfig:pureconfig-generic_2.12",
+       "version": "0.10.2"
+      }
+     },
+     {
+      "id": "com.github.pureconfig:pureconfig-macros_2.12@0.10.2",
+      "info": {
+       "name": "com.github.pureconfig:pureconfig-macros_2.12",
+       "version": "0.10.2"
+      }
+     },
+     {
+      "id": "com.typesafe.akka:akka-actor_2.12@2.5.22",
+      "info": {
+       "name": "com.typesafe.akka:akka-actor_2.12",
+       "version": "2.5.22"
+      }
+     },
+     {
+      "id": "com.typesafe.akka:akka-http_2.12@10.1.8",
+      "info": {
+       "name": "com.typesafe.akka:akka-http_2.12",
+       "version": "10.1.8"
+      }
+     },
+     {
+      "id": "com.typesafe.akka:akka-http-core_2.12@10.1.8",
+      "info": {
+       "name": "com.typesafe.akka:akka-http-core_2.12",
+       "version": "10.1.8"
+      }
+     },
+     {
+      "id": "com.typesafe.akka:akka-stream_2.12@2.5.22",
+      "info": {
+       "name": "com.typesafe.akka:akka-stream_2.12",
+       "version": "2.5.22"
+      }
+     },
+     {
+      "id": "com.typesafe:config@1.3.3",
+      "info": {
+       "name": "com.typesafe:config",
+       "version": "1.3.3"
+      }
+     },
+     {
+      "id": "com.typesafe.scala-logging:scala-logging_2.12@3.9.2",
+      "info": {
+       "name": "com.typesafe.scala-logging:scala-logging_2.12",
+       "version": "3.9.2"
+      }
+     },
+     {
+      "id": "org.scalaz:scalaz-core_2.12@7.2.27",
+      "info": {
+       "name": "org.scalaz:scalaz-core_2.12",
+       "version": "7.2.27"
+      }
+     },
+     {
+      "id": "org.scalaz:scalaz-concurrent_2.12@7.2.27",
+      "info": {
+       "name": "org.scalaz:scalaz-concurrent_2.12",
+       "version": "7.2.27"
+      }
+     },
+     {
+      "id": "org.slf4j:slf4j-api@1.7.26",
+      "info": {
+       "name": "org.slf4j:slf4j-api",
+       "version": "1.7.26"
+      }
+     },
+     {
+      "id": "org.slf4j:slf4j-simple@1.7.26",
+      "info": {
+       "name": "org.slf4j:slf4j-simple",
+       "version": "1.7.26"
+      }
+     },
+     {
+      "id": "org.scala-lang:scala-library@2.12.13",
+      "info": {
+       "name": "org.scala-lang:scala-library",
+       "version": "2.12.13"
+      }
+     },
+     {
+      "id": "org.typelevel:macro-compat_2.12@1.1.1",
+      "info": {
+       "name": "org.typelevel:macro-compat_2.12",
+       "version": "1.1.1"
+      }
+     },
+     {
+      "id": "org.scala-lang.modules:scala-java8-compat_2.12@0.8.0",
+      "info": {
+       "name": "org.scala-lang.modules:scala-java8-compat_2.12",
+       "version": "0.8.0"
+      }
+     },
+     {
+      "id": "com.typesafe.akka:akka-parsing_2.12@10.1.8",
+      "info": {
+       "name": "com.typesafe.akka:akka-parsing_2.12",
+       "version": "10.1.8"
+      }
+     },
+     {
+      "id": "com.typesafe.akka:akka-protobuf_2.12@2.5.22",
+      "info": {
+       "name": "com.typesafe.akka:akka-protobuf_2.12",
+       "version": "2.5.22"
+      }
+     },
+     {
+      "id": "com.typesafe:ssl-config-core_2.12@0.3.7",
+      "info": {
+       "name": "com.typesafe:ssl-config-core_2.12",
+       "version": "0.3.7"
+      }
+     },
+     {
+      "id": "org.reactivestreams:reactive-streams@1.0.2",
+      "info": {
+       "name": "org.reactivestreams:reactive-streams",
+       "version": "1.0.2"
+      }
+     },
+     {
+      "id": "org.scala-lang:scala-reflect@2.12.13",
+      "info": {
+       "name": "org.scala-lang:scala-reflect",
+       "version": "2.12.13"
+      }
+     },
+     {
+      "id": "org.scalaz:scalaz-effect_2.12@7.2.27",
+      "info": {
+       "name": "org.scalaz:scalaz-effect_2.12",
+       "version": "7.2.27"
+      }
+     },
+     {
+      "id": "org.scala-lang.modules:scala-parser-combinators_2.12@1.1.1",
+      "info": {
+       "name": "org.scala-lang.modules:scala-parser-combinators_2.12",
+       "version": "1.1.1"
+      }
+     }
+    ],
+    "schemaVersion": "1.3.0"
+   },
+   "meta": {
+    "normalisedTargetFile": "//:app",
+    "pluginName": "bazel"
+   },
+   "projectDescriptor": {
+    "identity": {
+     "targetFile": "//:app",
+     "type": "maven"
+    }
+   }
+  }
+ ]
+}
+---

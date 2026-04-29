@@ -1,0 +1,93 @@
+
+[TestPlugin_BuildDepGraphsFromDir_VersionReplace_MatchJSON/rules-go-0.60.0/gazelle-version-replace - 1]
+{
+ "results": [
+  {
+   "depGraph": {
+    "graph": {
+     "nodes": [
+      {
+       "deps": [
+        {
+         "nodeId": "//:basic_gazelle_lib"
+        }
+       ],
+       "nodeId": "root-node",
+       "pkgId": "//:basic_gazelle@"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@org_golang_x_net//html:html"
+        },
+        {
+         "nodeId": "@org_golang_x_net//html/atom:atom"
+        }
+       ],
+       "nodeId": "//:basic_gazelle_lib",
+       "pkgId": "//:basic_gazelle_lib@"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@org_golang_x_net//html/atom:atom"
+        }
+       ],
+       "nodeId": "@org_golang_x_net//html:html",
+       "pkgId": "golang.org/x/net/html@0.39.0"
+      },
+      {
+       "deps": [],
+       "nodeId": "@org_golang_x_net//html/atom:atom",
+       "pkgId": "golang.org/x/net/html/atom@0.39.0"
+      }
+     ],
+     "rootNodeId": "root-node"
+    },
+    "pkgManager": {
+     "name": "gomodules"
+    },
+    "pkgs": [
+     {
+      "id": "//:basic_gazelle@",
+      "info": {
+       "name": "//:basic_gazelle"
+      }
+     },
+     {
+      "id": "//:basic_gazelle_lib@",
+      "info": {
+       "name": "//:basic_gazelle_lib"
+      }
+     },
+     {
+      "id": "golang.org/x/net/html@0.39.0",
+      "info": {
+       "name": "golang.org/x/net/html",
+       "version": "0.39.0"
+      }
+     },
+     {
+      "id": "golang.org/x/net/html/atom@0.39.0",
+      "info": {
+       "name": "golang.org/x/net/html/atom",
+       "version": "0.39.0"
+      }
+     }
+    ],
+    "schemaVersion": "1.3.0"
+   },
+   "meta": {
+    "normalisedTargetFile": "//:basic_gazelle",
+    "pluginName": "bazel"
+   },
+   "projectDescriptor": {
+    "identity": {
+     "targetFile": "//:basic_gazelle",
+     "type": "gomodules"
+    }
+   }
+  }
+ ]
+}
+---

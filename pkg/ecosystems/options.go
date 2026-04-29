@@ -14,6 +14,7 @@ type SCAPluginOptions struct {
 	Global GlobalOptions
 	Python PythonOptions
 	Gradle GradleOptions
+	Bazel  BazelOptions
 }
 
 // GlobalOptions contains options that apply globally across all SCA plugins.
@@ -67,9 +68,19 @@ type GradleOptions struct {
 	// The flag is still forwarded to the legacy CLI as a fallback.
 }
 
+// BazelOptions contains Bazel-specific options for dependency graph generation.
+type BazelOptions struct {
+	TargetQuery string `arg:"--bazel-target-query"`
+	MaxTargets  *int   `arg:"--bazel-max-targets"`
+	Jvm         bool   `arg:"--bazel-jvm"`
+	Go          bool   `arg:"--bazel-go"`
+}
+
 func NewPluginOptions() *SCAPluginOptions {
 	return &SCAPluginOptions{
 		Python: PythonOptions{},
+		Gradle: GradleOptions{},
+		Bazel:  BazelOptions{},
 	}
 }
 
@@ -78,6 +89,7 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 		GlobalOptions
 		PythonOptions
 		GradleOptions
+		BazelOptions
 		StrictOutOfSync *string `arg:"--strict-out-of-sync"`
 	}
 
@@ -97,6 +109,7 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 		Global: args.GlobalOptions,
 		Python: args.PythonOptions,
 		Gradle: args.GradleOptions,
+		Bazel:  args.BazelOptions,
 	}, nil
 }
 
@@ -192,5 +205,31 @@ func (o *SCAPluginOptions) WithGradleSkipWrapper(skipWrapper bool) *SCAPluginOpt
 
 func (o *SCAPluginOptions) WithIncludeProvenance(includeProvenance bool) *SCAPluginOptions {
 	o.Global.IncludeProvenance = includeProvenance
+	return o
+}
+
+// WithBazelJvm sets whether the Bazel JVM dep-graph scanner should run.
+func (o *SCAPluginOptions) WithBazelJvm(b bool) *SCAPluginOptions {
+	o.Bazel.Jvm = b
+	return o
+}
+
+// WithBazelGo sets whether the Bazel Go dep-graph scanner should run.
+func (o *SCAPluginOptions) WithBazelGo(b bool) *SCAPluginOptions {
+	o.Bazel.Go = b
+	return o
+}
+
+// WithBazelTargetQuery sets the Bazel query used for target discovery (empty = plugin default).
+func (o *SCAPluginOptions) WithBazelTargetQuery(query string) *SCAPluginOptions {
+	o.Bazel.TargetQuery = query
+	return o
+}
+
+// WithBazelMaxTargets caps the number of Bazel targets the resolver will
+// process. 0 disables the ceiling. Not calling this leaves the plugin's safe
+// default in place.
+func (o *SCAPluginOptions) WithBazelMaxTargets(n int) *SCAPluginOptions {
+	o.Bazel.MaxTargets = &n
 	return o
 }

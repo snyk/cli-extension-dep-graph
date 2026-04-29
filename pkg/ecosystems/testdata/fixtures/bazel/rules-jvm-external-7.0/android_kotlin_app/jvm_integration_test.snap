@@ -1,0 +1,790 @@
+
+[TestPlugin_BuildDepGraphsFromDir_AndriodBinary_MatchJSON - 1]
+{
+ "processedFiles": [],
+ "results": [
+  {
+   "depGraph": {
+    "graph": {
+     "nodes": [
+      {
+       "deps": [
+        {
+         "nodeId": "//src:lib"
+        }
+       ],
+       "nodeId": "root-node",
+       "pkgId": "//:app@"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_appcompat_appcompat"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core_ktx"
+        },
+        {
+         "nodeId": "@maven//:androidx_drawerlayout_drawerlayout"
+        },
+        {
+         "nodeId": "@maven//:androidx_fragment_fragment"
+        },
+        {
+         "nodeId": "@maven//:androidx_lifecycle_lifecycle_common"
+        },
+        {
+         "nodeId": "@maven//:androidx_lifecycle_lifecycle_viewmodel"
+        }
+       ],
+       "nodeId": "//src:lib",
+       "pkgId": "//src:lib@"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_collection_collection"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core"
+        },
+        {
+         "nodeId": "@maven//:androidx_cursoradapter_cursoradapter"
+        },
+        {
+         "nodeId": "@maven//:androidx_fragment_fragment"
+        },
+        {
+         "nodeId": "@maven//:androidx_legacy_legacy_support_core_utils"
+        },
+        {
+         "nodeId": "@maven//:androidx_vectordrawable_vectordrawable_animated"
+        },
+        {
+         "nodeId": "@maven//:androidx_vectordrawable_vectordrawable"
+        }
+       ],
+       "nodeId": "@maven//:androidx_appcompat_appcompat",
+       "pkgId": "androidx.appcompat:appcompat@1.0.2"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_collection_collection"
+        },
+        {
+         "nodeId": "@maven//:androidx_lifecycle_lifecycle_runtime"
+        },
+        {
+         "nodeId": "@maven//:androidx_versionedparcelable_versionedparcelable"
+        }
+       ],
+       "nodeId": "@maven//:androidx_core_core",
+       "pkgId": "androidx.core:core@1.0.1"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core"
+        },
+        {
+         "nodeId": "@maven//:org_jetbrains_kotlin_kotlin_stdlib"
+        }
+       ],
+       "nodeId": "@maven//:androidx_core_core_ktx",
+       "pkgId": "androidx.core:core-ktx@1.0.1"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core"
+        },
+        {
+         "nodeId": "@maven//:androidx_customview_customview"
+        }
+       ],
+       "nodeId": "@maven//:androidx_drawerlayout_drawerlayout",
+       "pkgId": "androidx.drawerlayout:drawerlayout@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core"
+        },
+        {
+         "nodeId": "@maven//:androidx_legacy_legacy_support_core_ui"
+        },
+        {
+         "nodeId": "@maven//:androidx_legacy_legacy_support_core_utils"
+        },
+        {
+         "nodeId": "@maven//:androidx_lifecycle_lifecycle_viewmodel"
+        },
+        {
+         "nodeId": "@maven//:androidx_loader_loader"
+        }
+       ],
+       "nodeId": "@maven//:androidx_fragment_fragment",
+       "pkgId": "androidx.fragment:fragment@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        }
+       ],
+       "nodeId": "@maven//:androidx_lifecycle_lifecycle_common",
+       "pkgId": "androidx.lifecycle:lifecycle-common@2.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        }
+       ],
+       "nodeId": "@maven//:androidx_lifecycle_lifecycle_viewmodel",
+       "pkgId": "androidx.lifecycle:lifecycle-viewmodel@2.0.0"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:androidx_annotation_annotation",
+       "pkgId": "androidx.annotation:annotation@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        }
+       ],
+       "nodeId": "@maven//:androidx_collection_collection",
+       "pkgId": "androidx.collection:collection@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        }
+       ],
+       "nodeId": "@maven//:androidx_cursoradapter_cursoradapter",
+       "pkgId": "androidx.cursoradapter:cursoradapter@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core"
+        },
+        {
+         "nodeId": "@maven//:androidx_documentfile_documentfile"
+        },
+        {
+         "nodeId": "@maven//:androidx_loader_loader"
+        },
+        {
+         "nodeId": "@maven//:androidx_localbroadcastmanager_localbroadcastmanager"
+        },
+        {
+         "nodeId": "@maven//:androidx_print_print"
+        }
+       ],
+       "nodeId": "@maven//:androidx_legacy_legacy_support_core_utils",
+       "pkgId": "androidx.legacy:legacy-support-core-utils@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_legacy_legacy_support_core_ui"
+        },
+        {
+         "nodeId": "@maven//:androidx_vectordrawable_vectordrawable"
+        }
+       ],
+       "nodeId": "@maven//:androidx_vectordrawable_vectordrawable_animated",
+       "pkgId": "androidx.vectordrawable:vectordrawable-animated@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core"
+        }
+       ],
+       "nodeId": "@maven//:androidx_vectordrawable_vectordrawable",
+       "pkgId": "androidx.vectordrawable:vectordrawable@1.0.1"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_arch_core_core_common"
+        },
+        {
+         "nodeId": "@maven//:androidx_lifecycle_lifecycle_common"
+        }
+       ],
+       "nodeId": "@maven//:androidx_lifecycle_lifecycle_runtime",
+       "pkgId": "androidx.lifecycle:lifecycle-runtime@2.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_collection_collection"
+        }
+       ],
+       "nodeId": "@maven//:androidx_versionedparcelable_versionedparcelable",
+       "pkgId": "androidx.versionedparcelable:versionedparcelable@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:org_jetbrains_kotlin_kotlin_stdlib_common"
+        },
+        {
+         "nodeId": "@maven//:org_jetbrains_annotations"
+        }
+       ],
+       "nodeId": "@maven//:org_jetbrains_kotlin_kotlin_stdlib",
+       "pkgId": "org.jetbrains.kotlin:kotlin-stdlib@1.2.50"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core"
+        }
+       ],
+       "nodeId": "@maven//:androidx_customview_customview",
+       "pkgId": "androidx.customview:customview@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_asynclayoutinflater_asynclayoutinflater"
+        },
+        {
+         "nodeId": "@maven//:androidx_coordinatorlayout_coordinatorlayout"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core"
+        },
+        {
+         "nodeId": "@maven//:androidx_cursoradapter_cursoradapter"
+        },
+        {
+         "nodeId": "@maven//:androidx_customview_customview"
+        },
+        {
+         "nodeId": "@maven//:androidx_drawerlayout_drawerlayout"
+        },
+        {
+         "nodeId": "@maven//:androidx_interpolator_interpolator"
+        },
+        {
+         "nodeId": "@maven//:androidx_legacy_legacy_support_core_utils"
+        },
+        {
+         "nodeId": "@maven//:androidx_slidingpanelayout_slidingpanelayout"
+        },
+        {
+         "nodeId": "@maven//:androidx_swiperefreshlayout_swiperefreshlayout"
+        },
+        {
+         "nodeId": "@maven//:androidx_viewpager_viewpager"
+        }
+       ],
+       "nodeId": "@maven//:androidx_legacy_legacy_support_core_ui",
+       "pkgId": "androidx.legacy:legacy-support-core-ui@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core"
+        },
+        {
+         "nodeId": "@maven//:androidx_lifecycle_lifecycle_livedata"
+        },
+        {
+         "nodeId": "@maven//:androidx_lifecycle_lifecycle_viewmodel"
+        }
+       ],
+       "nodeId": "@maven//:androidx_loader_loader",
+       "pkgId": "androidx.loader:loader@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        }
+       ],
+       "nodeId": "@maven//:androidx_documentfile_documentfile",
+       "pkgId": "androidx.documentfile:documentfile@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        }
+       ],
+       "nodeId": "@maven//:androidx_localbroadcastmanager_localbroadcastmanager",
+       "pkgId": "androidx.localbroadcastmanager:localbroadcastmanager@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        }
+       ],
+       "nodeId": "@maven//:androidx_print_print",
+       "pkgId": "androidx.print:print@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        }
+       ],
+       "nodeId": "@maven//:androidx_arch_core_core_common",
+       "pkgId": "androidx.arch.core:core-common@2.0.0"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:org_jetbrains_kotlin_kotlin_stdlib_common",
+       "pkgId": "org.jetbrains.kotlin:kotlin-stdlib-common@1.2.50"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:org_jetbrains_annotations",
+       "pkgId": "org.jetbrains:annotations@13.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core"
+        }
+       ],
+       "nodeId": "@maven//:androidx_asynclayoutinflater_asynclayoutinflater",
+       "pkgId": "androidx.asynclayoutinflater:asynclayoutinflater@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core"
+        },
+        {
+         "nodeId": "@maven//:androidx_customview_customview"
+        }
+       ],
+       "nodeId": "@maven//:androidx_coordinatorlayout_coordinatorlayout",
+       "pkgId": "androidx.coordinatorlayout:coordinatorlayout@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        }
+       ],
+       "nodeId": "@maven//:androidx_interpolator_interpolator",
+       "pkgId": "androidx.interpolator:interpolator@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core"
+        },
+        {
+         "nodeId": "@maven//:androidx_customview_customview"
+        }
+       ],
+       "nodeId": "@maven//:androidx_slidingpanelayout_slidingpanelayout",
+       "pkgId": "androidx.slidingpanelayout:slidingpanelayout@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core"
+        },
+        {
+         "nodeId": "@maven//:androidx_interpolator_interpolator"
+        }
+       ],
+       "nodeId": "@maven//:androidx_swiperefreshlayout_swiperefreshlayout",
+       "pkgId": "androidx.swiperefreshlayout:swiperefreshlayout@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_core_core"
+        },
+        {
+         "nodeId": "@maven//:androidx_customview_customview"
+        }
+       ],
+       "nodeId": "@maven//:androidx_viewpager_viewpager",
+       "pkgId": "androidx.viewpager:viewpager@1.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_arch_core_core_common"
+        },
+        {
+         "nodeId": "@maven//:androidx_arch_core_core_runtime"
+        },
+        {
+         "nodeId": "@maven//:androidx_lifecycle_lifecycle_livedata_core"
+        }
+       ],
+       "nodeId": "@maven//:androidx_lifecycle_lifecycle_livedata",
+       "pkgId": "androidx.lifecycle:lifecycle-livedata@2.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_annotation_annotation"
+        },
+        {
+         "nodeId": "@maven//:androidx_arch_core_core_common"
+        }
+       ],
+       "nodeId": "@maven//:androidx_arch_core_core_runtime",
+       "pkgId": "androidx.arch.core:core-runtime@2.0.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:androidx_arch_core_core_common"
+        },
+        {
+         "nodeId": "@maven//:androidx_arch_core_core_runtime"
+        },
+        {
+         "nodeId": "@maven//:androidx_lifecycle_lifecycle_common"
+        }
+       ],
+       "nodeId": "@maven//:androidx_lifecycle_lifecycle_livedata_core",
+       "pkgId": "androidx.lifecycle:lifecycle-livedata-core@2.0.0"
+      }
+     ],
+     "rootNodeId": "root-node"
+    },
+    "pkgManager": {
+     "name": "maven"
+    },
+    "pkgs": [
+     {
+      "id": "//:app@",
+      "info": {
+       "name": "//:app"
+      }
+     },
+     {
+      "id": "//src:lib@",
+      "info": {
+       "name": "//src:lib"
+      }
+     },
+     {
+      "id": "androidx.appcompat:appcompat@1.0.2",
+      "info": {
+       "name": "androidx.appcompat:appcompat",
+       "version": "1.0.2"
+      }
+     },
+     {
+      "id": "androidx.core:core@1.0.1",
+      "info": {
+       "name": "androidx.core:core",
+       "version": "1.0.1"
+      }
+     },
+     {
+      "id": "androidx.core:core-ktx@1.0.1",
+      "info": {
+       "name": "androidx.core:core-ktx",
+       "version": "1.0.1"
+      }
+     },
+     {
+      "id": "androidx.drawerlayout:drawerlayout@1.0.0",
+      "info": {
+       "name": "androidx.drawerlayout:drawerlayout",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.fragment:fragment@1.0.0",
+      "info": {
+       "name": "androidx.fragment:fragment",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.lifecycle:lifecycle-common@2.0.0",
+      "info": {
+       "name": "androidx.lifecycle:lifecycle-common",
+       "version": "2.0.0"
+      }
+     },
+     {
+      "id": "androidx.lifecycle:lifecycle-viewmodel@2.0.0",
+      "info": {
+       "name": "androidx.lifecycle:lifecycle-viewmodel",
+       "version": "2.0.0"
+      }
+     },
+     {
+      "id": "androidx.annotation:annotation@1.0.0",
+      "info": {
+       "name": "androidx.annotation:annotation",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.collection:collection@1.0.0",
+      "info": {
+       "name": "androidx.collection:collection",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.cursoradapter:cursoradapter@1.0.0",
+      "info": {
+       "name": "androidx.cursoradapter:cursoradapter",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.legacy:legacy-support-core-utils@1.0.0",
+      "info": {
+       "name": "androidx.legacy:legacy-support-core-utils",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.vectordrawable:vectordrawable-animated@1.0.0",
+      "info": {
+       "name": "androidx.vectordrawable:vectordrawable-animated",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.vectordrawable:vectordrawable@1.0.1",
+      "info": {
+       "name": "androidx.vectordrawable:vectordrawable",
+       "version": "1.0.1"
+      }
+     },
+     {
+      "id": "androidx.lifecycle:lifecycle-runtime@2.0.0",
+      "info": {
+       "name": "androidx.lifecycle:lifecycle-runtime",
+       "version": "2.0.0"
+      }
+     },
+     {
+      "id": "androidx.versionedparcelable:versionedparcelable@1.0.0",
+      "info": {
+       "name": "androidx.versionedparcelable:versionedparcelable",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "org.jetbrains.kotlin:kotlin-stdlib@1.2.50",
+      "info": {
+       "name": "org.jetbrains.kotlin:kotlin-stdlib",
+       "version": "1.2.50"
+      }
+     },
+     {
+      "id": "androidx.customview:customview@1.0.0",
+      "info": {
+       "name": "androidx.customview:customview",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.legacy:legacy-support-core-ui@1.0.0",
+      "info": {
+       "name": "androidx.legacy:legacy-support-core-ui",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.loader:loader@1.0.0",
+      "info": {
+       "name": "androidx.loader:loader",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.documentfile:documentfile@1.0.0",
+      "info": {
+       "name": "androidx.documentfile:documentfile",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.localbroadcastmanager:localbroadcastmanager@1.0.0",
+      "info": {
+       "name": "androidx.localbroadcastmanager:localbroadcastmanager",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.print:print@1.0.0",
+      "info": {
+       "name": "androidx.print:print",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.arch.core:core-common@2.0.0",
+      "info": {
+       "name": "androidx.arch.core:core-common",
+       "version": "2.0.0"
+      }
+     },
+     {
+      "id": "org.jetbrains.kotlin:kotlin-stdlib-common@1.2.50",
+      "info": {
+       "name": "org.jetbrains.kotlin:kotlin-stdlib-common",
+       "version": "1.2.50"
+      }
+     },
+     {
+      "id": "org.jetbrains:annotations@13.0",
+      "info": {
+       "name": "org.jetbrains:annotations",
+       "version": "13.0"
+      }
+     },
+     {
+      "id": "androidx.asynclayoutinflater:asynclayoutinflater@1.0.0",
+      "info": {
+       "name": "androidx.asynclayoutinflater:asynclayoutinflater",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.coordinatorlayout:coordinatorlayout@1.0.0",
+      "info": {
+       "name": "androidx.coordinatorlayout:coordinatorlayout",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.interpolator:interpolator@1.0.0",
+      "info": {
+       "name": "androidx.interpolator:interpolator",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.slidingpanelayout:slidingpanelayout@1.0.0",
+      "info": {
+       "name": "androidx.slidingpanelayout:slidingpanelayout",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.swiperefreshlayout:swiperefreshlayout@1.0.0",
+      "info": {
+       "name": "androidx.swiperefreshlayout:swiperefreshlayout",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.viewpager:viewpager@1.0.0",
+      "info": {
+       "name": "androidx.viewpager:viewpager",
+       "version": "1.0.0"
+      }
+     },
+     {
+      "id": "androidx.lifecycle:lifecycle-livedata@2.0.0",
+      "info": {
+       "name": "androidx.lifecycle:lifecycle-livedata",
+       "version": "2.0.0"
+      }
+     },
+     {
+      "id": "androidx.arch.core:core-runtime@2.0.0",
+      "info": {
+       "name": "androidx.arch.core:core-runtime",
+       "version": "2.0.0"
+      }
+     },
+     {
+      "id": "androidx.lifecycle:lifecycle-livedata-core@2.0.0",
+      "info": {
+       "name": "androidx.lifecycle:lifecycle-livedata-core",
+       "version": "2.0.0"
+      }
+     }
+    ],
+    "schemaVersion": "1.3.0"
+   },
+   "meta": {
+    "normalisedTargetFile": "//:app",
+    "pluginName": "bazel"
+   },
+   "projectDescriptor": {
+    "identity": {
+     "targetFile": "//:app",
+     "type": "maven"
+    }
+   }
+  }
+ ]
+}
+---

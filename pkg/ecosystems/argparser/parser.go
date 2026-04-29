@@ -4,6 +4,7 @@ import (
 	"encoding"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -28,6 +29,8 @@ import (
 //    - bool: Presence of flag sets to true (no value required)
 //    - string: Next argument is used as the value
 //    - *string: Next argument is used to create a pointer to string
+//    - int: Next argument is parsed as a base-10 integer
+//    - *int: Next argument is parsed as a base-10 integer, stored via pointer (nil if flag absent)
 //    - []string: Collects all following non-flag arguments into a slice
 //    - encoding.TextUnmarshaler: Delegates parsing to the type's UnmarshalText method
 //
@@ -121,8 +124,17 @@ func Parse(rawFlags []string, dest interface{}) error { //nolint:gocyclo // Comp
 			}
 			field.SetString(value)
 
+		case reflect.Int:
+			value, consumed, err := readIntValue(flag, flagValue, hasEqualsSyntax, rawFlags, i)
+			if err != nil {
+				return err
+			}
+			i += consumed
+			field.SetInt(int64(value))
+
 		case reflect.Ptr:
-			if info.fieldType.Elem().Kind() == reflect.String {
+			switch info.fieldType.Elem().Kind() { //nolint:exhaustive // only string/int pointers are supported
+			case reflect.String:
 				var value string
 				if hasEqualsSyntax {
 					value = flagValue
@@ -133,6 +145,13 @@ func Parse(rawFlags []string, dest interface{}) error { //nolint:gocyclo // Comp
 					i++
 					value = rawFlags[i]
 				}
+				field.Set(reflect.ValueOf(&value))
+			case reflect.Int:
+				value, consumed, err := readIntValue(flag, flagValue, hasEqualsSyntax, rawFlags, i)
+				if err != nil {
+					return err
+				}
+				i += consumed
 				field.Set(reflect.ValueOf(&value))
 			}
 
@@ -163,6 +182,27 @@ func Parse(rawFlags []string, dest interface{}) error { //nolint:gocyclo // Comp
 type fieldInfo struct {
 	fieldPath []int
 	fieldType reflect.Type
+}
+
+// readIntValue extracts and parses an integer flag value. Returns the parsed
+// value plus the number of additional rawFlags entries consumed (0 for
+// --flag=value, 1 for --flag value).
+func readIntValue(flag, flagValue string, hasEqualsSyntax bool, rawFlags []string, i int) (value, consumed int, err error) {
+	var raw string
+	if hasEqualsSyntax {
+		raw = flagValue
+	} else {
+		if i+1 >= len(rawFlags) {
+			return 0, 0, fmt.Errorf(errRequiresValue, flag)
+		}
+		raw = rawFlags[i+1]
+		consumed = 1
+	}
+	value, err = strconv.Atoi(raw)
+	if err != nil {
+		return 0, 0, fmt.Errorf("%s requires an integer value, got %q", flag, raw)
+	}
+	return value, consumed, nil
 }
 
 // handleTextUnmarshaler handles fields that implement encoding.TextUnmarshaler.

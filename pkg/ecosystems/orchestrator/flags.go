@@ -15,9 +15,21 @@ var FlagNewGradleResolver = flag{
 	Value: "internal-new-gradle-resolver",
 }
 
+var FlagBazelResolver = flag{
+	Key:   "internal-bazel-resolver",
+	Value: "internal-bazel-resolver",
+}
+
+var FlagBunResolver = flag{
+	Key:   "internal-bun-resolver",
+	Value: "internal-bun-resolver",
+}
+
 var allFlags = []flag{
 	FlagUnifiedTestAPIOsCLI,
 	FlagNewGradleResolver,
+	FlagBazelResolver,
+	FlagBunResolver,
 }
 
 // GetAllFlags returns all feature flags as a map of key to flag name.
