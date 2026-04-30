@@ -19,6 +19,7 @@ import (
 var embeddedInitScript []byte
 
 const (
+	PluginName = "gradle"
 	// logAttrProjectDir is the structured-log key used when logging the Gradle project directory.
 	logAttrProjectDir = "project_dir"
 )
@@ -30,9 +31,8 @@ type Plugin struct{}
 // Compile-time assertion that Plugin satisfies the SCAPlugin interface.
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
-// NewPlugin constructs a Gradle plugin ready for use.
-func NewPlugin() Plugin {
-	return Plugin{}
+func (p Plugin) GetName() string {
+	return PluginName
 }
 
 // BuildDepGraphsFromDir discovers and builds Gradle dependency graphs for the

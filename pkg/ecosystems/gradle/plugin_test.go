@@ -390,7 +390,7 @@ func TestBuildExtraArgs(t *testing.T) {
 func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 	ctx := context.Background()
 	log := logger.Nop()
-	p := NewPlugin()
+	p := Plugin{}
 
 	// Simulate the JSON that would be returned by Gradle's :snykDependencyGraph task
 	// This represents a multi-project build with root, app, and lib subprojects
