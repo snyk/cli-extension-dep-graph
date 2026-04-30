@@ -297,11 +297,11 @@ func countEdgesTo(node *depgraph.Node, childID string) int {
 	return count
 }
 
-// TestBuildDepGraph_EdgePositionFromLexicallyFirstConfig asserts that when an
+// TestBuildDepGraph_EdgePositionFromFirstDeclaringConfig asserts that when an
 // edge is contributed by multiple configurations, its position in the parent's
-// Deps slice is taken from the lexically-first configuration that contributes
-// it. This documents the merge rule: configurations are walked in lexical
-// order and an edge keeps the position it was first inserted at.
+// Deps slice is taken from the first configuration in evaluation order that contributes
+// it. This documents the merge rule: configurations are walked in Gradle's natural
+// evaluation order and an edge keeps the position it was first inserted at.
 func TestBuildDepGraph_EdgePositionFromFirstDeclaringConfig(t *testing.T) {
 	// Test that edge positions are taken from the first configuration that declares them.
 	// compileClasspath has guava first, commons-lang3 second.
