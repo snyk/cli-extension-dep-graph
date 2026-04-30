@@ -22,7 +22,7 @@ func nodeIDSet(dg *depgraph.DepGraph) map[string]bool {
 }
 
 // makeProject is a test helper that builds a gradleProject with the given configurations.
-func makeProject(group, name, version string, configs map[string]gradleConfig) gradleProject {
+func makeProject(group, name, version string, configs []gradleConfig) gradleProject {
 	gav := group + ":" + name + ":" + version
 	return gradleProject{
 		Name:           name,
@@ -35,8 +35,9 @@ func makeProject(group, name, version string, configs map[string]gradleConfig) g
 	}
 }
 
-func makeConfig(rootID string, deps []gradleDep) gradleConfig {
+func makeConfig(name string, rootID string, deps []gradleDep) gradleConfig {
 	return gradleConfig{
+		Name: name,
 		Root: configRoot{
 			ID:           rootID,
 			Dependencies: deps,
@@ -52,11 +53,11 @@ func makeDep(id string, children ...gradleDep) gradleDep {
 
 func TestBuildDepGraph(t *testing.T) {
 	t.Run("merges deps from all configurations into one graph", func(t *testing.T) {
-		proj := makeProject("com.example", "my-app", "1.0.0", map[string]gradleConfig{
-			"runtimeClasspath": makeConfig("com.example:my-app:1.0.0", []gradleDep{
+		proj := makeProject("com.example", "my-app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:my-app:1.0.0", []gradleDep{
 				makeDep("com.google.guava:guava:32.1.2-jre"),
 			}),
-			"compileClasspath": makeConfig("com.example:my-app:1.0.0", []gradleDep{
+			makeConfig("compileClasspath", "com.example:my-app:1.0.0", []gradleDep{
 				makeDep("org.apache.commons:commons-lang3:3.12.0"),
 			}),
 		})
@@ -75,11 +76,11 @@ func TestBuildDepGraph(t *testing.T) {
 	})
 
 	t.Run("includes test configurations", func(t *testing.T) {
-		proj := makeProject("com.example", "my-app", "1.0.0", map[string]gradleConfig{
-			"testRuntimeClasspath": makeConfig("com.example:my-app:1.0.0", []gradleDep{
+		proj := makeProject("com.example", "my-app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:my-app:1.0.0", []gradleDep{
 				makeDep("org.junit.jupiter:junit-jupiter:5.10.0"),
 			}),
-			"runtimeClasspath": makeConfig("com.example:my-app:1.0.0", []gradleDep{
+			makeConfig("testRuntimeClasspath", "com.example:my-app:1.0.0", []gradleDep{
 				makeDep("com.google.guava:guava:32.1.2-jre"),
 			}),
 		})
@@ -93,8 +94,8 @@ func TestBuildDepGraph(t *testing.T) {
 	})
 
 	t.Run("includes transitive dependencies", func(t *testing.T) {
-		proj := makeProject("com.example", "app", "1.0.0", map[string]gradleConfig{
-			"runtimeClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{
+		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
 				makeDep("com.example:lib:1.0.0",
 					makeDep("org.slf4j:slf4j-api:2.0.0"),
 				),
@@ -110,8 +111,8 @@ func TestBuildDepGraph(t *testing.T) {
 	})
 
 	t.Run("handles circular dependencies as pruned nodes", func(t *testing.T) {
-		proj := makeProject("com.example", "app", "1.0.0", map[string]gradleConfig{
-			"runtimeClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{
+		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
 				{ID: "com.example:a:1.0.0", Circular: true},
 			}),
 		})
@@ -125,8 +126,8 @@ func TestBuildDepGraph(t *testing.T) {
 	})
 
 	t.Run("skips unresolved dependencies", func(t *testing.T) {
-		proj := makeProject("com.example", "app", "1.0.0", map[string]gradleConfig{
-			"runtimeClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{
+		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
 				{ID: "com.example:missing:1.0.0", Unresolved: true, Reason: "not found"},
 				makeDep("com.google.guava:guava:32.1.2-jre"),
 			}),
@@ -141,9 +142,9 @@ func TestBuildDepGraph(t *testing.T) {
 	})
 
 	t.Run("skips configurations with errors", func(t *testing.T) {
-		proj := makeProject("com.example", "app", "1.0.0", map[string]gradleConfig{
-			"runtimeClasspath": {Error: "resolution failed"},
-			"compileClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{
+		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
+			{Name: "runtimeClasspath", Error: "resolution failed"},
+			makeConfig("compileClasspath", "com.example:app:1.0.0", []gradleDep{
 				makeDep("com.google.guava:guava:32.1.2-jre"),
 			}),
 		})
@@ -156,8 +157,8 @@ func TestBuildDepGraph(t *testing.T) {
 	})
 
 	t.Run("returns empty graph when all configurations have errors", func(t *testing.T) {
-		proj := makeProject("com.example", "app", "1.0.0", map[string]gradleConfig{
-			"runtimeClasspath": {Error: "resolution failed"},
+		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
+			{Name: "runtimeClasspath", Error: "resolution failed"},
 		})
 
 		dg, err := buildDepGraph(&proj)
@@ -168,7 +169,7 @@ func TestBuildDepGraph(t *testing.T) {
 	})
 
 	t.Run("returns empty graph when no configurations present", func(t *testing.T) {
-		proj := makeProject("com.example", "app", "1.0.0", map[string]gradleConfig{})
+		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{})
 
 		dg, err := buildDepGraph(&proj)
 		require.NoError(t, err)
@@ -176,8 +177,8 @@ func TestBuildDepGraph(t *testing.T) {
 	})
 
 	t.Run("uses empty string for 'unspecified' version", func(t *testing.T) {
-		proj := makeProject("com.example", "app", "unspecified", map[string]gradleConfig{
-			"runtimeClasspath": makeConfig("com.example:app:unspecified", []gradleDep{}),
+		proj := makeProject("com.example", "app", "unspecified", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:app:unspecified", []gradleDep{}),
 		})
 
 		dg, err := buildDepGraph(&proj)
@@ -186,8 +187,8 @@ func TestBuildDepGraph(t *testing.T) {
 	})
 
 	t.Run("does not prune a dependency reached from multiple parents", func(t *testing.T) {
-		proj := makeProject("com.example", "app", "1.0.0", map[string]gradleConfig{
-			"runtimeClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{
+		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
 				makeDep("com.example:a:1.0.0", makeDep("com.example:c:1.0.0")),
 				makeDep("com.example:b:1.0.0", makeDep("com.example:c:1.0.0")),
 			}),
@@ -205,12 +206,12 @@ func TestBuildDepGraph(t *testing.T) {
 		// This test ensures we avoid the cross-configuration contamination issue where
 		// different configurations with different resolved versions of the same transitive
 		// dependency would interfere with each other.
-		proj := makeProject("com.example", "app", "1.0.0", map[string]gradleConfig{
-			"runtimeClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{
+		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
 				makeDep("com.example:lib:1.2.3",
 					makeDep("com.fasterxml.jackson.core:jackson-core:2.19.0")),
 			}),
-			"intellijPlatformTestClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{
+			makeConfig("intellijPlatformTestClasspath", "com.example:app:1.0.0", []gradleDep{
 				makeDep("com.example:lib:1.2.3",
 					makeDep("com.fasterxml.jackson.core:jackson-core:2.17.0")),
 			}),
@@ -256,11 +257,11 @@ func TestBuildDepGraph(t *testing.T) {
 // testCompileClasspath and testRuntimeClasspath), the merged graph contains
 // the edge exactly once.
 func TestBuildDepGraph_DoesNotDuplicateEdges(t *testing.T) {
-	proj := makeProject("com.example", "app", "1.0.0", map[string]gradleConfig{
-		"compileClasspath":     makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("com.google.guava:guava:32.1.2-jre")}),
-		"runtimeClasspath":     makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("com.google.guava:guava:32.1.2-jre")}),
-		"testCompileClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("com.google.guava:guava:32.1.2-jre")}),
-		"testRuntimeClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("com.google.guava:guava:32.1.2-jre")}),
+	proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
+		makeConfig("compileClasspath", "com.example:app:1.0.0", []gradleDep{makeDep("com.google.guava:guava:32.1.2-jre")}),
+		makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{makeDep("com.google.guava:guava:32.1.2-jre")}),
+		makeConfig("testCompileClasspath", "com.example:app:1.0.0", []gradleDep{makeDep("com.google.guava:guava:32.1.2-jre")}),
+		makeConfig("testRuntimeClasspath", "com.example:app:1.0.0", []gradleDep{makeDep("com.google.guava:guava:32.1.2-jre")}),
 	})
 
 	dg, err := buildDepGraph(&proj)
@@ -301,20 +302,22 @@ func countEdgesTo(node *depgraph.Node, childID string) int {
 // Deps slice is taken from the lexically-first configuration that contributes
 // it. This documents the merge rule: configurations are walked in lexical
 // order and an edge keeps the position it was first inserted at.
-func TestBuildDepGraph_EdgePositionFromLexicallyFirstConfig(t *testing.T) {
-	// guava is declared first in compileClasspath and last in runtimeClasspath.
-	// compileClasspath sorts before runtimeClasspath, so guava should appear
-	// in position 0 of the merged root deps.
-	proj := makeProject("com.example", "app", "1.0.0", map[string]gradleConfig{
-		"compileClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{
-			makeDep("com.google.guava:guava:32.1.2-jre"),
-			makeDep("org.apache.commons:commons-lang3:3.14.0"),
-		}),
-		"runtimeClasspath": makeConfig("com.example:app:1.0.0", []gradleDep{
-			makeDep("org.apache.commons:commons-lang3:3.14.0"),
-			makeDep("com.google.guava:guava:32.1.2-jre"),
-		}),
+func TestBuildDepGraph_EdgePositionFromFirstDeclaringConfig(t *testing.T) {
+	// Test that edge positions are taken from the first configuration that declares them.
+	// compileClasspath has guava first, commons-lang3 second.
+	// runtimeClasspath has commons-lang3 first, guava second.
+	// Since compileClasspath is processed first, the merged deps should follow compileClasspath's order.
+	compileConfig := makeConfig("compileClasspath", "com.example:app:1.0.0", []gradleDep{
+		makeDep("com.google.guava:guava:32.1.2-jre"),
+		makeDep("org.apache.commons:commons-lang3:3.14.0"),
 	})
+
+	runtimeConfig := makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
+		makeDep("org.apache.commons:commons-lang3:3.14.0"),
+		makeDep("com.google.guava:guava:32.1.2-jre"),
+	})
+
+	proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{compileConfig, runtimeConfig})
 
 	dg, err := buildDepGraph(&proj)
 	require.NoError(t, err)
@@ -322,40 +325,8 @@ func TestBuildDepGraph_EdgePositionFromLexicallyFirstConfig(t *testing.T) {
 	rootNode := findNodeByID(t, dg, "root-node")
 	require.Len(t, rootNode.Deps, 2, "duplicates across configs should be merged")
 	assert.Equal(t, "com.google.guava:guava@32.1.2-jre", rootNode.Deps[0].NodeID,
-		"position should be taken from compileClasspath (lexically first)")
+		"position should be taken from compileClasspath (first config), which has guava first")
 	assert.Equal(t, "org.apache.commons:commons-lang3@3.14.0", rootNode.Deps[1].NodeID)
-}
-
-// TestBuildDepGraph_StableConfigurationOrder asserts that two builds of the
-// same project produce the same edge ordering, even though Configurations is a
-// Go map (whose iteration order is randomized).
-func TestBuildDepGraph_StableConfigurationOrder(t *testing.T) {
-	configs := map[string]gradleConfig{
-		"alpha":   makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("a:a:1.0")}),
-		"bravo":   makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("b:b:1.0")}),
-		"charlie": makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("c:c:1.0")}),
-		"delta":   makeConfig("com.example:app:1.0.0", []gradleDep{makeDep("d:d:1.0")}),
-	}
-
-	first, err := buildDepGraph(&gradleProject{
-		Name: "app", Group: "com.example", Version: "1.0.0", Path: ":",
-		GAV: "com.example:app:1.0.0", BuildFile: "build.gradle",
-		Configurations: configs,
-	})
-	require.NoError(t, err)
-
-	for i := 0; i < 10; i++ {
-		next, err := buildDepGraph(&gradleProject{
-			Name: "app", Group: "com.example", Version: "1.0.0", Path: ":",
-			GAV: "com.example:app:1.0.0", BuildFile: "build.gradle",
-			Configurations: configs,
-		})
-		require.NoError(t, err)
-
-		firstRoot := findNodeByID(t, first, "root-node")
-		nextRoot := findNodeByID(t, next, "root-node")
-		assert.Equal(t, firstRoot.Deps, nextRoot.Deps, "root deps order should be stable across builds (iteration %d)", i)
-	}
 }
 
 // ── depNodeParts ──────────────────────────────────────────────────────────────

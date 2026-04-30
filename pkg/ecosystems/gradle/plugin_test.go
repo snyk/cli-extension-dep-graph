@@ -406,8 +406,8 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
       "path": "/project"
     }
   },
-  "projects": {
-    ":": {
+  "projects": [
+    {
       "name": "myproject",
       "group": "com.example",
       "version": "1.0.0",
@@ -415,8 +415,9 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
       "gav": "com.example:myproject:1.0.0",
       "buildFile": "/project/build.gradle",
       "plugins": ["java"],
-      "configurations": {
-        "compileClasspath": {
+      "configurations": [
+        {
+          "name": "compileClasspath",
           "description": "Compile classpath",
           "root": {
             "id": "com.example:myproject:1.0.0",
@@ -424,9 +425,9 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
           },
           "allDependencies": []
         }
-      }
+      ]
     },
-    ":app": {
+    {
       "name": "app",
       "group": "com.example",
       "version": "1.0.0",
@@ -434,8 +435,9 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
       "gav": "com.example:app:1.0.0",
       "buildFile": "/project/app/build.gradle",
       "plugins": ["java", "application"],
-      "configurations": {
-        "compileClasspath": {
+      "configurations": [
+        {
+          "name": "compileClasspath",
           "description": "Compile classpath",
           "root": {
             "id": "com.example:app:1.0.0",
@@ -450,9 +452,9 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
             { "id": "org.slf4j:slf4j-api:1.7.36" }
           ]
         }
-      }
+      ]
     },
-    ":lib": {
+    {
       "name": "lib",
       "group": "com.example", 
       "version": "1.0.0",
@@ -460,8 +462,9 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
       "gav": "com.example:lib:1.0.0",
       "buildFile": "/project/lib/build.gradle",
       "plugins": ["java-library"],
-      "configurations": {
-        "compileClasspath": {
+      "configurations": [
+        {
+          "name": "compileClasspath",
           "description": "Compile classpath",
           "root": {
             "id": "com.example:lib:1.0.0",
@@ -476,9 +479,9 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
             { "id": "com.google.guava:guava:31.1-jre" }
           ]
         }
-      }
+      ]
     }
-  }
+  ]
 }`
 
 	t.Run("demonstrates multi-project output gets filtered to single project", func(t *testing.T) {

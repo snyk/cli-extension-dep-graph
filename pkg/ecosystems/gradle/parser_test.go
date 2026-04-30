@@ -23,16 +23,17 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 					"path": "/projects/my-app"
 				}
 			},
-			"projects": {
-				":": {
+			"projects": [
+				{
 					"name": "my-app",
 					"group": "com.example",
 					"version": "1.0.0",
 					"path": ":",
 					"gav": "com.example:my-app:1.0.0",
 					"buildFile": "/projects/my-app/build.gradle",
-					"configurations": {
-						"runtimeClasspath": {
+					"configurations": [
+						{
+							"name": "runtimeClasspath",
 							"description": "Runtime classpath",
 							"root": {
 								"id": "com.example:my-app:1.0.0",
@@ -45,9 +46,9 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 							},
 							"allDependencies": []
 						}
-					}
+					]
 				}
-			}
+			]
 		}`)
 
 		result, err := parseDependencyGraphJSON(input)
@@ -58,12 +59,14 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 		assert.Equal(t, "my-app", result.Metadata.RootProject.Name)
 		require.Len(t, result.Projects, 1)
 
-		proj := result.Projects[":"]
+		proj := result.Projects[0] // Should be the root project with path ":"
+		assert.Equal(t, ":", proj.Path)
 		assert.Equal(t, "com.example:my-app:1.0.0", proj.GAV)
 		assert.Equal(t, "/projects/my-app/build.gradle", proj.BuildFile)
-		require.Contains(t, proj.Configurations, "runtimeClasspath")
+		require.Len(t, proj.Configurations, 1)
 
-		cfg := proj.Configurations["runtimeClasspath"]
+		cfg := proj.Configurations[0] // Should be the runtimeClasspath config
+		assert.Equal(t, "runtimeClasspath", cfg.Name)
 		assert.Equal(t, "com.example:my-app:1.0.0", cfg.Root.ID)
 		require.Len(t, cfg.Root.Dependencies, 1)
 		assert.Equal(t, "com.google.guava:guava:32.1.2-jre", cfg.Root.Dependencies[0].ID)
@@ -72,27 +75,38 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 	t.Run("parses multiple projects", func(t *testing.T) {
 		input := []byte(`{
 			"metadata": {"gradleVersion": "8.5", "javaVersion": "17", "generatedAt": "", "rootProject": {"name": "root", "group": "", "version": "", "path": ""}},
-			"projects": {
-				":": {"name": "root", "group": "com.example", "version": "1.0", "path": ":", "gav": "com.example:root:1.0", "buildFile": "", "configurations": {}},
-				":app": {"name": "app", "group": "com.example", "version": "1.0", "path": ":app", "gav": "com.example:app:1.0", "buildFile": "", "configurations": {}}
-			}
+			"projects": [
+				{"name": "root", "group": "com.example", "version": "1.0", "path": ":", "gav": "com.example:root:1.0", "buildFile": "", "configurations": []},
+				{"name": "app", "group": "com.example", "version": "1.0", "path": ":app", "gav": "com.example:app:1.0", "buildFile": "", "configurations": []}
+			]
 		}`)
 
 		result, err := parseDependencyGraphJSON(input)
 		require.NoError(t, err)
 		assert.Len(t, result.Projects, 2)
-		assert.Contains(t, result.Projects, ":")
-		assert.Contains(t, result.Projects, ":app")
+
+		// Check that we have both projects in the array
+		var foundRoot, foundApp bool
+		for _, proj := range result.Projects {
+			if proj.Path == ":" {
+				foundRoot = true
+			} else if proj.Path == ":app" {
+				foundApp = true
+			}
+		}
+		assert.True(t, foundRoot, "should contain root project")
+		assert.True(t, foundApp, "should contain app project")
 	})
 
 	t.Run("parses circular and unresolved dependencies", func(t *testing.T) {
 		input := []byte(`{
 			"metadata": {"gradleVersion": "8.5", "javaVersion": "17", "generatedAt": "", "rootProject": {"name": "root", "group": "", "version": "", "path": ""}},
-			"projects": {
-				":": {
+			"projects": [
+				{
 					"name": "root", "group": "com.example", "version": "1.0", "path": ":", "gav": "com.example:root:1.0", "buildFile": "",
-					"configurations": {
-						"runtimeClasspath": {
+					"configurations": [
+						{
+							"name": "runtimeClasspath",
 							"description": "",
 							"root": {
 								"id": "com.example:root:1.0",
@@ -103,15 +117,15 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 							},
 							"allDependencies": []
 						}
-					}
+					]
 				}
-			}
+			]
 		}`)
 
 		result, err := parseDependencyGraphJSON(input)
 		require.NoError(t, err)
 
-		deps := result.Projects[":"].Configurations["runtimeClasspath"].Root.Dependencies
+		deps := result.Projects[0].Configurations[0].Root.Dependencies
 		require.Len(t, deps, 2)
 		assert.True(t, deps[0].Circular)
 		assert.True(t, deps[1].Unresolved)
@@ -121,19 +135,22 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 	t.Run("parses configuration error field", func(t *testing.T) {
 		input := []byte(`{
 			"metadata": {"gradleVersion": "8.5", "javaVersion": "17", "generatedAt": "", "rootProject": {"name": "root", "group": "", "version": "", "path": ""}},
-			"projects": {
-				":": {
+			"projects": [
+				{
 					"name": "root", "group": "", "version": "1.0", "path": ":", "gav": ":root:1.0", "buildFile": "",
-					"configurations": {
-						"brokenConfig": {"description": "", "root": {"id": "", "dependencies": []}, "allDependencies": [], "error": "resolution failed"}
-					}
+					"configurations": [
+						{"name": "brokenConfig", "description": "", "root": {"id": "", "dependencies": []}, "allDependencies": [], "error": "resolution failed"}
+					]
 				}
-			}
+			]
 		}`)
 
 		result, err := parseDependencyGraphJSON(input)
 		require.NoError(t, err)
-		assert.Equal(t, "resolution failed", result.Projects[":"].Configurations["brokenConfig"].Error)
+
+		var brokenConfig gradleConfig = result.Projects[0].Configurations[0]
+		require.Equal(t, "brokenConfig", brokenConfig.Name)
+		assert.Equal(t, "resolution failed", brokenConfig.Error)
 	})
 
 	t.Run("returns error for invalid JSON", func(t *testing.T) {

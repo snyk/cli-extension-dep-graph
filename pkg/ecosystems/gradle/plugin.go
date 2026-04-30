@@ -283,9 +283,13 @@ func (p Plugin) convertProjects(
 		}
 	}
 
-	for projPath, proj := range parsed.Projects {
+	// Iterate projects in Gradle evaluation order (preserved by the array format).
+	// The init script outputs projects via root.allprojects.each, which visits
+	// in evaluation order: root first, then subprojects in settings.gradle
+	// declaration order.
+	for _, proj := range parsed.Projects {
 		// Apply --gradle-sub-project filter when specified.
-		if subProject != "" && !matchesSubProject(projPath, proj.Name, subProject) {
+		if subProject != "" && !matchesSubProject(proj.Path, proj.Name, subProject) {
 			continue
 		}
 
@@ -313,7 +317,7 @@ func (p Plugin) convertProjects(
 		depGraph, err := buildDepGraph(&proj)
 		if err != nil {
 			log.Error(ctx, "Failed to build dep graph for Gradle project",
-				logger.Attr("project_path", projPath),
+				logger.Attr("project_path", proj.Path),
 				logger.Err(err))
 			results = append(results, ecosystems.SCAResult{
 				ProjectDescriptor: identity.ProjectDescriptor{
@@ -329,7 +333,7 @@ func (p Plugin) convertProjects(
 		}
 
 		log.Debug(ctx, "Built dep graph for Gradle project",
-			logger.Attr("project_path", projPath))
+			logger.Attr("project_path", proj.Path))
 
 		var rootName string
 		if rootPkg := depGraph.GetRootPkg(); rootPkg != nil {

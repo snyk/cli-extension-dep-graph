@@ -2,7 +2,6 @@ package gradle
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
@@ -62,22 +61,13 @@ func buildDepGraph(proj *gradleProject) (*depgraph.DepGraph, error) {
 	// filtering (e.g. --configuration-matching, preferring runtimeClasspath)
 	// will be added when feature parity work begins.
 	//
-	// Iterate configurations in lexical order so the resulting graph is
-	// deterministic — Go map iteration is randomized, and downstream
-	// consumers (and snapshot tests) need a stable ordering of edges
-	// between root and its direct deps. Lexical order also matches the order
-	// `gradle dependencies` itself uses to print configurations, so when the
-	// same edge appears in multiple configurations its position in the
-	// merged graph is taken from the lexically-first configuration that
-	// contributes it.
-	configNames := make([]string, 0, len(proj.Configurations))
-	for name := range proj.Configurations {
-		configNames = append(configNames, name)
-	}
-	sort.Strings(configNames)
-
-	for _, name := range configNames {
-		cfg := proj.Configurations[name]
+	// Iterate configurations in Gradle declaration order (preserved by the array
+	// format from the init script). The init script processes configurations via
+	// project.configurations.matching{...}.each{...}, which iterates in the
+	// order configurations were declared. When the same edge appears in multiple
+	// configurations, its position in the merged graph is taken from the first
+	// configuration that contributes it.
+	for _, cfg := range proj.Configurations {
 		if cfg.Error != "" {
 			continue
 		}

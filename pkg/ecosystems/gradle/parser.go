@@ -18,22 +18,23 @@ type dependencyGraphJSON struct {
 			Path    string `json:"path"`
 		} `json:"rootProject"`
 	} `json:"metadata"`
-	Projects map[string]gradleProject `json:"projects"`
+	Projects []gradleProject `json:"projects"`
 }
 
 // gradleProject represents a single Gradle project (root or sub-project).
 type gradleProject struct {
-	Name           string                  `json:"name"`
-	Group          string                  `json:"group"`
-	Version        string                  `json:"version"`
-	Path           string                  `json:"path"`
-	GAV            string                  `json:"gav"`
-	BuildFile      string                  `json:"buildFile"`
-	Configurations map[string]gradleConfig `json:"configurations"`
+	Name           string         `json:"name"`
+	Group          string         `json:"group"`
+	Version        string         `json:"version"`
+	Path           string         `json:"path"`
+	GAV            string         `json:"gav"`
+	BuildFile      string         `json:"buildFile"`
+	Configurations []gradleConfig `json:"configurations"`
 }
 
 // gradleConfig represents one resolved Gradle configuration (e.g. runtimeClasspath).
 type gradleConfig struct {
+	Name            string        `json:"name"`
 	Description     string        `json:"description"`
 	Root            configRoot    `json:"root"`
 	AllDependencies []allDepEntry `json:"allDependencies"`

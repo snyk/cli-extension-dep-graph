@@ -46,8 +46,8 @@ gradle.projectsEvaluated { g ->
                 writer.println(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(buildMetadata(root))).replaceAll('(?m)^', '  '))
                 writer.println(',')
 
-                // Stream projects one by one
-                writer.println('  "projects": {')
+                // Stream projects as array to preserve Gradle evaluation order
+                writer.println('  "projects": [')
                 def first = true
                 root.allprojects.each { proj ->
                     def projEntry = buildProjectEntry(proj)
@@ -56,8 +56,7 @@ gradle.projectsEvaluated { g ->
                             writer.println(',')
                         }
 
-                        // Write project key and entry
-                        writer.print("    ${groovy.json.JsonOutput.toJson(proj.path)}: ")
+                        // Write project entry (path is already included in projEntry)
                         def projJson = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(projEntry))
                         writer.println(projJson.replaceAll('(?m)^', '    '))
 
@@ -66,7 +65,7 @@ gradle.projectsEvaluated { g ->
                     }
                 }
                 writer.println()
-                writer.println('  }')
+                writer.println('  ]')
                 writer.println('}')
             }
             println "SNYK_DEPS_JSON ${outputFile.absolutePath}"
@@ -110,17 +109,18 @@ def buildProjectEntry(project) {
         gav       : gav,
         buildFile : getBuildFilePath(project),
         plugins   : project.plugins.collect { it.class.name.replaceAll('_Decorated$', '') },
-        configurations: [:],
+        configurations: [],
     ]
 
     resolvableConfigs.each { config ->
         try {
             def configEntry = resolveConfiguration(config, project)
             if (configEntry != null) {
-                entry.configurations[config.name] = configEntry
+                entry.configurations << configEntry
             }
         } catch (Exception e) {
-            entry.configurations[config.name] = [
+            entry.configurations << [
+                name: config.name,
                 error: e.message,
             ]
         }
@@ -140,8 +140,9 @@ def resolveConfiguration(config, project) {
     def tree = walkDependencies(rootComponent, seen)
 
     return [
-        description  : config.description ?: '',
-        root         : [
+        name            : config.name,
+        description     : config.description ?: '',
+        root            : [
             id          : rootId,
             dependencies: tree,
         ],
