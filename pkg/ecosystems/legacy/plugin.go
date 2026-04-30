@@ -22,9 +22,15 @@ import (
 
 var legacyCLIWorkflowID = workflow.NewWorkflowIdentifier("legacycli")
 
+const PluginName = "legacycli"
+
 type Resolver struct {
 	ictx   workflow.InvocationContext
 	ignore []string
+}
+
+func (l *Resolver) GetName() string {
+	return PluginName
 }
 
 // BuildDepGraphsFromDir implements [ecosystems.SCAPlugin].

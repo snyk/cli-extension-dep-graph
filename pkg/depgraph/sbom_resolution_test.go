@@ -41,6 +41,10 @@ type mockScaPlugin struct {
 	options *ecosystems.SCAPluginOptions
 }
 
+func (m *mockScaPlugin) GetName() string {
+	return ""
+}
+
 func (m *mockScaPlugin) BuildDepGraphsFromDir(
 	_ context.Context,
 	_ logger.Logger,

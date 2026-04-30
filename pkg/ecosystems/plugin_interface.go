@@ -26,4 +26,5 @@ type PluginResult struct {
 // from a directory containing project files.
 type SCAPlugin interface {
 	BuildDepGraphsFromDir(ctx context.Context, log logger.Logger, dir string, options *SCAPluginOptions) (*PluginResult, error)
+	GetName() string
 }

@@ -21,12 +21,17 @@ import (
 )
 
 const (
+	PluginName            = "pip"
 	requirementsFile      = "requirements.txt"
 	maxConcurrentInstalls = 5
 	logFieldFile          = "file"
 )
 
 type Plugin struct{}
+
+func (p Plugin) GetName() string {
+	return PluginName
+}
 
 // Compile-time check to ensure Plugin implements SCAPlugin interface.
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
