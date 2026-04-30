@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -54,6 +55,10 @@ func pluginTestCases() map[string]PluginTestCase {
 			Options:      ecosystems.NewPluginOptions().WithTargetFile("build.gradle"),
 			ExpectedFile: "expected_plugin_target_file.json",
 		},
+		"simple_modern_deps_full_scan": {
+			Fixture: "simple-modern-deps",
+			Options: ecosystems.NewPluginOptions(),
+		},
 		"multi_module_full_scan": {
 			Fixture: "multi-module",
 			Options: ecosystems.NewPluginOptions(),
@@ -77,26 +82,42 @@ func pluginTestCases() map[string]PluginTestCase {
 func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 	updateFixtures := os.Getenv(updateFixturesEnvVar) != ""
 
+	gradleVersion, err := gradleRuntime()
+	require.NoErrorf(t, err, "could not detect gradle runtime version")
+	jdkVersion, err := jdkRuntime()
+	require.NoErrorf(t, err, "could not detect jdk runtime version")
+	t.Logf("gradle %s / jdk %s", gradleVersion, jdkVersion)
+
 	for name, testCase := range pluginTestCases() {
 		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-			defer cancel()
-
 			fixturePath := filepath.Join(fixturesRoot, testCase.Fixture)
 			absFixture, err := filepath.Abs(fixturePath)
 			require.NoError(t, err, "failed to resolve fixture path")
+
+			meta, err := loadFixtureMetadata(absFixture)
+			require.NoErrorf(t, err, "failed to load metadata for fixture %q", testCase.Fixture)
+
+			if reason, err := meta.skipReason(gradleVersion, jdkVersion); err != nil {
+				t.Fatalf("invalid metadata for fixture %q: %v", testCase.Fixture, err)
+			} else if reason != "" {
+				t.Skipf("fixture %q not applicable: %s", testCase.Fixture, reason)
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel()
 
 			plugin := Plugin{}
 			result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absFixture, testCase.Options)
 			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 			require.NotNil(t, result, "plugin result should not be nil")
 
-			expectedPath := filepath.Join(fixturePath, expectedFileName(testCase))
-
 			if updateFixtures {
-				writeExpectedSnapshot(t, expectedPath, result.Results)
+				writeExpectedSnapshot(t, filepath.Join(fixturePath, defaultExpectedFileName(testCase)), result.Results)
 				return
 			}
+
+			expectedPath, err := resolveExpectedSnapshotPath(fixturePath, testCase, gradleVersion)
+			require.NoErrorf(t, err, "no expected snapshot for fixture %q; run with %s=1 to generate", testCase.Fixture, updateFixturesEnvVar)
 
 			expected := loadExpectedResults(t, expectedPath)
 			assertResultsMatchExpected(t, result.Results, expected, testCase.Fixture)
@@ -104,12 +125,52 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 	}
 }
 
-// expectedFileName returns the filename for the expected snapshot of a test case.
-func expectedFileName(testCase PluginTestCase) string {
+// defaultExpectedFileName returns the snapshot filename used when writing
+// fresh fixtures via UPDATE_FIXTURES=1. We always write the version-agnostic
+// name; humans can rename / split into version-specific snapshots when a
+// fixture's output starts diverging across runtime versions.
+func defaultExpectedFileName(testCase PluginTestCase) string {
 	if testCase.ExpectedFile != "" {
 		return testCase.ExpectedFile
 	}
 	return "expected_plugin.json"
+}
+
+// resolveExpectedSnapshotPath returns the path of the expected snapshot to
+// compare against, preferring a version-specific file over the generic
+// fallback. For a test case whose default snapshot is "expected_plugin.json"
+// running on Gradle 8.x, the lookup order is:
+//
+//	expected_plugin_gradle8.json    (major-pinned version-specific snapshot)
+//	expected_plugin.json            (version-agnostic fallback)
+//
+// If the test case overrides the snapshot via ExpectedFile (e.g.
+// "expected_plugin_target_file_app.json"), the same suffixing rule is applied
+// before the .json extension:
+//
+//	expected_plugin_target_file_app_gradle8.json
+//	expected_plugin_target_file_app.json
+func resolveExpectedSnapshotPath(fixtureDir string, testCase PluginTestCase, gradleVersion *semver.Version) (string, error) {
+	defaultName := defaultExpectedFileName(testCase)
+	candidates := []string{
+		insertVersionSuffix(defaultName, fmt.Sprintf("gradle%d", gradleVersion.Major())),
+		defaultName,
+	}
+	for _, name := range candidates {
+		path := filepath.Join(fixtureDir, name)
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+	}
+	return "", fmt.Errorf("no expected snapshot found in %s (tried %v)", fixtureDir, candidates)
+}
+
+// insertVersionSuffix inserts "_<suffix>" before the .json extension. If the
+// filename has no extension, the suffix is appended.
+func insertVersionSuffix(name, suffix string) string {
+	ext := filepath.Ext(name)
+	stem := strings.TrimSuffix(name, ext)
+	return stem + "_" + suffix + ext
 }
 
 // loadExpectedResults reads the expected snapshot from disk. Tests fail if the
