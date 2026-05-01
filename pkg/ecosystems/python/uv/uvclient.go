@@ -10,7 +10,6 @@ import (
 	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/conversion"
 	scaecosystems "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 )
 
@@ -131,8 +130,8 @@ func parseAndValidateSBOM(sbomData Sbom) (*cycloneDXSBOM, error) {
 	return &sbom, nil
 }
 
-func extractMetadata(sbom *cycloneDXSBOM) *conversion.Metadata {
-	return &conversion.Metadata{
+func extractMetadata(sbom *cycloneDXSBOM) *sbomMetadata {
+	return &sbomMetadata{
 		PackageManager: "uv",
 		Name:           sbom.Metadata.Component.Name,
 		Version:        sbom.Metadata.Component.Version,

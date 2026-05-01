@@ -12,7 +12,6 @@ import (
 	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 
 	"github.com/snyk/cli-extension-dep-graph/internal/conversion"
-	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 	scaecosystems "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
@@ -23,14 +22,14 @@ const PluginName = "uv"
 
 type Plugin struct {
 	client        Client
-	snykClient    *snykclient.SnykClient
+	converter     conversion.SBOMConverter
 	remoteRepoURL string
 }
 
-func NewPlugin(client Client, snykClient *snykclient.SnykClient, remoteRepoURL string) Plugin {
+func NewPlugin(client Client, converter conversion.SBOMConverter, remoteRepoURL string) Plugin {
 	return Plugin{
 		client:        client,
-		snykClient:    snykClient,
+		converter:     converter,
 		remoteRepoURL: remoteRepoURL,
 	}
 }
@@ -136,15 +135,7 @@ func (p Plugin) buildResults(
 	metadata := extractMetadata(parsedSbom)
 	workspacePackages := extractWorkspacePackages(parsedSbom)
 
-	depGraphs, err := conversion.SbomToDepGraphs(
-		ctx,
-		bytes.NewReader(sbom),
-		metadata,
-		p.snykClient,
-		log,
-		p.remoteRepoURL,
-		options.Global.ForceSingleGraph,
-	)
+	depGraphs, err := p.convertWithFallback(ctx, sbom, metadata, options.Global.ForceSingleGraph, log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert sbom to dep-graphs for %s: %w", lockFilePath, err)
 	}
@@ -198,6 +189,66 @@ func (p Plugin) buildResults(
 	}
 
 	return result, nil
+}
+
+// sbomMetadata is the minimal metadata needed to construct an empty dep-graph
+// fallback when an SBOM yields no dep-graphs from conversion.
+type sbomMetadata struct {
+	PackageManager string
+	Name           string
+	Version        string
+}
+
+// convertWithFallback runs the SBOMConverter and falls back to an empty
+// dep-graph built from the SBOM root metadata if the converter returns no
+// dep-graphs (e.g. a uv workspace with no dependencies).
+func (p Plugin) convertWithFallback(
+	ctx context.Context,
+	sbom Sbom,
+	metadata *sbomMetadata,
+	forceSingleGraph bool,
+	log logger.Logger,
+) ([]*depgraph.DepGraph, error) {
+	depGraphs, warnings, err := p.converter.ConvertSBOM(
+		ctx,
+		bytes.NewReader(sbom),
+		conversion.ConvertSBOMOptions{
+			RemoteRepoURL:    p.remoteRepoURL,
+			ForceSingleGraph: forceSingleGraph,
+		},
+	)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // wrapped by caller
+	}
+	log.Info(ctx, "Successfully converted SBOM", logger.Attr("warnings", len(warnings)))
+
+	if len(depGraphs) == 0 {
+		emptyDG, err := buildEmptyDepGraph(metadata)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create empty depgraph: %w", err)
+		}
+		depGraphs = append(depGraphs, emptyDG)
+	}
+	return depGraphs, nil
+}
+
+// buildEmptyDepGraph creates a dep-graph with just a root package, used as a
+// fallback when the SBOM has no dependencies (e.g. a workspace with no deps).
+func buildEmptyDepGraph(metadata *sbomMetadata) (*depgraph.DepGraph, error) {
+	if metadata.PackageManager == "" {
+		return nil, fmt.Errorf("found empty PackageManager on metadata")
+	}
+	if metadata.Name == "" {
+		return nil, fmt.Errorf("found empty Name on metadata")
+	}
+	builder, err := depgraph.NewBuilder(
+		&depgraph.PkgManager{Name: metadata.PackageManager},
+		&depgraph.PkgInfo{Name: metadata.Name, Version: metadata.Version},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build depgraph: %w", err)
+	}
+	return builder.Build(), nil
 }
 
 // Returns nil if the package was not found.

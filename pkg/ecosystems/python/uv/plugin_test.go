@@ -3,7 +3,6 @@ package uv
 import (
 	"context"
 	"errors"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,8 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
-	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
@@ -41,62 +38,6 @@ const validSBOMJSON = `{
 	"components": []
 }`
 
-func singleDepGraphResponse(name, version string) string {
-	return `{
-		"scanResults": [{
-			"facts": [{
-				"type": "depGraph",
-				"data": {
-					"schemaVersion": "1.3.0",
-					"pkgManager": {"name": "uv"},
-					"pkgs": [{"id": "` + name + `@` + version + `", "info": {"name": "` + name + `", "version": "` + version + `"}}],
-					"graph": {
-						"rootNodeId": "root-node",
-						"nodes": [{"nodeId": "root-node", "pkgId": "` + name + `@` + version + `", "deps": []}]
-					}
-				}
-			}]
-		}],
-		"warnings": []
-	}`
-}
-
-func multipleDepGraphsResponse() string {
-	return `{
-		"scanResults": [
-			{
-				"facts": [{
-					"type": "depGraph",
-					"data": {
-						"schemaVersion": "1.3.0",
-						"pkgManager": {"name": "uv"},
-						"pkgs": [{"id": "package1@1.0.0", "info": {"name": "package1", "version": "1.0.0"}}],
-						"graph": {
-							"rootNodeId": "root-node-1",
-							"nodes": [{"nodeId": "root-node-1", "pkgId": "package1@1.0.0", "deps": []}]
-						}
-					}
-				}]
-			},
-			{
-				"facts": [{
-					"type": "depGraph",
-					"data": {
-						"schemaVersion": "1.3.0",
-						"pkgManager": {"name": "uv"},
-						"pkgs": [{"id": "package2@2.0.0", "info": {"name": "package2", "version": "2.0.0"}}],
-						"graph": {
-							"rootNodeId": "root-node-2",
-							"nodes": [{"nodeId": "root-node-2", "pkgId": "package2@2.0.0", "deps": []}]
-						}
-					}
-				}]
-			}
-		],
-		"warnings": []
-	}`
-}
-
 func createTestDepGraph(name, version string) *depgraph.DepGraph {
 	builder, err := depgraph.NewBuilder(
 		&depgraph.PkgManager{Name: "uv"},
@@ -108,17 +49,17 @@ func createTestDepGraph(name, version string) *depgraph.DepGraph {
 	return builder.Build()
 }
 
-func setupMockSnykClientMultiResponse(t *testing.T, responses []mocks.MockResponse) *snykclient.SnykClient {
-	t.Helper()
-	mockSBOMService := mocks.NewMockSBOMServiceMultiResponse(responses)
-	t.Cleanup(func() { mockSBOMService.Close() })
-	return snykclient.NewSnykClient(mockSBOMService.Client(), mockSBOMService.URL, "test-org")
+// mockConverter returns a MockSBOMConverter that returns the given depgraphs
+// on every call. If no depgraphs are passed, the plugin's empty-depgraph
+// fallback will produce a single depgraph from the SBOM's metadata.
+func mockConverter(depGraphs ...*depgraph.DepGraph) *MockSBOMConverter {
+	return &MockSBOMConverter{DepGraphs: depGraphs}
 }
 
-func setupMockSnykClient(t *testing.T, responseBody string) *snykclient.SnykClient {
-	t.Helper()
-	mockResponse := mocks.NewMockResponse("application/json", []byte(responseBody), http.StatusOK)
-	return setupMockSnykClientMultiResponse(t, []mocks.MockResponse{mockResponse})
+// erroringConverter returns a MockSBOMConverter that returns the given error
+// from ConvertSBOM.
+func erroringConverter(err error) *MockSBOMConverter {
+	return &MockSBOMConverter{Err: err}
 }
 
 func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
@@ -247,22 +188,8 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := createFiles(t, tt.files...)
 
-			// Setup mockClient and plugin
 			mockClient := &MockClient{}
-			// Create mock SBOM service for conversion - need enough responses for all lock files
-			expectedCount := len(tt.expectedDirs)
-			mockResponses := make([]mocks.MockResponse, expectedCount)
-			//nolint:lll // Long JSON string for mock response
-			mockResponseBody := `{"scanResults":[{"facts":[{"type":"depGraph","data":{"schemaVersion":"1.3.0","pkgManager":{"name":"uv"},"pkgs":[{"id":"mock-project@1.0.0","info":{"name":"mock-project","version":"1.0.0"}}],"graph":{"rootNodeId":"root-node","nodes":[{"nodeId":"root-node","pkgId":"mock-project@1.0.0","deps":[]}]}}}]}],"warnings":[]}`
-			for i := range expectedCount {
-				mockResponses[i] = mocks.NewMockResponse(
-					"application/json",
-					[]byte(mockResponseBody),
-					http.StatusOK,
-				)
-			}
-			snykClient := setupMockSnykClientMultiResponse(t, mockResponses)
-			plugin := NewPlugin(mockClient, snykClient, "")
+			plugin := NewPlugin(mockClient, mockConverter(createTestDepGraph("mock-project", "1.0.0")), "")
 
 			// Execute
 			ctx := context.Background()
@@ -309,8 +236,7 @@ func TestPlugin_ShouldNotSkipProcessingWhenNoTargetFileIsSet(t *testing.T) {
 	tmpDir := createFiles(t, "uv.lock", "pyproject.toml", "package.json")
 
 	mockClient := &MockClient{}
-	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, mockConverter(), "")
 
 	options := ecosystems.NewPluginOptions()
 	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
@@ -325,8 +251,7 @@ func TestPlugin_ShouldNotSkipProcessingWhenUvLockFile(t *testing.T) {
 	tmpDir := createFiles(t, "uv.lock", "pyproject.toml", "package.json")
 
 	mockClient := &MockClient{}
-	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, mockConverter(), "")
 
 	options := ecosystems.NewPluginOptions().WithTargetFile("uv.lock")
 	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
@@ -341,8 +266,7 @@ func TestPlugin_SkipsProcessingWhenTargetFileIsNotUVFile(t *testing.T) {
 	tmpDir := createFiles(t, "uv.lock", "pyproject.toml", "package.json")
 
 	mockClient := &MockClient{}
-	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, mockConverter(), "")
 
 	options := ecosystems.NewPluginOptions().WithTargetFile("package.json")
 	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
@@ -357,8 +281,7 @@ func TestPlugin_SkipsProcessingWhenTargetFileIsAPyProjectTomlFile(t *testing.T) 
 	tmpDir := createFiles(t, "uv.lock", "pyproject.toml", "package.json")
 
 	mockClient := &MockClient{}
-	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, mockConverter(), "")
 
 	options := ecosystems.NewPluginOptions().WithTargetFile("pyproject.toml")
 	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
@@ -378,8 +301,7 @@ func TestPlugin_ShouldNotSkipProcessingWhenTargetFileIsRelativeFolderPath(t *tes
 	)
 
 	mockClient := &MockClient{}
-	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, mockConverter(), "")
 
 	options := ecosystems.NewPluginOptions().WithTargetFile("my-project/uv.lock")
 	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
@@ -400,8 +322,7 @@ func TestPlugin_ShouldSkipProcessingWhenTargetFileIsNotUvLockInRelativeFolderPat
 	)
 
 	mockClient := &MockClient{}
-	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, mockConverter(), "")
 
 	options := ecosystems.NewPluginOptions().WithTargetFile("my-project/package.json")
 	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
@@ -421,8 +342,7 @@ func TestPlugin_ShouldRaiseErrorWhenTargetFileIsUvLockInRelativeFolderButDoesNot
 	)
 
 	mockClient := &MockClient{}
-	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, mockConverter(), "")
 
 	options := ecosystems.NewPluginOptions().WithTargetFile("my-project/uv.lock")
 	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
@@ -438,8 +358,7 @@ func TestPlugin_BuildDepGraphsFromDir_ErrorHandling(t *testing.T) {
 	tmpDir := createFiles(t, "uv.lock")
 
 	mockClient := &MockClient{ReturnErr: errors.New("export failed")}
-	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewPlugin(mockClient, snykClient, "")
+	plugin := NewPlugin(mockClient, mockConverter(), "")
 
 	ctx := context.Background()
 	options := ecosystems.NewPluginOptions()
@@ -471,15 +390,8 @@ func TestPlugin_BuildDepGraphsFromDir_MixedSuccessAndFailure(t *testing.T) {
 	}
 	ctx := context.Background()
 	options := ecosystems.NewPluginOptions().WithAllProjects(true)
-	// Mock SBOM service: project1 fails at ExportSBOM (before conversion), so only "." and "project2" need conversion responses
-	//nolint:lll // Long JSON string for mock response
-	mockResponseBody := `{"scanResults":[{"facts":[{"type":"depGraph","data":{"schemaVersion":"1.3.0","pkgManager":{"name":"uv"},"pkgs":[{"id":"mock-project@1.0.0","info":{"name":"mock-project","version":"1.0.0"}}],"graph":{"rootNodeId":"root-node","nodes":[{"nodeId":"root-node","pkgId":"mock-project@1.0.0","deps":[]}]}}}]}],"warnings":[]}`
-	mockResponses := []mocks.MockResponse{
-		mocks.NewMockResponse("application/json", []byte(mockResponseBody), http.StatusOK),
-		mocks.NewMockResponse("application/json", []byte(mockResponseBody), http.StatusOK),
-	}
-	snykClient := setupMockSnykClientMultiResponse(t, mockResponses)
-	plugin := NewPlugin(mockClient, snykClient, "")
+	// project1 fails at ExportSBOM (before conversion), so the converter is only called for "." and "project2".
+	plugin := NewPlugin(mockClient, mockConverter(createTestDepGraph("mock-project", "1.0.0")), "")
 	pluginResult, err := plugin.BuildDepGraphsFromDir(ctx, testLogger, tmpDir, options)
 	findings := pluginResult.Results
 	require.NoError(t, err)
@@ -509,9 +421,7 @@ func TestPlugin_BuildDepGraphsFromDir_MixedSuccessAndFailure(t *testing.T) {
 
 func TestBuildFindings_Success(t *testing.T) {
 	sbom := Sbom(validSBOMJSON)
-	mockResponseBody := singleDepGraphResponse("test-package", "1.0.0")
-	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("test-package", "1.0.0")), "")
 
 	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
@@ -561,8 +471,7 @@ func TestBuildFindings_NoProjectRoot_ReturnsErrorFinding(t *testing.T) {
 		]
 	}`
 	sbom := Sbom(sbomJSON)
-	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, mockConverter(), "")
 
 	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 	findings := buildResult.Results
@@ -610,9 +519,7 @@ func TestBuildFindings_NoProjectRoot_AllProjects_Succeeds(t *testing.T) {
 		]
 	}`
 	sbom := Sbom(sbomJSON)
-	mockResponseBody := singleDepGraphResponse("albatross", "0.1.0")
-	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("albatross", "0.1.0")), "")
 
 	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions().WithAllProjects(true), testLogger)
 
@@ -652,9 +559,7 @@ func TestBuildFindings_NoProjectRoot_UvWorkspacePackages_Succeeds(t *testing.T) 
 		]
 	}`
 	sbom := Sbom(sbomJSON)
-	mockResponseBody := singleDepGraphResponse("albatross", "0.1.0")
-	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("albatross", "0.1.0")), "")
 
 	buildResult, err := plugin.buildResults(
 		context.Background(),
@@ -675,8 +580,7 @@ func TestBuildFindings_NoProjectRoot_UvWorkspacePackages_Succeeds(t *testing.T) 
 
 func TestBuildFindings_InvalidSBOM(t *testing.T) {
 	sbom := Sbom(`{"invalid": "json"}`)
-	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, mockConverter(), "")
 
 	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
@@ -691,8 +595,7 @@ func TestBuildFindings_MissingRootComponent(t *testing.T) {
 		"components": []
 	}`
 	sbom := Sbom(sbomJSON)
-	snykClient := setupMockSnykClient(t, `{}`)
-	plugin := NewPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, mockConverter(), "")
 
 	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
@@ -703,9 +606,7 @@ func TestBuildFindings_MissingRootComponent(t *testing.T) {
 
 func TestBuildFindings_ConversionError(t *testing.T) {
 	sbom := Sbom(validSBOMJSON)
-	mockResponse := mocks.NewMockResponse("application/json", []byte(`{"error": "invalid"}`), http.StatusBadRequest)
-	snykClient := setupMockSnykClientMultiResponse(t, []mocks.MockResponse{mockResponse})
-	plugin := NewPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, erroringConverter(errors.New("api request failed")), "")
 
 	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
@@ -714,11 +615,61 @@ func TestBuildFindings_ConversionError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to convert sbom to dep-graphs")
 }
 
+func TestBuildFindings_EmptyDepGraphFallback_BuildsFromMetadata(t *testing.T) {
+	sbom := Sbom(validSBOMJSON)
+	// Converter returns no depgraphs (e.g. workspace with no deps).
+	// The plugin should fall back to building an empty depgraph from the SBOM root metadata.
+	plugin := NewPlugin(&MockClient{}, mockConverter(), "")
+
+	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
+
+	require.NoError(t, err)
+	require.Len(t, buildResult.Results, 1)
+	finding := buildResult.Results[0]
+	require.NotNil(t, finding.DepGraph)
+	rootPkg := finding.DepGraph.GetRootPkg()
+	assert.Equal(t, "test-package", rootPkg.Info.Name)
+	assert.Equal(t, "1.0.0", rootPkg.Info.Version)
+	assert.Equal(t, "uv", finding.DepGraph.PkgManager.Name)
+}
+
+func TestBuildFindings_ForwardsForceSingleGraphToConverter(t *testing.T) {
+	sbom := Sbom(validSBOMJSON)
+	converter := mockConverter(createTestDepGraph("test-package", "1.0.0"))
+	plugin := NewPlugin(&MockClient{}, converter, "")
+
+	_, err := plugin.buildResults(
+		context.Background(),
+		sbom,
+		"uv.lock",
+		".",
+		ecosystems.NewPluginOptions().WithForceSingleGraph(true),
+		testLogger,
+	)
+
+	require.NoError(t, err)
+	require.Len(t, converter.CalledOptions, 1)
+	assert.True(t, converter.CalledOptions[0].ForceSingleGraph)
+}
+
+func TestBuildFindings_ForwardsRemoteRepoURLToConverter(t *testing.T) {
+	sbom := Sbom(validSBOMJSON)
+	converter := mockConverter(createTestDepGraph("test-package", "1.0.0"))
+	plugin := NewPlugin(&MockClient{}, converter, "https://example.com/repo")
+
+	_, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
+
+	require.NoError(t, err)
+	require.Len(t, converter.CalledOptions, 1)
+	assert.Equal(t, "https://example.com/repo", converter.CalledOptions[0].RemoteRepoURL)
+}
+
 func TestBuildFindings_MultipleDepGraphs(t *testing.T) {
 	sbom := Sbom(validSBOMJSON)
-	mockResponseBody := multipleDepGraphsResponse()
-	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, mockConverter(
+		createTestDepGraph("package1", "1.0.0"),
+		createTestDepGraph("package2", "2.0.0"),
+	), "")
 
 	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
@@ -762,9 +713,7 @@ func TestBuildFindings_WorkspacePackage(t *testing.T) {
 		]
 	}`
 	sbom := Sbom(sbomJSON)
-	mockResponseBody := singleDepGraphResponse("workspace-package", "3.1.0")
-	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("workspace-package", "3.1.0")), "")
 
 	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
@@ -776,9 +725,7 @@ func TestBuildFindings_WorkspacePackage(t *testing.T) {
 
 func TestBuildFindings_PathConstruction_RootDir(t *testing.T) {
 	sbom := Sbom(validSBOMJSON)
-	mockResponseBody := singleDepGraphResponse("test-package", "1.0.0")
-	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("test-package", "1.0.0")), "")
 
 	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
@@ -790,9 +737,7 @@ func TestBuildFindings_PathConstruction_RootDir(t *testing.T) {
 
 func TestBuildFindings_PathConstruction_NestedDir(t *testing.T) {
 	sbom := Sbom(validSBOMJSON)
-	mockResponseBody := singleDepGraphResponse("test-package", "1.0.0")
-	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("test-package", "1.0.0")), "")
 
 	buildResult, err := plugin.buildResults(context.Background(), sbom, "project1/uv.lock", "project1", ecosystems.NewPluginOptions(), testLogger)
 
@@ -835,9 +780,7 @@ func TestBuildFindings_PathConstruction_NestedWorkspacePackage(t *testing.T) {
 		]
 	}`
 	sbom := Sbom(sbomJSON)
-	mockResponseBody := singleDepGraphResponse("workspace-package", "3.1.0")
-	snykClient := setupMockSnykClient(t, mockResponseBody)
-	plugin := NewPlugin(&MockClient{}, snykClient, "")
+	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("workspace-package", "3.1.0")), "")
 
 	buildResult, err := plugin.buildResults(context.Background(), sbom, "workspace/uv.lock", "workspace", ecosystems.NewPluginOptions(), testLogger)
 
@@ -881,6 +824,58 @@ func TestFindWorkspacePackage_EmptyWorkspacePackages(t *testing.T) {
 	result := findWorkspacePackage(depGraph, workspacePackages)
 
 	assert.Nil(t, result)
+}
+
+func TestBuildEmptyDepGraph(t *testing.T) {
+	tests := []struct {
+		name        string
+		metadata    *sbomMetadata
+		wantErr     string
+		wantName    string
+		wantVersion string
+	}{
+		{
+			name:        "all fields set",
+			metadata:    &sbomMetadata{PackageManager: "pip", Name: "test-package", Version: "1.0.0"},
+			wantName:    "test-package",
+			wantVersion: "1.0.0",
+		},
+		{
+			name:        "empty version is allowed",
+			metadata:    &sbomMetadata{PackageManager: "pip", Name: "test-package", Version: ""},
+			wantName:    "test-package",
+			wantVersion: "",
+		},
+		{
+			name:     "empty PackageManager errors",
+			metadata: &sbomMetadata{PackageManager: "", Name: "test-package", Version: "1.0.0"},
+			wantErr:  "empty PackageManager",
+		},
+		{
+			name:     "empty Name errors",
+			metadata: &sbomMetadata{PackageManager: "pip", Name: "", Version: "1.0.0"},
+			wantErr:  "empty Name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			depGraph, err := buildEmptyDepGraph(tt.metadata)
+
+			if tt.wantErr != "" {
+				assert.Error(t, err)
+				assert.Nil(t, depGraph)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, depGraph)
+			rootPkg := depGraph.GetRootPkg()
+			assert.Equal(t, tt.wantName, rootPkg.Info.Name)
+			assert.Equal(t, tt.wantVersion, rootPkg.Info.Version)
+		})
+	}
 }
 
 func TestPlugin_DiscoverLockFiles(t *testing.T) {
