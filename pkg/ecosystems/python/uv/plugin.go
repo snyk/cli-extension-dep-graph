@@ -11,7 +11,7 @@ import (
 
 	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/conversion"
+	"github.com/snyk/cli-extension-dep-graph/pkg/conversion"
 	scaecosystems "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"

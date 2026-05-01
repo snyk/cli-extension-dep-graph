@@ -1,3 +1,6 @@
+// Package conversion defines the public SBOM-to-depgraph conversion interface
+// and supporting types. Consumers implement this interface to inject their own
+// conversion strategy into ecosystem plugins.
 package conversion
 
 import (

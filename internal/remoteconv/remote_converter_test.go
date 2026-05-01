@@ -1,4 +1,4 @@
-package conversion
+package remoteconv
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/pkg/conversion"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
 
@@ -62,7 +63,7 @@ func TestRemoteSBOMConverter_ConvertSBOM_Success(t *testing.T) {
 	depGraphs, warnings, err := converter.ConvertSBOM(
 		context.Background(),
 		bytes.NewReader([]byte(`{"test": "sbom"}`)),
-		ConvertSBOMOptions{},
+		conversion.ConvertSBOMOptions{},
 	)
 
 	require.NoError(t, err)
@@ -79,13 +80,13 @@ func TestRemoteSBOMConverter_ConvertSBOM_TranslatesWarnings(t *testing.T) {
 	_, warnings, err := converter.ConvertSBOM(
 		context.Background(),
 		bytes.NewReader([]byte(`{"test": "sbom"}`)),
-		ConvertSBOMOptions{},
+		conversion.ConvertSBOMOptions{},
 	)
 
 	require.NoError(t, err)
 	require.Len(t, warnings, 2)
-	assert.Equal(t, Warning{Type: "UnsupportedComponent", BOMRef: "ref-1", Msg: "first warning"}, warnings[0])
-	assert.Equal(t, Warning{Type: "MissingPurl", BOMRef: "ref-2", Msg: "second warning"}, warnings[1])
+	assert.Equal(t, conversion.Warning{Type: "UnsupportedComponent", BOMRef: "ref-1", Msg: "first warning"}, warnings[0])
+	assert.Equal(t, conversion.Warning{Type: "MissingPurl", BOMRef: "ref-2", Msg: "second warning"}, warnings[1])
 }
 
 func TestRemoteSBOMConverter_ConvertSBOM_ForwardsRemoteRepoURL(t *testing.T) {
@@ -99,7 +100,7 @@ func TestRemoteSBOMConverter_ConvertSBOM_ForwardsRemoteRepoURL(t *testing.T) {
 	_, _, err := converter.ConvertSBOM(
 		context.Background(),
 		bytes.NewReader([]byte(`{"test": "sbom"}`)),
-		ConvertSBOMOptions{RemoteRepoURL: "https://example.com/repo"},
+		conversion.ConvertSBOMOptions{RemoteRepoURL: "https://example.com/repo"},
 	)
 
 	require.NoError(t, err)
@@ -128,7 +129,7 @@ func TestRemoteSBOMConverter_ConvertSBOM_ForwardsForceSingleGraph(t *testing.T) 
 			_, _, err := converter.ConvertSBOM(
 				context.Background(),
 				bytes.NewReader([]byte(`{"test": "sbom"}`)),
-				ConvertSBOMOptions{ForceSingleGraph: tt.forceSingleGraph},
+				conversion.ConvertSBOMOptions{ForceSingleGraph: tt.forceSingleGraph},
 			)
 
 			require.NoError(t, err)
@@ -149,7 +150,7 @@ func TestRemoteSBOMConverter_ConvertSBOM_PropagatesError(t *testing.T) {
 	depGraphs, warnings, err := converter.ConvertSBOM(
 		context.Background(),
 		bytes.NewReader([]byte(`{"test": "sbom"}`)),
-		ConvertSBOMOptions{},
+		conversion.ConvertSBOMOptions{},
 	)
 
 	require.Error(t, err)
@@ -166,7 +167,7 @@ func TestRemoteSBOMConverter_ConvertSBOM_EmptyResultsReturnsEmptySlice(t *testin
 	depGraphs, warnings, err := converter.ConvertSBOM(
 		context.Background(),
 		bytes.NewReader([]byte(`{"test": "sbom"}`)),
-		ConvertSBOMOptions{},
+		conversion.ConvertSBOMOptions{},
 	)
 
 	require.NoError(t, err)

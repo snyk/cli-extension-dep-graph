@@ -15,7 +15,7 @@ import (
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/conversion"
+	"github.com/snyk/cli-extension-dep-graph/internal/remoteconv"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	ecosystemslogger "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
@@ -41,7 +41,7 @@ func handleSBOMResolution(
 		orgID,
 	)
 
-	converter := conversion.NewRemoteSBOMConverter(snykClient, ecosystemslogger.NewFromZerolog(logger))
+	converter := remoteconv.NewRemoteSBOMConverter(snykClient, ecosystemslogger.NewFromZerolog(logger))
 
 	return handleSBOMResolutionDI(
 		ctx,
