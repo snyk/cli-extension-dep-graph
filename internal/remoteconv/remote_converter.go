@@ -1,4 +1,4 @@
-package conversion
+package remoteconv
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/pkg/conversion"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
 
@@ -27,8 +28,8 @@ func NewRemoteSBOMConverter(client *snykclient.SnykClient, log logger.Logger) *R
 func (c *RemoteSBOMConverter) ConvertSBOM(
 	ctx context.Context,
 	sbom io.Reader,
-	options ConvertSBOMOptions,
-) ([]*depgraph.DepGraph, []Warning, error) {
+	options conversion.ConvertSBOMOptions,
+) ([]*depgraph.DepGraph, []conversion.Warning, error) {
 	scans, snykWarnings, err := c.client.SBOMConvert(ctx, c.log, sbom, options.RemoteRepoURL, options.ForceSingleGraph)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert SBOM: %w", err)
@@ -43,16 +44,16 @@ func (c *RemoteSBOMConverter) ConvertSBOM(
 	return depGraphs, warnings, nil
 }
 
-func translateWarnings(warnings []*snykclient.ConversionWarning) []Warning {
+func translateWarnings(warnings []*snykclient.ConversionWarning) []conversion.Warning {
 	if len(warnings) == 0 {
 		return nil
 	}
-	out := make([]Warning, 0, len(warnings))
+	out := make([]conversion.Warning, 0, len(warnings))
 	for _, w := range warnings {
 		if w == nil {
 			continue
 		}
-		out = append(out, Warning{
+		out = append(out, conversion.Warning{
 			Type:   w.Type,
 			BOMRef: w.BOMRef,
 			Msg:    w.Msg,
@@ -75,5 +76,5 @@ func extractDepGraphsFromScans(scans []*snykclient.ScanResult) ([]*depgraph.DepG
 	return depGraphs, nil
 }
 
-// Compile-time check that RemoteSBOMConverter satisfies SBOMConverter.
-var _ SBOMConverter = (*RemoteSBOMConverter)(nil)
+// Compile-time check that RemoteSBOMConverter satisfies the public SBOMConverter interface.
+var _ conversion.SBOMConverter = (*RemoteSBOMConverter)(nil)
