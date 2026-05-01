@@ -1,0 +1,4 @@
+{
+  "gradle": ">=7",
+  "reason": "TOML version catalogs (libs.versions.toml) require Gradle 7.0+"
+}

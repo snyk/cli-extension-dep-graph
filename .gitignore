@@ -4,3 +4,4 @@ cp.out
 .bin
 
 .gradle
+build/

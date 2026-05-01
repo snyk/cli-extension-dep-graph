@@ -20,6 +20,7 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/metadata"
 )
 
 // updateFixturesEnvVar, when set to a truthy value, causes the integration tests
@@ -73,6 +74,112 @@ func pluginTestCases() map[string]PluginTestCase {
 			Options:      ecosystems.NewPluginOptions().WithTargetFile("lib/build.gradle"),
 			ExpectedFile: "expected_plugin_target_file_lib.json",
 		},
+		// Exercises TOML version catalog (libs.versions.toml) parsing. Gradle 7+ only.
+		"version_catalog": {
+			Fixture: "version-catalog",
+			Options: ecosystems.NewPluginOptions(),
+		},
+		// Exercises dependency locking with dynamic versions and version ranges
+		// resolved against a checked-in gradle.lockfile.
+		"with_lock_file": {
+			Fixture: "with-lock-file",
+			Options: ecosystems.NewPluginOptions(),
+		},
+		// Exercises Maven BOM resolution via `implementation platform(...)` where
+		// transitive coordinates inherit versions from the BOM.
+		"platform_bom": {
+			Fixture: "platform-bom",
+			Options: ecosystems.NewPluginOptions(),
+		},
+		// Smoke test that the Kotlin DSL build file (build.gradle.kts) is
+		// discovered and resolved equivalently to its Groovy counterpart.
+		"kts_simple": {
+			Fixture: "kts-simple",
+			Options: ecosystems.NewPluginOptions(),
+		},
+		// Exercises Maven artifact classifiers. Gradle's resolution result keys
+		// off GAV so both classifier variants collapse to a single component.
+		"classifiers": {
+			Fixture: "classifiers",
+			Options: ecosystems.NewPluginOptions(),
+		},
+		// Exercises three subprojects where two share the simple name "subproj"
+		// (one at :subproj, one at :greeter:subproj) — verifies project paths
+		// disambiguate and that targetFile uniqueness is preserved.
+		"same_name_subprojects": {
+			Fixture: "same-name-subprojects",
+			Options: ecosystems.NewPluginOptions(),
+		},
+		// Exercises dynamic version selectors (range `[a, b)`, open `+`) and
+		// resolutionStrategy.force. Resolved versions are wildcarded in the
+		// snapshot to stay resilient to Maven Central transitive bumps.
+		"dynamic_versions": {
+			Fixture: "dynamic-versions",
+			Options: ecosystems.NewPluginOptions(),
+		},
+	}
+}
+
+// TestGradleWrapper_BinaryResolution validates that the plugin correctly chooses
+// between wrapper and system gradle binaries based on options and fixture setup.
+// These tests focus on execution path and metadata, not graph content (which is
+// identical regardless of gradle binary version).
+func TestGradleWrapper_BinaryResolution(t *testing.T) {
+	wrapperFixture := filepath.Join(fixturesRoot, "with-wrapper")
+	absFixture, err := filepath.Abs(wrapperFixture)
+	require.NoError(t, err, "failed to resolve wrapper fixture path")
+
+	plugin := Plugin{}
+	ctx := context.Background()
+
+	testCases := []struct {
+		name                string
+		options             *ecosystems.SCAPluginOptions
+		expectedVersionFunc func() string
+		versionDescription  string
+	}{
+		{
+			name:                "uses_wrapper_binary",
+			options:             ecosystems.NewPluginOptions(),
+			expectedVersionFunc: func() string { return "8.4" },
+			versionDescription:  "should use wrapper Gradle 8.4, not system gradle",
+		},
+		{
+			name:    "skip_wrapper_uses_system",
+			options: ecosystems.NewPluginOptions().WithGradleSkipWrapper(true),
+			expectedVersionFunc: func() string {
+				systemVersion, err := gradleRuntime()
+				if err != nil {
+					return ""
+				}
+				return systemVersion.String()
+			},
+			versionDescription: "should use detected system gradle version",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absFixture, tc.options)
+
+			require.NoError(t, err, "gradle execution should succeed")
+			require.Len(t, result.Results, 1, "should process one project")
+
+			// Assert gradle version from ResolverMetadata
+			require.NotNil(t, result.Results[0].ResolverMetadata, "metadata should be populated")
+			require.NotNil(t, result.Results[0].ResolverMetadata.VersionBuildInfo, "version build info should be populated")
+
+			actualGradleVersion := result.Results[0].ResolverMetadata.VersionBuildInfo[metadata.GradleVersion]
+			expectedVersion := tc.expectedVersionFunc()
+			if expectedVersion == "" {
+				t.Fatalf("failed to get expected gradle version for test case %q", tc.name)
+			}
+			assert.Equal(t, expectedVersion, actualGradleVersion, tc.versionDescription)
+
+			// Ensure basic execution works
+			assert.Equal(t, "com.snyk.fixtures:with-wrapper", result.Results[0].ProjectDescriptor.Identity.RootComponentName)
+			require.NotNil(t, result.Results[0].DepGraph, "dependency graph should be built")
+		})
 	}
 }
 
@@ -214,11 +321,10 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 	sortedExpected := sortResults(expected)
 
 	for i := range sortedExpected {
-		// TargetRuntime is not currently emitted by the gradle plugin, but if
-		// it ever starts varying with the JDK we want to ignore that here.
-		sortedExpected[i].ProjectDescriptor.Identity.TargetRuntime = sortedActual[i].ProjectDescriptor.Identity.TargetRuntime
 		// Error is not part of the snapshot format.
 		sortedActual[i].Error = nil
+		// ResolverMetadata contains runtime-specific info and is not part of the snapshot format.
+		sortedActual[i].ResolverMetadata = nil
 	}
 
 	actualJSON, err := json.Marshal(sortedActual)
