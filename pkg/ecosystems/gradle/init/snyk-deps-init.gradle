@@ -39,34 +39,22 @@ gradle.projectsEvaluated { g ->
 
             // Stream JSON output to avoid memory accumulation for large projects
             outputFile.withWriter('UTF-8') { writer ->
-                writer.println('{')
-
-                // Write metadata first
-                writer.print('  "metadata": ')
-                writer.println(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(buildMetadata(root))).replaceAll('(?m)^', '  '))
-                writer.println(',')
-
-                // Stream projects as array to preserve Gradle evaluation order
-                writer.println('  "projects": [')
+                writer.print('{"metadata":')
+                writer.print(groovy.json.JsonOutput.toJson(buildMetadata(root)))
+                writer.print(',"projects":[')
                 def first = true
                 root.allprojects.each { proj ->
                     def projEntry = buildProjectEntry(proj)
                     if (projEntry != null) {
                         if (!first) {
-                            writer.println(',')
+                            writer.print(',')
                         }
-
-                        // Write project entry (path is already included in projEntry)
-                        def projJson = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(projEntry))
-                        writer.println(projJson.replaceAll('(?m)^', '    '))
-
+                        writer.print(groovy.json.JsonOutput.toJson(projEntry))
                         first = false
                         projEntry = null  // Release memory immediately
                     }
                 }
-                writer.println()
-                writer.println('  ]')
-                writer.println('}')
+                writer.print(']}')
             }
             println "SNYK_DEPS_JSON ${outputFile.absolutePath}"
         }

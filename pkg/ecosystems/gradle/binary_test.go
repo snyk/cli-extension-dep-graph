@@ -66,20 +66,25 @@ func TestResolveGradleBinary(t *testing.T) {
 	t.Run("prefers gradlew when present and executable", func(t *testing.T) {
 		dir := t.TempDir()
 		wrapperPath := filepath.Join(dir, "gradlew")
-		require.NoError(t, os.WriteFile(wrapperPath, []byte("#!/bin/sh"), 0o755))
+		require.NoError(t, os.WriteFile(wrapperPath, nil, 0o755))
 
 		binary, err := ResolveGradleBinary(dir, false)
 		require.NoError(t, err)
 		assert.Equal(t, wrapperPath, binary)
 	})
 
-	t.Run("falls back to gradle when gradlew is not executable", func(t *testing.T) {
+	t.Run("falls back to gradle when gradlew is not executable (Unix only)", func(t *testing.T) {
 		cleanup := setupFakeGradle(t)
 		defer cleanup()
 
+		// Mock Unix OS - Windows doesn't have this scenario
+		originalDetector := osDetector
+		osDetector = func() string { return "linux" }
+		defer func() { osDetector = originalDetector }()
+
 		dir := t.TempDir()
 		wrapperPath := filepath.Join(dir, "gradlew")
-		require.NoError(t, os.WriteFile(wrapperPath, []byte("#!/bin/sh"), 0o644)) // not executable
+		require.NoError(t, os.WriteFile(wrapperPath, nil, 0o644)) // not executable
 
 		binary, err := ResolveGradleBinary(dir, false)
 		require.NoError(t, err)
@@ -87,20 +92,35 @@ func TestResolveGradleBinary(t *testing.T) {
 	})
 
 	t.Run("uses platform-appropriate wrapper when present", func(t *testing.T) {
-		dir := t.TempDir()
-		gradlewPath := filepath.Join(dir, "gradlew")
-		gradlewBatPath := filepath.Join(dir, "gradlew.bat")
+		testCases := []struct {
+			name            string
+			mockOS          string
+			expectedWrapper string
+		}{
+			{"windows", "windows", "gradlew.bat"},
+			{"unix", "linux", "gradlew"},
+		}
 
-		require.NoError(t, os.WriteFile(gradlewPath, []byte("#!/bin/sh"), 0o755))
-		require.NoError(t, os.WriteFile(gradlewBatPath, []byte("@echo off"), 0o755))
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				dir := t.TempDir()
+				gradlewPath := filepath.Join(dir, "gradlew")
+				gradlewBatPath := filepath.Join(dir, "gradlew.bat")
 
-		binary, err := ResolveGradleBinary(dir, false)
-		require.NoError(t, err)
+				require.NoError(t, os.WriteFile(gradlewPath, nil, 0o755))
+				require.NoError(t, os.WriteFile(gradlewBatPath, nil, 0o755))
 
-		if runtime.GOOS == "windows" {
-			assert.Equal(t, gradlewBatPath, binary)
-		} else {
-			assert.Equal(t, gradlewPath, binary)
+				// Mock the specified OS
+				originalDetector := osDetector
+				osDetector = func() string { return tc.mockOS }
+				defer func() { osDetector = originalDetector }()
+
+				binary, err := ResolveGradleBinary(dir, false)
+				require.NoError(t, err)
+
+				expectedPath := filepath.Join(dir, tc.expectedWrapper)
+				assert.Equal(t, expectedPath, binary)
+			})
 		}
 	})
 
@@ -110,7 +130,7 @@ func TestResolveGradleBinary(t *testing.T) {
 
 		dir := t.TempDir()
 		wrapperPath := filepath.Join(dir, "gradlew")
-		require.NoError(t, os.WriteFile(wrapperPath, []byte("#!/bin/sh"), 0o755))
+		require.NoError(t, os.WriteFile(wrapperPath, nil, 0o755))
 
 		// Even though wrapper exists, should skip it when flag is true
 		binary, err := ResolveGradleBinary(dir, true)
@@ -120,27 +140,38 @@ func TestResolveGradleBinary(t *testing.T) {
 	})
 
 	t.Run("finds wrapper in parent directory", func(t *testing.T) {
-		parentDir := t.TempDir()
-		childDir := filepath.Join(parentDir, "subproject")
-		require.NoError(t, os.MkdirAll(childDir, 0o755))
-
-		// Create wrapper in parent directory
-		var wrapperName string
-		if runtime.GOOS == "windows" {
-			wrapperName = "gradlew.bat"
-		} else {
-			wrapperName = "gradlew"
+		testCases := []struct {
+			name        string
+			mockOS      string
+			wrapperName string
+		}{
+			{"windows", "windows", "gradlew.bat"},
+			{"unix", "linux", "gradlew"},
 		}
-		wrapperPath := filepath.Join(parentDir, wrapperName)
-		require.NoError(t, os.WriteFile(wrapperPath, []byte("#!/bin/sh"), 0o755))
 
-		// Should find wrapper by walking up from childDir (project directory)
-		binary, err := ResolveGradleBinary(childDir, false)
-		require.NoError(t, err)
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				parentDir := t.TempDir()
+				childDir := filepath.Join(parentDir, "subproject")
+				require.NoError(t, os.MkdirAll(childDir, 0o755))
 
-		// Use filepath.Base comparison to avoid symlink path differences on macOS
-		assert.Equal(t, wrapperName, filepath.Base(binary))
-		assert.Contains(t, binary, parentDir)
+				// Mock the specified OS
+				originalDetector := osDetector
+				osDetector = func() string { return tc.mockOS }
+				defer func() { osDetector = originalDetector }()
+
+				wrapperPath := filepath.Join(parentDir, tc.wrapperName)
+				require.NoError(t, os.WriteFile(wrapperPath, nil, 0o755))
+
+				// Should find wrapper by walking up from childDir (project directory)
+				binary, err := ResolveGradleBinary(childDir, false)
+				require.NoError(t, err)
+
+				// Use filepath.Base comparison to avoid symlink path differences on macOS
+				assert.Equal(t, tc.wrapperName, filepath.Base(binary))
+				assert.Contains(t, binary, parentDir)
+			})
+		}
 	})
 
 	t.Run("returns error when gradle not found and no wrapper", func(t *testing.T) {

@@ -130,10 +130,12 @@ func (p Plugin) processGradleFiles(
 	dir string,
 	options *ecosystems.SCAPluginOptions,
 ) ([]ecosystems.SCAResult, []string, error) {
-	// Sort by path depth to process parent directories first
-	sort.Slice(files, func(i, j int) bool {
-		depthI := strings.Count(files[i].Path, string(filepath.Separator))
-		depthJ := strings.Count(files[j].Path, string(filepath.Separator))
+	// Create a copy to avoid mutating the original slice, then sort by path depth to process parent directories first
+	filesCopy := make([]discovery.FindResult, len(files))
+	copy(filesCopy, files)
+	sort.Slice(filesCopy, func(i, j int) bool {
+		depthI := strings.Count(filesCopy[i].Path, string(filepath.Separator))
+		depthJ := strings.Count(filesCopy[j].Path, string(filepath.Separator))
 		return depthI < depthJ
 	})
 
@@ -153,70 +155,21 @@ func (p Plugin) processGradleFiles(
 		return nil, nil, fmt.Errorf("gradle: %w", err)
 	}
 
-	for _, discoveredFile := range files {
-		projectDir := filepath.Dir(discoveredFile.Path)
+	for _, discoveredFile := range filesCopy {
 		relativeProjectDir := filepath.Dir(discoveredFile.RelPath)
 
 		// Skip if we've already processed this directory
 		if processedDirs[relativeProjectDir] {
 			log.Debug(ctx, "Skipping already processed directory",
-				logger.Attr("dir", projectDir),
+				logger.Attr("dir", filepath.Dir(discoveredFile.Path)),
 				logger.Attr("file", discoveredFile.RelPath))
 			continue
 		}
 
-		// Try to resolve Gradle binary first - if it fails, add error result and mark as processed
-		gradleBinary, err := ResolveGradleBinary(projectDir, options.Gradle.SkipWrapper)
+		results, processedFiles, err := p.processGradleFile(ctx, log, discoveredFile, dir, initScriptPath, extraArgs, options)
 		if err != nil {
-			log.Error(ctx, "Gradle binary resolution failed",
-				logger.Attr(logAttrProjectDir, projectDir),
-				logger.Err(err))
-			// Add error result and mark directory as processed (failed)
-			errResult := gradleErrorResult(dir, discoveredFile.Path, fmt.Errorf("binary resolution failed: %w", err))
-			allResults = append(allResults, errResult)
-			processedDirs[relativeProjectDir] = true
-			continue // Skip to next file
+			return nil, nil, err
 		}
-
-		// Check if we discovered a settings file (project root) vs build file (scan target)
-		isSettingsFile := isSettingsFile(discoveredFile.RelPath)
-		if isSettingsFile {
-			log.Debug(ctx, "Gradle settings file found, will scan sub-projects",
-				logger.Attr("settings_file", discoveredFile.RelPath))
-		}
-
-		log.Debug(ctx, "Processing Gradle project",
-			logger.Attr(logAttrProjectDir, projectDir),
-			logger.Attr("file", discoveredFile.RelPath))
-
-		log.Debug(ctx, "Running Gradle dependency resolution",
-			logger.Attr(logAttrProjectDir, projectDir),
-			logger.Attr("init_script", initScriptPath),
-			logger.Attr("gradle_binary", gradleBinary))
-
-		data, err := runInitScript(ctx, projectDir, gradleBinary, initScriptPath, extraArgs)
-		if err != nil {
-			log.Error(ctx, "Gradle execution failed",
-				logger.Attr(logAttrProjectDir, projectDir),
-				logger.Err(err))
-			// Surface as an error result rather than a hard failure
-			errResult := gradleErrorResult(dir, discoveredFile.Path, err)
-			allResults = append(allResults, errResult)
-			continue
-		}
-
-		parsed, err := parseDependencyGraphJSON(data)
-		if err != nil {
-			return nil, nil, fmt.Errorf("gradle: failed to parse init script output: %w", err)
-		}
-
-		// For settings files, don't pass them as build file fallback since they're not scan targets
-		buildFileForFallback := discoveredFile.Path
-		if isSettingsFile {
-			buildFileForFallback = "" // Let Gradle init script determine actual build files
-		}
-
-		results, processedFiles := p.convertProjects(ctx, log, parsed, dir, buildFileForFallback, options)
 
 		allResults = append(allResults, results...)
 		allProcessedFiles = append(allProcessedFiles, processedFiles...)
@@ -232,6 +185,65 @@ func (p Plugin) processGradleFiles(
 	}
 
 	return allResults, allProcessedFiles, nil
+}
+
+// processGradleFile processes a single discovered Gradle file.
+// Returns the SCA results, processed file paths, and any fatal error.
+// Soft errors (binary resolution, gradle execution) are returned as SCAResult with Error field.
+func (p Plugin) processGradleFile(
+	ctx context.Context,
+	log logger.Logger,
+	discoveredFile discovery.FindResult,
+	dir, initScriptPath string,
+	extraArgs []string,
+	options *ecosystems.SCAPluginOptions,
+) ([]ecosystems.SCAResult, []string, error) {
+	projectDir := filepath.Dir(discoveredFile.Path)
+
+	// Try to resolve Gradle binary first - if it fails, add error result
+	gradleBinary, err := ResolveGradleBinary(projectDir, options.Gradle.SkipWrapper)
+	if err != nil {
+		log.Error(ctx, "Gradle binary resolution failed",
+			logger.Attr(logAttrProjectDir, projectDir),
+			logger.Err(err))
+		// Return error result - not a fatal error
+		errResult := gradleErrorResult(dir, discoveredFile.Path, fmt.Errorf("binary resolution failed: %w", err))
+		return []ecosystems.SCAResult{errResult}, nil, nil
+	}
+
+	// Check if we discovered a settings file (project root) vs build file (scan target)
+	isSettingsFile := isSettingsFile(discoveredFile.RelPath)
+
+	log.Debug(ctx, "Processing Gradle project",
+		logger.Attr(logAttrProjectDir, projectDir),
+		logger.Attr("file", discoveredFile.RelPath),
+		logger.Attr("init_script", initScriptPath),
+		logger.Attr("gradle_binary", gradleBinary))
+
+	reader, err := runInitScript(ctx, projectDir, gradleBinary, initScriptPath, extraArgs)
+	if err != nil {
+		log.Error(ctx, "Gradle execution failed",
+			logger.Attr(logAttrProjectDir, projectDir),
+			logger.Err(err))
+		// Return error result - not a fatal error
+		errResult := gradleErrorResult(dir, discoveredFile.Path, err)
+		return []ecosystems.SCAResult{errResult}, nil, nil
+	}
+	defer reader.Close()
+
+	parsed, err := parseDependencyGraphJSON(reader)
+	if err != nil {
+		return nil, nil, fmt.Errorf("gradle: failed to parse init script output: %w", err)
+	}
+
+	// For settings files, don't pass them as build file fallback since they're not scan targets
+	buildFileForFallback := discoveredFile.Path
+	if isSettingsFile {
+		buildFileForFallback = "" // Let Gradle init script determine actual build files
+	}
+
+	results, processedFiles := p.convertProjects(ctx, log, parsed, dir, buildFileForFallback, options)
+	return results, processedFiles, nil
 }
 
 // discoverAllGradleProjects finds all Gradle files recursively for --all-projects.

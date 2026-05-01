@@ -3,6 +3,7 @@ package gradle
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 )
 
 // dependencyGraphJSON is the top-level output produced by snyk-deps-init.gradle.
@@ -62,9 +63,10 @@ type allDepEntry struct {
 }
 
 // parseDependencyGraphJSON deserialises the JSON file produced by snyk-deps-init.gradle.
-func parseDependencyGraphJSON(data []byte) (*dependencyGraphJSON, error) {
+func parseDependencyGraphJSON(reader io.Reader) (*dependencyGraphJSON, error) {
 	var result dependencyGraphJSON
-	if err := json.Unmarshal(data, &result); err != nil {
+	decoder := json.NewDecoder(reader)
+	if err := decoder.Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to parse snyk-deps-init.gradle output: %w", err)
 	}
 	return &result, nil

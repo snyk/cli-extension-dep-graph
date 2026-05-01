@@ -3,6 +3,7 @@
 package gradle
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,7 +52,7 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 			]
 		}`)
 
-		result, err := parseDependencyGraphJSON(input)
+		result, err := parseDependencyGraphJSON(bytes.NewReader(input))
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -81,7 +82,7 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 			]
 		}`)
 
-		result, err := parseDependencyGraphJSON(input)
+		result, err := parseDependencyGraphJSON(bytes.NewReader(input))
 		require.NoError(t, err)
 		assert.Len(t, result.Projects, 2)
 
@@ -122,7 +123,7 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 			]
 		}`)
 
-		result, err := parseDependencyGraphJSON(input)
+		result, err := parseDependencyGraphJSON(bytes.NewReader(input))
 		require.NoError(t, err)
 
 		deps := result.Projects[0].Configurations[0].Root.Dependencies
@@ -145,7 +146,7 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 			]
 		}`)
 
-		result, err := parseDependencyGraphJSON(input)
+		result, err := parseDependencyGraphJSON(bytes.NewReader(input))
 		require.NoError(t, err)
 
 		var brokenConfig gradleConfig = result.Projects[0].Configurations[0]
@@ -154,13 +155,13 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 	})
 
 	t.Run("returns error for invalid JSON", func(t *testing.T) {
-		_, err := parseDependencyGraphJSON([]byte(`not valid json`))
+		_, err := parseDependencyGraphJSON(bytes.NewReader([]byte(`not valid json`)))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse")
 	})
 
 	t.Run("returns error for empty input", func(t *testing.T) {
-		_, err := parseDependencyGraphJSON([]byte(``))
+		_, err := parseDependencyGraphJSON(bytes.NewReader([]byte(``)))
 		require.Error(t, err)
 	})
 }

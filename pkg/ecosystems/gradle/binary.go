@@ -11,6 +11,12 @@ import (
 // errGradleNotFound is returned when the gradle binary is not in PATH.
 var errGradleNotFound = errors.New("gradle binary not found in PATH")
 
+// osDetector returns the current operating system name.
+// This variable can be overridden in tests to mock different platforms.
+var osDetector = func() string {
+	return runtime.GOOS
+}
+
 // ResolveGradleBinary returns the gradle executable to use for a given project directory.
 // It looks for the platform-appropriate Gradle wrapper when not skipped:
 // - On Windows: gradlew.bat
@@ -39,7 +45,7 @@ func ResolveGradleBinary(projectDir string, skipWrapper bool) (string, error) {
 func findWrapperInTreeFromPath(startDir string) string {
 	// Choose wrapper based on OS - these are mutually exclusive
 	var wrapperName string
-	if runtime.GOOS == "windows" {
+	if osDetector() == "windows" {
 		wrapperName = "gradlew.bat"
 	} else {
 		wrapperName = "gradlew"
@@ -64,5 +70,17 @@ func findWrapperInTreeFromPath(startDir string) string {
 
 func isExecutable(path string) bool {
 	info, err := os.Stat(path)
-	return err == nil && !info.IsDir() && info.Mode()&0o111 != 0
+	if err != nil || info.IsDir() {
+		return false
+	}
+
+	// On Windows, executable-ness is determined by file extension via registry associations.
+	// By default .bat files are registered as executable and making them non-executable
+	// would cause system-wide issues. So if the file exists, assume it's executable.
+	if osDetector() == "windows" {
+		return true
+	}
+
+	// On Unix-like systems, check permission bits
+	return info.Mode()&0o111 != 0
 }

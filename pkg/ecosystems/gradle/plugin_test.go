@@ -3,6 +3,7 @@
 package gradle
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -486,7 +487,7 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 
 	t.Run("demonstrates multi-project output gets filtered to single project", func(t *testing.T) {
 		// Parse the mock JSON as if it came from Gradle
-		parsed, err := parseDependencyGraphJSON([]byte(mockMultiProjectJSON))
+		parsed, err := parseDependencyGraphJSON(bytes.NewReader([]byte(mockMultiProjectJSON)))
 		require.NoError(t, err)
 
 		// Without target file - should get all 3 projects
@@ -547,7 +548,7 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 	})
 
 	t.Run("demonstrates filtering works with absolute paths", func(t *testing.T) {
-		parsed, err := parseDependencyGraphJSON([]byte(mockMultiProjectJSON))
+		parsed, err := parseDependencyGraphJSON(bytes.NewReader([]byte(mockMultiProjectJSON)))
 		require.NoError(t, err)
 
 		// Use absolute path for lib project
@@ -589,7 +590,7 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 	})
 
 	t.Run("demonstrates no results when target file doesn't match", func(t *testing.T) {
-		parsed, err := parseDependencyGraphJSON([]byte(mockMultiProjectJSON))
+		parsed, err := parseDependencyGraphJSON(bytes.NewReader([]byte(mockMultiProjectJSON)))
 		require.NoError(t, err)
 
 		targetFile := "nonexistent/build.gradle"
