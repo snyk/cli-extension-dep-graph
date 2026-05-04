@@ -1,4 +1,4 @@
-package depgraph
+package legacycli
 
 import (
 	"fmt"
@@ -7,8 +7,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/snyk/go-application-framework/pkg/configuration"
-	"github.com/snyk/go-application-framework/pkg/workflow"
+	gafworkflow "github.com/snyk/go-application-framework/pkg/workflow"
 
+	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
 	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 )
 
@@ -17,14 +18,13 @@ const (
 	printOutputJsonlWithErrorsCliArg = "--print-output-jsonl-with-errors"
 )
 
-var legacyWorkflowID = workflow.NewWorkflowIdentifier(legacyCLIWorkflowIDStr)
+var legacyWorkflowID = gafworkflow.NewWorkflowIdentifier(workflow.LegacyCLIWorkflowIDStr)
 
-func handleLegacyResolution(ctx workflow.InvocationContext, config configuration.Configuration, logger *zerolog.Logger) ([]workflow.Data, error) {
+func HandleLegacyResolution(ctx gafworkflow.InvocationContext, config configuration.Configuration, logger *zerolog.Logger) ([]gafworkflow.Data, error) {
 	engine := ctx.GetEngine()
-	argument, outputParser := chooseGraphArgument(config)
+	argument, outputParser := ChooseGraphArgument(config)
 
-	// prepare invocation of the legacy cli
-	prepareLegacyFlags(argument, config, logger)
+	PrepareLegacyFlags(argument, config, logger)
 
 	legacyData, legacyCLIError := engine.InvokeWithConfig(legacyWorkflowID, config)
 	if legacyCLIError != nil {
@@ -41,42 +41,42 @@ func handleLegacyResolution(ctx workflow.InvocationContext, config configuration
 		return nil, fmt.Errorf("error parsing dep graphs: %w", err)
 	}
 	if len(depGraphs) == 0 {
-		return nil, errNoDepGraphsFound
+		return nil, ErrNoDepGraphsFound
 	}
 
-	workflowOutputData := mapToWorkflowData(depGraphs, logger)
+	workflowOutputData := MapToWorkflowData(depGraphs, logger)
 	logger.Printf("DepGraph workflow done (extracted %d dependency graphs)", len(workflowOutputData))
 	return workflowOutputData, nil
 }
 
-func chooseGraphArgument(config configuration.Configuration) (string, parsers.OutputParser) {
-	if config.GetBool(FlagPrintEffectiveGraph) {
+func ChooseGraphArgument(config configuration.Configuration) (string, parsers.OutputParser) {
+	if config.GetBool(workflow.FlagPrintEffectiveGraph) {
 		return "--print-effective-graph", parsers.NewJSONL()
 	}
 
-	if config.GetBool(FlagPrintEffectiveGraphWithErrors) {
+	if config.GetBool(workflow.FlagPrintEffectiveGraphWithErrors) {
 		return "--print-effective-graph-with-errors", parsers.NewJSONL()
 	}
 
-	if config.GetBool(FlagPrintOutputJsonlWithErrors) {
+	if config.GetBool(workflow.FlagPrintOutputJsonlWithErrors) {
 		return printGraphCliArg, parsers.NewJSONL()
 	}
 
 	return printGraphCliArg, parsers.NewPlainText()
 }
 
-func mapToWorkflowData(depGraphs []parsers.DepGraphOutput, logger *zerolog.Logger) []workflow.Data {
-	depGraphList := make([]workflow.Data, 0, len(depGraphs))
+func MapToWorkflowData(depGraphs []parsers.DepGraphOutput, logger *zerolog.Logger) []gafworkflow.Data {
+	depGraphList := make([]gafworkflow.Data, 0, len(depGraphs))
 	for i := range depGraphs {
 		depGraph := &depGraphs[i]
-		data := workflow.NewData(DataTypeID, contentTypeJSON, depGraph.DepGraph)
-		data.SetMetaData(contentLocationKey, depGraph.NormalisedTargetFile)
-		data.SetMetaData(MetaKeyNormalisedTargetFile, depGraph.NormalisedTargetFile)
+		data := gafworkflow.NewData(workflow.DataTypeID, workflow.ContentTypeJSON, depGraph.DepGraph)
+		data.SetMetaData(workflow.ContentLocationKey, depGraph.NormalisedTargetFile)
+		data.SetMetaData(workflow.MetaKeyNormalisedTargetFile, depGraph.NormalisedTargetFile)
 		if depGraph.TargetFileFromPlugin != nil {
-			data.SetMetaData(MetaKeyTargetFileFromPlugin, *depGraph.TargetFileFromPlugin)
+			data.SetMetaData(workflow.MetaKeyTargetFileFromPlugin, *depGraph.TargetFileFromPlugin)
 		}
 		if depGraph.Target != nil {
-			data.SetMetaData(MetaKeyTarget, string(depGraph.Target))
+			data.SetMetaData(workflow.MetaKeyTarget, string(depGraph.Target))
 		}
 		if depGraph.Error != nil {
 			snykErrors, err := snyk_errors.FromJSONAPIErrorBytes(depGraph.Error)
@@ -94,7 +94,7 @@ func mapToWorkflowData(depGraphs []parsers.DepGraphOutput, logger *zerolog.Logge
 }
 
 //nolint:gocyclo // Function contains many conditional flag checks
-func prepareLegacyFlags(argument string, cfg configuration.Configuration, logger *zerolog.Logger) {
+func PrepareLegacyFlags(argument string, cfg configuration.Configuration, logger *zerolog.Logger) {
 	cmdArgs := []string{"test", "--json"}
 	cmdArgs = append(cmdArgs, argument)
 
@@ -102,11 +102,11 @@ func prepareLegacyFlags(argument string, cfg configuration.Configuration, logger
 		cmdArgs = append(cmdArgs, "--all-projects")
 	}
 
-	if cfg.GetBool(FlagPrintOutputJsonlWithErrors) {
+	if cfg.GetBool(workflow.FlagPrintOutputJsonlWithErrors) {
 		cmdArgs = append(cmdArgs, printOutputJsonlWithErrorsCliArg)
 	}
 
-	if cfg.GetBool(FlagFailFast) {
+	if cfg.GetBool(workflow.FlagFailFast) {
 		cmdArgs = append(cmdArgs, "--fail-fast")
 	}
 
@@ -115,12 +115,12 @@ func prepareLegacyFlags(argument string, cfg configuration.Configuration, logger
 		logger.Print("Exclude:", exclude)
 	}
 
-	if detectionDepth := cfg.GetString(FlagDetectionDepth); detectionDepth != "" {
+	if detectionDepth := cfg.GetString(workflow.FlagDetectionDepth); detectionDepth != "" {
 		cmdArgs = append(cmdArgs, "--detection-depth="+detectionDepth)
 		logger.Print("Detection depth:", detectionDepth)
 	}
 
-	if file := cfg.GetString(FlagFile); file != "" {
+	if file := cfg.GetString(workflow.FlagFile); file != "" {
 		cmdArgs = append(cmdArgs, "--file="+file)
 		logger.Print("File:", file)
 	} else {
@@ -140,73 +140,73 @@ func prepareLegacyFlags(argument string, cfg configuration.Configuration, logger
 		logger.Print("Debug: true")
 	}
 
-	if cfg.GetBool(FlagDev) {
+	if cfg.GetBool(workflow.FlagDev) {
 		cmdArgs = append(cmdArgs, "--dev")
 		logger.Print("Dev dependencies: true")
 	}
 
-	if cfg.GetBool(FlagPruneRepeatedSubdependencies) {
+	if cfg.GetBool(workflow.FlagPruneRepeatedSubdependencies) {
 		cmdArgs = append(cmdArgs, "--prune-repeated-subdependencies")
 		logger.Print("Prune repeated sub-dependencies: true")
 	}
 
-	if cfg.GetBool(FlagMavenAggregateProject) {
+	if cfg.GetBool(workflow.FlagMavenAggregateProject) {
 		cmdArgs = append(cmdArgs, "--maven-aggregate-project")
 		logger.Print("Ensure all modules are resolvable by the Maven reactor: true")
 	}
 
-	if cfg.GetBool(FlagMavenSkipWrapper) {
+	if cfg.GetBool(workflow.FlagMavenSkipWrapper) {
 		cmdArgs = append(cmdArgs, "--maven-skip-wrapper")
 		logger.Print("Use system Maven instead of the Maven wrapper: true")
 	}
 
-	if cfg.GetBool(FlagScanUnmanaged) {
+	if cfg.GetBool(workflow.FlagScanUnmanaged) {
 		cmdArgs = append(cmdArgs, "--scan-unmanaged")
 		logger.Print("Specify an individual JAR, WAR, or AAR file: true")
 	}
 
-	if cfg.GetBool(FlagScanAllUnmanaged) {
+	if cfg.GetBool(workflow.FlagScanAllUnmanaged) {
 		cmdArgs = append(cmdArgs, "--scan-all-unmanaged")
 		logger.Print("Auto-detect Maven, JAR, WAR, and AAR files recursively from the current folder: true")
 	}
 
-	if subProject := cfg.GetString(FlagSubProject); subProject != "" {
+	if subProject := cfg.GetString(workflow.FlagSubProject); subProject != "" {
 		cmdArgs = append(cmdArgs, "--sub-project="+subProject)
 		logger.Print("Sub-project:", subProject)
 	}
 
-	if gradleSubProject := cfg.GetString(FlagGradleSubProject); gradleSubProject != "" {
+	if gradleSubProject := cfg.GetString(workflow.FlagGradleSubProject); gradleSubProject != "" {
 		cmdArgs = append(cmdArgs, "--gradle-sub-project="+gradleSubProject)
 		logger.Print("Gradle sub-project:", gradleSubProject)
 	}
 
-	if cfg.GetBool(FlagGradleNormalizeDeps) {
+	if cfg.GetBool(workflow.FlagGradleNormalizeDeps) {
 		cmdArgs = append(cmdArgs, "--gradle-normalize-deps")
 		logger.Print("Normalize Gradle dependencies: true")
 	}
 
-	if cfg.GetBool(FlagAllSubProjects) {
+	if cfg.GetBool(workflow.FlagAllSubProjects) {
 		cmdArgs = append(cmdArgs, "--all-sub-projects")
 		logger.Print("Test all sub-projects: true")
 	}
 
-	if configurationMatching := cfg.GetString(FlagConfigurationMatching); configurationMatching != "" {
+	if configurationMatching := cfg.GetString(workflow.FlagConfigurationMatching); configurationMatching != "" {
 		cmdArgs = append(cmdArgs, "--configuration-matching="+configurationMatching)
 		logger.Print("Configuration matching:", configurationMatching)
 	}
 
-	if configurationAttributes := cfg.GetString(FlagConfigurationAttributes); configurationAttributes != "" {
+	if configurationAttributes := cfg.GetString(workflow.FlagConfigurationAttributes); configurationAttributes != "" {
 		cmdArgs = append(cmdArgs, "--configuration-attributes="+configurationAttributes)
 		logger.Print("Configuration attributes:", configurationAttributes)
 	}
 
-	if initScript := cfg.GetString(FlagInitScript); initScript != "" {
+	if initScript := cfg.GetString(workflow.FlagInitScript); initScript != "" {
 		cmdArgs = append(cmdArgs, "--init-script="+initScript)
 		logger.Print("Init script:", initScript)
 	}
 
 	strictOutOfSync := true
-	if parsedStrictOutOfSync, err := strconv.ParseBool(cfg.GetString(FlagStrictOutOfSync)); err == nil {
+	if parsedStrictOutOfSync, err := strconv.ParseBool(cfg.GetString(workflow.FlagStrictOutOfSync)); err == nil {
 		strictOutOfSync = parsedStrictOutOfSync
 	}
 	if !strictOutOfSync {
@@ -214,52 +214,52 @@ func prepareLegacyFlags(argument string, cfg configuration.Configuration, logger
 		logger.Print("strict-out-of-sync: false")
 	}
 
-	if cfg.GetBool(FlagNugetAssetsProjectName) {
+	if cfg.GetBool(workflow.FlagNugetAssetsProjectName) {
 		cmdArgs = append(cmdArgs, "--assets-project-name")
 		logger.Print("NuGet assets-project-name: true")
 	}
 
-	if file := cfg.GetString(FlagNugetPkgsFolder); file != "" {
+	if file := cfg.GetString(workflow.FlagNugetPkgsFolder); file != "" {
 		cmdArgs = append(cmdArgs, "--packages-folder="+file)
 		logger.Print("NuGet packages-folder: ", file)
 	}
 
-	if cfg.GetBool(FlagYarnWorkspaces) {
+	if cfg.GetBool(workflow.FlagYarnWorkspaces) {
 		cmdArgs = append(cmdArgs, "--yarn-workspaces")
 		logger.Print("Yarn Workspaces: true")
 	}
 
-	if pyCmd := cfg.GetString(FlagPythonCommand); pyCmd != "" {
+	if pyCmd := cfg.GetString(workflow.FlagPythonCommand); pyCmd != "" {
 		cmdArgs = append(cmdArgs, "--command="+pyCmd)
 		logger.Print("Python command:", pyCmd)
 	}
 
-	if skipUnresolved := cfg.GetString(FlagPythonSkipUnresolved); skipUnresolved != "" {
+	if skipUnresolved := cfg.GetString(workflow.FlagPythonSkipUnresolved); skipUnresolved != "" {
 		cmdArgs = append(cmdArgs, "--skip-unresolved="+skipUnresolved)
 		logger.Print("Python skip unresolved: true")
 	}
 
-	if pyPkgManager := cfg.GetString(FlagPythonPackageManager); pyPkgManager != "" {
+	if pyPkgManager := cfg.GetString(workflow.FlagPythonPackageManager); pyPkgManager != "" {
 		cmdArgs = append(cmdArgs, "--package-manager="+pyPkgManager)
 		logger.Print("Python package manager:", pyPkgManager)
 	}
 
-	if maxDepth := cfg.GetInt(FlagUnmanagedMaxDepth); maxDepth != 0 {
+	if maxDepth := cfg.GetInt(workflow.FlagUnmanagedMaxDepth); maxDepth != 0 {
 		cmdArgs = append(cmdArgs, "--max-depth="+strconv.Itoa(maxDepth))
 	}
 
-	if cfg.GetBool(FlagIncludeProvenance) {
+	if cfg.GetBool(workflow.FlagIncludeProvenance) {
 		cmdArgs = append(cmdArgs, "--include-provenance")
 		logger.Print("Include provenance: true")
 	}
 
-	if cfg.IsSet(FlagDotnetRuntimeResolution) {
-		dotnetRuntimeResolution := cfg.GetBool(FlagDotnetRuntimeResolution)
+	if cfg.IsSet(workflow.FlagDotnetRuntimeResolution) {
+		dotnetRuntimeResolution := cfg.GetBool(workflow.FlagDotnetRuntimeResolution)
 		cmdArgs = append(cmdArgs, fmt.Sprintf("--dotnet-runtime-resolution=%t", dotnetRuntimeResolution))
 		logger.Print("Dotnet runtime resolution: ", dotnetRuntimeResolution)
 	}
 
-	if tf := cfg.GetString(FlagDotnetTargetFramework); tf != "" {
+	if tf := cfg.GetString(workflow.FlagDotnetTargetFramework); tf != "" {
 		cmdArgs = append(cmdArgs, "--dotnet-target-framework="+tf)
 		logger.Print("Dotnet target framework:", tf)
 	}

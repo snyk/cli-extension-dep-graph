@@ -3,30 +3,28 @@ package depgraph
 import (
 	"fmt"
 
-	"github.com/snyk/go-application-framework/pkg/workflow"
-)
+	gafworkflow "github.com/snyk/go-application-framework/pkg/workflow"
 
-const (
-	workflowIDStr = "depgraph"
+	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
 )
 
 var (
 	// WorkflowID is the unique identifier for this workflow. It should be used as
 	// a reference everywhere.
-	WorkflowID workflow.Identifier = workflow.NewWorkflowIdentifier(workflowIDStr)
+	WorkflowID = workflow.WorkflowID
 
 	// DataTypeID is the unique identifier for the data type that is being returned
 	// from this workflow.
-	DataTypeID workflow.Identifier = workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
+	DataTypeID = workflow.DataTypeID
 )
 
 // Init initializes the DepGraph workflow.
-func Init(engine workflow.Engine) error {
-	flags := getFlagSet()
+func Init(engine gafworkflow.Engine) error {
+	flagSet := getFlagSet()
 
 	_, err := engine.Register(
 		WorkflowID,
-		workflow.ConfigurationOptionsFromFlagset(flags),
+		gafworkflow.ConfigurationOptionsFromFlagset(flagSet),
 		callback)
 	if err != nil {
 		return fmt.Errorf("failed to register workflow: %w", err)
