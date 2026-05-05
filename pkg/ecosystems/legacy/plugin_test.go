@@ -2,6 +2,7 @@
 package legacy_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -163,6 +164,75 @@ func TestResolver_ReturnsProcessedFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"project.assets.json"}, res.ProcessedFiles)
+}
+
+func TestResolver_IgnoredFilesUseExcludePaths(t *testing.T) {
+	ictx, opts, capturedArgs := setupLegacyCLICapturingArgs(t,
+		`{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`)
+	opts.WithAllProjects(true)
+
+	ignored := []string{"packages/api/package.json", "packages/web/package.json"}
+	resolver := legacy.NewLegacyResolver(ictx, ignored)
+
+	_, err := resolver.BuildDepGraphsFromDir(t.Context(), nil, "", opts)
+	require.NoError(t, err)
+
+	assert.Contains(t, *capturedArgs,
+		"--exclude-paths=packages/api/package.json,packages/web/package.json",
+		"processed files should be forwarded as --exclude-paths so paths are matched exactly")
+	for _, arg := range *capturedArgs {
+		assert.False(t, strings.HasPrefix(arg, "--exclude="),
+			"should not use --exclude (basename match) for processed files: %q", arg)
+	}
+}
+
+func TestResolver_IgnoredFilesMergeWithUserExcludePaths(t *testing.T) {
+	ictx, opts, capturedArgs := setupLegacyCLICapturingArgs(t,
+		`{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`)
+	opts.WithAllProjects(true).
+		WithRawFlags("--exclude-paths=user/manual.json")
+
+	resolver := legacy.NewLegacyResolver(ictx, []string{"packages/api/package.json"})
+
+	_, err := resolver.BuildDepGraphsFromDir(t.Context(), nil, "", opts)
+	require.NoError(t, err)
+
+	assert.Contains(t, *capturedArgs,
+		"--exclude-paths=user/manual.json,packages/api/package.json",
+		"processed files should be merged with user-supplied --exclude-paths value")
+}
+
+func setupLegacyCLICapturingArgs(t *testing.T, testBody string) (workflow.InvocationContext, *ecosystems.SCAPluginOptions, *[]string) {
+	t.Helper()
+
+	ctrl := gomock.NewController(t)
+	ictx := gafmocks.NewMockInvocationContext(ctrl)
+	engine := gafmocks.NewMockEngine(ctrl)
+	cfg := configuration.New()
+	logger := zerolog.Nop()
+
+	opts := ecosystems.NewPluginOptions()
+
+	ictx.EXPECT().GetConfiguration().Return(cfg).AnyTimes()
+	ictx.EXPECT().GetEngine().Return(engine).AnyTimes()
+	ictx.EXPECT().GetEnhancedLogger().Return(&logger).AnyTimes()
+
+	captured := &[]string{}
+	engine.EXPECT().
+		InvokeWithConfig(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ workflow.Identifier, config configuration.Configuration) ([]workflow.Data, error) {
+			if args, ok := config.Get(configuration.RAW_CMD_ARGS).([]string); ok {
+				*captured = args
+			}
+			return []workflow.Data{
+				workflow.NewData(
+					workflow.NewTypeIdentifier(workflow.NewWorkflowIdentifier("legacycli"), "application/text"),
+					"application/text",
+					[]byte(testBody)),
+			}, nil
+		})
+
+	return ictx, opts, captured
 }
 
 func setupLegacyCLI(t *testing.T, testBody string) (workflow.InvocationContext, *ecosystems.SCAPluginOptions) {

@@ -6,6 +6,7 @@ const (
 	FlagPrintOutputJsonlWithErrors    = "print-output-jsonl-with-errors"
 	FlagDev                           = "dev"
 	FlagExclude                       = "exclude"
+	FlagExcludePaths                  = "exclude-paths"
 	FlagFile                          = "file"
 	FlagDetectionDepth                = "detection-depth"
 	FlagPruneRepeatedSubdependencies  = "prune-repeated-subdependencies"
