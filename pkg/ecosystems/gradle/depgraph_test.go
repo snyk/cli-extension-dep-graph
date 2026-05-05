@@ -110,10 +110,10 @@ func TestBuildDepGraph(t *testing.T) {
 		assert.True(t, ids["org.slf4j:slf4j-api@2.0.0"])
 	})
 
-	t.Run("handles circular dependencies as pruned nodes", func(t *testing.T) {
+	t.Run("handles cycle-pruned dependencies as pruned nodes", func(t *testing.T) {
 		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
 			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
-				{ID: "com.example:a:1.0.0", Circular: true},
+				{ID: "com.example:a:1.0.0", Pruned: pruneCycle},
 			}),
 		})
 
@@ -121,8 +121,23 @@ func TestBuildDepGraph(t *testing.T) {
 		require.NoError(t, err)
 
 		ids := nodeIDSet(dg)
-		assert.True(t, ids["com.example:a@1.0.0:pruned"], "circular dep should appear as pruned node")
-		assert.False(t, ids["com.example:a@1.0.0"], "circular dep should not appear as normal node")
+		assert.True(t, ids["com.example:a@1.0.0:pruned"], "cycle-pruned dep should appear as pruned node")
+		assert.False(t, ids["com.example:a@1.0.0"], "cycle-pruned dep should not appear as normal node")
+	})
+
+	t.Run("handles visited-pruned dependencies as pruned nodes", func(t *testing.T) {
+		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
+				{ID: "com.example:b:2.0.0", Pruned: pruneVisited},
+			}),
+		})
+
+		dg, err := buildDepGraph(&proj)
+		require.NoError(t, err)
+
+		ids := nodeIDSet(dg)
+		assert.True(t, ids["com.example:b@2.0.0:pruned"], "visited-pruned dep should appear as pruned node")
+		assert.False(t, ids["com.example:b@2.0.0"], "visited-pruned dep should not appear as normal node")
 	})
 
 	t.Run("skips unresolved dependencies", func(t *testing.T) {
@@ -186,11 +201,14 @@ func TestBuildDepGraph(t *testing.T) {
 		assert.Equal(t, "", dg.Pkgs[0].Info.Version)
 	})
 
-	t.Run("does not prune a dependency reached from multiple parents", func(t *testing.T) {
+	t.Run("prunes subsequent references to same dependency per configuration", func(t *testing.T) {
+		// This test simulates the common case where two parents reference the same child.
+		// The init script would emit the child's full subtree under the first parent and
+		// mark subsequent references as pruned: "visited".
 		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
 			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
 				makeDep("com.example:a:1.0.0", makeDep("com.example:c:1.0.0")),
-				makeDep("com.example:b:1.0.0", makeDep("com.example:c:1.0.0")),
+				makeDep("com.example:b:1.0.0", gradleDep{ID: "com.example:c:1.0.0", Pruned: pruneVisited}),
 			}),
 		})
 
@@ -198,8 +216,8 @@ func TestBuildDepGraph(t *testing.T) {
 		require.NoError(t, err)
 
 		ids := nodeIDSet(dg)
-		assert.True(t, ids["com.example:c@1.0.0"], "shared dep should appear in graph")
-		assert.False(t, ids["com.example:c@1.0.0:pruned"], "shared dep should NOT be pruned when it is not circular")
+		assert.True(t, ids["com.example:c@1.0.0"], "first occurrence should appear as normal node")
+		assert.True(t, ids["com.example:c@1.0.0:pruned"], "subsequent occurrence should appear as pruned node")
 	})
 
 	t.Run("preserves different versions of same transitive dependency across configurations", func(t *testing.T) {

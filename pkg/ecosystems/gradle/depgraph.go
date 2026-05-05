@@ -71,9 +71,9 @@ func buildDepGraph(proj *gradleProject) (*depgraph.DepGraph, error) {
 		if cfg.Error != "" {
 			continue
 		}
-		seen := make(map[string]bool) // Fresh seen map per configuration
+		processed := make(map[string]bool) // Fresh processed set per configuration; tracks components whose subtree we've expanded in this configuration
 		for _, dep := range cfg.Root.Dependencies {
-			if err := addDep(builder, dep, rootNodeID, seen, connectOnce); err != nil {
+			if err := addDep(builder, &dep, rootNodeID, processed, connectOnce); err != nil {
 				return nil, fmt.Errorf("project %s: %w", proj.Path, err)
 			}
 		}
@@ -82,18 +82,32 @@ func buildDepGraph(proj *gradleProject) (*depgraph.DepGraph, error) {
 	return builder.Build(), nil
 }
 
-// addDep recursively adds a resolved dependency node and its children to the builder.
-// Circular dependencies (already present in seen) are added as pruned leaf nodes.
-// connectOnce wraps depgraph.Builder.ConnectNodes with deduplication so that the
-// same (parent, child) edge is only added once across the entire merged graph.
-func addDep(builder *depgraph.Builder, dep gradleDep, parentID string, seen map[string]bool, connectOnce func(parentID, childID string) error) error {
+// addDep recursively adds a resolved dependency node and its children to the
+// builder.  The Gradle init script (snyk-deps-init.gradle) emits a pre-pruned
+// DFS spanning tree of the resolved dependency DAG: each component's children
+// appear under exactly one parent per configuration; every subsequent
+// reference to the same component is emitted with `pruned: "visited"` or
+// `pruned: "cycle"` and no children.  We mirror that shape here:
+//
+//   - `processed` records every component we've already expanded in this
+//     configuration so a malformed input that includes the same expanded
+//     subtree twice would still be walked at most once.
+//   - Components flagged with any `pruned` value by the init script (or already in
+//     `processed`) become labeled `pruned` leaves so the tree shape matches
+//     `gradle dependencies` text output and downstream "vulnerable path"
+//     counts remain meaningful.
+//
+// connectOnce wraps depgraph.Builder.ConnectNodes with deduplication so that
+// the same (parent, child) edge is only added once across the entire merged
+// graph (configurations are merged into one dep-graph per project).
+func addDep(builder *depgraph.Builder, dep *gradleDep, parentID string, processed map[string]bool, connectOnce func(parentID, childID string) error) error {
 	if dep.ID == "" || dep.Unresolved {
 		return nil
 	}
 
 	nodeID, name, version := depNodeParts(dep.ID)
 
-	if dep.Circular || seen[nodeID] {
+	if dep.Pruned.IsPruned() || processed[nodeID] {
 		// Record a pruned leaf so the dep-graph is still complete, but avoid
 		// infinite recursion.
 		prunedID := nodeID + ":pruned"
@@ -110,16 +124,12 @@ func addDep(builder *depgraph.Builder, dep gradleDep, parentID string, seen map[
 		return err
 	}
 
-	seen[nodeID] = true
+	processed[nodeID] = true
 	for _, child := range dep.Dependencies {
-		if err := addDep(builder, child, nodeID, seen, connectOnce); err != nil {
+		if err := addDep(builder, &child, nodeID, processed, connectOnce); err != nil {
 			return err
 		}
 	}
-	// Allow the same package to appear under multiple parents without pruning,
-	// but don't re-traverse children we already walked from a different path.
-	// Remove from seen so sibling subtrees can include this node without pruning.
-	delete(seen, nodeID)
 
 	return nil
 }

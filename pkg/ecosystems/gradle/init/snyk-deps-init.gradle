@@ -124,8 +124,9 @@ def resolveConfiguration(config, project) {
     def rootComponent = resolutionResult.root
 
     def rootId = componentId(rootComponent)
-    def seen = new HashSet<String>()
-    def tree = walkDependencies(rootComponent, seen)
+    def processed = new HashSet<String>()
+    def ancestry = new HashSet<String>()
+    def tree = walkDependencies(rootComponent, processed, ancestry)
 
     return [
         name            : config.name,
@@ -141,7 +142,7 @@ def resolveConfiguration(config, project) {
 
 // ── Recursive tree walk ─────────────────────────────────────────────
 
-def walkDependencies(component, Set<String> seen) {
+def walkDependencies(component, Set<String> processed, Set<String> ancestry) {
     def children = []
 
     component.dependencies.each { dep ->
@@ -152,19 +153,27 @@ def walkDependencies(component, Set<String> seen) {
             // ResolvedDependencyResult
             def id = componentId(selected)
 
-            if (seen.contains(id)) {
-                // Circular or already-visited — record but don't recurse
+            if (ancestry.contains(id)) {
+                // True cycle — this component is on the current ancestor chain
                 children << [
-                    id      : id,
-                    circular: true,
+                    id    : id,
+                    pruned: 'cycle',
+                ]
+            } else if (processed.contains(id)) {
+                // Diamond — already visited elsewhere in this configuration
+                children << [
+                    id    : id,
+                    pruned: 'visited',
                 ]
             } else {
-                seen.add(id)
+                processed.add(id)
+                ancestry.add(id)
                 children << [
                     id          : id,
                     // Omit 'requested' field to reduce memory usage
-                    dependencies: walkDependencies(selected, seen),
+                    dependencies: walkDependencies(selected, processed, ancestry),
                 ]
+                ancestry.remove(id)
             }
         } else if (dep.hasProperty('attempted')) {
             // UnresolvedDependencyResult

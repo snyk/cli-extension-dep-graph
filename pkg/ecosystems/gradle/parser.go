@@ -48,10 +48,33 @@ type configRoot struct {
 	Dependencies []gradleDep `json:"dependencies"`
 }
 
+// pruneReason indicates why a dependency node was pruned (elided) during tree construction.
+type pruneReason string
+
+const (
+	pruneVisited pruneReason = "visited" // Node was already expanded elsewhere in this configuration
+	pruneCycle   pruneReason = "cycle"   // Node creates a cycle (appears on current ancestor chain)
+)
+
+// Valid returns true if this pruneReason has a recognized value.
+func (p pruneReason) Valid() bool {
+	return p == pruneVisited || p == pruneCycle
+}
+
+// IsEmpty returns true if this pruneReason is empty (not pruned).
+func (p pruneReason) IsEmpty() bool {
+	return p == ""
+}
+
+// IsPruned returns true if this dependency was pruned for any reason.
+func (p pruneReason) IsPruned() bool {
+	return p != "" && p.Valid()
+}
+
 // gradleDep is one node in the resolved dependency tree.
 type gradleDep struct {
 	ID           string      `json:"id"`
-	Circular     bool        `json:"circular,omitempty"`
+	Pruned       pruneReason `json:"pruned,omitempty"`
 	Unresolved   bool        `json:"unresolved,omitempty"`
 	Reason       string      `json:"reason,omitempty"`
 	Dependencies []gradleDep `json:"dependencies"`

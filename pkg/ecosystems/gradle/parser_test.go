@@ -99,7 +99,7 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 		assert.True(t, foundApp, "should contain app project")
 	})
 
-	t.Run("parses circular and unresolved dependencies", func(t *testing.T) {
+	t.Run("parses pruned and unresolved dependencies", func(t *testing.T) {
 		input := []byte(`{
 			"metadata": {"gradleVersion": "8.5", "javaVersion": "17", "generatedAt": "", "rootProject": {"name": "root", "group": "", "version": "", "path": ""}},
 			"projects": [
@@ -112,8 +112,9 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 							"root": {
 								"id": "com.example:root:1.0",
 								"dependencies": [
-									{"id": "com.example:a:1.0", "circular": true, "dependencies": []},
-									{"id": "com.example:b:1.0", "unresolved": true, "reason": "not found", "dependencies": []}
+									{"id": "com.example:a:1.0", "pruned": "cycle", "dependencies": []},
+									{"id": "com.example:b:1.0", "pruned": "visited", "dependencies": []},
+									{"id": "com.example:c:1.0", "unresolved": true, "reason": "not found", "dependencies": []}
 								]
 							},
 							"allDependencies": []
@@ -127,10 +128,12 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 		require.NoError(t, err)
 
 		deps := result.Projects[0].Configurations[0].Root.Dependencies
-		require.Len(t, deps, 2)
-		assert.True(t, deps[0].Circular)
-		assert.True(t, deps[1].Unresolved)
-		assert.Equal(t, "not found", deps[1].Reason)
+		require.Len(t, deps, 3)
+		assert.Equal(t, pruneCycle, deps[0].Pruned)
+		assert.Equal(t, pruneVisited, deps[1].Pruned)
+		assert.True(t, deps[2].Pruned.IsEmpty())
+		assert.True(t, deps[2].Unresolved)
+		assert.Equal(t, "not found", deps[2].Reason)
 	})
 
 	t.Run("parses configuration error field", func(t *testing.T) {
