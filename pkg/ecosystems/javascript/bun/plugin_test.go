@@ -71,6 +71,10 @@ func TestPlugin_Simple(t *testing.T) {
 	assert.Equal(t, "my-app", scaResult.DepGraph.GetRootPkg().Info.Name)
 	assert.Equal(t, "package.json", scaResult.ProjectDescriptor.GetTargetFile())
 
+	// Validate ResolverMetadata
+	assert.NotNil(t, scaResult.ResolverMetadata)
+	assert.Equal(t, "bun", scaResult.ResolverMetadata.PluginName)
+
 	pkgIDs := make(map[string]bool)
 	for _, p := range scaResult.DepGraph.Pkgs {
 		pkgIDs[p.ID] = true
@@ -99,6 +103,10 @@ func TestPlugin_Workspace_MultipleDepGraphs(t *testing.T) {
 	for _, r := range result.Results {
 		require.NoError(t, r.Error)
 		require.NotNil(t, r.DepGraph)
+
+		// Validate ResolverMetadata
+		assert.NotNil(t, r.ResolverMetadata)
+		assert.Equal(t, "bun", r.ResolverMetadata.PluginName)
 	}
 
 	rootResult := testFindResultByRoot(t, result.Results, "my-workspace")
@@ -298,6 +306,10 @@ func TestPlugin_AllProjects_WorkspacesWithSubpackages(t *testing.T) {
 	for i, r := range result.Results {
 		require.NoError(t, r.Error, "result[%d] must not carry an error", i)
 		require.NotNil(t, r.DepGraph, "result[%d] must have a dep graph", i)
+
+		// Validate ResolverMetadata
+		assert.NotNil(t, r.ResolverMetadata, "result[%d] ResolverMetadata should not be nil", i)
+		assert.Equal(t, "bun", r.ResolverMetadata.PluginName, "result[%d] PluginName should be 'bun'", i)
 	}
 
 	wantTargetFiles := []string{

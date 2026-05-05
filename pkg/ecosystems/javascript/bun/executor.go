@@ -45,7 +45,7 @@ var _ bunWhyRunner = (*bunCmdExecutor)(nil)
 // The caller must close the returned ReadCloser when done (or on error) to
 // ensure the background goroutine and subprocess are released promptly.
 func (e *bunCmdExecutor) Run(ctx context.Context, dir string) (io.ReadCloser, error) {
-	resolved, err := exec.LookPath("bun")
+	resolved, err := exec.LookPath("bun") //nolint:goconst // executable name
 	if err != nil {
 		return nil, errBunNotFound //nolint:wrapcheck // sentinel error, intentionally returned unwrapped
 	}

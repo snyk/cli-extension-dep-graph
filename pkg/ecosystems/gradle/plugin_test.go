@@ -13,6 +13,7 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/metadata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -499,6 +500,14 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 		assert.Len(t, allResults, 3, "Without target file, should return all projects")
 		assert.Len(t, allFiles, 3)
 
+		// Validate ResolverMetadata for all results
+		for i, result := range allResults {
+			assert.NotNil(t, result.ResolverMetadata, "allResults[%d] ResolverMetadata should not be nil", i)
+			assert.Equal(t, "gradle", result.ResolverMetadata.PluginName, "allResults[%d] PluginName should be 'gradle'", i)
+			assert.Contains(t, result.ResolverMetadata.VersionBuildInfo, metadata.GradleVersion, "allResults[%d] should contain gradleVersion", i)
+			assert.Contains(t, result.ResolverMetadata.VersionBuildInfo, metadata.JavaVersion, "allResults[%d] should contain javaVersion", i)
+		}
+
 		// Extract project names for verification
 		allProjectNames := make([]string, len(allResults))
 		for i, result := range allResults {
@@ -524,6 +533,12 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 		result := targetedResults[0]
 		assert.NotNil(t, result.DepGraph)
 		assert.Equal(t, "com.example:app", result.DepGraph.GetRootPkg().Info.Name)
+
+		// Validate ResolverMetadata
+		assert.NotNil(t, result.ResolverMetadata)
+		assert.Equal(t, "gradle", result.ResolverMetadata.PluginName)
+		assert.Contains(t, result.ResolverMetadata.VersionBuildInfo, metadata.GradleVersion)
+		assert.Contains(t, result.ResolverMetadata.VersionBuildInfo, metadata.JavaVersion)
 
 		// Verify it has the expected dependency (slf4j-api from the mock)
 		depGraph := result.DepGraph
@@ -565,6 +580,12 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 		result := results[0]
 		assert.NotNil(t, result.DepGraph)
 		assert.Equal(t, "com.example:lib", result.DepGraph.GetRootPkg().Info.Name)
+
+		// Validate ResolverMetadata
+		assert.NotNil(t, result.ResolverMetadata)
+		assert.Equal(t, "gradle", result.ResolverMetadata.PluginName)
+		assert.Contains(t, result.ResolverMetadata.VersionBuildInfo, metadata.GradleVersion)
+		assert.Contains(t, result.ResolverMetadata.VersionBuildInfo, metadata.JavaVersion)
 
 		// Verify it has the expected dependency (guava from the mock)
 		depGraph := result.DepGraph

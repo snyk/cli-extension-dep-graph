@@ -22,6 +22,7 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/metadata"
 )
 
 // PluginTestCase defines a test case for the plugin
@@ -242,12 +243,30 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 		return sortExpected[i].DepGraph.GetRootPkg().Info.Name < sortExpected[j].DepGraph.GetRootPkg().Info.Name
 	})
 
+	// Validate and sync ResolverMetadata before comparison
+	for i := range sortActual {
+		// Validate ResolverMetadata is properly populated
+		require.NotNil(t, sortActual[i].ResolverMetadata, "[%s] ResolverMetadata should not be nil", fixtureName)
+		assert.Equal(t, "pip", sortActual[i].ResolverMetadata.PluginName, "[%s] PluginName should be 'pip'", fixtureName)
+
+		// Validate pythonVersion is present (should be non-empty if available)
+		if pythonVersion, exists := sortActual[i].ResolverMetadata.VersionBuildInfo[metadata.PythonVersion]; exists {
+			assert.NotEmpty(t, pythonVersion, "[%s] pythonVersion should not be empty if present", fixtureName)
+		}
+
+		// Null out ResolverMetadata for comparison (not part of golden files)
+		sortActual[i].ResolverMetadata = nil
+	}
+
 	// Sync fields that vary between pip and pipenv or by environment (allows sharing fixtures)
 	for i := range sortExpected {
 		sortExpected[i].ProjectDescriptor.Identity.TargetRuntime = sortActual[i].ProjectDescriptor.Identity.TargetRuntime
 		sortExpected[i].ProjectDescriptor.Identity.TargetFile = sortActual[i].ProjectDescriptor.Identity.TargetFile
 		sortActual[i].ProjectDescriptor.Identity.ProjectType = "" // Clear type since fixtures are shared
-		sortActual[i].Error = nil                                 // Error field isn't in expected JSON
+
+		// Ensure expected ResolverMetadata is also nil for comparison
+		sortExpected[i].ResolverMetadata = nil
+		sortActual[i].Error = nil // Error field isn't in expected JSON
 	}
 
 	// Compare by JSON representation to ignore internal unexported fields in depgraph.DepGraph
