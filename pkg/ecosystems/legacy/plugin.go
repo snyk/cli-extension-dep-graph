@@ -13,7 +13,7 @@ import (
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 
-	extensionDepgraph "github.com/snyk/cli-extension-dep-graph/pkg/depgraph"
+	"github.com/snyk/cli-extension-dep-graph/internal/legacycli"
 	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
@@ -98,11 +98,8 @@ func getDepGraphsFromLegacy(
 		return []ecosystems.SCAResult{}, nil
 	}
 
-	// TODO: This introduces a dep cycle in workflow.go, preventing us from using the
-	// orchestrator in the single entry point to this extension. Refactor the legacy integration
-	// to have some shared error extraction.
 	//nolint:wrapcheck // must return unwrapped so os-flows can detect and render ErrorCatalog
-	return nil, extensionDepgraph.ExtractLegacyCLIError(invocationErr, data)
+	return nil, legacycli.ExtractLegacyCLIError(invocationErr, data)
 }
 
 func invokeLegacyCLI(ictx workflow.InvocationContext, opts *ecosystems.SCAPluginOptions, ignores []string) ([]workflow.Data, error) {

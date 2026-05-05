@@ -1,4 +1,4 @@
-package depgraph
+package legacycli
 
 import (
 	_ "embed"
@@ -9,10 +9,11 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	frameworkmocks "github.com/snyk/go-application-framework/pkg/mocks"
-	"github.com/snyk/go-application-framework/pkg/workflow"
+	gafworkflow "github.com/snyk/go-application-framework/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
 	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 )
 
@@ -33,12 +34,10 @@ const errMsgPayloadShouldBeByte = "payload should be []byte"
 func Test_LegacyResolution(t *testing.T) {
 	nopLogger := zerolog.Nop()
 	config := configuration.New()
-	// setup mocks
 	ctrl := gomock.NewController(t)
 	engineMock := frameworkmocks.NewMockEngine(ctrl)
 	invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
 
-	// invocation context mocks
 	invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
 	invocationContextMock.EXPECT().GetConfiguration().Return(config).AnyTimes()
 	invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
@@ -56,17 +55,17 @@ func Test_LegacyResolution(t *testing.T) {
 			expected: "--debug",
 		},
 		{
-			key:      FlagDev,
+			key:      workflow.FlagDev,
 			value:    true,
 			expected: "--dev",
 		},
 		{
-			key:      FlagFailFast,
+			key:      workflow.FlagFailFast,
 			value:    true,
 			expected: "--fail-fast",
 		},
 		{
-			key:      FlagAllProjects,
+			key:      workflow.FlagAllProjects,
 			value:    true,
 			expected: "--all-projects",
 		},
@@ -76,7 +75,7 @@ func Test_LegacyResolution(t *testing.T) {
 			expected: "path/to/target",
 		},
 		{
-			key:      FlagFile,
+			key:      workflow.FlagFile,
 			value:    "path/to/target/file.js",
 			expected: "--file=path/to/target/file.js",
 		},
@@ -86,12 +85,12 @@ func Test_LegacyResolution(t *testing.T) {
 			expected: "--exclude=path/to/target/file.js",
 		},
 		{
-			key:      FlagDetectionDepth,
+			key:      workflow.FlagDetectionDepth,
 			value:    "42",
 			expected: "--detection-depth=42",
 		},
 		{
-			key:      FlagPruneRepeatedSubdependencies,
+			key:      workflow.FlagPruneRepeatedSubdependencies,
 			value:    true,
 			expected: "--prune-repeated-subdependencies",
 		},
@@ -101,102 +100,102 @@ func Test_LegacyResolution(t *testing.T) {
 			expected: "--unmanaged",
 		},
 		{
-			key:      FlagScanUnmanaged,
+			key:      workflow.FlagScanUnmanaged,
 			value:    true,
 			expected: "--scan-unmanaged",
 		},
 		{
-			key:      FlagScanAllUnmanaged,
+			key:      workflow.FlagScanAllUnmanaged,
 			value:    true,
 			expected: "--scan-all-unmanaged",
 		},
 		{
-			key:      FlagSubProject,
+			key:      workflow.FlagSubProject,
 			value:    "app",
 			expected: "--sub-project=app",
 		},
 		{
-			key:      FlagGradleSubProject,
+			key:      workflow.FlagGradleSubProject,
 			value:    "app",
 			expected: "--gradle-sub-project=app",
 		},
 		{
-			key:      FlagGradleNormalizeDeps,
+			key:      workflow.FlagGradleNormalizeDeps,
 			value:    true,
 			expected: "--gradle-normalize-deps",
 		},
 		{
-			key:      FlagAllSubProjects,
+			key:      workflow.FlagAllSubProjects,
 			value:    true,
 			expected: "--all-sub-projects",
 		},
 		{
-			key:      FlagConfigurationMatching,
+			key:      workflow.FlagConfigurationMatching,
 			value:    "^releaseRuntimeClasspath$",
 			expected: "--configuration-matching=^releaseRuntimeClasspath$",
 		},
 		{
-			key:      FlagConfigurationAttributes,
+			key:      workflow.FlagConfigurationAttributes,
 			value:    "buildtype:release,usage:java-runtime",
 			expected: "--configuration-attributes=buildtype:release,usage:java-runtime",
 		},
 		{
-			key:      FlagInitScript,
+			key:      workflow.FlagInitScript,
 			value:    "/somewhere/init.gradle",
 			expected: "--init-script=/somewhere/init.gradle",
 		},
 		{
-			key:      FlagYarnWorkspaces,
+			key:      workflow.FlagYarnWorkspaces,
 			value:    true,
 			expected: "--yarn-workspaces",
 		},
 		{
-			key:      FlagPythonCommand,
+			key:      workflow.FlagPythonCommand,
 			value:    "python3",
 			expected: "--command=python3",
 		},
 		{
-			key:      FlagPythonSkipUnresolved,
+			key:      workflow.FlagPythonSkipUnresolved,
 			value:    "true",
 			expected: "--skip-unresolved=true",
 		},
 		{
-			key:      FlagPythonPackageManager,
+			key:      workflow.FlagPythonPackageManager,
 			value:    "pip",
 			expected: "--package-manager=pip",
 		},
 		{
-			key:      FlagStrictOutOfSync,
+			key:      workflow.FlagStrictOutOfSync,
 			value:    "false",
 			expected: "--strict-out-of-sync=false",
 		},
 		{
-			key:      FlagNugetAssetsProjectName,
+			key:      workflow.FlagNugetAssetsProjectName,
 			value:    true,
 			expected: "--assets-project-name",
 		},
 		{
-			key:      FlagNugetPkgsFolder,
+			key:      workflow.FlagNugetPkgsFolder,
 			value:    "../packages",
 			expected: "--packages-folder=../packages",
 		},
 		{
-			key:      FlagUnmanagedMaxDepth,
+			key:      workflow.FlagUnmanagedMaxDepth,
 			value:    "42",
 			expected: "--max-depth=42",
 		},
 		{
-			key:      FlagDotnetRuntimeResolution,
+			key:      workflow.FlagDotnetRuntimeResolution,
 			value:    true,
 			expected: "--dotnet-runtime-resolution=true",
 		},
 		{
-			key:      FlagDotnetRuntimeResolution,
+			key:      workflow.FlagDotnetRuntimeResolution,
 			value:    false,
 			expected: "--dotnet-runtime-resolution=false",
 		},
 		{
-			key:      FlagDotnetTargetFramework,
+			key:      workflow.FlagDotnetTargetFramework,
 			value:    "net9.3",
 			expected: "--dotnet-target-framework=net9.3",
 		},
@@ -210,37 +209,31 @@ func Test_LegacyResolution(t *testing.T) {
 		})
 	}
 
-	t.Run("GIVEN FlagPrintOutputJsonlWithErrors is set WHEN prepareLegacyFlags THEN arg is included in cmd args", func(t *testing.T) {
-		// GIVEN: a fresh config with only the new flag enabled
+	t.Run("GIVEN FlagPrintOutputJsonlWithErrors is set WHEN PrepareLegacyFlags THEN arg is included in cmd args", func(t *testing.T) {
 		isolatedConfig := configuration.New()
-		isolatedConfig.Set(FlagPrintOutputJsonlWithErrors, true)
+		isolatedConfig.Set(workflow.FlagPrintOutputJsonlWithErrors, true)
 
 		nopLog := zerolog.Nop()
-		// WHEN
-		prepareLegacyFlags("--print-output-jsonl-with-errors", isolatedConfig, &nopLog)
+		PrepareLegacyFlags("--print-output-jsonl-with-errors", isolatedConfig, &nopLog)
 
-		// THEN
 		cmdArgs, ok := isolatedConfig.Get(configuration.RAW_CMD_ARGS).([]string)
 		require.True(t, ok, "RAW_CMD_ARGS should be a []string")
 		assert.Contains(t, cmdArgs, "--print-output-jsonl-with-errors")
 	})
 
-	t.Run("GIVEN FlagPrintOutputJsonlWithErrors is NOT set WHEN prepareLegacyFlags THEN arg is NOT included in cmd args", func(t *testing.T) {
-		// GIVEN: a fresh config without the flag
+	t.Run("GIVEN FlagPrintOutputJsonlWithErrors is NOT set WHEN PrepareLegacyFlags THEN arg is NOT included in cmd args", func(t *testing.T) {
 		isolatedConfig := configuration.New()
 
 		nopLog := zerolog.Nop()
-		// WHEN
-		prepareLegacyFlags("--print-graph", isolatedConfig, &nopLog)
+		PrepareLegacyFlags("--print-graph", isolatedConfig, &nopLog)
 
-		// THEN
 		cmdArgs, ok := isolatedConfig.Get(configuration.RAW_CMD_ARGS).([]string)
 		require.True(t, ok, "RAW_CMD_ARGS should be a []string")
 		assert.NotContains(t, cmdArgs, "--print-output-jsonl-with-errors")
 	})
 
 	t.Run("should not include target directory if file flag provided", func(t *testing.T) {
-		config.Set(FlagFile, "path/to/target/file.js")
+		config.Set(workflow.FlagFile, "path/to/target/file.js")
 		config.Set("targetDirectory", "path/to/target")
 
 		testCmdArgs := invokeWithConfigAndGetTestCmdArgs(t, engineMock, config, invocationContextMock)
@@ -250,16 +243,15 @@ func Test_LegacyResolution(t *testing.T) {
 	})
 
 	t.Run("should return a depGraphList", func(t *testing.T) {
-		// setup
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
-		data := workflow.NewData(dataIdentifier, contentTypeJSON, []byte(payload))
+		dataIdentifier := gafworkflow.NewTypeIdentifier(workflow.WorkflowID, workflow.WorkflowIDStr)
+		data := gafworkflow.NewData(dataIdentifier, workflow.ContentTypeJSON, []byte(payload))
 		engineMock.
 			EXPECT().
 			InvokeWithConfig(legacyWorkflowID, config).
-			Return([]workflow.Data{data}, nil).
+			Return([]gafworkflow.Data{data}, nil).
 			Times(1)
 
-		depGraphs, err := handleLegacyResolution(invocationContextMock, config, &nopLogger)
+		depGraphs, err := HandleLegacyResolution(invocationContextMock, config, &nopLogger)
 		require.Nil(t, err)
 
 		assert.Len(t, depGraphs, 1)
@@ -270,16 +262,16 @@ func Test_LegacyResolution(t *testing.T) {
 	})
 
 	t.Run("should return effective dep graphs when requested", func(t *testing.T) {
-		config.Set(FlagPrintEffectiveGraph, true)
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
-		data := workflow.NewData(dataIdentifier, contentTypeJSON, []byte(jsonlPayload))
+		config.Set(workflow.FlagPrintEffectiveGraph, true)
+		dataIdentifier := gafworkflow.NewTypeIdentifier(workflow.WorkflowID, workflow.WorkflowIDStr)
+		data := gafworkflow.NewData(dataIdentifier, workflow.ContentTypeJSON, []byte(jsonlPayload))
 		engineMock.
 			EXPECT().
 			InvokeWithConfig(legacyWorkflowID, config).
-			Return([]workflow.Data{data}, nil).
+			Return([]gafworkflow.Data{data}, nil).
 			Times(1)
 
-		depGraphs, err := handleLegacyResolution(invocationContextMock, config, &nopLogger)
+		depGraphs, err := HandleLegacyResolution(invocationContextMock, config, &nopLogger)
 		require.Nil(t, err)
 
 		assert.Len(t, depGraphs, 1)
@@ -288,48 +280,44 @@ func Test_LegacyResolution(t *testing.T) {
 		require.True(t, ok, errMsgPayloadShouldBeByte)
 		assert.Contains(t, string(actualDepGraph), "npm")
 
-		verifyMeta(t, depGraphs[0], MetaKeyNormalisedTargetFile, "some normalised target file")
-		verifyMeta(t, depGraphs[0], MetaKeyTargetFileFromPlugin, "some target file from plugin")
-		verifyMeta(t, depGraphs[0], MetaKeyTarget, `{"key":"some target value"}`)
+		verifyMeta(t, depGraphs[0], workflow.MetaKeyNormalisedTargetFile, "some normalised target file")
+		verifyMeta(t, depGraphs[0], workflow.MetaKeyTargetFileFromPlugin, "some target file from plugin")
+		verifyMeta(t, depGraphs[0], workflow.MetaKeyTarget, `{"key":"some target value"}`)
 	})
 
 	t.Run("should error if no dependency graphs found", func(t *testing.T) {
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
-		data := workflow.NewData(dataIdentifier, contentTypeJSON, []byte{})
+		dataIdentifier := gafworkflow.NewTypeIdentifier(workflow.WorkflowID, workflow.WorkflowIDStr)
+		data := gafworkflow.NewData(dataIdentifier, workflow.ContentTypeJSON, []byte{})
 
-		// engine mocks
-		id := workflow.NewWorkflowIdentifier("legacycli")
-		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
+		id := gafworkflow.NewWorkflowIdentifier("legacycli")
+		engineMock.EXPECT().InvokeWithConfig(id, config).Return([]gafworkflow.Data{data}, nil).Times(1)
 
-		// execute
-		_, err := handleLegacyResolution(invocationContextMock, config, &nopLogger)
+		_, err := HandleLegacyResolution(invocationContextMock, config, &nopLogger)
 
-		// assert
-		assert.ErrorIs(t, err, errNoDepGraphsFound)
+		assert.ErrorIs(t, err, ErrNoDepGraphsFound)
 	})
 
 	t.Run("should include errors from dep graphs in workflow data", func(t *testing.T) {
-		config.Set(FlagPrintEffectiveGraphWithErrors, true)
+		config.Set(workflow.FlagPrintEffectiveGraphWithErrors, true)
 
-		dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
-		data := workflow.NewData(
+		dataIdentifier := gafworkflow.NewTypeIdentifier(workflow.WorkflowID, workflow.WorkflowIDStr)
+		data := gafworkflow.NewData(
 			dataIdentifier,
-			contentTypeJSON,
+			workflow.ContentTypeJSON,
 			[]byte(jsonlDepGraphWithErrorPayload))
 		engineMock.
 			EXPECT().
 			InvokeWithConfig(legacyWorkflowID, config).
-			Return([]workflow.Data{data}, nil).
+			Return([]gafworkflow.Data{data}, nil).
 			Times(1)
 
-		depGraphs, err := handleLegacyResolution(invocationContextMock, config, &nopLogger)
+		depGraphs, err := HandleLegacyResolution(invocationContextMock, config, &nopLogger)
 		require.Nil(t, err)
 		require.Len(t, depGraphs, 2)
 
-		verifyMeta(t, depGraphs[0], MetaKeyNormalisedTargetFile, "some normalised target file")
+		verifyMeta(t, depGraphs[0], workflow.MetaKeyNormalisedTargetFile, "some normalised target file")
 
-		// verify error
-		verifyMeta(t, depGraphs[1], MetaKeyNormalisedTargetFile, "some normalised target file")
+		verifyMeta(t, depGraphs[1], workflow.MetaKeyNormalisedTargetFile, "some normalised target file")
 		errorList := depGraphs[1].GetErrorList()
 		require.Len(t, errorList, 1)
 		assert.Equal(t, "SNYK-CLI-0000", errorList[0].ErrorCode)
@@ -345,23 +333,20 @@ func invokeWithConfigAndGetTestCmdArgs(
 	invocationContextMock *frameworkmocks.MockInvocationContext,
 ) interface{} {
 	t.Helper()
-	dataIdentifier := workflow.NewTypeIdentifier(WorkflowID, workflowIDStr)
-	data := workflow.NewData(dataIdentifier, contentTypeJSON, []byte(payload))
+	dataIdentifier := gafworkflow.NewTypeIdentifier(workflow.WorkflowID, workflow.WorkflowIDStr)
+	data := gafworkflow.NewData(dataIdentifier, workflow.ContentTypeJSON, []byte(payload))
 	nopLogger := zerolog.Nop()
 
-	// engine mocks
-	id := workflow.NewWorkflowIdentifier("legacycli")
-	engineMock.EXPECT().InvokeWithConfig(id, config).Return([]workflow.Data{data}, nil).Times(1)
+	id := gafworkflow.NewWorkflowIdentifier("legacycli")
+	engineMock.EXPECT().InvokeWithConfig(id, config).Return([]gafworkflow.Data{data}, nil).Times(1)
 
-	// execute
-	_, err := handleLegacyResolution(invocationContextMock, config, &nopLogger)
+	_, err := HandleLegacyResolution(invocationContextMock, config, &nopLogger)
 
-	// assert
 	assert.Nil(t, err)
 	return config.Get(configuration.RAW_CMD_ARGS)
 }
 
-func verifyMeta(t *testing.T, data workflow.Data, key, expectedValue string) {
+func verifyMeta(t *testing.T, data gafworkflow.Data, key, expectedValue string) {
 	t.Helper()
 
 	value, err := data.GetMetaData(key)
@@ -370,55 +355,43 @@ func verifyMeta(t *testing.T, data workflow.Data, key, expectedValue string) {
 }
 
 func Test_chooseGraphArgument(t *testing.T) {
-	t.Run("GIVEN FlagPrintOutputJsonlWithErrors is set WHEN chooseGraphArgument THEN returns correct arg with JSONL parser", func(t *testing.T) {
-		// GIVEN
+	t.Run("GIVEN FlagPrintOutputJsonlWithErrors is set WHEN ChooseGraphArgument THEN returns correct arg with JSONL parser", func(t *testing.T) {
 		config := configuration.New()
-		config.Set(FlagPrintOutputJsonlWithErrors, true)
+		config.Set(workflow.FlagPrintOutputJsonlWithErrors, true)
 
-		// WHEN
-		arg, parser := chooseGraphArgument(config)
+		arg, parser := ChooseGraphArgument(config)
 
-		// THEN
 		assert.Equal(t, "--print-graph", arg)
 		assert.IsType(t, &parsers.JSONLOutputParser{}, parser)
 	})
 
-	t.Run("GIVEN no flags are set WHEN chooseGraphArgument is called THEN returns default --print-graph with PlainText parser", func(t *testing.T) {
-		// GIVEN
+	t.Run("GIVEN no flags are set WHEN ChooseGraphArgument is called THEN returns default --print-graph with PlainText parser", func(t *testing.T) {
 		config := configuration.New()
 
-		// WHEN
-		arg, parser := chooseGraphArgument(config)
+		arg, parser := ChooseGraphArgument(config)
 
-		// THEN
 		assert.Equal(t, "--print-graph", arg)
 		assert.IsType(t, &parsers.PlainTextOutputParser{}, parser)
 	})
 
-	t.Run("GIVEN FlagPrintEffectiveGraph and FlagPrintOutputJsonlWithErrors both set WHEN chooseGraphArgument THEN effective-graph wins", func(t *testing.T) {
-		// GIVEN
+	t.Run("GIVEN FlagPrintEffectiveGraph and FlagPrintOutputJsonlWithErrors both set WHEN ChooseGraphArgument THEN effective-graph wins", func(t *testing.T) {
 		config := configuration.New()
-		config.Set(FlagPrintEffectiveGraph, true)
-		config.Set(FlagPrintOutputJsonlWithErrors, true)
+		config.Set(workflow.FlagPrintEffectiveGraph, true)
+		config.Set(workflow.FlagPrintOutputJsonlWithErrors, true)
 
-		// WHEN
-		arg, parser := chooseGraphArgument(config)
+		arg, parser := ChooseGraphArgument(config)
 
-		// THEN
 		assert.Equal(t, "--print-effective-graph", arg)
 		assert.IsType(t, &parsers.JSONLOutputParser{}, parser)
 	})
 
-	t.Run("GIVEN FlagPrintEffectiveGraphWithErrors set alongside JSONL flag WHEN chooseGraphArgument THEN WithErrors wins", func(t *testing.T) {
-		// GIVEN
+	t.Run("GIVEN FlagPrintEffectiveGraphWithErrors set alongside JSONL flag WHEN ChooseGraphArgument THEN WithErrors wins", func(t *testing.T) {
 		config := configuration.New()
-		config.Set(FlagPrintEffectiveGraphWithErrors, true)
-		config.Set(FlagPrintOutputJsonlWithErrors, true)
+		config.Set(workflow.FlagPrintEffectiveGraphWithErrors, true)
+		config.Set(workflow.FlagPrintOutputJsonlWithErrors, true)
 
-		// WHEN
-		arg, parser := chooseGraphArgument(config)
+		arg, parser := ChooseGraphArgument(config)
 
-		// THEN
 		assert.Equal(t, "--print-effective-graph-with-errors", arg)
 		assert.IsType(t, &parsers.JSONLOutputParser{}, parser)
 	})

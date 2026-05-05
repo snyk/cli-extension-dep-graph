@@ -13,10 +13,12 @@ import (
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/snyk/go-application-framework/pkg/configuration"
-	"github.com/snyk/go-application-framework/pkg/workflow"
+	gafworkflow "github.com/snyk/go-application-framework/pkg/workflow"
 
+	"github.com/snyk/cli-extension-dep-graph/internal/legacycli"
 	"github.com/snyk/cli-extension-dep-graph/internal/remoteconv"
 	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	ecosystemslogger "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/uv"
@@ -24,10 +26,10 @@ import (
 )
 
 func handleSBOMResolution(
-	ctx workflow.InvocationContext,
+	ctx gafworkflow.InvocationContext,
 	config configuration.Configuration,
 	logger *zerolog.Logger,
-) ([]workflow.Data, error) {
+) ([]gafworkflow.Data, error) {
 	orgID := config.GetString(configuration.ORGANIZATION)
 	if orgID == "" {
 		logger.Printf("ERROR: failed to determine org id\n")
@@ -50,18 +52,18 @@ func handleSBOMResolution(
 		[]ecosystems.SCAPlugin{
 			uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL),
 		},
-		handleLegacyResolution,
+		legacycli.HandleLegacyResolution,
 	)
 }
 
 //nolint:gocyclo // Complex orchestration logic with multiple flag combinations
 func handleSBOMResolutionDI(
-	ctx workflow.InvocationContext,
+	ctx gafworkflow.InvocationContext,
 	config configuration.Configuration,
 	logger *zerolog.Logger,
 	scaPlugins []ecosystems.SCAPlugin,
 	depGraphWorkflowFunc ResolutionHandlerFunc,
-) ([]workflow.Data, error) {
+) ([]gafworkflow.Data, error) {
 	inputDir := config.GetString(configuration.INPUT_DIRECTORY)
 	if inputDir == "" {
 		inputDir = "."
@@ -73,19 +75,19 @@ func handleSBOMResolutionDI(
 		return nil, snykclient.NewEmptyOrgError()
 	}
 
-	allProjects := config.GetBool(FlagAllProjects)
-	forceIncludeWorkspacePackages := config.GetBool(FlagUvWorkspacePackages)
+	allProjects := config.GetBool(workflow.FlagAllProjects)
+	forceIncludeWorkspacePackages := config.GetBool(workflow.FlagUvWorkspacePackages)
 
-	targetFile := config.GetString(FlagFile)
-	dev := config.GetBool(FlagDev)
+	targetFile := config.GetString(workflow.FlagFile)
+	dev := config.GetBool(workflow.FlagDev)
 	strictOutOfSync := true
-	if parsedStrictOutOfSync, err := strconv.ParseBool(config.GetString(FlagStrictOutOfSync)); err == nil {
+	if parsedStrictOutOfSync, err := strconv.ParseBool(config.GetString(workflow.FlagStrictOutOfSync)); err == nil {
 		strictOutOfSync = parsedStrictOutOfSync
 	}
 	allowOutOfSync := !strictOutOfSync
-	exclude := parseExcludeFlag(config.GetString(FlagExclude))
-	failFast := config.GetBool(FlagFailFast)
-	forceSingleGraph := config.GetBool(FlagForceSingleGraph)
+	exclude := parseExcludeFlag(config.GetString(workflow.FlagExclude))
+	failFast := config.GetBool(workflow.FlagFailFast)
+	forceSingleGraph := config.GetBool(workflow.FlagForceSingleGraph)
 
 	pluginOptions := ecosystems.NewPluginOptions().
 		WithAllProjects(allProjects).
@@ -126,13 +128,12 @@ func handleSBOMResolutionDI(
 		results = append(results, pluginResult.Results...)
 		processedFiles = append(processedFiles, pluginResult.ProcessedFiles...)
 		if !allProjects && len(pluginResult.Results) > 0 {
-			// If `allProjects` is false we don't want more than one project
 			break
 		}
 	}
 
-	// Convert Results to workflow.Data
-	var workflowData []workflow.Data
+	// Convert Results to workflow Data
+	var workflowData []gafworkflow.Data
 	var problemResults []ecosystems.SCAResult
 	var err error
 
@@ -150,7 +151,7 @@ func handleSBOMResolutionDI(
 		return nil, err
 	}
 	if workflowData == nil {
-		workflowData = []workflow.Data{}
+		workflowData = []gafworkflow.Data{}
 	}
 
 	totalResults := len(results)
@@ -190,7 +191,7 @@ func logResultError(logger *zerolog.Logger, targetFile string, err error) {
 	}
 }
 
-func outputAnyWarnings(ctx workflow.InvocationContext, logger *zerolog.Logger, problemResults []ecosystems.SCAResult, totalResults int) {
+func outputAnyWarnings(ctx gafworkflow.InvocationContext, logger *zerolog.Logger, problemResults []ecosystems.SCAResult, totalResults int) {
 	if len(problemResults) > 0 {
 		message := renderWarningForProblemResults(problemResults, totalResults)
 
@@ -221,8 +222,8 @@ func renderWarningForProblemResults(problemResults []ecosystems.SCAResult, total
 // processLegacyData separates successful dependency graphs from errors in the legacy data.
 // It returns workflow data containing only valid dependency graphs, while converting
 // any errors into problem results that can be reported as warnings.
-func processLegacyData(logger *zerolog.Logger, legacyData []workflow.Data) ([]workflow.Data, []ecosystems.SCAResult) {
-	workflowData := make([]workflow.Data, 0, len(legacyData))
+func processLegacyData(logger *zerolog.Logger, legacyData []gafworkflow.Data) ([]gafworkflow.Data, []ecosystems.SCAResult) {
+	workflowData := make([]gafworkflow.Data, 0, len(legacyData))
 	problemResults := make([]ecosystems.SCAResult, 0)
 
 	for _, data := range legacyData {
@@ -237,11 +238,11 @@ func processLegacyData(logger *zerolog.Logger, legacyData []workflow.Data) ([]wo
 	return workflowData, problemResults
 }
 
-func extractProblemResults(logger *zerolog.Logger, data workflow.Data, errList []snyk_errors.Error) []ecosystems.SCAResult {
+func extractProblemResults(logger *zerolog.Logger, data gafworkflow.Data, errList []snyk_errors.Error) []ecosystems.SCAResult {
 	results := make([]ecosystems.SCAResult, 0, len(errList))
-	targetFile, metaErr := data.GetMetaData(contentLocationKey)
+	targetFile, metaErr := data.GetMetaData(workflow.ContentLocationKey)
 	if metaErr != nil {
-		logger.Printf("Failed to get metadata %s for workflow data: %v", contentLocationKey, metaErr)
+		logger.Printf("Failed to get metadata %s for workflow data: %v", workflow.ContentLocationKey, metaErr)
 		targetFile = "unknown"
 	}
 	for i := range errList {
@@ -281,29 +282,29 @@ func applyProcessedFilesExclusions(config configuration.Configuration, processed
 		return
 	}
 
-	exclude := config.GetString(FlagExclude)
+	exclude := config.GetString(workflow.FlagExclude)
 	if exclude != "" {
 		exclude = fmt.Sprintf("%s,", exclude)
 	}
 	exclude = fmt.Sprintf("%s%s", exclude, strings.Join(processedFiles, ","))
-	config.Set(FlagExclude, exclude)
+	config.Set(workflow.FlagExclude, exclude)
 }
 
 func executeLegacyWorkflow(
-	ctx workflow.InvocationContext,
+	ctx gafworkflow.InvocationContext,
 	config configuration.Configuration,
 	logger *zerolog.Logger,
 	depGraphWorkflowFunc ResolutionHandlerFunc,
 	results []ecosystems.SCAResult,
-) ([]workflow.Data, error) {
+) ([]gafworkflow.Data, error) {
 	legacyConfig := config.Clone()
-	legacyConfig.Unset(FlagPrintEffectiveGraph)
+	legacyConfig.Unset(workflow.FlagPrintEffectiveGraph)
 
-	if config.GetBool(FlagPrintOutputJsonlWithErrors) {
-		legacyConfig.Set(FlagPrintOutputJsonlWithErrors, true)
-		legacyConfig.Set(FlagPrintEffectiveGraphWithErrors, false)
+	if config.GetBool(workflow.FlagPrintOutputJsonlWithErrors) {
+		legacyConfig.Set(workflow.FlagPrintOutputJsonlWithErrors, true)
+		legacyConfig.Set(workflow.FlagPrintEffectiveGraphWithErrors, false)
 	} else {
-		legacyConfig.Set(FlagPrintEffectiveGraphWithErrors, true)
+		legacyConfig.Set(workflow.FlagPrintEffectiveGraphWithErrors, true)
 	}
 
 	legacyData, err := depGraphWorkflowFunc(ctx, legacyConfig, logger)
@@ -317,16 +318,15 @@ func executeLegacyWorkflow(
 			logger.Printf("No projects found in legacy workflow (exit code 3), continuing with SBOM data only")
 			return nil, nil
 		}
-		// No SBOM results and no legacy projects found, return the error
 		return nil, fmt.Errorf("no supported projects detected: %w", err)
 	}
 
 	return nil, fmt.Errorf("error handling legacy workflow: %w", err)
 }
 
-func combineWorkspaceResultsAsJSONL(logger *zerolog.Logger, results []ecosystems.SCAResult) ([]workflow.Data, []ecosystems.SCAResult, error) {
+func combineWorkspaceResultsAsJSONL(logger *zerolog.Logger, results []ecosystems.SCAResult) ([]gafworkflow.Data, []ecosystems.SCAResult, error) {
 	if len(results) == 0 {
-		return []workflow.Data{}, []ecosystems.SCAResult{}, nil
+		return []gafworkflow.Data{}, []ecosystems.SCAResult{}, nil
 	}
 
 	var problemResults []ecosystems.SCAResult
@@ -348,18 +348,18 @@ func combineWorkspaceResultsAsJSONL(logger *zerolog.Logger, results []ecosystems
 	// Ideally we would return multiple workflow.Data items, but this is a workaround until
 	// the CLI team addresses the underlying issue.
 	// Example failing test: https://github.com/snyk/go-application-framework/pull/559
-	workflowData := workflow.NewData(DataTypeID, contentTypeJSONL, data)
+	workflowData := gafworkflow.NewData(workflow.DataTypeID, workflow.ContentTypeJSONL, data)
 
 	targetFile := results[0].ProjectDescriptor.GetTargetFile()
-	workflowData.SetMetaData(contentLocationKey, targetFile)
-	workflowData.SetMetaData(MetaKeyNormalisedTargetFile, targetFile)
-	workflowData.SetMetaData(MetaKeyTargetFileFromPlugin, targetFile)
+	workflowData.SetMetaData(workflow.ContentLocationKey, targetFile)
+	workflowData.SetMetaData(workflow.MetaKeyNormalisedTargetFile, targetFile)
+	workflowData.SetMetaData(workflow.MetaKeyTargetFileFromPlugin, targetFile)
 
-	return []workflow.Data{workflowData}, problemResults, nil
+	return []gafworkflow.Data{workflowData}, problemResults, nil
 }
 
-func processResultsIndividually(logger *zerolog.Logger, results []ecosystems.SCAResult, allProjects bool) ([]workflow.Data, []ecosystems.SCAResult, error) {
-	var workflowData []workflow.Data
+func processResultsIndividually(logger *zerolog.Logger, results []ecosystems.SCAResult, allProjects bool) ([]gafworkflow.Data, []ecosystems.SCAResult, error) {
+	var workflowData []gafworkflow.Data
 	var problemResults []ecosystems.SCAResult
 	for i := range results {
 		result := &results[i]
@@ -409,18 +409,18 @@ func combineWorkspaceDepGraphsAsJSONL(results []ecosystems.SCAResult) ([]byte, e
 	return combined, nil
 }
 
-func workflowDataFromDepGraph(result *ecosystems.SCAResult) (workflow.Data, error) {
+func workflowDataFromDepGraph(result *ecosystems.SCAResult) (gafworkflow.Data, error) {
 	depGraphBytes, err := json.Marshal(result.DepGraph)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal depgraph data: %w", err)
 	}
 
-	data := workflow.NewData(DataTypeID, contentTypeJSON, depGraphBytes)
+	data := gafworkflow.NewData(workflow.DataTypeID, workflow.ContentTypeJSON, depGraphBytes)
 
 	targetFile := result.ProjectDescriptor.GetTargetFile()
-	data.SetMetaData(contentLocationKey, targetFile)
-	data.SetMetaData(MetaKeyNormalisedTargetFile, targetFile)
-	data.SetMetaData(MetaKeyTargetFileFromPlugin, targetFile)
+	data.SetMetaData(workflow.ContentLocationKey, targetFile)
+	data.SetMetaData(workflow.MetaKeyNormalisedTargetFile, targetFile)
+	data.SetMetaData(workflow.MetaKeyTargetFileFromPlugin, targetFile)
 
 	return data, nil
 }

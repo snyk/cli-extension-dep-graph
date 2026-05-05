@@ -1,4 +1,4 @@
-package depgraph
+package legacycli
 
 import (
 	"fmt"
@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
-	"github.com/snyk/go-application-framework/pkg/workflow"
+	gafworkflow "github.com/snyk/go-application-framework/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
 )
 
 const (
@@ -23,9 +25,9 @@ func Test_ExtractLegacyCLIError_ErrorFromLegacyCLI(t *testing.T) {
 	  }`
 
 	wrappedErr := fmt.Errorf("something bad happened: %w", &exec.ExitError{})
-	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, testDataTypeID), contentTypeJSON, []byte(expectedMsgJSON))
+	data := gafworkflow.NewData(gafworkflow.NewTypeIdentifier(workflow.WorkflowID, testDataTypeID), workflow.ContentTypeJSON, []byte(expectedMsgJSON))
 
-	outputError := ExtractLegacyCLIError(wrappedErr, []workflow.Data{data})
+	outputError := ExtractLegacyCLIError(wrappedErr, []gafworkflow.Data{data})
 
 	var snykErr snyk_errors.Error
 	assert.ErrorAs(t, outputError, &snykErr)
@@ -39,9 +41,9 @@ func Test_ExtractLegacyCLIError_ErrorCatalogFromLegacyCLI(t *testing.T) {
 		Detail: "Something bad happened",
 	}
 
-	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, testDataTypeID), contentTypeJSON, nil)
+	data := gafworkflow.NewData(gafworkflow.NewTypeIdentifier(workflow.WorkflowID, testDataTypeID), workflow.ContentTypeJSON, nil)
 
-	outputError := ExtractLegacyCLIError(err, []workflow.Data{data})
+	outputError := ExtractLegacyCLIError(err, []gafworkflow.Data{data})
 
 	var snykErr snyk_errors.Error
 	assert.ErrorAs(t, outputError, &snykErr)
@@ -50,9 +52,9 @@ func Test_ExtractLegacyCLIError_ErrorCatalogFromLegacyCLI(t *testing.T) {
 
 func Test_ExtractLegacyCLIError_InputSameAsOutput(t *testing.T) {
 	inputError := fmt.Errorf("some other error")
-	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, "something"), "application/json", []byte{})
+	data := gafworkflow.NewData(gafworkflow.NewTypeIdentifier(workflow.WorkflowID, "something"), "application/json", []byte{})
 
-	outputError := ExtractLegacyCLIError(inputError, []workflow.Data{data})
+	outputError := ExtractLegacyCLIError(inputError, []gafworkflow.Data{data})
 
 	var snykErr snyk_errors.Error
 	assert.ErrorAs(t, outputError, &snykErr)
@@ -61,19 +63,14 @@ func Test_ExtractLegacyCLIError_InputSameAsOutput(t *testing.T) {
 
 func Test_ExtractLegacyCLIError_RetainExitError(t *testing.T) {
 	inputError := &exec.ExitError{}
-	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, "something"), "application/json", []byte{})
+	data := gafworkflow.NewData(gafworkflow.NewTypeIdentifier(workflow.WorkflowID, "something"), "application/json", []byte{})
 
-	outputError := ExtractLegacyCLIError(inputError, []workflow.Data{data})
+	outputError := ExtractLegacyCLIError(inputError, []gafworkflow.Data{data})
 
 	assert.ErrorIs(t, outputError, inputError)
 }
 
 func Test_ExtractLegacyCLIError_JSONLPayloadWithErrorCatalog(t *testing.T) {
-	// When handleLegacyResolution calls ExtractLegacyCLIError with a JSONL payload
-	// (e.g. from --print-effective-graph-with-errors), the multi-line payload is not
-	// valid single JSON so the direct JSON API parse is skipped. The JSONL path
-	// (tryParseFirstErrorFromJSONL) then finds the ErrorCatalog error embedded in one
-	// of the JSONL lines and returns it directly, preserving the structured error.
 	jsonlErrorLine := `{"error":{"jsonapi":{"version":"1.0"},"errors":[` +
 		`{"id":"test-id","code":"SNYK-CLI-0001","title":"Test JSONL Error",` +
 		`"detail":"error from JSONL line","meta":{"isErrorCatalogError":true,` +
@@ -83,9 +80,9 @@ func Test_ExtractLegacyCLIError_JSONLPayloadWithErrorCatalog(t *testing.T) {
 		"\n" + jsonlErrorLine + "\n"
 
 	inputError := fmt.Errorf("legacy cli error")
-	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, testDataTypeID), contentTypeJSON, []byte(jsonlPayload))
+	data := gafworkflow.NewData(gafworkflow.NewTypeIdentifier(workflow.WorkflowID, testDataTypeID), workflow.ContentTypeJSON, []byte(jsonlPayload))
 
-	outputError := ExtractLegacyCLIError(inputError, []workflow.Data{data})
+	outputError := ExtractLegacyCLIError(inputError, []gafworkflow.Data{data})
 
 	var snykErr snyk_errors.Error
 	require.ErrorAs(t, outputError, &snykErr)
@@ -94,17 +91,15 @@ func Test_ExtractLegacyCLIError_JSONLPayloadWithErrorCatalog(t *testing.T) {
 }
 
 func Test_ExtractLegacyCLIError_JSONAPIPayloadWithErrorCatalog(t *testing.T) {
-	// When the payload is a direct JSON API error document (e.g. from --json output),
-	// parseJSONAPIError extracts the ErrorCatalog error without needing the JSONL path.
 	jsonAPIPayload := `{"jsonapi":{"version":"1.0"},"errors":[` +
 		`{"id":"test-id","code":"SNYK-CLI-0002","title":"JSON API Error",` +
 		`"detail":"error from JSON API","meta":{"isErrorCatalogError":true,` +
 		`"classification":"ACTIONABLE","level":"error"}}]}`
 
 	inputError := fmt.Errorf("legacy cli error")
-	data := workflow.NewData(workflow.NewTypeIdentifier(WorkflowID, testDataTypeID), contentTypeJSON, []byte(jsonAPIPayload))
+	data := gafworkflow.NewData(gafworkflow.NewTypeIdentifier(workflow.WorkflowID, testDataTypeID), workflow.ContentTypeJSON, []byte(jsonAPIPayload))
 
-	outputError := ExtractLegacyCLIError(inputError, []workflow.Data{data})
+	outputError := ExtractLegacyCLIError(inputError, []gafworkflow.Data{data})
 
 	var snykErr snyk_errors.Error
 	require.ErrorAs(t, outputError, &snykErr)
