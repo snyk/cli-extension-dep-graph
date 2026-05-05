@@ -27,6 +27,11 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 				"--strict-out-of-sync", "false",
 				"--force-single-graph",
 				"--internal-uv-workspace-packages",
+				"--configuration-matching", "implementation.*",
+				"--gradle-sub-project", "myproject",
+				"--all-sub-projects",
+				"--init-script", "custom.gradle",
+				"--gradle-skip-wrapper",
 			},
 			expected: &SCAPluginOptions{
 				Global: GlobalOptions{
@@ -41,6 +46,13 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 				},
 				Python: PythonOptions{
 					NoBuildIsolation: true,
+				},
+				Gradle: GradleOptions{
+					ConfigurationMatching: "implementation.*",
+					SubProject:            "myproject",
+					AllSubProjects:        true,
+					InitScript:            "custom.gradle",
+					SkipWrapper:           true,
 				},
 			},
 			wantErr: false,
