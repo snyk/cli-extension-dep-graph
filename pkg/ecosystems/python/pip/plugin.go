@@ -17,6 +17,7 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/metadata"
 	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
 )
 
@@ -216,6 +217,12 @@ func (p Plugin) buildDepGraphFromFile(
 				ProjectType:       "pip",
 				TargetFile:        &file.RelPath,
 				RootComponentName: rootName,
+			},
+		},
+		ResolverMetadata: &ecosystems.ResolverMetadata{
+			PluginName: PluginName,
+			VersionBuildInfo: map[string]string{
+				metadata.PythonVersion: pythonVersion,
 			},
 		},
 	}, nil

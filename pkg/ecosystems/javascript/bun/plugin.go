@@ -153,6 +153,10 @@ func (p Plugin) buildResults(
 					TargetFile:  &tf,
 				},
 			},
+			ResolverMetadata: &ecosystems.ResolverMetadata{
+				PluginName:       PluginName,
+				VersionBuildInfo: map[string]string{},
+			},
 		}
 	}
 

@@ -9,11 +9,17 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
 )
 
+type ResolverMetadata struct {
+	PluginName       string            `json:"pluginName,omitempty"`
+	VersionBuildInfo map[string]string `json:"versionBuildInfo,omitempty"`
+}
+
 // SCAResult represents the result of a Software Composition Analysis (SCA),
 // containing the dependency graph and associated project descriptor.
 type SCAResult struct {
 	DepGraph          *depgraph.DepGraph         `json:"depGraph,omitempty"`
 	ProjectDescriptor identity.ProjectDescriptor `json:"projectDescriptor"`
+	ResolverMetadata  *ResolverMetadata          `json:"meta,omitempty"`
 	Error             error                      `json:"error,omitempty"`
 }
 

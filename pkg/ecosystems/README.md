@@ -34,9 +34,10 @@ The `SCAResult.DepGraph` field uses the standard Snyk dependency graph format fr
 import "github.com/snyk/dep-graph/go/pkg/depgraph"
 
 type SCAResult struct {
-    DepGraph *depgraph.DepGraph `json:"depGraph,omitempty"`
-    Metadata Metadata           `json:"metadata"`
-    Error    error              `json:"error,omitempty"`
+    DepGraph          *depgraph.DepGraph         `json:"depGraph,omitempty"`
+    ProjectDescriptor identity.ProjectDescriptor `json:"projectDescriptor"`
+    ResolverMetadata  *ResolverMetadata          `json:"meta,omitempty"`
+    Error             error                      `json:"error,omitempty"`
 }
 ```
 
@@ -133,23 +134,76 @@ depGraph := builder.Build()
 
 ```go
 type SCAResult struct {
-    DepGraph *depgraph.DepGraph `json:"depGraph,omitempty"`
-    Metadata Metadata           `json:"metadata"`
-    Error    error              `json:"error,omitempty"`
+    DepGraph          *depgraph.DepGraph         `json:"depGraph,omitempty"`
+    ProjectDescriptor identity.ProjectDescriptor `json:"projectDescriptor"`
+    ResolverMetadata  *ResolverMetadata          `json:"meta,omitempty"`
+    Error             error                      `json:"error,omitempty"`
 }
 ```
 
 Each result contains:
 - **DepGraph**: The complete dependency graph using Snyk's standard format
-- **Metadata**: Context about the analysis (target file, runtime environment)
+- **ProjectDescriptor**: Project identity information (type, target file, runtime)
+- **ResolverMetadata**: Information about the resolver/plugin that performed the analysis
 - **Error**: Any error encountered during analysis (optional)
 
-### Metadata
+### ProjectDescriptor
 
 ```go
-type Metadata struct {
-    TargetFile string `json:"targetFile"`  // Path to the manifest file (e.g., "requirements.txt")
-    Runtime    string `json:"runtime"`     // Runtime environment (e.g., "python@3.11.0")
+type ProjectDescriptor struct {
+    Identity ProjectIdentity `json:"identity"`
+}
+
+type ProjectIdentity struct {
+    ProjectType       string  `json:"type,omitempty"`           // Project type (e.g., "npm", "maven", "pip")
+    TargetFile        *string `json:"targetFile,omitempty"`     // Manifest/build file path
+    TargetRuntime     *string `json:"targetRuntime,omitempty"`  // Runtime environment
+    RootComponentName string  `json:"rootComponentName,omitempty"` // Root component name
+}
+```
+
+The `ProjectDescriptor` contains project identity information that uniquely identifies what was analyzed. This includes the project type (ecosystem), the specific manifest file, and runtime details.
+
+### ResolverMetadata
+
+```go
+type ResolverMetadata struct {
+    PluginName       string            `json:"pluginName"`       // Name of the plugin/resolver
+    VersionBuildInfo map[string]string `json:"versionBuildInfo"` // Version and build information
+}
+```
+
+**Standard keys** are available in the `metadata` package:
+
+```go
+import "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/metadata"
+
+// Available keys:
+const (
+    // Gradle ecosystem
+    metadata.GradleVersion  = "gradleVersion"
+    metadata.JavaVersion    = "javaVersion" 
+    
+    // Python ecosystem
+    metadata.PythonVersion  = "pythonVersion"
+    
+    // General build info
+    metadata.BuildTimestamp = "buildTimestamp"
+)
+```
+
+**Example usage:**
+
+```go
+import "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/metadata"
+
+resolverMetadata := ResolverMetadata{
+    PluginName: "gradle",
+    VersionBuildInfo: map[string]string{
+        metadata.GradleVersion:  "8.5",
+        metadata.JavaVersion:    "17.0.1", 
+        metadata.BuildTimestamp: "2024-01-01T12:00:00Z",
+    },
 }
 ```
 
@@ -186,12 +240,10 @@ func main() {
     
     for _, scaResult := range result.Results {
         if scaResult.Error != nil {
-            fmt.Printf("Error analyzing %s: %v\n", scaResult.Metadata.TargetFile, scaResult.Error)
+            fmt.Printf("Error analyzing with %s: %v\n", scaResult.ResolverMetadata.PluginName, scaResult.Error)
             continue
         }
-        
-        fmt.Printf("Target: %s\n", scaResult.Metadata.TargetFile)
-        fmt.Printf("Runtime: %s\n", scaResult.Metadata.Runtime)
+
         fmt.Printf("Package Manager: %s\n", scaResult.DepGraph.PkgManager.Name)
         fmt.Printf("Total Packages: %d\n", len(scaResult.DepGraph.Pkgs))
     }
@@ -214,7 +266,7 @@ result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), "/path/to/monorep
 for _, result := range result.Results {
     if result.Error != nil {
         // Individual file failed, but others may have succeeded
-        log.Printf("Failed to analyze %s: %v", result.Metadata.TargetFile, result.Error)
+        log.Printf("Failed to analyze with %s: %v", result.ResolverMetadata.PluginName, result.Error)
         continue
     }
     
