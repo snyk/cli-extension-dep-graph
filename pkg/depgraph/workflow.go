@@ -3,6 +3,7 @@ package depgraph
 import (
 	"fmt"
 
+	"github.com/snyk/go-application-framework/pkg/local_workflows/config_utils"
 	gafworkflow "github.com/snyk/go-application-framework/pkg/workflow"
 
 	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
@@ -29,6 +30,9 @@ func Init(engine gafworkflow.Engine) error {
 	if err != nil {
 		return fmt.Errorf("failed to register workflow: %w", err)
 	}
+
+	config_utils.AddFeatureFlagToConfig(engine, workflow.FeatureFlagUvCLI, "enableUvCLI")
+	config_utils.AddFeatureFlagToConfig(engine, workflow.FeatureFlagUseUnifiedTestAPIForOSCliTest, "unified-test-api-os-cli")
 
 	return nil
 }
