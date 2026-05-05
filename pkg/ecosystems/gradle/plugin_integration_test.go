@@ -299,7 +299,17 @@ func loadExpectedResults(t *testing.T, path string) []ecosystems.SCAResult {
 func writeExpectedSnapshot(t *testing.T, path string, results []ecosystems.SCAResult) {
 	t.Helper()
 
-	data, err := json.MarshalIndent(results, "", "  ")
+	// Clean volatile fields before writing snapshot
+	cleaned := make([]ecosystems.SCAResult, len(results))
+	copy(cleaned, results)
+	for i := range cleaned {
+		// Error is not part of the snapshot format.
+		cleaned[i].Error = nil
+		// ResolverMetadata contains runtime-specific info and is not part of the snapshot format.
+		cleaned[i].ResolverMetadata = nil
+	}
+
+	data, err := json.MarshalIndent(cleaned, "", "  ")
 	require.NoError(t, err, "failed to marshal results for snapshot")
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755), "failed to create snapshot directory")
