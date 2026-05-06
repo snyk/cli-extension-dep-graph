@@ -125,6 +125,14 @@ func pluginTestCases() map[string]PluginTestCase {
 // These tests focus on execution path and metadata, not graph content (which is
 // identical regardless of gradle binary version).
 func TestGradleWrapper_BinaryResolution(t *testing.T) {
+	// Check JDK compatibility - Gradle 8.4 (used by wrapper) supports at most Java 21
+	jdkVersion, err := jdkRuntime()
+	require.NoErrorf(t, err, "could not detect jdk runtime version")
+	
+	if jdkVersion.Major() > 21 {
+		t.Skipf("Gradle 8.4 wrapper supports at most Java 21; running on Java %d", jdkVersion.Major())
+	}
+
 	wrapperFixture := filepath.Join(fixturesRoot, "with-wrapper")
 	absFixture, err := filepath.Abs(wrapperFixture)
 	require.NoError(t, err, "failed to resolve wrapper fixture path")
