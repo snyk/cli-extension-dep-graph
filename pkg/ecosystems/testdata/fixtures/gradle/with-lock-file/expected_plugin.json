@@ -1,0 +1,262 @@
+[
+  {
+    "depGraph": {
+      "schemaVersion": "1.3.0",
+      "pkgManager": {
+        "name": "gradle"
+      },
+      "pkgs": [
+        {
+          "id": "com.snyk.fixtures:with-lock-file@1.0.0",
+          "info": {
+            "name": "com.snyk.fixtures:with-lock-file",
+            "version": "1.0.0"
+          }
+        },
+        {
+          "id": "org.codehaus.groovy:groovy@3.0.3",
+          "info": {
+            "name": "org.codehaus.groovy:groovy",
+            "version": "3.0.3"
+          }
+        },
+        {
+          "id": "com.google.guava:guava@32.0.1-jre",
+          "info": {
+            "name": "com.google.guava:guava",
+            "version": "32.0.1-jre"
+          }
+        },
+        {
+          "id": "com.google.guava:failureaccess@1.0.1",
+          "info": {
+            "name": "com.google.guava:failureaccess",
+            "version": "1.0.1"
+          }
+        },
+        {
+          "id": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava",
+          "info": {
+            "name": "com.google.guava:listenablefuture",
+            "version": "9999.0-empty-to-avoid-conflict-with-guava"
+          }
+        },
+        {
+          "id": "com.google.code.findbugs:jsr305@3.0.2",
+          "info": {
+            "name": "com.google.code.findbugs:jsr305",
+            "version": "3.0.2"
+          }
+        },
+        {
+          "id": "org.checkerframework:checker-qual@3.33.0",
+          "info": {
+            "name": "org.checkerframework:checker-qual",
+            "version": "3.33.0"
+          }
+        },
+        {
+          "id": "com.google.errorprone:error_prone_annotations@2.18.0",
+          "info": {
+            "name": "com.google.errorprone:error_prone_annotations",
+            "version": "2.18.0"
+          }
+        },
+        {
+          "id": "com.google.j2objc:j2objc-annotations@2.8",
+          "info": {
+            "name": "com.google.j2objc:j2objc-annotations",
+            "version": "2.8"
+          }
+        }
+      ],
+      "graph": {
+        "rootNodeId": "root-node",
+        "nodes": [
+          {
+            "nodeId": "root-node",
+            "pkgId": "com.snyk.fixtures:with-lock-file@1.0.0",
+            "deps": [
+              {
+                "nodeId": "org.codehaus.groovy:groovy@3.0.3"
+              },
+              {
+                "nodeId": "org.codehaus.groovy:groovy@3.0.3:pruned"
+              },
+              {
+                "nodeId": "com.google.guava:guava@32.0.1-jre"
+              },
+              {
+                "nodeId": "com.google.guava:guava@32.0.1-jre:pruned"
+              },
+              {
+                "nodeId": "com.google.guava:failureaccess@1.0.1:pruned"
+              },
+              {
+                "nodeId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava:pruned"
+              },
+              {
+                "nodeId": "com.google.code.findbugs:jsr305@3.0.2:pruned"
+              },
+              {
+                "nodeId": "org.checkerframework:checker-qual@3.33.0:pruned"
+              },
+              {
+                "nodeId": "com.google.errorprone:error_prone_annotations@2.18.0:pruned"
+              },
+              {
+                "nodeId": "com.google.j2objc:j2objc-annotations@2.8:pruned"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.codehaus.groovy:groovy@3.0.3",
+            "pkgId": "org.codehaus.groovy:groovy@3.0.3",
+            "deps": []
+          },
+          {
+            "nodeId": "org.codehaus.groovy:groovy@3.0.3:pruned",
+            "pkgId": "org.codehaus.groovy:groovy@3.0.3",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.guava:guava@32.0.1-jre",
+            "pkgId": "com.google.guava:guava@32.0.1-jre",
+            "deps": [
+              {
+                "nodeId": "com.google.guava:failureaccess@1.0.1"
+              },
+              {
+                "nodeId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava"
+              },
+              {
+                "nodeId": "com.google.code.findbugs:jsr305@3.0.2"
+              },
+              {
+                "nodeId": "org.checkerframework:checker-qual@3.33.0"
+              },
+              {
+                "nodeId": "com.google.errorprone:error_prone_annotations@2.18.0"
+              },
+              {
+                "nodeId": "com.google.j2objc:j2objc-annotations@2.8"
+              }
+            ]
+          },
+          {
+            "nodeId": "com.google.guava:failureaccess@1.0.1",
+            "pkgId": "com.google.guava:failureaccess@1.0.1",
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava",
+            "pkgId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava",
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.code.findbugs:jsr305@3.0.2",
+            "pkgId": "com.google.code.findbugs:jsr305@3.0.2",
+            "deps": []
+          },
+          {
+            "nodeId": "org.checkerframework:checker-qual@3.33.0",
+            "pkgId": "org.checkerframework:checker-qual@3.33.0",
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.errorprone:error_prone_annotations@2.18.0",
+            "pkgId": "com.google.errorprone:error_prone_annotations@2.18.0",
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.j2objc:j2objc-annotations@2.8",
+            "pkgId": "com.google.j2objc:j2objc-annotations@2.8",
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.guava:guava@32.0.1-jre:pruned",
+            "pkgId": "com.google.guava:guava@32.0.1-jre",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.guava:failureaccess@1.0.1:pruned",
+            "pkgId": "com.google.guava:failureaccess@1.0.1",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava:pruned",
+            "pkgId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.code.findbugs:jsr305@3.0.2:pruned",
+            "pkgId": "com.google.code.findbugs:jsr305@3.0.2",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.checkerframework:checker-qual@3.33.0:pruned",
+            "pkgId": "org.checkerframework:checker-qual@3.33.0",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.errorprone:error_prone_annotations@2.18.0:pruned",
+            "pkgId": "com.google.errorprone:error_prone_annotations@2.18.0",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.j2objc:j2objc-annotations@2.8:pruned",
+            "pkgId": "com.google.j2objc:j2objc-annotations@2.8",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
+            "deps": []
+          }
+        ]
+      }
+    },
+    "projectDescriptor": {
+      "identity": {
+        "type": "gradle",
+        "targetFile": "build.gradle",
+        "rootComponentName": "com.snyk.fixtures:with-lock-file"
+      }
+    }
+  }
+]

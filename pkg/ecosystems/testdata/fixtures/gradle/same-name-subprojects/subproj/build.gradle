@@ -1,0 +1,7 @@
+plugins {
+    id 'java'
+}
+
+dependencies {
+    implementation 'com.google.guava:32.0.1-jre'
+}

@@ -1,0 +1,12 @@
+allprojects {
+    group = 'com.snyk.fixtures'
+    version = '1.0.0'
+
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+}

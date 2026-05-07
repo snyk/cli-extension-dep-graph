@@ -2,3 +2,6 @@
 cp.out
 .DS_Store
 .bin
+
+.gradle
+build/

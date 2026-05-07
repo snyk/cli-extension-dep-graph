@@ -1,0 +1,4 @@
+{
+  "gradle": ">=7",
+  "reason": "guava 32 ships POM metadata Gradle 6 cannot resolve"
+}
