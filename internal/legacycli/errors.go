@@ -14,6 +14,21 @@ import (
 
 var ErrNoDepGraphsFound = errors.New("no depgraphs found")
 
+// ExitCoder allows checking for exit codes without depending on a concrete error type.
+type ExitCoder interface {
+	ExitCode() int
+}
+
+// IsExitCode3 reports whether the error chain contains an error with exit code 3.
+// Exit code 3 from the legacy CLI means "no projects found to test".
+func IsExitCode3(err error) bool {
+	var ec ExitCoder
+	if errors.As(err, &ec) {
+		return ec.ExitCode() == 3
+	}
+	return false
+}
+
 // CLIJSONError is the error type returned by the legacy cli.
 type CLIJSONError struct {
 	Ok       bool   `json:"ok"`

@@ -58,7 +58,6 @@ func (r *PluginRegistry) ResolveDepgraphs(ictx workflow.InvocationContext, dir s
 
 		ctx := ictx.Context()
 		enhancedLogger := ictx.GetEnhancedLogger()
-		processedFiles := make([]string, 0)
 
 		for _, plugin := range r.plugins {
 			select {
@@ -71,7 +70,6 @@ func (r *PluginRegistry) ResolveDepgraphs(ictx workflow.InvocationContext, dir s
 			if len(files) > 0 && !opts.Global.AllProjects {
 				return
 			}
-			processedFiles = append(processedFiles, files...)
 			opts.WithExclude(files)
 		}
 
@@ -81,7 +79,7 @@ func (r *PluginRegistry) ResolveDepgraphs(ictx workflow.InvocationContext, dir s
 		default:
 		}
 
-		executePluginWithResults(ctx, legacy.NewLegacyResolver(ictx, processedFiles), enhancedLogger, dir, opts, resultsChan)
+		executePluginWithResults(ctx, legacy.NewPlugin(ictx), enhancedLogger, dir, opts, resultsChan)
 	}()
 
 	return resultsChan

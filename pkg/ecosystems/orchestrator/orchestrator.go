@@ -49,8 +49,18 @@ func resolveLegacy(
 	opts *ecosystems.SCAPluginOptions,
 	ignores []string,
 ) (*ecosystems.PluginResult, error) {
+	if len(ignores) > 0 && !opts.Global.AllProjects {
+		return &ecosystems.PluginResult{}, nil
+	}
+
 	log := logger.NewFromZerolog(enhancedLogger)
-	res, err := legacy.NewLegacyResolver(ictx, ignores).BuildDepGraphsFromDir(ictx.Context(), log, dir, opts)
+	// Shallow-copy opts and explicitly clone the Exclude slice so WithExclude's append
+	// cannot reach into the caller's backing array.
+	legacyOpts := *opts
+	legacyOpts.Global.Exclude = append(ecosystems.CommaSeparatedString(nil), opts.Global.Exclude...)
+	legacyOpts.WithExclude(ignores)
+
+	res, err := legacy.NewPlugin(ictx).BuildDepGraphsFromDir(ictx.Context(), log, dir, &legacyOpts)
 	if err != nil {
 		return nil, err //nolint:wrapcheck // must return unwrapped so os-flows can detect and render ErrorCatalog
 	}
