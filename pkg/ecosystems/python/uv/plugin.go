@@ -186,8 +186,9 @@ func (p Plugin) buildResults(
 				},
 			},
 			ResolverMetadata: &scaecosystems.ResolverMetadata{
-				PluginName:       PluginName,
-				VersionBuildInfo: map[string]string{},
+				PluginName:           PluginName,
+				NormalisedTargetFile: manifestFile,
+				VersionBuildInfo:     map[string]string{},
 			},
 		}
 		result.Results = append(result.Results, res)

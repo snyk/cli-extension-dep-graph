@@ -2,240 +2,397 @@
 package legacy_test
 
 import (
-	"strings"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
+	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	gafmocks "github.com/snyk/go-application-framework/pkg/mocks"
-	"github.com/snyk/go-application-framework/pkg/workflow"
+	gafworkflow "github.com/snyk/go-application-framework/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/snyk/cli-extension-dep-graph/internal/legacycli"
+	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/legacy"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
 
-func TestResolver_MapsProjectType(t *testing.T) {
-	ictx, opts := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","targetFileFromPlugin":"package.json","target":{}}`)
-	resolver := legacy.NewLegacyResolver(ictx, nil)
+func TestPlugin_GetName(t *testing.T) {
+	assert.Equal(t, "legacycli", legacy.NewPlugin(nil).GetName())
+}
 
-	results, err := resolver.BuildDepGraphsFromDir(t.Context(), nil, "", opts)
+func TestPlugin_MapsProjectType(t *testing.T) {
+	ictx, _ := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","targetFileFromPlugin":"package.json","target":{}}`, nil)
+	plugin := legacy.NewPlugin(ictx)
+
+	results, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.NoError(t, err)
 
 	require.Len(t, results.Results, 1)
 	assert.Equal(t, "npm", results.Results[0].ProjectDescriptor.Identity.ProjectType)
 }
 
-func TestResolver_MapsTargetFramework(t *testing.T) {
-	ictx, opts := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"nuget"}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json","target":{},"targetRuntime":"net6.0"}`)
-	resolver := legacy.NewLegacyResolver(ictx, nil)
+func TestPlugin_MapsTargetFramework(t *testing.T) {
+	ictx, _ := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"nuget"}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json","target":{},"targetRuntime":"net6.0"}`, nil)
+	plugin := legacy.NewPlugin(ictx)
 
-	results, err := resolver.BuildDepGraphsFromDir(t.Context(), nil, "", opts)
+	results, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.NoError(t, err)
 
 	require.Len(t, results.Results, 1)
 	assert.Equal(t, "net6.0", *results.Results[0].ProjectDescriptor.Identity.TargetRuntime)
 }
 
-func TestResolver_MapsTargetFile(t *testing.T) {
-	tests := map[string]struct {
-		body               string
-		expectedTargetFile string
+// TestPlugin_TargetFileForwarding verifies the plugin forwards the legacy CLI's
+// `targetFileFromPlugin` field verbatim onto Identity.TargetFile, and its
+// `normalisedTargetFile` onto ResolverMetadata.NormalisedTargetFile. Downstream
+// emission of MetaKeyTargetFileFromPlugin depends on Identity.TargetFile's nilness
+// exactly matching the CLI's own.
+func TestPlugin_TargetFileForwarding(t *testing.T) {
+	cases := map[string]struct {
+		body                 string
+		wantNormalisedTarget string  // expected ResolverMetadata.NormalisedTargetFile
+		wantPluginTargetFile *string // expected Identity.TargetFile
 	}{
-		"npm": {
-			body: `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package-lock.json","target":{}}`,
+		"CLI emits targetFileFromPlugin → forwarded verbatim": {
+			body:                 `{"depGraph":{"pkgManager":{"name":"nuget"}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json"}`,
+			wantNormalisedTarget: "project.assets.json",
+			wantPluginTargetFile: stringPtr("project.assets.json"),
 		},
-		"npm workspaces": {
-			body:               `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package-lock.json","target":{},"workspace":{}}`,
-			expectedTargetFile: "package-lock.json",
+		"CLI emits a distinct targetFileFromPlugin → forwarded verbatim": {
+			body:                 `{"depGraph":{"pkgManager":{"name":"gradle"}},"normalisedTargetFile":"build.gradle.kts","targetFileFromPlugin":"something-else.kts"}`,
+			wantNormalisedTarget: "build.gradle.kts",
+			wantPluginTargetFile: stringPtr("something-else.kts"),
 		},
-		"yarn": {
-			body: `{"depGraph":{"pkgManager":{"name":"yarn"}},"normalisedTargetFile":"yarn.lock","target":{}}`,
+		"CLI omits targetFileFromPlugin → forwarded as nil": {
+			body:                 `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package-lock.json"}`,
+			wantNormalisedTarget: "package-lock.json",
+			wantPluginTargetFile: nil,
 		},
-		"yarn workspaces": {
-			body:               `{"depGraph":{"pkgManager":{"name":"yarn"}},"normalisedTargetFile":"yarn.lock","target":{},"workspace":{}}`,
-			expectedTargetFile: "yarn.lock",
-		},
-		"pnpm": {
-			body: `{"depGraph":{"pkgManager":{"name":"pnpm"}},"normalisedTargetFile":"pnpm.lock","target":{}}`,
-		},
-		"pnpm workspaces": {
-			body:               `{"depGraph":{"pkgManager":{"name":"pnpm"}},"normalisedTargetFile":"pnpm.lock","target":{},"workspace":{}}`,
-			expectedTargetFile: "pnpm.lock",
-		},
-		"pip requirements.txt": {
-			body: `{"depGraph":{"pkgManager":{"name":"pip"}},"normalisedTargetFile":"requirements.txt","target":{}}`,
-		},
-		"pip pipfile": {
-			body:               `{"depGraph":{"pkgManager":{"name":"pip"}},"normalisedTargetFile":"Pipfile","target":{}}`,
-			expectedTargetFile: "Pipfile",
-		},
-		"pip setup.py": {
-			body:               `{"depGraph":{"pkgManager":{"name":"pip"}},"normalisedTargetFile":"setup.py","target":{}}`,
-			expectedTargetFile: "setup.py",
-		},
-		"gradle": {
-			body: `{"depGraph":{"pkgManager":{"name":"gradle"}},"normalisedTargetFile":"build.gradle","target":{}}`,
-		},
-		"gradle build.gradle.kts": {
-			body:               `{"depGraph":{"pkgManager":{"name":"gradle"}},"normalisedTargetFile":"build.gradle.kts","target":{}}`,
-			expectedTargetFile: "build.gradle.kts",
-		},
-		"poetry": {
-			body:               `{"depGraph":{"pkgManager":{"name":"poetry"}},"normalisedTargetFile":"poetry.lock","target":{}}`,
-			expectedTargetFile: "poetry.lock",
-		},
-		"gomodules": {
-			body:               `{"depGraph":{"pkgManager":{"name":"gomodules"}},"normalisedTargetFile":"go.mod","target":{}}`,
-			expectedTargetFile: "go.mod",
-		},
-		"golangdep": {
-			body:               `{"depGraph":{"pkgManager":{"name":"golangdep"}},"normalisedTargetFile":"Gopkg.lock","target":{}}`,
-			expectedTargetFile: "Gopkg.lock",
-		},
-		"nuget": {
-			body:               `{"depGraph":{"pkgManager":{"name":"nuget"}},"normalisedTargetFile":"project.assets.json","target":{}}`,
-			expectedTargetFile: "project.assets.json",
-		},
-		"paket": {
-			body:               `{"depGraph":{"pkgManager":{"name":"paket"}},"normalisedTargetFile":"paket.lock","target":{}}`,
-			expectedTargetFile: "paket.lock",
-		},
-		"composer": {
-			body:               `{"depGraph":{"pkgManager":{"name":"composer"}},"normalisedTargetFile":"composer.lock","target":{}}`,
-			expectedTargetFile: "composer.lock",
-		},
-		"cocoapods": {
-			body:               `{"depGraph":{"pkgManager":{"name":"cocoapods"}},"normalisedTargetFile":"Podfile.lock","target":{}}`,
-			expectedTargetFile: "Podfile.lock",
-		},
-		"hex": {
-			body:               `{"depGraph":{"pkgManager":{"name":"hex"}},"normalisedTargetFile":"mix.lock","target":{}}`,
-			expectedTargetFile: "mix.lock",
-		},
-		"swift": {
-			body:               `{"depGraph":{"pkgManager":{"name":"swift"}},"normalisedTargetFile":"Package.swift","target":{}}`,
-			expectedTargetFile: "Package.swift",
-		},
-		"maven": {
-			body: `{"depGraph":{"pkgManager":{"name":"maven"}},"normalisedTargetFile":"pom.xml","target":{}}`,
-		},
-		"sbt": {
-			body: `{"depGraph":{"pkgManager":{"name":"sbt"}},"normalisedTargetFile":"build.sbt","target":{}}`,
-		},
-		"rubygems": {
-			body: `{"depGraph":{"pkgManager":{"name":"rubygems"}},"normalisedTargetFile":"Gemfile.lock","target":{}}`,
+		"CLI omits targetFileFromPlugin even when workspace is set": {
+			body:                 `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package-lock.json","workspace":{"type":"npm"}}`,
+			wantNormalisedTarget: "package-lock.json",
+			wantPluginTargetFile: nil,
 		},
 	}
 
-	for name, test := range tests {
+	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			ictx, opts := setupLegacyCLI(t, test.body)
-			resolver := legacy.NewLegacyResolver(ictx, nil)
+			ictx, _ := setupLegacyCLI(t, tc.body, nil)
+			plugin := legacy.NewPlugin(ictx)
 
-			res, err := resolver.BuildDepGraphsFromDir(t.Context(), nil, "", opts)
+			res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
 			require.NoError(t, err)
-
 			require.Len(t, res.Results, 1)
-			assert.Equal(t, test.expectedTargetFile, res.Results[0].ProjectDescriptor.GetTargetFile())
+
+			require.NotNil(t, res.Results[0].ResolverMetadata, "legacy plugin must always populate ResolverMetadata")
+			assert.Equal(t, tc.wantNormalisedTarget, res.Results[0].ResolverMetadata.NormalisedTargetFile,
+				"ResolverMetadata.NormalisedTargetFile must mirror the legacy CLI's normalisedTargetFile verbatim")
+
+			if tc.wantPluginTargetFile == nil {
+				assert.Nil(t, res.Results[0].ProjectDescriptor.Identity.TargetFile,
+					"Identity.TargetFile must be nil when the legacy CLI omitted targetFileFromPlugin")
+			} else {
+				require.NotNil(t, res.Results[0].ProjectDescriptor.Identity.TargetFile)
+				assert.Equal(t, *tc.wantPluginTargetFile, *res.Results[0].ProjectDescriptor.Identity.TargetFile)
+			}
 		})
 	}
 }
 
-func TestResolver_MapsRootComponentName(t *testing.T) {
-	ictx, opts := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"nuget"},"pkgs":[{"id":"my-project@","info":{"name":"my-project"}}],"graph":{"rootNodeId":"root","nodes":[{"nodeId":"root","pkgId":"my-project@"}]}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json","target":{}}`)
-	resolver := legacy.NewLegacyResolver(ictx, nil)
+func stringPtr(s string) *string { return &s }
 
-	res, err := resolver.BuildDepGraphsFromDir(t.Context(), nil, "", opts)
+func TestPlugin_MapsRootComponentName(t *testing.T) {
+	ictx, _ := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"nuget"},"pkgs":[{"id":"my-project@","info":{"name":"my-project"}}],"graph":{"rootNodeId":"root","nodes":[{"nodeId":"root","pkgId":"my-project@"}]}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json","target":{}}`, nil)
+	plugin := legacy.NewPlugin(ictx)
+
+	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.NoError(t, err)
 
 	require.Len(t, res.Results, 1)
 	assert.Equal(t, "my-project", res.Results[0].ProjectDescriptor.Identity.RootComponentName)
 }
 
-func TestResolver_ReturnsProcessedFiles(t *testing.T) {
-	ictx, opts := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"nuget"}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json","target":{}}`)
+func TestPlugin_PopulatesResolverMetadata(t *testing.T) {
+	ictx, _ := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`, nil)
+	plugin := legacy.NewPlugin(ictx)
 
-	resolver := legacy.NewLegacyResolver(ictx, nil)
+	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	require.NoError(t, err)
 
-	res, err := resolver.BuildDepGraphsFromDir(t.Context(), nil, "", opts)
+	require.Len(t, res.Results, 1)
+	require.NotNil(t, res.Results[0].ResolverMetadata)
+	assert.Equal(t, "legacycli", res.Results[0].ResolverMetadata.PluginName)
+}
+
+func TestPlugin_ReturnsProcessedFiles(t *testing.T) {
+	ictx, _ := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"nuget"}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json","target":{}}`, nil)
+
+	plugin := legacy.NewPlugin(ictx)
+
+	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"project.assets.json"}, res.ProcessedFiles)
 }
 
-func TestResolver_IgnoredFilesUseExcludePaths(t *testing.T) {
-	ictx, opts, capturedArgs := setupLegacyCLICapturingArgs(t,
-		`{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`)
-	opts.WithAllProjects(true)
+func TestPlugin_PerResultErrorPopulatesSCAResultError(t *testing.T) {
+	body := `{"normalisedTargetFile":"broken/pom.xml","error":{"jsonapi":{"version":"1.0"},"errors":[{"id":"abc","status":"500","code":"SNYK-LEGACY-MOD-001","title":"Module failed","detail":"Could not resolve","meta":{"isErrorCatalogError":true,"classification":"ACTIONABLE"}}]}}`
+	ictx, _ := setupLegacyCLI(t, body, nil)
+	plugin := legacy.NewPlugin(ictx)
 
-	ignored := []string{"packages/api/package.json", "packages/web/package.json"}
-	resolver := legacy.NewLegacyResolver(ictx, ignored)
+	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, res.Results, 1)
 
-	_, err := resolver.BuildDepGraphsFromDir(t.Context(), nil, "", opts)
+	require.Error(t, res.Results[0].Error)
+	var snykErr snyk_errors.Error
+	require.True(t, errors.As(res.Results[0].Error, &snykErr))
+	assert.Equal(t, "SNYK-LEGACY-MOD-001", snykErr.ErrorCode)
+	assert.Equal(t, "Module failed", snykErr.Title)
+}
+
+func TestPlugin_PerResultCLIErrorIsPreservedWhenDepGraphIsMalformed(t *testing.T) {
+	// Output carries both an upstream CLI error AND a malformed depgraph payload. The
+	// CLI error is the user-meaningful one, so the unmarshal failure must not overwrite it.
+	body := `{"normalisedTargetFile":"broken/pom.xml","depGraph":"not-valid-json","error":{"jsonapi":{"version":"1.0"},"errors":[{"id":"abc","status":"500","code":"SNYK-LEGACY-MOD-002","title":"Upstream failure","detail":"Module fetch failed","meta":{"isErrorCatalogError":true,"classification":"ACTIONABLE"}}]}}`
+	ictx, _ := setupLegacyCLI(t, body, nil)
+	plugin := legacy.NewPlugin(ictx)
+
+	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, res.Results, 1)
+
+	require.Error(t, res.Results[0].Error)
+	var snykErr snyk_errors.Error
+	require.True(t, errors.As(res.Results[0].Error, &snykErr), "upstream CLI error should be preserved, not overwritten by depgraph unmarshal failure")
+	assert.Equal(t, "SNYK-LEGACY-MOD-002", snykErr.ErrorCode)
+}
+
+func TestPlugin_ExitCode3ReturnsNilSuccess(t *testing.T) {
+	ictx := setupLegacyCLIWithError(t, exitCodeError{code: 3})
+	plugin := legacy.NewPlugin(ictx)
+
+	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	assert.Nil(t, res, "no-projects-found is signaled by a nil PluginResult, not an empty one")
+}
+
+func TestPlugin_ErrNoDepGraphsFoundReturnsNilSuccess(t *testing.T) {
+	ictx := setupLegacyCLIWithEmptyData(t)
+	plugin := legacy.NewPlugin(ictx)
+
+	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	assert.Nil(t, res, "no-projects-found is signaled by a nil PluginResult, not an empty one")
+}
+
+func TestPlugin_NonExitCode3ErrorIsWrapped(t *testing.T) {
+	underlying := fmt.Errorf("network unreachable")
+	ictx := setupLegacyCLIWithError(t, underlying)
+	plugin := legacy.NewPlugin(ictx)
+
+	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "error handling legacy workflow")
+	assert.ErrorIs(t, err, underlying, "underlying error should remain in the chain via the snyk_errors.WithCause wrap")
+	assert.Nil(t, res)
+}
+
+func TestPlugin_NilOptionsReturnsError(t *testing.T) {
+	plugin := legacy.NewPlugin(nil)
+
+	_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "options")
+}
+
+func TestPlugin_ExcludeBehaviour(t *testing.T) {
+	t.Run("opts.Exclude is NOT forwarded to the legacy config", func(t *testing.T) {
+		ictx, capturedConfig := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`, nil)
+		plugin := legacy.NewPlugin(ictx)
+
+		opts := ecosystems.NewPluginOptions().WithExclude([]string{"a.lock", "b.lock"})
+		_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", opts)
+		require.NoError(t, err)
+
+		assert.Equal(t, "", (*capturedConfig).GetString(workflow.FlagExclude),
+			"opts.Exclude must not leak into the legacy CLI --exclude")
+	})
+
+	t.Run("user-supplied FlagExclude on the live config is preserved on the clone", func(t *testing.T) {
+		preexisting := map[string]any{workflow.FlagExclude: "user-exclude.txt"}
+		ictx, capturedConfig := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`, preexisting)
+		plugin := legacy.NewPlugin(ictx)
+
+		opts := ecosystems.NewPluginOptions().WithExclude([]string{"a.lock"})
+		_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", opts)
+		require.NoError(t, err)
+
+		assert.Equal(t, "user-exclude.txt", (*capturedConfig).GetString(workflow.FlagExclude),
+			"the user's --exclude flows through unmodified; opts.Exclude is ignored")
+	})
+}
+
+func TestPlugin_DoesNotMutateLiveConfig(t *testing.T) {
+	preexisting := map[string]any{workflow.FlagExclude: "user-exclude.txt"}
+	ictx, _ := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`, preexisting)
+	plugin := legacy.NewPlugin(ictx)
+
+	opts := ecosystems.NewPluginOptions().WithExclude([]string{"a.lock"})
+	_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", opts)
 	require.NoError(t, err)
 
-	assert.Contains(t, *capturedArgs,
-		"--exclude-paths=packages/api/package.json,packages/web/package.json",
-		"processed files should be forwarded as --exclude-paths so paths are matched exactly")
-	for _, arg := range *capturedArgs {
-		assert.False(t, strings.HasPrefix(arg, "--exclude="),
-			"should not use --exclude (basename match) for processed files: %q", arg)
+	assert.Equal(t, "user-exclude.txt", ictx.GetConfiguration().GetString(workflow.FlagExclude),
+		"live config exclude should not be mutated; merge happens on a clone")
+}
+
+func TestPlugin_ForcesEffectiveGraphWithErrorsByDefault(t *testing.T) {
+	ictx, capturedConfig := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`, nil)
+	plugin := legacy.NewPlugin(ictx)
+
+	_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+
+	assert.True(t, (*capturedConfig).GetBool(workflow.FlagPrintEffectiveGraphWithErrors))
+}
+
+func TestPlugin_DisablesEffectiveGraphWithErrorsWhenJSONLWithErrorsRequested(t *testing.T) {
+	preexisting := map[string]any{workflow.FlagPrintOutputJsonlWithErrors: true}
+	ictx, capturedConfig := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`, preexisting)
+	plugin := legacy.NewPlugin(ictx)
+
+	_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+
+	assert.False(t, (*capturedConfig).GetBool(workflow.FlagPrintEffectiveGraphWithErrors))
+	assert.True(t, (*capturedConfig).GetBool(workflow.FlagPrintOutputJsonlWithErrors))
+}
+
+// TestPlugin_BuildLegacyConfig_WritesExcludePathsFromOpts covers the contract:
+// opts.Global.ExcludePaths is the canonical source for what the legacy CLI receives as
+// --exclude-paths. When non-empty, it overrides any pre-existing FlagExcludePaths on the
+// live config. When empty, the live config's value is preserved. (The override is
+// lossless in every production path because the user's --exclude-paths is also on opts.)
+func TestPlugin_BuildLegacyConfig_WritesExcludePathsFromOpts(t *testing.T) {
+	cases := []struct {
+		name                 string
+		liveExcludePaths     string
+		optsExcludePaths     []string
+		expectedExcludePaths string
+	}{
+		{
+			name:                 "empty opts and empty live leaves config empty",
+			liveExcludePaths:     "",
+			optsExcludePaths:     nil,
+			expectedExcludePaths: "",
+		},
+		{
+			name:                 "opts populated, live empty: opts written through",
+			liveExcludePaths:     "",
+			optsExcludePaths:     []string{"file1.py", "file2.py"},
+			expectedExcludePaths: "file1.py,file2.py",
+		},
+		{
+			name:                 "live populated, opts empty: live preserved (no opts to write)",
+			liveExcludePaths:     "user-supplied.lock",
+			optsExcludePaths:     nil,
+			expectedExcludePaths: "user-supplied.lock",
+		},
+		{
+			name:                 "both populated: opts overrides live (opts is canonical)",
+			liveExcludePaths:     "user-supplied.lock",
+			optsExcludePaths:     []string{"user-supplied.lock", "processed1.lock", "processed2.lock"},
+			expectedExcludePaths: "user-supplied.lock,processed1.lock,processed2.lock",
+		},
+		{
+			name:                 "single processed file",
+			liveExcludePaths:     "",
+			optsExcludePaths:     []string{"file1.py"},
+			expectedExcludePaths: "file1.py",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			preexisting := map[string]any{}
+			if tc.liveExcludePaths != "" {
+				preexisting[workflow.FlagExcludePaths] = tc.liveExcludePaths
+			}
+			ictx, capturedConfig := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`, preexisting)
+			plugin := legacy.NewPlugin(ictx)
+
+			opts := ecosystems.NewPluginOptions()
+			if len(tc.optsExcludePaths) > 0 {
+				opts = opts.WithExcludePaths(tc.optsExcludePaths)
+			}
+			_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", opts)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.expectedExcludePaths, (*capturedConfig).GetString(workflow.FlagExcludePaths))
+		})
 	}
 }
 
-func TestResolver_IgnoredFilesMergeWithUserExcludePaths(t *testing.T) {
-	ictx, opts, capturedArgs := setupLegacyCLICapturingArgs(t,
-		`{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`)
-	opts.WithAllProjects(true).
-		WithRawFlags("--exclude-paths=user/manual.json")
+// TestPlugin_BuildLegacyConfig_DoesNotMutateLiveConfigExcludePaths locks in the no-side-effect
+// guarantee: the merge happens on the cloned config only.
+func TestPlugin_BuildLegacyConfig_DoesNotMutateLiveConfigExcludePaths(t *testing.T) {
+	preexisting := map[string]any{workflow.FlagExcludePaths: "user-supplied.lock"}
+	ictx, _ := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`, preexisting)
+	plugin := legacy.NewPlugin(ictx)
 
-	resolver := legacy.NewLegacyResolver(ictx, []string{"packages/api/package.json"})
-
-	_, err := resolver.BuildDepGraphsFromDir(t.Context(), nil, "", opts)
+	opts := ecosystems.NewPluginOptions().WithExcludePaths([]string{"processed.lock"})
+	_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", opts)
 	require.NoError(t, err)
 
-	assert.Contains(t, *capturedArgs,
-		"--exclude-paths=user/manual.json,packages/api/package.json",
-		"processed files should be merged with user-supplied --exclude-paths value")
+	assert.Equal(t, "user-supplied.lock", ictx.GetConfiguration().GetString(workflow.FlagExcludePaths),
+		"live config FlagExcludePaths must not be mutated; merge happens on a clone")
 }
 
-func setupLegacyCLICapturingArgs(t *testing.T, testBody string) (workflow.InvocationContext, *ecosystems.SCAPluginOptions, *[]string) {
+// setupLegacyCLI configures a mock InvocationContext whose engine returns the supplied JSONL body
+// as the legacy CLI's payload. preexistingConfig keys are set on the live config before the plugin
+// runs. The returned configuration pointer captures the cloned config the plugin passed to
+// InvokeWithConfig, so tests can assert on what the plugin produced.
+func setupLegacyCLI(t *testing.T, testBody string, preexistingConfig map[string]any) (gafworkflow.InvocationContext, *configuration.Configuration) {
 	t.Helper()
 
 	ctrl := gomock.NewController(t)
 	ictx := gafmocks.NewMockInvocationContext(ctrl)
 	engine := gafmocks.NewMockEngine(ctrl)
 	cfg := configuration.New()
+	for k, v := range preexistingConfig {
+		cfg.Set(k, v)
+	}
 	logger := zerolog.Nop()
-
-	opts := ecosystems.NewPluginOptions()
 
 	ictx.EXPECT().GetConfiguration().Return(cfg).AnyTimes()
 	ictx.EXPECT().GetEngine().Return(engine).AnyTimes()
 	ictx.EXPECT().GetEnhancedLogger().Return(&logger).AnyTimes()
 
-	captured := &[]string{}
+	var captured configuration.Configuration
 	engine.EXPECT().
 		InvokeWithConfig(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ workflow.Identifier, config configuration.Configuration) ([]workflow.Data, error) {
-			if args, ok := config.Get(configuration.RAW_CMD_ARGS).([]string); ok {
-				*captured = args
-			}
-			return []workflow.Data{
-				workflow.NewData(
-					workflow.NewTypeIdentifier(workflow.NewWorkflowIdentifier("legacycli"), "application/text"),
+		DoAndReturn(func(_ gafworkflow.Identifier, c configuration.Configuration) ([]gafworkflow.Data, error) {
+			captured = c
+			return []gafworkflow.Data{
+				gafworkflow.NewData(
+					gafworkflow.NewTypeIdentifier(
+						gafworkflow.NewWorkflowIdentifier("legacycli"),
+						"application/text"),
 					"application/text",
 					[]byte(testBody)),
 			}, nil
 		})
 
-	return ictx, opts, captured
+	return ictx, &captured
 }
 
-func setupLegacyCLI(t *testing.T, testBody string) (workflow.InvocationContext, *ecosystems.SCAPluginOptions) {
+func setupLegacyCLIWithError(t *testing.T, returnedErr error) gafworkflow.InvocationContext {
 	t.Helper()
 
 	ctrl := gomock.NewController(t)
@@ -244,7 +401,25 @@ func setupLegacyCLI(t *testing.T, testBody string) (workflow.InvocationContext, 
 	cfg := configuration.New()
 	logger := zerolog.Nop()
 
-	opts := ecosystems.NewPluginOptions()
+	ictx.EXPECT().GetConfiguration().Return(cfg).AnyTimes()
+	ictx.EXPECT().GetEngine().Return(engine).AnyTimes()
+	ictx.EXPECT().GetEnhancedLogger().Return(&logger).AnyTimes()
+
+	engine.EXPECT().
+		InvokeWithConfig(gomock.Any(), gomock.Any()).
+		Return(nil, returnedErr)
+
+	return ictx
+}
+
+func setupLegacyCLIWithEmptyData(t *testing.T) gafworkflow.InvocationContext {
+	t.Helper()
+
+	ctrl := gomock.NewController(t)
+	ictx := gafmocks.NewMockInvocationContext(ctrl)
+	engine := gafmocks.NewMockEngine(ctrl)
+	cfg := configuration.New()
+	logger := zerolog.Nop()
 
 	ictx.EXPECT().GetConfiguration().Return(cfg).AnyTimes()
 	ictx.EXPECT().GetEngine().Return(engine).AnyTimes()
@@ -252,16 +427,18 @@ func setupLegacyCLI(t *testing.T, testBody string) (workflow.InvocationContext, 
 
 	engine.EXPECT().
 		InvokeWithConfig(gomock.Any(), gomock.Any()).
-		Return(
-			[]workflow.Data{
-				workflow.NewData(
-					workflow.NewTypeIdentifier(
-						workflow.NewWorkflowIdentifier("legacycli"),
-						"application/text"),
-					"application/text",
-					[]byte(testBody)),
-			},
-			nil)
+		Return([]gafworkflow.Data{}, nil)
 
-	return ictx, opts
+	return ictx
 }
+
+// Ensure ErrNoDepGraphsFound stays observable from tests (compile-time pin).
+var _ = legacycli.ErrNoDepGraphsFound
+
+// exitCodeError is a minimal error type implementing legacycli.ExitCoder for tests.
+type exitCodeError struct {
+	code int
+}
+
+func (e exitCodeError) Error() string { return fmt.Sprintf("exit %d", e.code) }
+func (e exitCodeError) ExitCode() int { return e.code }

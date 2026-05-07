@@ -21,6 +21,20 @@ const (
 var legacyWorkflowID = gafworkflow.NewWorkflowIdentifier(workflow.LegacyCLIWorkflowIDStr)
 
 func HandleLegacyResolution(ctx gafworkflow.InvocationContext, config configuration.Configuration, logger *zerolog.Logger) ([]gafworkflow.Data, error) {
+	depGraphs, err := InvokeLegacy(ctx, config, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	workflowOutputData := MapToWorkflowData(depGraphs, logger)
+	logger.Printf("DepGraph workflow done (extracted %d dependency graphs)", len(workflowOutputData))
+	return workflowOutputData, nil
+}
+
+// InvokeLegacy invokes the legacy CLI workflow and parses its output, returning the parsed
+// dep-graph outputs. Returns ErrNoDepGraphsFound when the invocation succeeds but produces no
+// graphs.
+func InvokeLegacy(ctx gafworkflow.InvocationContext, config configuration.Configuration, logger *zerolog.Logger) ([]parsers.DepGraphOutput, error) {
 	engine := ctx.GetEngine()
 	argument, outputParser := ChooseGraphArgument(config)
 
@@ -29,6 +43,10 @@ func HandleLegacyResolution(ctx gafworkflow.InvocationContext, config configurat
 	legacyData, legacyCLIError := engine.InvokeWithConfig(legacyWorkflowID, config)
 	if legacyCLIError != nil {
 		return nil, ExtractLegacyCLIError(legacyCLIError, legacyData)
+	}
+
+	if len(legacyData) == 0 {
+		return nil, ErrNoDepGraphsFound
 	}
 
 	snykOutput, ok := legacyData[0].GetPayload().([]byte)
@@ -44,9 +62,7 @@ func HandleLegacyResolution(ctx gafworkflow.InvocationContext, config configurat
 		return nil, ErrNoDepGraphsFound
 	}
 
-	workflowOutputData := MapToWorkflowData(depGraphs, logger)
-	logger.Printf("DepGraph workflow done (extracted %d dependency graphs)", len(workflowOutputData))
-	return workflowOutputData, nil
+	return depGraphs, nil
 }
 
 func ChooseGraphArgument(config configuration.Configuration) (string, parsers.OutputParser) {

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -23,10 +24,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/snyk/cli-extension-dep-graph/internal/legacycli"
 	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
 	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/legacy"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/uv"
 	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
 )
 
@@ -37,13 +41,14 @@ var uvSBOMConvertExpectedDepGraph string
 var uvSBOMConvertResponse string
 
 type mockScaPlugin struct {
+	name    string
 	result  *ecosystems.PluginResult
 	err     error
 	options *ecosystems.SCAPluginOptions
 }
 
 func (m *mockScaPlugin) GetName() string {
-	return ""
+	return m.name
 }
 
 func (m *mockScaPlugin) BuildDepGraphsFromDir(
@@ -62,29 +67,124 @@ func (m *mockScaPlugin) BuildDepGraphsFromDir(
 	return m.result, nil
 }
 
-// CalledResolutionHandlerFunc is a test helper structure to track calls to the mock ResolutionHandlerFunc.
-type CalledResolutionHandlerFunc struct {
-	Called      bool
-	Config      configuration.Configuration
-	ReturnData  []gafworkflow.Data
+// LegacyHarness wraps a real `legacy.Plugin` whose underlying `legacycli` workflow is
+// answered by a mock engine. Tests construct it, optionally configure ReturnTargets /
+// ReturnLines / ReturnError after construction, and pass `Plugin` into
+// handleSBOMResolutionDI's scaPlugins list. At invocation time the harness records the
+// cloned configuration the real `buildLegacyConfig` produced — so tests can assert on
+// exactly the `--exclude-paths` / `--exclude` value the legacy CLI would have received,
+// with no test-side simulation of production logic.
+type LegacyHarness struct {
+	Plugin ecosystems.SCAPlugin
+
+	// ReturnTargets — if non-empty — yields one minimal JSONL line per entry, with that
+	// string as `normalisedTargetFile`. Use this when a test only cares about how many
+	// legacy results came back and which targets they had.
+	ReturnTargets []string
+	// ReturnLines — if non-empty — overrides ReturnTargets and is emitted as the raw JSONL
+	// payload (one element per line). Use this when a test needs control over the line shape
+	// (errors, depGraph contents, custom target metadata).
+	ReturnLines []string
+	// ReturnError — if non-nil — is returned from the engine call instead of any payload.
 	ReturnError error
+
+	invoked     bool
+	capturedCfg configuration.Configuration
 }
 
-// NewCalledResolutionHandlerFunc creates a new instance for use in tests.
-func NewCalledResolutionHandlerFunc(returnData []gafworkflow.Data, returnErr error) *CalledResolutionHandlerFunc {
-	return &CalledResolutionHandlerFunc{
-		ReturnData:  returnData,
-		ReturnError: returnErr,
+// NewLegacyHarness wires `ctx.engine.InvokeWithConfig` to read from the harness's
+// Return* fields at invocation time and returns a harness wrapping a real legacy plugin.
+// Pass `harness.Plugin` into the scaPlugins list under test.
+func NewLegacyHarness(ctx *testContext) *LegacyHarness {
+	h := &LegacyHarness{
+		Plugin: legacy.NewPlugin(ctx.invocationContext),
 	}
+
+	ctx.engine.EXPECT().
+		InvokeWithConfig(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ gafworkflow.Identifier, cfg configuration.Configuration) ([]gafworkflow.Data, error) {
+			h.invoked = true
+			h.capturedCfg = cfg
+			if h.ReturnError != nil {
+				return nil, h.ReturnError
+			}
+
+			payload := h.buildPayload()
+			if payload == "" {
+				return []gafworkflow.Data{}, nil
+			}
+			data := gafworkflow.NewData(
+				gafworkflow.NewTypeIdentifier(
+					gafworkflow.NewWorkflowIdentifier("legacycli"),
+					"application/text"),
+				"application/text",
+				[]byte(payload))
+			return []gafworkflow.Data{data}, nil
+		}).
+		AnyTimes()
+
+	return h
 }
 
-// Func returns a ResolutionHandlerFunc that records invocation and arguments.
-func (c *CalledResolutionHandlerFunc) Func() ResolutionHandlerFunc {
-	return func(_ gafworkflow.InvocationContext, config configuration.Configuration, _ *zerolog.Logger) ([]gafworkflow.Data, error) {
-		c.Called = true
-		c.Config = config
-		return c.ReturnData, c.ReturnError
+// buildPayload turns the harness's configured Return* values into a JSONL payload.
+// ReturnLines wins if both are set.
+func (h *LegacyHarness) buildPayload() string {
+	if len(h.ReturnLines) > 0 {
+		return strings.Join(h.ReturnLines, "\n")
 	}
+	if len(h.ReturnTargets) == 0 {
+		return ""
+	}
+	lines := make([]string, 0, len(h.ReturnTargets))
+	for _, tf := range h.ReturnTargets {
+		lines = append(lines, MakeLegacyJSONLLine(tf))
+	}
+	return strings.Join(lines, "\n")
+}
+
+// Called reports whether the legacy plugin actually invoked the legacy CLI workflow
+// during the test.
+func (h *LegacyHarness) Called() bool { return h.invoked }
+
+// CapturedExclude returns the value of FlagExclude on the cloned config the real
+// legacy plugin handed to the legacy CLI. Returns "" if the plugin was never invoked.
+func (h *LegacyHarness) CapturedExclude() string {
+	if h.capturedCfg == nil {
+		return ""
+	}
+	return h.capturedCfg.GetString(workflow.FlagExclude)
+}
+
+// CapturedExcludePaths returns the value of FlagExcludePaths on the cloned config the
+// real legacy plugin handed to the legacy CLI — i.e. exactly what the legacy CLI would
+// have received as `--exclude-paths`. Returns "" if the plugin was never invoked.
+func (h *LegacyHarness) CapturedExcludePaths() string {
+	if h.capturedCfg == nil {
+		return ""
+	}
+	return h.capturedCfg.GetString(workflow.FlagExcludePaths)
+}
+
+// MakeLegacyJSONLLine builds a single minimal JSONL line shaped like the legacy CLI's
+// `--print-effective-graph-with-errors` output, with the supplied `normalisedTargetFile`.
+// For tests needing per-line errors or custom shapes, build the line by hand.
+func MakeLegacyJSONLLine(targetFile string) string {
+	return fmt.Sprintf(
+		`{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":%q,"target":{}}`,
+		targetFile,
+	)
+}
+
+// MakeLegacyJSONLLineWithErrorCatalog builds a JSONL line with both a depgraph and a
+// JSONAPI-shaped error catalog payload — mirrors what the legacy CLI emits when
+// `--print-effective-graph-with-errors` produces a partial result for a failing target.
+func MakeLegacyJSONLLineWithErrorCatalog(targetFile, errorID, errorTitle, errorDetail string) string {
+	return fmt.Sprintf(
+		`{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":%q,"target":{},`+
+			`"error":{"jsonapi":{"version":"1.0"},"errors":[{"id":%q,"title":%q,"detail":%q,`+
+			`"meta":{"isErrorCatalogError":true,"classification":"ACTIONABLE"}}]}}`,
+		targetFile, errorID, errorTitle, errorDetail,
+	)
 }
 
 // mockExitError creates an error with the specified exit code.
@@ -117,10 +217,17 @@ type testContext struct {
 	ctrl              *gomock.Controller
 	config            configuration.Configuration
 	invocationContext *gafmocks.MockInvocationContext
+	engine            *gafmocks.MockEngine
 	userInterface     *gafmocks.MockUserInterface
 }
 
 // setupTestContext initializes common test objects and handles cleanup automatically.
+//
+// The mock engine is registered on the invocation context with no default behavior;
+// tests that exercise the real legacy plugin should attach a `LegacyHarness` (which
+// configures the engine to return canned JSONL or an error). Tests that never trigger
+// the legacy plugin pay nothing for the engine mock — gomock does not require unused
+// EXPECTs.
 func setupTestContext(t *testing.T, withDefaultUI bool) *testContext {
 	t.Helper()
 	ctrl := gomock.NewController(t)
@@ -133,6 +240,11 @@ func setupTestContext(t *testing.T, withDefaultUI bool) *testContext {
 	invocationContext := gafmocks.NewMockInvocationContext(ctrl)
 	invocationContext.EXPECT().GetNetworkAccess().Return(networking.NewNetworkAccess(config)).AnyTimes()
 	invocationContext.EXPECT().Context().Return(context.Background()).AnyTimes()
+	invocationContext.EXPECT().GetConfiguration().Return(config).AnyTimes()
+	invocationContext.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
+
+	engine := gafmocks.NewMockEngine(ctrl)
+	invocationContext.EXPECT().GetEngine().Return(engine).AnyTimes()
 
 	mockUI := gafmocks.NewMockUserInterface(ctrl)
 	invocationContext.EXPECT().GetUserInterface().Return(mockUI).AnyTimes()
@@ -144,6 +256,7 @@ func setupTestContext(t *testing.T, withDefaultUI bool) *testContext {
 		ctrl:              ctrl,
 		config:            config,
 		invocationContext: invocationContext,
+		engine:            engine,
 		userInterface:     mockUI,
 	}
 }
@@ -171,7 +284,7 @@ func createMockSBOMService(t *testing.T, responseBody string) *httptest.Server {
 func Test_callback_SBOMResolution(t *testing.T) {
 	t.Run("should return depgraphs from SBOM conversion when use-sbom-resolution flag is enabled", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 
 		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse)
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
@@ -193,6 +306,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("pyproject.toml"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "pyproject.toml",
+						},
 					},
 				},
 			},
@@ -202,14 +318,13 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 		assert.Len(t, workflowData, 1)
-		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called")
+		assert.False(t, legacyMock.Called(), "legacy plugin should not be called")
 
 		depGraph, ok := workflowData[0].GetPayload().([]byte)
 		require.True(t, ok, "payload should be []byte")
@@ -218,7 +333,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 	t.Run("should handle UV client errors gracefully", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 
 		mockPlugin := &mockScaPlugin{
 			err: fmt.Errorf("uv command failed"),
@@ -228,19 +343,18 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "uv command failed")
 		assert.Nil(t, workflowData)
-		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called")
+		assert.False(t, legacyMock.Called(), "legacy plugin should not be called")
 	})
 
 	t.Run("should handle SBOM convert network request errors", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 
 		mockPlugin := &mockScaPlugin{
 			err: fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
@@ -250,20 +364,19 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "analysis of SBOM document failed due to error")
 		assert.Contains(t, err.Error(), "500")
 		assert.Nil(t, workflowData)
-		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called")
+		assert.False(t, legacyMock.Called(), "legacy plugin should not be called")
 	})
 
 	t.Run("should skip findings with errors and only process valid findings when allProjects is true", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagAllProjects, true)
 
 		mockPlugin := &mockScaPlugin{
@@ -276,6 +389,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("pyproject.toml"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "pyproject.toml",
+						},
 					},
 					{
 						Error: fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
@@ -284,38 +400,32 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("uv.lock"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "uv.lock",
+						},
 					},
 				},
 			},
 		}
 
-		dataIdentifier := gafworkflow.NewTypeIdentifier(WorkflowID, workflow.WorkflowIDStr)
-		mockWorkflowData := []gafworkflow.Data{
-			gafworkflow.NewData(
-				dataIdentifier,
-				"application/json",
-				[]byte(`{"mock":"data"}`),
-			),
-		}
-		resolutionHandler.ReturnData = mockWorkflowData
+		legacyMock.ReturnTargets = []string{"legacy-target/package.json"}
 
 		depGraphs, err := handleSBOMResolutionDI(
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.NoError(t, err)
 		assert.NotNil(t, depGraphs)
 		assert.Len(t, depGraphs, 2, "Should return one valid finding plus legacy workflow result")
-		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called when allProjects is true")
+		assert.True(t, legacyMock.Called(), "legacy plugin should be called when allProjects is true")
 	})
 
 	t.Run("should return error when SBOM conversion fails for all findings when multiple findings are present", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagAllProjects, true)
 
 		// Create mock plugin that returns multiple findings, all with conversion errors
@@ -329,6 +439,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("project1/uv.lock"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "project1/uv.lock",
+						},
 					},
 					{
 						Error: fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
@@ -337,6 +450,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("project2/uv.lock"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "project2/uv.lock",
+						},
 					},
 				},
 			},
@@ -344,14 +460,13 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		// Legacy workflow should return exit code 3 (no projects found) when all findings have errors
 		exitError3 := mockExitError{code: 3}
-		resolutionHandler.ReturnError = exitError3
+		legacyMock.ReturnError = exitError3
 
 		depGraphs, err := handleSBOMResolutionDI(
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		// Current behavior: when all findings have errors but len(findings) > 0, exit code 3 from legacy workflow
@@ -361,12 +476,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, depGraphs)
 		assert.Len(t, depGraphs, 0, "Should return empty workflowData when all findings have errors and legacy workflow returns exit code 3")
-		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called when allProjects is true")
+		assert.True(t, legacyMock.Called(), "legacy plugin should be called when allProjects is true")
 	})
 
 	t.Run("should return only first finding when FlagAllProjects is false", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagAllProjects, false)
 
 		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse)
@@ -382,6 +497,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("pyproject.toml"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "pyproject.toml",
+						},
 					},
 				},
 			},
@@ -391,15 +509,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 		// Should only have one finding even if multiple plugins could return findings
 		assert.Len(t, workflowData, 1)
-		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called")
+		assert.False(t, legacyMock.Called(), "legacy plugin should not be called")
 	})
 
 	t.Run("handleSBOMResolution with FlagAllProjects", func(t *testing.T) {
@@ -410,6 +527,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 					TargetFile: stringPtr("pyproject.toml"),
 				},
 			},
+			ResolverMetadata: &ecosystems.ResolverMetadata{
+				NormalisedTargetFile: "pyproject.toml",
+			},
 		}
 		finding2 := ecosystems.SCAResult{
 			DepGraph: createTestDepGraph(t, "pip", "project-2", "2.0.0"),
@@ -417,6 +537,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Identity: identity.ProjectIdentity{
 					TargetFile: stringPtr("subproject/pyproject.toml"),
 				},
+			},
+			ResolverMetadata: &ecosystems.ResolverMetadata{
+				NormalisedTargetFile: "subproject/pyproject.toml",
 			},
 		}
 		finding3 := ecosystems.SCAResult{
@@ -426,6 +549,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 					TargetFile: stringPtr("package.json"),
 				},
 			},
+			ResolverMetadata: &ecosystems.ResolverMetadata{
+				NormalisedTargetFile: "package.json",
+			},
 		}
 		finding4 := ecosystems.SCAResult{
 			DepGraph: createTestDepGraph(t, "gomod", "project-4", "4.0.0"),
@@ -433,6 +559,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				Identity: identity.ProjectIdentity{
 					TargetFile: stringPtr("go.mod"),
 				},
+			},
+			ResolverMetadata: &ecosystems.ResolverMetadata{
+				NormalisedTargetFile: "go.mod",
 			},
 		}
 
@@ -596,41 +725,32 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				defer mockSBOMService.Close()
 
 				ctx := setupTestContext(t, true)
-				resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+				legacyMock := NewLegacyHarness(ctx)
 				ctx.config.Set(workflow.FlagAllProjects, tc.allProjects)
 				ctx.config.Set(workflow.FlagExclude, tc.initialExclude)
 				ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 				if tc.expectLegacyResolutionToBeCalled {
-					dataIdentifier := gafworkflow.NewTypeIdentifier(WorkflowID, workflow.WorkflowIDStr)
-					mockWorkflowData := []gafworkflow.Data{
-						gafworkflow.NewData(
-							dataIdentifier,
-							"application/json",
-							[]byte(`{"mock":"data"}`),
-						),
-					}
-					resolutionHandler.ReturnData = mockWorkflowData
+					legacyMock.ReturnTargets = []string{"legacy-target/package.json"}
 				}
 
 				workflowData, err := handleSBOMResolutionDI(
 					ctx.invocationContext,
 					ctx.config,
 					&nopLogger,
-					tc.plugins,
-					resolutionHandler.Func(),
+					append(tc.plugins, legacyMock.Plugin),
 				)
 
 				require.NoError(t, err)
 				assert.NotNil(t, workflowData)
 				assert.Len(t, workflowData, tc.expectedWorkflowDataLen)
-				assert.Equal(t, tc.expectLegacyResolutionToBeCalled, resolutionHandler.Called)
+				assert.Equal(t, tc.expectLegacyResolutionToBeCalled, legacyMock.Called())
 
 				if tc.expectLegacyResolutionToBeCalled {
-					assert.Equal(t, tc.expectedExclude, resolutionHandler.Config.GetString(workflow.FlagExclude),
-						"FlagExclude should retain user-supplied value (not be modified by ProcessedFiles)")
-					assert.Equal(t, tc.expectedExcludePaths, resolutionHandler.Config.GetString(workflow.FlagExcludePaths),
-						"FlagExcludePaths should contain ProcessedFiles from plugins")
+					assert.Equal(t, tc.expectedExclude, legacyMock.CapturedExclude(),
+						"legacy plugin should see FlagExclude unchanged from the user-supplied value")
+					assert.Equal(t, tc.expectedExcludePaths, legacyMock.CapturedExcludePaths(),
+						"legacy plugin should see ProcessedFiles from earlier plugins on FlagExcludePaths")
 				}
 
 				for _, idx := range tc.pluginsShouldNotBeCalled {
@@ -644,7 +764,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 	t.Run("should handle exit code 3 (no projects found) gracefully and continue with SBOM data", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagAllProjects, true)
 
 		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse)
@@ -661,6 +781,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("pyproject.toml"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "pyproject.toml",
+						},
 					},
 				},
 				ProcessedFiles: []string{"uv.lock"},
@@ -669,14 +792,13 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		// Create an error with exit code 3 (no projects found)
 		exitError3 := mockExitError{code: 3}
-		resolutionHandler.ReturnError = exitError3
+		legacyMock.ReturnError = exitError3
 
 		workflowData, err := handleSBOMResolutionDI(
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		// Should succeed and return SBOM data despite exit code 3 from legacy workflow
@@ -685,14 +807,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		// Should have 1 SBOM finding (legacy workflow returned exit code 3, so no legacy data)
 		assert.Len(t, workflowData, 1)
 		// Legacy resolution should have been called
-		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
-		assert.Equal(t, "uv.lock", resolutionHandler.Config.GetString(workflow.FlagExcludePaths),
-			"ProcessedFiles should be excluded via FlagExcludePaths")
+		assert.True(t, legacyMock.Called(), "legacy plugin should be called")
+		assert.Equal(t, "uv.lock", legacyMock.CapturedExcludePaths(),
+			"legacy plugin should see ProcessedFiles on FlagExcludePaths at invocation")
 	})
 
 	t.Run("should handle exit code 3 when no SBOM findings are found", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagAllProjects, false)
 
 		// Create mock plugin that returns no findings
@@ -700,27 +822,29 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		// Create an error with exit code 3 (no projects found)
 		exitError3 := mockExitError{code: 3}
-		resolutionHandler.ReturnError = exitError3
+		legacyMock.ReturnError = exitError3
 
 		workflowData, err := handleSBOMResolutionDI(
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		// Should return error when exit code 3 occurs with no SBOM findings
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no supported projects detected")
+		var ec legacycli.ExitCoder
+		require.True(t, errors.As(err, &ec), "no supported projects error should carry an exit code")
+		assert.Equal(t, 3, ec.ExitCode())
 		assert.Nil(t, workflowData)
 		// Legacy resolution should have been called
-		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
+		assert.True(t, legacyMock.Called(), "legacy plugin should be called")
 	})
 
 	t.Run("should return error for non-exit-code-3 errors from legacy workflow", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagAllProjects, true)
 
 		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse)
@@ -736,6 +860,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 							Identity: identity.ProjectIdentity{
 								TargetFile: stringPtr("pyproject.toml"),
 							},
+						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "pyproject.toml",
 						},
 					},
 				},
@@ -745,14 +872,13 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		// Create an error with exit code 1 (not exit code 3)
 		exitError1 := mockExitError{code: 1}
-		resolutionHandler.ReturnError = exitError1
+		legacyMock.ReturnError = exitError1
 
 		workflowData, err := handleSBOMResolutionDI(
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		// Should return error for non-exit-code-3 errors
@@ -760,9 +886,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Contains(t, err.Error(), "error handling legacy workflow")
 		assert.Nil(t, workflowData)
 		// Legacy resolution should have been called
-		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
-		assert.Equal(t, "uv.lock", resolutionHandler.Config.GetString(workflow.FlagExcludePaths),
-			"ProcessedFiles should be excluded via FlagExcludePaths")
+		assert.True(t, legacyMock.Called(), "legacy plugin should be called")
+		assert.Equal(t, "uv.lock", legacyMock.CapturedExcludePaths(),
+			"legacy plugin should see ProcessedFiles on FlagExcludePaths at invocation")
 	})
 
 	t.Run("should skip findings with errors when legacy workflow returns no data", func(t *testing.T) {
@@ -772,7 +898,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse)
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 
 		mockPlugin := &mockScaPlugin{
 			result: &ecosystems.PluginResult{
@@ -784,6 +910,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("project1/pyproject.toml"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "project1/pyproject.toml",
+						},
 						Error: nil,
 					},
 					{
@@ -791,6 +920,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 							Identity: identity.ProjectIdentity{
 								TargetFile: stringPtr("project2/uv.lock"),
 							},
+						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "project2/uv.lock",
 						},
 						Error: fmt.Errorf("failed to generate SBOM"),
 					},
@@ -803,16 +935,15 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 		assert.Len(t, workflowData, 1, "Should return only the valid finding since legacy workflow returns nil")
-		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
-		assert.Equal(t, "project1/uv.lock,project2/uv.lock", resolutionHandler.Config.GetString(workflow.FlagExcludePaths),
-			"ProcessedFiles should be excluded from legacy resolution via FlagExcludePaths")
+		assert.True(t, legacyMock.Called(), "legacy plugin should be called")
+		assert.Equal(t, "project1/uv.lock,project2/uv.lock", legacyMock.CapturedExcludePaths(),
+			"legacy plugin should see ProcessedFiles on FlagExcludePaths at invocation")
 	})
 
 	t.Run("should log snyk_errors.Error details for support debugging", func(t *testing.T) {
@@ -834,6 +965,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("uv.lock"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "uv.lock",
+						},
 						Error: snykErr,
 					},
 				},
@@ -844,14 +978,13 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		var logBuffer bytes.Buffer
 		testLogger := zerolog.New(&logBuffer)
 
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 
 		workflowData, err := handleSBOMResolutionDI(
 			ctx.invocationContext,
 			ctx.config,
 			&testLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.NoError(t, err)
@@ -868,7 +1001,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 	t.Run("should pass strict-out-of-sync=false to plugin options", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagStrictOutOfSync, "false")
 
 		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse)
@@ -884,6 +1017,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("pyproject.toml"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "pyproject.toml",
+						},
 					},
 				},
 			},
@@ -893,8 +1029,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.NoError(t, err)
@@ -904,7 +1039,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 	t.Run("should default to strict-out-of-sync=true in plugin options", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 
 		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse)
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
@@ -919,6 +1054,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("pyproject.toml"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "pyproject.toml",
+						},
 					},
 				},
 			},
@@ -928,8 +1066,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.NoError(t, err)
@@ -939,7 +1076,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 	t.Run("should ignore invalid strict-out-of-sync values and default to true", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagStrictOutOfSync, "invalid")
 
 		mockPlugin := &mockScaPlugin{
@@ -952,6 +1089,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("pyproject.toml"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "pyproject.toml",
+						},
 					},
 				},
 			},
@@ -961,20 +1101,19 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 		require.NotNil(t, mockPlugin.options, "plugin should be called when strict-out-of-sync is invalid")
 		assert.False(t, mockPlugin.options.Global.AllowOutOfSync, "invalid strict-out-of-sync should default to strict mode")
-		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called when a plugin finding is returned")
+		assert.False(t, legacyMock.Called(), "legacy plugin should not be called when a plugin finding is returned")
 	})
 
 	t.Run("should pass exclude flag to plugin options", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagAllProjects, true)
 		ctx.config.Set(workflow.FlagExclude, "dir1, dir2 ,dir3")
 
@@ -992,6 +1131,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("pyproject.toml"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "pyproject.toml",
+						},
 					},
 				},
 			},
@@ -1001,8 +1143,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.NoError(t, err)
@@ -1013,7 +1154,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 	t.Run("should pass file flag to plugin options", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagFile, "Gemfile")
 
 		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse)
@@ -1030,6 +1171,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("pyproject.toml"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "pyproject.toml",
+						},
 					},
 				},
 			},
@@ -1039,8 +1183,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.NoError(t, err)
@@ -1051,7 +1194,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 	t.Run("should handle empty exclude flag", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagExclude, "")
 
 		mockSBOMService := createMockSBOMService(t, uvSBOMConvertResponse)
@@ -1068,6 +1211,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("pyproject.toml"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "pyproject.toml",
+						},
 					},
 				},
 			},
@@ -1077,8 +1223,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.NoError(t, err)
@@ -1093,27 +1238,18 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		// Create mock plugin that returns no findings to trigger legacy workflow
 		mockPlugin := &mockScaPlugin{}
 
-		// Create workflow data with an error attached
-		dataIdentifier := gafworkflow.NewTypeIdentifier(WorkflowID, workflow.WorkflowIDStr)
-		validData := gafworkflow.NewData(
-			dataIdentifier,
-			"application/json",
-			[]byte(`{}`),
-		)
-
-		errorData := gafworkflow.NewData(
-			dataIdentifier,
-			"application/json",
-			[]byte(`{}`),
-		)
-		errorData.SetMetaData(workflow.ContentLocationKey, "legacy-project/requirements.txt")
-		errorData.AddError(snyk_errors.Error{
-			ID:     "SNYK-LEGACY-001",
-			Title:  "Legacy Error Title",
-			Detail: "Detailed legacy error information for debugging",
-		})
-
-		resolutionHandler := NewCalledResolutionHandlerFunc([]gafworkflow.Data{validData, errorData}, nil)
+		// One valid line plus one error-bearing line; the latter is what should produce
+		// the warning output the test asserts on below.
+		legacyMock := NewLegacyHarness(ctx)
+		legacyMock.ReturnLines = []string{
+			MakeLegacyJSONLLine("legacy-project/valid.json"),
+			MakeLegacyJSONLLineWithErrorCatalog(
+				"legacy-project/requirements.txt",
+				"SNYK-LEGACY-001",
+				"Legacy Error Title",
+				"Detailed legacy error information for debugging",
+			),
+		}
 
 		// Capture the output to verify it contains expected error messages
 		var capturedOutput string
@@ -1126,14 +1262,13 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 		assert.Len(t, workflowData, 1, "Should return only the valid data, filtering out error data")
-		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
+		assert.True(t, legacyMock.Called(), "legacy plugin should be called")
 
 		// Verify that the warning output contains the legacy error details
 		assert.Contains(t, capturedOutput, "legacy-project/requirements.txt", "Output should mention the problem file")
@@ -1145,7 +1280,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 	t.Run("should return snyk_errors.Error when finding has error and allProjects is false", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagAllProjects, false)
 
 		snykErr := snyk_errors.Error{
@@ -1163,6 +1298,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("uv.lock"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "uv.lock",
+						},
 						Error: snykErr,
 					},
 				},
@@ -1174,13 +1312,12 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.Error(t, err)
 		assert.Nil(t, workflowData)
-		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called when error is returned early")
+		assert.False(t, legacyMock.Called(), "legacy plugin should not be called when error is returned early")
 
 		// Verify the returned error is a snyk_errors.Error
 		var returnedSnykErr snyk_errors.Error
@@ -1192,7 +1329,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 	t.Run("should fail fast and return exit code 2 when fail-fast is enabled with all-projects", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagAllProjects, true)
 		ctx.config.Set(workflow.FlagFailFast, true)
 
@@ -1212,6 +1349,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("valid-project/pyproject.toml"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "valid-project/pyproject.toml",
+						},
 						Error: nil,
 					},
 					{
@@ -1220,6 +1360,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("project1/uv.lock"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "project1/uv.lock",
+						},
 						Error: snykErr,
 					},
 					{
@@ -1227,6 +1370,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 							Identity: identity.ProjectIdentity{
 								TargetFile: stringPtr("project2/uv.lock"),
 							},
+						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "project2/uv.lock",
 						},
 						Error: fmt.Errorf("This should not be processed"),
 					},
@@ -1239,23 +1385,22 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.Error(t, err)
 		assert.Nil(t, workflowData)
-		assert.False(t, resolutionHandler.Called, "ResolutionHandlerFunc should not be called when fail-fast triggers")
+		assert.False(t, legacyMock.Called(), "legacy plugin should not be called when fail-fast triggers")
 
-		var ec exitCoder
-		require.True(t, errors.As(err, &ec), "error should implement exitCoder")
+		var ec legacycli.ExitCoder
+		require.True(t, errors.As(err, &ec), "error should implement ExitCoder")
 		assert.Equal(t, 2, ec.ExitCode(), "exit code should be 2 for fail-fast")
 		assert.Contains(t, err.Error(), "project1/uv.lock")
 	})
 
 	t.Run("should fail fast on first error with snyk error details", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagAllProjects, true)
 		ctx.config.Set(workflow.FlagFailFast, true)
 
@@ -1274,6 +1419,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("project1/uv.lock"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "project1/uv.lock",
+						},
 						Error: snykErr,
 					},
 				},
@@ -1285,8 +1433,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.Error(t, err)
@@ -1294,14 +1441,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Contains(t, err.Error(), "The SBOM document could not be converted due to invalid format")
 		assert.Contains(t, err.Error(), "project1/uv.lock")
 
-		var ec exitCoder
-		require.True(t, errors.As(err, &ec), "error should implement exitCoder")
+		var ec legacycli.ExitCoder
+		require.True(t, errors.As(err, &ec), "error should implement ExitCoder")
 		assert.Equal(t, 2, ec.ExitCode())
 	})
 
 	t.Run("should not fail fast when fail-fast is false with all-projects", func(t *testing.T) {
 		ctx := setupTestContext(t, false)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagAllProjects, true)
 		ctx.config.Set(workflow.FlagFailFast, false)
 
@@ -1321,6 +1468,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("valid-project/pyproject.toml"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "valid-project/pyproject.toml",
+						},
 						Error: nil,
 					},
 					{
@@ -1329,6 +1479,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("project1/uv.lock"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "project1/uv.lock",
+						},
 						Error: snykErr,
 					},
 				},
@@ -1336,15 +1489,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			},
 		}
 
-		dataIdentifier := gafworkflow.NewTypeIdentifier(WorkflowID, workflow.WorkflowIDStr)
-		mockWorkflowData := []gafworkflow.Data{
-			gafworkflow.NewData(
-				dataIdentifier,
-				"application/json",
-				[]byte(`{"mock":"data"}`),
-			),
-		}
-		resolutionHandler.ReturnData = mockWorkflowData
+		legacyMock.ReturnTargets = []string{"legacy-target/package.json"}
 
 		var capturedOutput string
 		ctx.userInterface.EXPECT().OutputError(gomock.Any()).DoAndReturn(func(err error, _ ...ui.Opts) error {
@@ -1356,21 +1501,20 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
-		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
-		assert.Equal(t, "project1/uv.lock", resolutionHandler.Config.GetString(workflow.FlagExcludePaths),
-			"ProcessedFiles should be excluded via FlagExcludePaths")
+		assert.True(t, legacyMock.Called(), "legacy plugin should be called")
+		assert.Equal(t, "project1/uv.lock", legacyMock.CapturedExcludePaths(),
+			"legacy plugin should see ProcessedFiles on FlagExcludePaths at invocation")
 		assert.Contains(t, capturedOutput, "project1/uv.lock")
 	})
 
 	t.Run("should ignore fail-fast when all-projects is false", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagAllProjects, false)
 		ctx.config.Set(workflow.FlagFailFast, true)
 
@@ -1389,6 +1533,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("uv.lock"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "uv.lock",
+						},
 						Error: snykErr,
 					},
 				},
@@ -1400,14 +1547,13 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.Error(t, err)
 		assert.Nil(t, workflowData)
 
-		var ec exitCoder
+		var ec legacycli.ExitCoder
 		if errors.As(err, &ec) {
 			assert.NotEqual(t, 2, ec.ExitCode(), "exit code should not be 2 when all-projects is false")
 		}
@@ -1415,7 +1561,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 	t.Run("should pass fail-fast flag to plugin options", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagAllProjects, true)
 		ctx.config.Set(workflow.FlagFailFast, true)
 
@@ -1429,6 +1575,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("pyproject.toml"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "pyproject.toml",
+						},
 					},
 				},
 			},
@@ -1441,8 +1590,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.NoError(t, err)
@@ -1452,7 +1600,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 	t.Run("should output problem findings through UI when allProjects is true", func(t *testing.T) {
 		ctx := setupTestContext(t, false)
-		resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+		legacyMock := NewLegacyHarness(ctx)
 		ctx.config.Set(workflow.FlagAllProjects, true)
 
 		// Create a snyk error and a regular error
@@ -1473,6 +1621,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("valid-project/pyproject.toml"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "valid-project/pyproject.toml",
+						},
 						Error: nil,
 					},
 					{
@@ -1480,6 +1631,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 							Identity: identity.ProjectIdentity{
 								TargetFile: stringPtr("project1/uv.lock"),
 							},
+						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "project1/uv.lock",
 						},
 						Error: snykErr,
 					},
@@ -1489,6 +1643,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 								TargetFile: stringPtr("project2/uv.lock"),
 							},
 						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "project2/uv.lock",
+						},
 						Error: regularErr,
 					},
 				},
@@ -1496,15 +1653,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			},
 		}
 
-		dataIdentifier := gafworkflow.NewTypeIdentifier(WorkflowID, workflow.WorkflowIDStr)
-		mockWorkflowData := []gafworkflow.Data{
-			gafworkflow.NewData(
-				dataIdentifier,
-				"application/json",
-				[]byte(`{"mock":"data"}`),
-			),
-		}
-		resolutionHandler.ReturnData = mockWorkflowData
+		legacyMock.ReturnTargets = []string{"legacy-target/package.json"}
 
 		// Capture the output to verify it contains expected error messages
 		var capturedOutput string
@@ -1517,15 +1666,14 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			ctx.invocationContext,
 			ctx.config,
 			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
+			[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 		)
 
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 
-		assert.Equal(t, "project1/uv.lock,project2/uv.lock", resolutionHandler.Config.GetString(workflow.FlagExcludePaths),
-			"ProcessedFiles should be excluded from legacy resolution via FlagExcludePaths")
+		assert.Equal(t, "project1/uv.lock,project2/uv.lock", legacyMock.CapturedExcludePaths(),
+			"legacy plugin should see ProcessedFiles on FlagExcludePaths at invocation")
 		assert.Contains(t, capturedOutput, "project1/uv.lock", "Output should mention the first problem file")
 		assert.Contains(t, capturedOutput, "project2/uv.lock", "Output should mention the second problem file")
 		assert.Contains(t, capturedOutput, "Detailed error to help the customer debug the issue",
@@ -1534,90 +1682,6 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			"Output should output a generic message rather than the error details of a non-snyk error")
 		assert.Contains(t, capturedOutput, "2/4 potential projects failed to get dependencies",
 			"Output should include number of failed potential projects")
-	})
-}
-
-func Test_executeLegacyWorkflow_FlagPrintOutputJsonlWithErrors(t *testing.T) {
-	t.Run("GIVEN FlagPrintOutputJsonlWithErrors set WHEN executeLegacyWorkflow THEN disables effective-graph-with-errors in legacy config", func(t *testing.T) {
-		// GIVEN
-		ctx := setupTestContext(t, false)
-		ctx.config.Set(workflow.FlagPrintOutputJsonlWithErrors, true)
-
-		resolutionHandler := NewCalledResolutionHandlerFunc([]gafworkflow.Data{}, nil)
-		mockPlugin := &mockScaPlugin{}
-
-		// WHEN
-		_, err := handleSBOMResolutionDI(
-			ctx.invocationContext,
-			ctx.config,
-			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
-		)
-
-		// THEN
-		require.NoError(t, err)
-		require.True(t, resolutionHandler.Called, "legacy resolution handler should have been called")
-		assert.True(t, resolutionHandler.Config.GetBool(workflow.FlagPrintOutputJsonlWithErrors),
-			"FlagPrintOutputJsonlWithErrors should be forwarded to legacy config")
-		assert.False(t, resolutionHandler.Config.GetBool(workflow.FlagPrintEffectiveGraphWithErrors),
-			"FlagPrintEffectiveGraphWithErrors must be disabled when FlagPrintOutputJsonlWithErrors is used")
-		assert.False(t, resolutionHandler.Config.GetBool(workflow.FlagPrintEffectiveGraph),
-			"FlagPrintEffectiveGraph should be unset in legacy config")
-	})
-
-	t.Run("GIVEN FlagPrintOutputJsonlWithErrors not set WHEN executeLegacyWorkflow THEN enables effective-graph-with-errors by default", func(t *testing.T) {
-		// GIVEN
-		ctx := setupTestContext(t, false)
-		// FlagPrintOutputJsonlWithErrors is false by default
-
-		resolutionHandler := NewCalledResolutionHandlerFunc([]gafworkflow.Data{}, nil)
-		mockPlugin := &mockScaPlugin{}
-
-		// WHEN
-		_, err := handleSBOMResolutionDI(
-			ctx.invocationContext,
-			ctx.config,
-			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
-		)
-
-		// THEN
-		require.NoError(t, err)
-		require.True(t, resolutionHandler.Called, "legacy resolution handler should have been called")
-		assert.True(t, resolutionHandler.Config.GetBool(workflow.FlagPrintEffectiveGraphWithErrors),
-			"FlagPrintEffectiveGraphWithErrors must be enabled by default for SBOM resolution")
-		assert.False(t, resolutionHandler.Config.GetBool(workflow.FlagPrintOutputJsonlWithErrors),
-			"FlagPrintOutputJsonlWithErrors should remain false when not explicitly set")
-		assert.False(t, resolutionHandler.Config.GetBool(workflow.FlagPrintEffectiveGraph),
-			"FlagPrintEffectiveGraph should be unset in legacy config")
-	})
-
-	t.Run("GIVEN FlagPrintOutputJsonlWithErrors is set WHEN executeLegacyWorkflow runs THEN parent config is not mutated", func(t *testing.T) {
-		// GIVEN
-		ctx := setupTestContext(t, false)
-		ctx.config.Set(workflow.FlagPrintOutputJsonlWithErrors, true)
-		ctx.config.Set(workflow.FlagPrintEffectiveGraph, true)
-
-		resolutionHandler := NewCalledResolutionHandlerFunc([]gafworkflow.Data{}, nil)
-		mockPlugin := &mockScaPlugin{}
-
-		// WHEN
-		_, err := handleSBOMResolutionDI(
-			ctx.invocationContext,
-			ctx.config,
-			&nopLogger,
-			[]ecosystems.SCAPlugin{mockPlugin},
-			resolutionHandler.Func(),
-		)
-		require.NoError(t, err)
-
-		// THEN: original config should not be modified
-		assert.True(t, ctx.config.GetBool(workflow.FlagPrintEffectiveGraph),
-			"parent config FlagPrintEffectiveGraph should remain unchanged after executeLegacyWorkflow")
-		assert.True(t, ctx.config.GetBool(workflow.FlagPrintOutputJsonlWithErrors),
-			"parent config FlagPrintOutputJsonlWithErrors should remain unchanged after executeLegacyWorkflow")
 	})
 }
 
@@ -1672,64 +1736,12 @@ func Test_parseExcludeFlag(t *testing.T) {
 	}
 }
 
-func Test_extractProblemResults(t *testing.T) {
-	t.Run("should return findings with lockFile from metadata", func(t *testing.T) {
-		dataIdentifier := gafworkflow.NewTypeIdentifier(WorkflowID, workflow.WorkflowIDStr)
-		data := gafworkflow.NewData(dataIdentifier, "application/json", []byte(`{}`))
-		data.SetMetaData(workflow.ContentLocationKey, "project/requirements.txt")
-
-		errList := []snyk_errors.Error{
-			{ID: "SNYK-001", Title: "Error 1"},
-			{ID: "SNYK-002", Title: "Error 2"},
-		}
-
-		findings := extractProblemResults(&nopLogger, data, errList)
-
-		require.Len(t, findings, 2)
-		assert.Equal(t, "project/requirements.txt", findings[0].ProjectDescriptor.GetTargetFile())
-		assert.Equal(t, "project/requirements.txt", findings[1].ProjectDescriptor.GetTargetFile())
-		assert.Equal(t, errList[0], findings[0].Error)
-		assert.Equal(t, errList[1], findings[1].Error)
-	})
-
-	t.Run("should use 'unknown' as lockFile when metadata retrieval fails", func(t *testing.T) {
-		dataIdentifier := gafworkflow.NewTypeIdentifier(WorkflowID, workflow.WorkflowIDStr)
-		data := gafworkflow.NewData(dataIdentifier, "application/json", []byte(`{}`))
-		// Intentionally NOT setting metadata for workflow.ContentLocationKey
-
-		errList := []snyk_errors.Error{
-			{ID: "SNYK-001", Title: "Error 1"},
-		}
-
-		findings := extractProblemResults(&nopLogger, data, errList)
-
-		require.Len(t, findings, 1)
-		assert.Equal(t, "unknown", findings[0].ProjectDescriptor.GetTargetFile())
-		assert.Equal(t, errList[0], findings[0].Error)
-	})
-
-	t.Run("should return empty findings when errList is empty", func(t *testing.T) {
-		dataIdentifier := gafworkflow.NewTypeIdentifier(WorkflowID, workflow.WorkflowIDStr)
-		data := gafworkflow.NewData(dataIdentifier, "application/json", []byte(`{}`))
-		data.SetMetaData(workflow.ContentLocationKey, "project/requirements.txt")
-
-		errList := []snyk_errors.Error{}
-
-		findings := extractProblemResults(&nopLogger, data, errList)
-
-		assert.Len(t, findings, 0)
-		assert.NotNil(t, findings)
-	})
-}
-
 // Test_processedFilesFlowFromPluginsToExcludeConfig locks in the end-to-end contract that
 // the legacy CLI subprocess sees the full union of paths to skip: the user's --exclude-paths
-// flag combined with every plugin's ProcessedFiles. The union is built up on
-// pluginOptions.Global.ExcludePaths during the plugin loop and written verbatim to the
-// FlagExcludePaths config flag before the legacy workflow is invoked.
+// flag combined with every earlier plugin's ProcessedFiles. The union is built up on
+// pluginOptions.Global.ExcludePaths during the plugin loop, and the legacy plugin (the last
+// plugin in the chain) translates it into the legacy CLI's --exclude-paths flag.
 func Test_processedFilesFlowFromPluginsToExcludeConfig(t *testing.T) {
-	dataIdentifier := gafworkflow.NewTypeIdentifier(WorkflowID, workflow.WorkflowIDStr)
-
 	pluginWithProcessedFiles := func(targetFile, name string, processedFiles []string) *mockScaPlugin {
 		return &mockScaPlugin{
 			result: &ecosystems.PluginResult{
@@ -1737,6 +1749,9 @@ func Test_processedFilesFlowFromPluginsToExcludeConfig(t *testing.T) {
 					DepGraph: createTestDepGraph(t, "pip", name, "1.0.0"),
 					ProjectDescriptor: identity.ProjectDescriptor{
 						Identity: identity.ProjectIdentity{TargetFile: stringPtr(targetFile)},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: targetFile,
 					},
 				}},
 				ProcessedFiles: processedFiles,
@@ -1747,29 +1762,35 @@ func Test_processedFilesFlowFromPluginsToExcludeConfig(t *testing.T) {
 	testCases := []struct {
 		name                 string
 		userExcludePaths     string
-		plugins              []ecosystems.SCAPlugin
+		plugins              func() []ecosystems.SCAPlugin
 		expectedExcludePaths string
 	}{
 		{
 			name: "union of every plugin's ProcessedFiles",
-			plugins: []ecosystems.SCAPlugin{
-				pluginWithProcessedFiles("pyproject.toml", "project-1", []string{"file1.py", "file2.py"}),
-				pluginWithProcessedFiles("package.json", "project-2", []string{"file3.py"}),
+			plugins: func() []ecosystems.SCAPlugin {
+				return []ecosystems.SCAPlugin{
+					pluginWithProcessedFiles("pyproject.toml", "project-1", []string{"file1.py", "file2.py"}),
+					pluginWithProcessedFiles("package.json", "project-2", []string{"file3.py"}),
+				}
 			},
 			expectedExcludePaths: "file1.py,file2.py,file3.py",
 		},
 		{
 			name:             "user --exclude-paths value is preserved alongside processed files",
 			userExcludePaths: "user-supplied.txt",
-			plugins: []ecosystems.SCAPlugin{
-				pluginWithProcessedFiles("pyproject.toml", "project-1", []string{"file1.py"}),
+			plugins: func() []ecosystems.SCAPlugin {
+				return []ecosystems.SCAPlugin{
+					pluginWithProcessedFiles("pyproject.toml", "project-1", []string{"file1.py"}),
+				}
 			},
 			expectedExcludePaths: "user-supplied.txt,file1.py",
 		},
 		{
-			name:                 "user --exclude-paths value alone when no plugin produced ProcessedFiles",
-			userExcludePaths:     "user-supplied.txt",
-			plugins:              []ecosystems.SCAPlugin{&mockScaPlugin{result: &ecosystems.PluginResult{}}},
+			name:             "user --exclude-paths value alone when no plugin produced ProcessedFiles",
+			userExcludePaths: "user-supplied.txt",
+			plugins: func() []ecosystems.SCAPlugin {
+				return []ecosystems.SCAPlugin{&mockScaPlugin{result: &ecosystems.PluginResult{}}}
+			},
 			expectedExcludePaths: "user-supplied.txt",
 		},
 	}
@@ -1782,29 +1803,28 @@ func Test_processedFilesFlowFromPluginsToExcludeConfig(t *testing.T) {
 				ctx.config.Set(workflow.FlagExcludePaths, tc.userExcludePaths)
 			}
 
-			resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
-			resolutionHandler.ReturnData = []gafworkflow.Data{
-				gafworkflow.NewData(dataIdentifier, "application/json", []byte(`{"mock":"data"}`)),
-			}
+			legacyMock := NewLegacyHarness(ctx)
+			legacyMock.ReturnTargets = []string{"legacy-target/package.json"}
+
+			plugins := append(tc.plugins(), legacyMock.Plugin)
 
 			_, err := handleSBOMResolutionDI(
 				ctx.invocationContext,
 				ctx.config,
 				&nopLogger,
-				tc.plugins,
-				resolutionHandler.Func(),
+				plugins,
 			)
 
 			require.NoError(t, err)
-			require.True(t, resolutionHandler.Called)
-			assert.Equal(t, tc.expectedExcludePaths, resolutionHandler.Config.GetString(workflow.FlagExcludePaths))
+			require.True(t, legacyMock.Called())
+			assert.Equal(t, tc.expectedExcludePaths, legacyMock.CapturedExcludePaths())
 		})
 	}
 }
 
 func Test_uvWorkspacePackages_passesOptionToPlugin(t *testing.T) {
 	ctx := setupTestContext(t, true)
-	resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+	legacyMock := NewLegacyHarness(ctx)
 	ctx.config.Set(workflow.FlagUvWorkspacePackages, true)
 	ctx.config.Set(workflow.FlagFile, "uv.lock")
 
@@ -1817,6 +1837,9 @@ func Test_uvWorkspacePackages_passesOptionToPlugin(t *testing.T) {
 						Identity: identity.ProjectIdentity{
 							TargetFile: stringPtr("pyproject.toml"),
 						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "pyproject.toml",
 					},
 				},
 			},
@@ -1827,26 +1850,26 @@ func Test_uvWorkspacePackages_passesOptionToPlugin(t *testing.T) {
 		ctx.invocationContext,
 		ctx.config,
 		&nopLogger,
-		[]ecosystems.SCAPlugin{mockPlugin},
-		resolutionHandler.Func(),
+		[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 	)
 
 	require.NoError(t, err)
 	require.NotNil(t, mockPlugin.options)
 	assert.True(t, mockPlugin.options.Global.ForceIncludeWorkspacePackages, "ForceIncludeWorkspacePackages should be passed to the plugin")
 	assert.False(t, mockPlugin.options.Global.AllProjects, "AllProjects should remain false")
-	assert.False(t, resolutionHandler.Called, "legacy workflow should not be called when UvWorkspacePackages is set")
+	assert.False(t, legacyMock.Called(), "legacy workflow should not be called when UvWorkspacePackages is set")
 	require.NotNil(t, mockPlugin.options.Global.TargetFile)
 	assert.Equal(t, "uv.lock", *mockPlugin.options.Global.TargetFile)
 }
 
 func Test_uvWorkspacePackages_combinesMultipleDepGraphsAsJSONL(t *testing.T) {
 	ctx := setupTestContext(t, true)
-	resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+	legacyMock := NewLegacyHarness(ctx)
 	ctx.config.Set(workflow.FlagFile, "uv.lock")
 	ctx.config.Set(workflow.FlagUvWorkspacePackages, true)
 
 	mockPlugin := &mockScaPlugin{
+		name: uv.PluginName,
 		result: &ecosystems.PluginResult{
 			Results: []ecosystems.SCAResult{
 				{
@@ -1856,6 +1879,9 @@ func Test_uvWorkspacePackages_combinesMultipleDepGraphsAsJSONL(t *testing.T) {
 							TargetFile: stringPtr("pyproject.toml"),
 						},
 					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "pyproject.toml",
+					},
 				},
 				{
 					DepGraph: createTestDepGraph(t, "uv", "pkg-b", "2.0.0"),
@@ -1863,6 +1889,9 @@ func Test_uvWorkspacePackages_combinesMultipleDepGraphsAsJSONL(t *testing.T) {
 						Identity: identity.ProjectIdentity{
 							TargetFile: stringPtr("packages/pkg-b/pyproject.toml"),
 						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "packages/pkg-b/pyproject.toml",
 					},
 				},
 			},
@@ -1873,13 +1902,12 @@ func Test_uvWorkspacePackages_combinesMultipleDepGraphsAsJSONL(t *testing.T) {
 		ctx.invocationContext,
 		ctx.config,
 		&nopLogger,
-		[]ecosystems.SCAPlugin{mockPlugin},
-		resolutionHandler.Func(),
+		[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 	)
 
 	require.NoError(t, err)
 	require.Len(t, workflowDataResult, 1, "multiple findings should be combined into a single workflow.Data")
-	assert.False(t, resolutionHandler.Called, "legacy workflow should not be called")
+	assert.False(t, legacyMock.Called(), "legacy workflow should not be called")
 
 	workflowData := workflowDataResult[0]
 	payload, ok := workflowData.GetPayload().([]byte)
@@ -1914,12 +1942,13 @@ func Test_uvWorkspacePackages_combinesMultipleDepGraphsAsJSONL(t *testing.T) {
 
 	targetFileFromPlugin, err := workflowData.GetMetaData(workflow.MetaKeyTargetFileFromPlugin)
 	require.NoError(t, err)
-	assert.Equal(t, "pyproject.toml", targetFileFromPlugin, "targetFileFromPlugin should be set to the first result's TargetFile")
+	assert.Equal(t, "pyproject.toml", targetFileFromPlugin,
+		"MetaKeyTargetFileFromPlugin is emitted from Identity.TargetFile whenever the plugin sets it (uv does)")
 }
 
 func Test_uvWorkspacePackages_returnsErrorWhenFindingHasError(t *testing.T) {
 	ctx := setupTestContext(t, true)
-	resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+	legacyMock := NewLegacyHarness(ctx)
 	ctx.config.Set(workflow.FlagUvWorkspacePackages, true)
 	ctx.config.Set(workflow.FlagFile, "uv.lock")
 
@@ -1930,6 +1959,7 @@ func Test_uvWorkspacePackages_returnsErrorWhenFindingHasError(t *testing.T) {
 	}
 
 	mockPlugin := &mockScaPlugin{
+		name: uv.PluginName,
 		result: &ecosystems.PluginResult{
 			Results: []ecosystems.SCAResult{
 				{
@@ -1937,6 +1967,9 @@ func Test_uvWorkspacePackages_returnsErrorWhenFindingHasError(t *testing.T) {
 						Identity: identity.ProjectIdentity{
 							TargetFile: stringPtr("uv.lock"),
 						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "uv.lock",
 					},
 					Error: snykErr,
 				},
@@ -1948,19 +1981,309 @@ func Test_uvWorkspacePackages_returnsErrorWhenFindingHasError(t *testing.T) {
 		ctx.invocationContext,
 		ctx.config,
 		&nopLogger,
-		[]ecosystems.SCAPlugin{mockPlugin},
-		resolutionHandler.Func(),
+		[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
 	)
 
 	require.Error(t, err)
 	assert.Nil(t, workflowData)
-	assert.False(t, resolutionHandler.Called, "legacy workflow should not be called when error is returned early")
+	assert.False(t, legacyMock.Called(), "legacy workflow should not be called when error is returned early")
 
 	var returnedSnykErr snyk_errors.Error
 	require.True(t, errors.As(err, &returnedSnykErr), "returned error should be a snyk_errors.Error")
 	assert.Equal(t, "SNYK-TEST-001", returnedSnykErr.ID)
 	assert.Equal(t, "Test Error Title", returnedSnykErr.Title)
 	assert.Equal(t, "Detailed error information for support debugging", returnedSnykErr.Detail)
+}
+
+func Test_uvWorkspacePackages_legacyResultsAppendedIndividually(t *testing.T) {
+	ctx := setupTestContext(t, true)
+	ctx.config.Set(workflow.FlagFile, "uv.lock")
+	ctx.config.Set(workflow.FlagUvWorkspacePackages, true)
+	ctx.config.Set(workflow.FlagAllProjects, true)
+
+	mockPlugin := &mockScaPlugin{
+		name: uv.PluginName,
+		result: &ecosystems.PluginResult{
+			Results: []ecosystems.SCAResult{
+				{
+					DepGraph: createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("pyproject.toml"),
+						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "pyproject.toml",
+					},
+				},
+				{
+					DepGraph: createTestDepGraph(t, "uv", "pkg-b", "2.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("packages/pkg-b/pyproject.toml"),
+						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "packages/pkg-b/pyproject.toml",
+					},
+				},
+			},
+		},
+	}
+
+	legacyMock := NewLegacyHarness(ctx)
+	legacyMock.ReturnTargets = []string{"legacy/one.gradle", "legacy/two.gradle"}
+
+	workflowData, err := handleSBOMResolutionDI(
+		ctx.invocationContext,
+		ctx.config,
+		&nopLogger,
+		[]ecosystems.SCAPlugin{mockPlugin, legacyMock.Plugin},
+	)
+
+	require.NoError(t, err)
+	require.True(t, legacyMock.Called(), "legacy resolution should run when allProjects=true")
+	require.Len(t, workflowData, 3, "expected 1 JSONL bundle from plugin + 2 individual workflow.Data from legacy")
+
+	bundlePayload, ok := workflowData[0].GetPayload().([]byte)
+	require.True(t, ok, "first workflow.Data should carry the JSONL bundle payload")
+	bundleLines := bytes.Split(bundlePayload, []byte("\n"))
+	require.Len(t, bundleLines, 2, "plugin results should be bundled into 2 JSONL lines")
+
+	type jsonlLine struct {
+		DepGraph   json.RawMessage `json:"depGraph"`
+		TargetFile string          `json:"targetFile"`
+	}
+	var line1, line2 jsonlLine
+	require.NoError(t, json.Unmarshal(bundleLines[0], &line1))
+	require.NoError(t, json.Unmarshal(bundleLines[1], &line2))
+	assert.Equal(t, "pyproject.toml", line1.TargetFile)
+	assert.Equal(t, "packages/pkg-b/pyproject.toml", line2.TargetFile)
+
+	secondLoc, err := workflowData[1].GetMetaData(workflow.ContentLocationKey)
+	require.NoError(t, err)
+	assert.Equal(t, "legacy/one.gradle", secondLoc, "legacy results should be appended individually, with their own target")
+
+	thirdLoc, err := workflowData[2].GetMetaData(workflow.ContentLocationKey)
+	require.NoError(t, err)
+	assert.Equal(t, "legacy/two.gradle", thirdLoc, "legacy results should be appended individually, with their own target")
+}
+
+// Test_handleSBOMResolutionDI_perResultErrorMatrix locks in the failure semantics for per-result
+// errors across (allProjects, failFast) combinations. The behavior is uniform across plugins:
+// the orchestrator does not special-case any plugin's results for error handling.
+//
+//   - !allProjects             → halt (the user asked for one project; that one errored).
+//   - allProjects + !failFast  → continue, render as warnings, return successful results.
+//   - allProjects + failFast   → halt with exit code 2.
+func Test_handleSBOMResolutionDI_perResultErrorMatrix(t *testing.T) {
+	pluginErroredResult := func() *mockScaPlugin {
+		return &mockScaPlugin{
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						DepGraph: createTestDepGraph(t, "pip", "good", "1.0.0"),
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{TargetFile: stringPtr("good/requirements.txt")},
+						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "good/requirements.txt",
+						},
+					},
+					{
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{TargetFile: stringPtr("broken/requirements.txt")},
+						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "broken/requirements.txt",
+						},
+						Error: snyk_errors.Error{Title: "Resolution failed", Detail: "missing dep"},
+					},
+				},
+			},
+		}
+	}
+
+	t.Run("!allProjects: per-result error halts the scan", func(t *testing.T) {
+		ctx := setupTestContext(t, true)
+		ctx.config.Set(workflow.FlagAllProjects, false)
+
+		_, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]ecosystems.SCAPlugin{pluginErroredResult()},
+		)
+
+		require.Error(t, err, "an errored result must fail the scan in !allProjects mode")
+	})
+
+	t.Run("allProjects + !failFast: errors become warnings, successful results returned", func(t *testing.T) {
+		ctx := setupTestContext(t, false)
+		ctx.config.Set(workflow.FlagAllProjects, true)
+		ctx.userInterface.EXPECT().OutputError(gomock.Any()).Return(nil).Times(1)
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]ecosystems.SCAPlugin{pluginErroredResult()},
+		)
+
+		require.NoError(t, err, "errored results should not halt under allProjects without fail-fast")
+		assert.Len(t, workflowData, 1, "the successful result is returned alongside the warning")
+	})
+
+	t.Run("allProjects + failFast: per-result error halts with exit code 2", func(t *testing.T) {
+		ctx := setupTestContext(t, true)
+		ctx.config.Set(workflow.FlagAllProjects, true)
+		ctx.config.Set(workflow.FlagFailFast, true)
+
+		_, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]ecosystems.SCAPlugin{pluginErroredResult()},
+		)
+
+		require.Error(t, err)
+		var ec legacycli.ExitCoder
+		require.True(t, errors.As(err, &ec), "fail-fast must surface an exit-coded error")
+		assert.Equal(t, 2, ec.ExitCode())
+	})
+}
+
+func Test_handleSBOMResolutionDI_noSupportedProjectsDetectedWhenAllPluginsReturnZero(t *testing.T) {
+	t.Run("two plugins both empty", func(t *testing.T) {
+		ctx := setupTestContext(t, true)
+		emptyPlugin1 := &mockScaPlugin{result: &ecosystems.PluginResult{}}
+		emptyPlugin2 := &mockScaPlugin{result: &ecosystems.PluginResult{}}
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]ecosystems.SCAPlugin{emptyPlugin1, emptyPlugin2},
+		)
+
+		require.Error(t, err)
+		assert.EqualError(t, err, "no supported projects detected")
+		var ec legacycli.ExitCoder
+		require.True(t, errors.As(err, &ec), "no supported projects error should carry an exit code")
+		assert.Equal(t, 3, ec.ExitCode())
+		assert.Nil(t, workflowData)
+	})
+
+	t.Run("single empty plugin", func(t *testing.T) {
+		ctx := setupTestContext(t, true)
+		emptyPlugin := &mockScaPlugin{result: &ecosystems.PluginResult{}}
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]ecosystems.SCAPlugin{emptyPlugin},
+		)
+
+		require.Error(t, err)
+		assert.EqualError(t, err, "no supported projects detected")
+		var ec legacycli.ExitCoder
+		require.True(t, errors.As(err, &ec), "no supported projects error should carry an exit code")
+		assert.Equal(t, 3, ec.ExitCode())
+		assert.Nil(t, workflowData)
+	})
+
+	t.Run("does not fire when at least one plugin returns a result, even if errored", func(t *testing.T) {
+		ctx := setupTestContext(t, true)
+		ctx.config.Set(workflow.FlagAllProjects, true)
+		erroredPlugin := &mockScaPlugin{
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{
+					{
+						ProjectDescriptor: identity.ProjectDescriptor{
+							Identity: identity.ProjectIdentity{TargetFile: stringPtr("broken/pom.xml")},
+						},
+						ResolverMetadata: &ecosystems.ResolverMetadata{
+							NormalisedTargetFile: "broken/pom.xml",
+						},
+						Error: fmt.Errorf("module failed to resolve"),
+					},
+				},
+			},
+		}
+		emptyPlugin := &mockScaPlugin{result: &ecosystems.PluginResult{}}
+
+		workflowData, err := handleSBOMResolutionDI(
+			ctx.invocationContext,
+			ctx.config,
+			&nopLogger,
+			[]ecosystems.SCAPlugin{erroredPlugin, emptyPlugin},
+		)
+
+		require.NoError(t, err, "totalResults > 0 because the errored result still counts as a result")
+		assert.NotNil(t, workflowData)
+		assert.Empty(t, workflowData, "errored result becomes a warning, no workflow data is produced")
+	})
+}
+
+// TestWorkflowDataFromDepGraph documents the workflow.Data metadata emission contract.
+// ContentLocationKey and MetaKeyNormalisedTargetFile are always emitted from
+// ResolverMetadata.NormalisedTargetFile. MetaKeyTargetFileFromPlugin is emitted only when
+// Identity.TargetFile is non-nil (i.e. the per-language plugin set its own targetFile name).
+// Downstream consumers treat the absence of MetaKeyTargetFileFromPlugin as a signal, so
+// emitting it spuriously must be avoided.
+func TestWorkflowDataFromDepGraph(t *testing.T) {
+	t.Run("Identity.TargetFile nil → MetaKeyTargetFileFromPlugin suppressed", func(t *testing.T) {
+		result := &ecosystems.SCAResult{
+			DepGraph: createTestDepGraph(t, "uv", "test-project", "1.0.0"),
+			ResolverMetadata: &ecosystems.ResolverMetadata{
+				NormalisedTargetFile: "pyproject.toml",
+			},
+		}
+
+		data, err := workflowDataFromDepGraph(result)
+		require.NoError(t, err)
+
+		contentLocation, err := data.GetMetaData(workflow.ContentLocationKey)
+		require.NoError(t, err)
+		assert.Equal(t, "pyproject.toml", contentLocation)
+
+		normalised, err := data.GetMetaData(workflow.MetaKeyNormalisedTargetFile)
+		require.NoError(t, err)
+		assert.Equal(t, "pyproject.toml", normalised)
+
+		_, err = data.GetMetaData(workflow.MetaKeyTargetFileFromPlugin)
+		assert.Error(t, err)
+	})
+
+	t.Run("Identity.TargetFile set → MetaKeyTargetFileFromPlugin emitted verbatim", func(t *testing.T) {
+		result := &ecosystems.SCAResult{
+			DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+			ProjectDescriptor: identity.ProjectDescriptor{
+				Identity: identity.ProjectIdentity{
+					TargetFile: stringPtr("Pipfile"),
+				},
+			},
+			ResolverMetadata: &ecosystems.ResolverMetadata{
+				NormalisedTargetFile: "Pipfile",
+			},
+		}
+
+		data, err := workflowDataFromDepGraph(result)
+		require.NoError(t, err)
+
+		contentLocation, err := data.GetMetaData(workflow.ContentLocationKey)
+		require.NoError(t, err)
+		assert.Equal(t, "Pipfile", contentLocation)
+
+		normalised, err := data.GetMetaData(workflow.MetaKeyNormalisedTargetFile)
+		require.NoError(t, err)
+		assert.Equal(t, "Pipfile", normalised)
+
+		fromPlugin, err := data.GetMetaData(workflow.MetaKeyTargetFileFromPlugin)
+		require.NoError(t, err)
+		assert.Equal(t, "Pipfile", fromPlugin)
+	})
 }
 
 // stringPtr returns a pointer to the given string value.

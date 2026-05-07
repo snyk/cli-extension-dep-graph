@@ -48,12 +48,18 @@ func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry,
 func (r *PluginRegistry) ResolveDepgraphs(dir string, opts *ecosystems.SCAPluginOptions) <-chan ecosystems.SCAResult {
 	resultsChan := make(chan ecosystems.SCAResult)
 
+	// Clone opts so WithExcludePaths mutations during the loop don't reach into the
+	// caller's opts. Other Global fields are shallow-copied; only ExcludePaths is mutated
+	// here, so its backing slice is the only one we need to clone.
+	localOpts := *opts
+	localOpts.Global.ExcludePaths = append(ecosystems.CommaSeparatedString(nil), opts.Global.ExcludePaths...)
+	opts = &localOpts
+
 	go func() {
 		defer close(resultsChan)
 
 		ctx := r.ictx.Context()
 		enhancedLogger := r.ictx.GetEnhancedLogger()
-		processedFiles := make([]string, 0)
 
 		for _, plugin := range r.plugins {
 			select {
@@ -66,7 +72,6 @@ func (r *PluginRegistry) ResolveDepgraphs(dir string, opts *ecosystems.SCAPlugin
 			if len(files) > 0 && !opts.Global.AllProjects {
 				return
 			}
-			processedFiles = append(processedFiles, files...)
 			opts.WithExcludePaths(files)
 		}
 
@@ -76,7 +81,7 @@ func (r *PluginRegistry) ResolveDepgraphs(dir string, opts *ecosystems.SCAPlugin
 		default:
 		}
 
-		executePluginWithResults(ctx, legacy.NewLegacyResolver(r.ictx, processedFiles), enhancedLogger, dir, opts, resultsChan)
+		executePluginWithResults(ctx, legacy.NewPlugin(r.ictx), enhancedLogger, dir, opts, resultsChan)
 	}()
 
 	return resultsChan

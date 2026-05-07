@@ -401,7 +401,7 @@ func TestPlugin_BuildDepGraphsFromDir_ErrorHandling(t *testing.T) {
 	require.NotNil(t, findings[0].Error)
 	require.ErrorContains(t, findings[0].Error, "failed to build dependency graph")
 
-	require.Equal(t, "uv.lock", findings[0].ProjectDescriptor.GetTargetFile())
+	require.Equal(t, "uv.lock", findings[0].ResolverMetadata.NormalisedTargetFile)
 	require.Nil(t, findings[0].DepGraph)
 }
 
@@ -446,7 +446,7 @@ func TestPlugin_BuildDepGraphsFromDir_MixedSuccessAndFailure(t *testing.T) {
 
 	require.NotNil(t, errorFinding)
 	require.ErrorContains(t, errorFinding.Error, "failed to build dependency graph")
-	require.Equal(t, "project1/uv.lock", errorFinding.ProjectDescriptor.GetTargetFile())
+	require.Equal(t, "project1/uv.lock", errorFinding.ResolverMetadata.NormalisedTargetFile)
 	require.Nil(t, errorFinding.DepGraph)
 }
 
@@ -460,7 +460,7 @@ func TestBuildFindings_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
 	assert.NotNil(t, findings[0].DepGraph)
-	assert.Equal(t, "pyproject.toml", findings[0].ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, "pyproject.toml", findings[0].ResolverMetadata.NormalisedTargetFile)
 	assert.Nil(t, findings[0].Error)
 	assert.Equal(t, []string{"uv.lock", "pyproject.toml", "requirements.txt"}, buildResult.ProcessedFiles)
 }
@@ -513,7 +513,7 @@ func TestBuildFindings_NoProjectRoot_ReturnsErrorFinding(t *testing.T) {
 	require.NotNil(t, findings[0].Error)
 	assert.Contains(t, findings[0].Error.Error(), "No root project found")
 	assert.Nil(t, findings[0].DepGraph)
-	assert.Equal(t, "uv.lock", findings[0].ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, "uv.lock", findings[0].ResolverMetadata.NormalisedTargetFile)
 
 	var catalogErr snyk_errors.Error
 	require.True(t, errors.As(findings[0].Error, &catalogErr), "error should be a catalog error")
@@ -607,7 +607,7 @@ func TestBuildFindings_NoProjectRoot_UvWorkspacePackages_Succeeds(t *testing.T) 
 	require.Len(t, findings, 1)
 	assert.NotNil(t, findings[0].DepGraph)
 	assert.Nil(t, findings[0].Error)
-	assert.Equal(t, filepath.Join("packages", "albatross", "pyproject.toml"), findings[0].ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, filepath.Join("packages", "albatross", "pyproject.toml"), findings[0].ResolverMetadata.NormalisedTargetFile)
 }
 
 func TestBuildFindings_InvalidSBOM(t *testing.T) {
@@ -752,7 +752,7 @@ func TestBuildFindings_WorkspacePackage(t *testing.T) {
 	findings := buildResult.Results
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
-	assert.Equal(t, filepath.Join("packages", "my-package", "pyproject.toml"), findings[0].ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, filepath.Join("packages", "my-package", "pyproject.toml"), findings[0].ResolverMetadata.NormalisedTargetFile)
 }
 
 func TestBuildFindings_PathConstruction_RootDir(t *testing.T) {
@@ -764,7 +764,7 @@ func TestBuildFindings_PathConstruction_RootDir(t *testing.T) {
 	findings := buildResult.Results
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
-	assert.Equal(t, "pyproject.toml", findings[0].ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, "pyproject.toml", findings[0].ResolverMetadata.NormalisedTargetFile)
 }
 
 func TestBuildFindings_PathConstruction_NestedDir(t *testing.T) {
@@ -776,7 +776,7 @@ func TestBuildFindings_PathConstruction_NestedDir(t *testing.T) {
 	findings := buildResult.Results
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
-	assert.Equal(t, filepath.Join("project1", "pyproject.toml"), findings[0].ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, filepath.Join("project1", "pyproject.toml"), findings[0].ResolverMetadata.NormalisedTargetFile)
 }
 
 func TestBuildFindings_PathConstruction_NestedWorkspacePackage(t *testing.T) {
@@ -819,7 +819,7 @@ func TestBuildFindings_PathConstruction_NestedWorkspacePackage(t *testing.T) {
 	findings := buildResult.Results
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
-	assert.Equal(t, filepath.Join("workspace", "packages", "my-package", "pyproject.toml"), findings[0].ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, filepath.Join("workspace", "packages", "my-package", "pyproject.toml"), findings[0].ResolverMetadata.NormalisedTargetFile)
 }
 
 func TestFindWorkspacePackage_MatchFound(t *testing.T) {
