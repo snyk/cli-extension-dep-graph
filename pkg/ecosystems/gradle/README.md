@@ -4,7 +4,7 @@
 
 This package implements a Gradle dependency graph resolver for the Snyk CLI ecosystem. It extracts complete dependency trees from Gradle projects using Gradle's native ResolutionResult API, producing dependency graphs that can be analysed for vulnerabilities and licence compliance.
 
-The resolver works by injecting a custom init script (`snyk-deps-init.gradle`) into Gradle builds, which programmatically walks the resolved dependency graph for each project and configuration, outputting structured JSON data that is then converted into Snyk's internal dependency graph format.
+The resolver works by injecting a custom init script (`snyk-deps-init.gradle`) into Gradle builds, which programmatically walks the resolved dependency graph for each project and configuration, outputting newline-delimited JSON (NDJSON) that is then converted into Snyk's internal dependency graph format.
 
 ## Design Decisions & Known Issues
 
@@ -111,16 +111,17 @@ This approach leverages Gradle's native multi-module handling whilst providing t
 
 ### Memory Optimisation
 
-The init script uses streaming JSON output to handle large projects efficiently:
-- Dependencies are written incrementally rather than accumulated in memory
-- Minimal data retention during graph traversal
+The init script uses NDJSON output to handle large projects efficiently:
+- Each subproject's dependencies are resolved and written by an isolated per-project task (`snykDependencyGraphProject`), then aggregated by the root `snykDependencyGraph` task
+- One JSON object per line — no in-memory accumulation of the full document
 - Suitable for projects with thousands of dependencies
 
 ### Execution Isolation
 
 Gradle execution uses several flags for predictable, isolated behaviour:
 - `--no-daemon`: Prevents state leakage between invocations
-- `--no-parallel`: Currently used but undesirable; planned improvements should remove this limitation to allow parallel execution for better performance, with particular benefits expected for `TargetFile` invocation scenarios
+
+Parallel project execution is safe because each `snykDependencyGraphProject` task writes to its own output file — there is no shared mutable state between subproject tasks. Projects that opt in to parallel execution via `org.gradle.parallel=true` in their `gradle.properties` will have that setting respected.
 
 `GRADLE_OPTS` configuration is left for invoking system to handle, following standard Gradle conventions rather than prescriptive memory tuning.
 
