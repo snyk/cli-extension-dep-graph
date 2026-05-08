@@ -77,36 +77,29 @@ func handleSBOMResolutionDI(
 	}
 
 	allProjects := config.GetBool(workflow.FlagAllProjects)
-	failFast := config.GetBool(workflow.FlagFailFast)
 	forceIncludeWorkspacePackages := config.GetBool(workflow.FlagUvWorkspacePackages)
 	targetFile := config.GetString(workflow.FlagFile)
 	pluginOptions := buildPluginOptions(config)
-
 	pluginLogger := ecosystemslogger.NewFromZerolog(logger)
+
+	results, failFastResult, err := ecosystems.RunPluginsSequentially(
+		ctx.Context(), pluginLogger, inputDir, *pluginOptions, scaPlugins,
+	)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // must return unwrapped so os-flows can detect and render ErrorCatalog
+	}
+	if failFastResult != nil {
+		//nolint:wrapcheck // must return unwrapped so os-flows can detect and render ErrorCatalog
+		return nil, ecosystems.HandleFailFastResult(logger, *failFastResult)
+	}
+
 	workflowData := []gafworkflow.Data{}
 	var problemResults []ecosystems.SCAResult
 	totalResults := 0
 
-	for _, sp := range scaPlugins {
-		pluginResult, err := sp.BuildDepGraphsFromDir(
-			ctx.Context(),
-			pluginLogger,
-			inputDir,
-			pluginOptions,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("error building results: %w", err)
-		}
-		if pluginResult == nil {
-			continue
-		}
-
-		if ffErr := checkFailFast(logger, failFast, allProjects, pluginResult.Results); ffErr != nil {
-			return nil, ffErr
-		}
-
+	for _, res := range results {
 		pluginData, pluginProblems, err := convertPluginResults(
-			logger, sp, pluginResult.Results, allProjects, forceIncludeWorkspacePackages, targetFile,
+			logger, res.Plugin, res.Results, allProjects, forceIncludeWorkspacePackages, targetFile,
 		)
 		if err != nil {
 			return nil, err
@@ -114,17 +107,12 @@ func handleSBOMResolutionDI(
 
 		workflowData = append(workflowData, pluginData...)
 		problemResults = append(problemResults, pluginProblems...)
-		totalResults += len(pluginResult.Results)
-
-		applyProcessedFilesExclusions(config, pluginResult.ProcessedFiles)
-
-		if !allProjects && len(pluginResult.Results) > 0 {
-			break
-		}
+		totalResults += len(res.Results)
 	}
 
 	if totalResults == 0 {
-		return nil, newExitCodeError(3, errMsgNoSupportedProjects, legacycli.ErrNoDepGraphsFound)
+		//nolint:wrapcheck // fresh ExitCoder construction, not a wrap
+		return nil, ecosystems.NewExitCodeError(3, errMsgNoSupportedProjects, legacycli.ErrNoDepGraphsFound)
 	}
 
 	// TODO: This is a temporary implementation for rendering warnings.
@@ -159,19 +147,6 @@ func buildPluginOptions(config configuration.Configuration) *ecosystems.SCAPlugi
 	return opts
 }
 
-func checkFailFast(logger *zerolog.Logger, failFast, allProjects bool, results []ecosystems.SCAResult) error {
-	if !failFast || !allProjects {
-		return nil
-	}
-	for _, result := range results {
-		if result.Error != nil {
-			logResultError(logger, result.ProjectDescriptor.GetTargetFile(), result.Error)
-			return createFailFastError(result.ProjectDescriptor.GetTargetFile(), result.Error)
-		}
-	}
-	return nil
-}
-
 func convertPluginResults(
 	logger *zerolog.Logger,
 	plugin ecosystems.SCAPlugin,
@@ -183,15 +158,6 @@ func convertPluginResults(
 		return combineWorkspaceResultsAsJSONL(logger, results)
 	}
 	return processResultsIndividually(logger, results, allProjects)
-}
-
-func logResultError(logger *zerolog.Logger, targetFile string, err error) {
-	var snykErr snyk_errors.Error
-	if errors.As(err, &snykErr) && snykErr.Detail != "" {
-		logger.Printf("Skipping result for %s which errored with: %v (details: %s)", targetFile, err, snykErr.Detail)
-	} else {
-		logger.Printf("Skipping result for %s which errored with: %v", targetFile, err)
-	}
 }
 
 func outputAnyWarnings(ctx gafworkflow.InvocationContext, logger *zerolog.Logger, problemResults []ecosystems.SCAResult, totalResults int) {
@@ -244,36 +210,6 @@ func isMonitorJSONLBridgeInvocation(plugin ecosystems.SCAPlugin, forceIncludeWor
 	return plugin.GetName() == uv.PluginName && forceIncludeWorkspacePackages && targetFile != ""
 }
 
-// applyProcessedFilesExclusions forwards the runner-accumulated opts.Global.Exclude
-// into the legacy CLI's `--exclude-paths` flag. It exists so the legacy CLI can skip
-// files that have already been resolved by an earlier plugin in the same orchestration pass.
-//
-// This is currently a no-op: it requires snyk/cli-extension-dep-graph#152 (which adds
-// the workflow.FlagExcludePaths constant + forwards it from this extension) and
-// snyk/cli#6741 (which adds the --exclude-paths flag to the legacy CLI itself).
-// Once both have landed, we can uncomment the below to enable the real implementation,
-// and unskip any associated tests.
-//
-// We cannot use the existing `--exclude` flag in the meantime: it only accepts
-// basenames and folder names, which would break workspace-style projects where
-// multiple packages share the same manifest filename (e.g. several `package.json`
-// in different workspace directories).
-func applyProcessedFilesExclusions(_ configuration.Configuration, _ []string) {
-	//nolint:gocritic // intentionally retained, to be used when above PRs are merged
-	/*
-		if len(processedFiles) == 0 {
-			return
-		}
-
-		parts := make([]string, 0, len(processedFiles)+1)
-		if existing := config.GetString(workflow.FlagExcludePaths); existing != "" {
-			parts = append(parts, existing)
-		}
-		parts = append(parts, processedFiles...)
-		config.Set(workflow.FlagExcludePaths, strings.Join(parts, ","))
-	*/
-}
-
 // parseExcludeFlag parses a comma-separated exclude flag value into a slice of strings.
 func parseExcludeFlag(excludeFlag string) []string {
 	if excludeFlag == "" {
@@ -301,7 +237,7 @@ func combineWorkspaceResultsAsJSONL(logger *zerolog.Logger, results []ecosystems
 	var problemResults []ecosystems.SCAResult
 	for _, result := range results {
 		if result.Error != nil {
-			logResultError(logger, result.ProjectDescriptor.GetTargetFile(), result.Error)
+			ecosystems.LogResultError(logger, result.ProjectDescriptor.GetTargetFile(), result.Error)
 			problemResults = append(problemResults, result)
 			return nil, problemResults, result.Error
 		}
@@ -336,7 +272,7 @@ func processResultsIndividually(logger *zerolog.Logger, results []ecosystems.SCA
 		result := &results[i]
 
 		if result.Error != nil {
-			logResultError(logger, result.ProjectDescriptor.GetTargetFile(), result.Error)
+			ecosystems.LogResultError(logger, result.ProjectDescriptor.GetTargetFile(), result.Error)
 			problemResults = append(problemResults, *result)
 
 			if !allProjects {

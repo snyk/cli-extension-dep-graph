@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -124,13 +123,12 @@ func (c *LegacyMockBuilder) Called() bool {
 	return c.Plugin.options != nil
 }
 
-// ExcludeString returns the exclude list passed to the legacy plugin via options as a comma-joined
-// string, mirroring how the legacy CLI's --exclude flag is built up.
-func (c *LegacyMockBuilder) ExcludeString() string {
-	if c.Plugin.options == nil {
-		return ""
-	}
-	return strings.Join([]string(c.Plugin.options.Global.Exclude), ",")
+// ExcludeString returns the value of the --exclude config flag — what the legacy CLI
+// process would actually receive. The runner appends ProcessedFiles to opts.Global.Exclude
+// between plugins, so opts is not a faithful proxy for the legacy CLI's --exclude flag;
+// the config is.
+func (c *LegacyMockBuilder) ExcludeString(cfg configuration.Configuration) string {
+	return cfg.GetString(workflow.FlagExclude)
 }
 
 // lazyLegacyMockPlugin defers building the mockScaPlugin until BuildDepGraphsFromDir is invoked
@@ -685,7 +683,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				assert.Equal(t, tc.expectLegacyResolutionToBeCalled, legacyMock.Called())
 
 				if tc.expectLegacyResolutionToBeCalled {
-					actualExclude := legacyMock.ExcludeString()
+					actualExclude := legacyMock.ExcludeString(ctx.config)
 					assert.Equal(t, tc.expectedExclude, actualExclude,
 						"FlagExclude should match the config passed to legacy resolution "+
 							"(ProcessedFiles are not propagated until --exclude-paths lands)")
@@ -743,7 +741,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Len(t, workflowData, 1)
 		// Legacy resolution should have been called
 		assert.True(t, legacyMock.Called(), "legacy plugin should be called")
-		assert.Equal(t, "", legacyMock.ExcludeString(),
+		assert.Equal(t, "", legacyMock.ExcludeString(ctx.config),
 			"ProcessedFiles do not flow into legacy --exclude until --exclude-paths lands "+
 				"(see applyProcessedFilesExclusions)")
 	})
@@ -820,7 +818,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Nil(t, workflowData)
 		// Legacy resolution should have been called
 		assert.True(t, legacyMock.Called(), "legacy plugin should be called")
-		assert.Equal(t, "", legacyMock.ExcludeString(),
+		assert.Equal(t, "", legacyMock.ExcludeString(ctx.config),
 			"ProcessedFiles do not flow into legacy --exclude until --exclude-paths lands "+
 				"(see applyProcessedFilesExclusions)")
 	})
@@ -870,7 +868,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.NotNil(t, workflowData)
 		assert.Len(t, workflowData, 1, "Should return only the valid finding since legacy workflow returns nil")
 		assert.True(t, legacyMock.Called(), "legacy plugin should be called")
-		assert.Equal(t, "", legacyMock.ExcludeString(),
+		assert.Equal(t, "", legacyMock.ExcludeString(ctx.config),
 			"ProcessedFiles do not flow into legacy --exclude until --exclude-paths lands (see applyProcessedFilesExclusions)")
 	})
 
@@ -1410,7 +1408,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 		assert.True(t, legacyMock.Called(), "legacy plugin should be called")
-		assert.Equal(t, "", legacyMock.ExcludeString(),
+		assert.Equal(t, "", legacyMock.ExcludeString(ctx.config),
 			"ProcessedFiles do not flow into legacy --exclude until --exclude-paths lands "+
 				"(see applyProcessedFilesExclusions)")
 		assert.Contains(t, capturedOutput, "project1/uv.lock")
@@ -1569,7 +1567,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 
-		assert.Equal(t, "", legacyMock.ExcludeString(),
+		assert.Equal(t, "", legacyMock.ExcludeString(ctx.config),
 			"ProcessedFiles do not flow into legacy --exclude until --exclude-paths lands (see applyProcessedFilesExclusions)")
 		assert.Contains(t, capturedOutput, "project1/uv.lock", "Output should mention the first problem file")
 		assert.Contains(t, capturedOutput, "project2/uv.lock", "Output should mention the second problem file")
@@ -1683,9 +1681,11 @@ func Test_processedFilesFlowFromPluginsToExcludeConfig(t *testing.T) {
 
 	require.NoError(t, err)
 	require.True(t, legacyMock.Called())
-	actualExclude := legacyMock.ExcludeString()
-	assert.Equal(t, "file1.py,file2.py,file3.py", actualExclude,
-		"ProcessedFiles from all plugins should be combined into FlagExclude")
+	// TODO: swap to workflow.FlagExcludePaths once snyk/cli-extension-dep-graph#152
+	// adds the constant.
+	actualExcludePaths := ctx.config.GetString("exclude-paths")
+	assert.Equal(t, "file1.py,file2.py,file3.py", actualExcludePaths,
+		"ProcessedFiles from all plugins should be combined into FlagExcludePaths")
 }
 
 func Test_uvWorkspacePackages_passesOptionToPlugin(t *testing.T) {

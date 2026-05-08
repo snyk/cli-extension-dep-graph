@@ -1,9 +1,6 @@
 package orchestrator
 
 import (
-	"context"
-
-	"github.com/rs/zerolog"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
@@ -13,84 +10,48 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pipenv"
 )
 
-// ResolveDepgraphs resolves dependency graphs for a directory by invoking the legacy CLI workflow.
-// It accepts a workflow.InvocationContext to provide access to the engine, configuration, and logger.
-// Returns a channel of SCAResult structs containing dependency graphs and associated metadata.
+// ResolveDepgraphs resolves dependency graphs for a directory by running the
+// configured SCA plugins in order and emitting their results on the returned
+// channel.
 //
-//nolint:gocritic // hugeParam: ensure `options` is not nil
+//nolint:gocritic // hugeParam: ensure `opts` is not nil
 func ResolveDepgraphs(ictx workflow.InvocationContext, dir string, opts ecosystems.SCAPluginOptions) (<-chan ecosystems.SCAResult, error) {
+	return resolveDepgraphsDI(ictx, dir, opts, []ecosystems.SCAPlugin{
+		pip.Plugin{},
+		pipenv.Plugin{},
+		legacy.NewPlugin(ictx),
+	})
+}
+
+//nolint:gocritic // hugeParam: ensure `opts` is not nil
+func resolveDepgraphsDI(
+	ictx workflow.InvocationContext,
+	dir string,
+	opts ecosystems.SCAPluginOptions,
+	plugins []ecosystems.SCAPlugin,
+) (<-chan ecosystems.SCAResult, error) {
 	enhancedLogger := ictx.GetEnhancedLogger()
+	pluginLogger := logger.NewFromZerolog(enhancedLogger)
 
-	pythonResult := resolvePython(ictx.Context(), enhancedLogger, dir, opts)
-
-	// Call legacy fallback to get legacyResults
-	legacyResults, err := resolveLegacy(ictx, enhancedLogger, dir, &opts, pythonResult.ProcessedFiles)
+	results, failFastResult, err := ecosystems.RunPluginsSequentially(ictx.Context(), pluginLogger, dir, opts, plugins)
 	if err != nil {
-		return nil, err
+		return nil, err //nolint:wrapcheck // must return unwrapped so os-flows can detect and render ErrorCatalog
+	}
+	if failFastResult != nil {
+		//nolint:wrapcheck // must return unwrapped so os-flows can detect and render ErrorCatalog
+		return nil, ecosystems.HandleFailFastResult(enhancedLogger, *failFastResult)
 	}
 
-	// Create channel and send all results
-	resultsChan := make(chan ecosystems.SCAResult, len(legacyResults.Results)+len(pythonResult.Results))
-	for _, result := range legacyResults.Results {
-		resultsChan <- result
+	var collected []ecosystems.SCAResult
+	for _, o := range results {
+		collected = append(collected, o.Results...)
 	}
-	for _, result := range pythonResult.Results {
-		resultsChan <- result
+
+	resultsChan := make(chan ecosystems.SCAResult, len(collected))
+	for _, r := range collected {
+		resultsChan <- r
 	}
 	close(resultsChan)
 
 	return resultsChan, nil
-}
-
-func resolveLegacy(
-	ictx workflow.InvocationContext,
-	enhancedLogger *zerolog.Logger,
-	dir string,
-	opts *ecosystems.SCAPluginOptions,
-	ignores []string,
-) (*ecosystems.PluginResult, error) {
-	if len(ignores) > 0 && !opts.Global.AllProjects {
-		return &ecosystems.PluginResult{}, nil
-	}
-
-	log := logger.NewFromZerolog(enhancedLogger)
-	// Shallow-copy opts and explicitly clone the Exclude slice so WithExclude's append
-	// cannot reach into the caller's backing array.
-	legacyOpts := *opts
-	legacyOpts.Global.Exclude = append(ecosystems.CommaSeparatedString(nil), opts.Global.Exclude...)
-	legacyOpts.WithExclude(ignores)
-
-	res, err := legacy.NewPlugin(ictx).BuildDepGraphsFromDir(ictx.Context(), log, dir, &legacyOpts)
-	if err != nil {
-		return nil, err //nolint:wrapcheck // must return unwrapped so os-flows can detect and render ErrorCatalog
-	}
-	return res, nil
-}
-
-//nolint:gocritic // hugeParam: ensure `options` is not nil
-func resolvePython(ctx context.Context, enhancedLogger *zerolog.Logger, dir string, opts ecosystems.SCAPluginOptions) ecosystems.PluginResult {
-	log := logger.NewFromZerolog(enhancedLogger)
-
-	pipResults, err := pip.Plugin{}.BuildDepGraphsFromDir(ctx, log, dir, &opts)
-	if err != nil {
-		enhancedLogger.Warn().Err(err).Msg("pip plugin failed, continuing with other plugins")
-	}
-
-	pipenvResults, err := pipenv.Plugin{}.BuildDepGraphsFromDir(ctx, log, dir, &opts)
-	if err != nil {
-		enhancedLogger.Warn().Err(err).Msg("pipenv plugin failed, continuing with other plugins")
-	}
-
-	result := ecosystems.PluginResult{}
-
-	if pipResults != nil {
-		result.Results = append(result.Results, pipResults.Results...)
-		result.ProcessedFiles = append(result.ProcessedFiles, pipResults.ProcessedFiles...)
-	}
-	if pipenvResults != nil {
-		result.Results = append(result.Results, pipenvResults.Results...)
-		result.ProcessedFiles = append(result.ProcessedFiles, pipenvResults.ProcessedFiles...)
-	}
-
-	return result
 }

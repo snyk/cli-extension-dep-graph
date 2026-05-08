@@ -431,6 +431,7 @@ func TestBuildFindings_Success(t *testing.T) {
 	assert.NotNil(t, findings[0].DepGraph)
 	assert.Equal(t, "pyproject.toml", findings[0].ProjectDescriptor.GetTargetFile())
 	assert.Nil(t, findings[0].Error)
+	assert.Equal(t, []string{"uv.lock", "pyproject.toml", "requirements.txt"}, buildResult.ProcessedFiles)
 }
 
 func TestBuildFindings_NoProjectRoot_ReturnsErrorFinding(t *testing.T) {

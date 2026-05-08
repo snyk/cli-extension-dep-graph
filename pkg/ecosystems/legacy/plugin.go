@@ -49,7 +49,7 @@ func (l *Resolver) BuildDepGraphsFromDir(
 		return nil, fmt.Errorf("cannot resolve dependencies without options")
 	}
 
-	legacyConfig := buildLegacyConfig(l.ictx.GetConfiguration())
+	legacyConfig := buildLegacyConfig(l.ictx.GetConfiguration(), opts)
 
 	depGraphs, err := legacycli.InvokeLegacy(l.ictx, legacyConfig, l.ictx.GetEnhancedLogger())
 	if err != nil {
@@ -75,7 +75,7 @@ func (l *Resolver) BuildDepGraphsFromDir(
 }
 
 // buildLegacyConfig clones the live config and applies legacy-CLI-specific transformations.
-func buildLegacyConfig(src configuration.Configuration) configuration.Configuration {
+func buildLegacyConfig(src configuration.Configuration, opts *ecosystems.SCAPluginOptions) configuration.Configuration {
 	cfg := src.Clone()
 
 	cfg.Unset(workflow.FlagPrintEffectiveGraph)
@@ -86,7 +86,39 @@ func buildLegacyConfig(src configuration.Configuration) configuration.Configurat
 		cfg.Set(workflow.FlagPrintEffectiveGraphWithErrors, true)
 	}
 
+	applyProcessedFilesExclusions(cfg, opts.Global.Exclude)
+
 	return cfg
+}
+
+// applyProcessedFilesExclusions forwards the runner-accumulated opts.Global.Exclude
+// into the legacy CLI's `--exclude-paths` flag. It exists so the legacy CLI can skip
+// files that have already been resolved by an earlier plugin in the same orchestration pass.
+//
+// This is currently a no-op: it requires snyk/cli-extension-dep-graph#152 (which adds
+// the workflow.FlagExcludePaths constant + forwards it from this extension) and
+// snyk/cli#6741 (which adds the --exclude-paths flag to the legacy CLI itself).
+// Once both have landed, we can uncomment the below to enable the real implementation,
+// and unskip any associated tests e.g. `Test_processedFilesFlowFromPluginsToExcludeConfig`.
+//
+// We cannot use the existing `--exclude` flag in the meantime: it only accepts
+// basenames and folder names, which would break workspace-style projects where
+// multiple packages share the same manifest filename (e.g. several `package.json`
+// in different workspace directories).
+func applyProcessedFilesExclusions(_ configuration.Configuration, _ ecosystems.CommaSeparatedString) {
+	//nolint:gocritic // intentionally retained, to be used when above PRs are merged
+	/*
+		if len(excludes) == 0 {
+			return
+		}
+
+		parts := make([]string, 0, len(excludes)+1)
+		if existing := cfg.GetString(workflow.FlagExcludePaths); existing != "" {
+			parts = append(parts, existing)
+		}
+		parts = append(parts, []string(excludes)...)
+		cfg.Set(workflow.FlagExcludePaths, strings.Join(parts, ","))
+	*/
 }
 
 // depGraphOutputToSCAResult converts a parsed legacy CLI output line to an SCAResult. Per-result
