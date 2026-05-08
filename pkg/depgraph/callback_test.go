@@ -43,22 +43,7 @@ func TestShouldUseSBOMResolution(t *testing.T) {
 	t.Parallel()
 	nopLogger := zerolog.Nop()
 
-	t.Run("returns false when uv feature flag is disabled", func(t *testing.T) {
-		t.Parallel()
-		config := configuration.New()
-		config.Set(workflow.FeatureFlagUvCLI, false)
-
-		assert.False(t, shouldUseSBOMResolution(config, &nopLogger))
-	})
-
-	t.Run("returns false when uv feature flag is not set", func(t *testing.T) {
-		t.Parallel()
-		config := configuration.New()
-
-		assert.False(t, shouldUseSBOMResolution(config, &nopLogger))
-	})
-
-	t.Run("returns false when uv feature flag is enabled but no uv.lock exists", func(t *testing.T) {
+	t.Run("returns false when no uv.lock exists even with FF enabled", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
 
@@ -69,7 +54,19 @@ func TestShouldUseSBOMResolution(t *testing.T) {
 		assert.False(t, shouldUseSBOMResolution(config, &nopLogger))
 	})
 
-	t.Run("returns true when uv feature flag is enabled and uv.lock exists", func(t *testing.T) {
+	t.Run("returns false when uv.lock exists but FF is disabled", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		createUvLockFile(t, dir)
+
+		config := configuration.New()
+		config.Set(workflow.FeatureFlagUvCLI, false)
+		config.Set(configuration.INPUT_DIRECTORY, dir)
+
+		assert.False(t, shouldUseSBOMResolution(config, &nopLogger))
+	})
+
+	t.Run("returns true when uv.lock exists and FF is enabled", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
 		createUvLockFile(t, dir)
@@ -81,7 +78,7 @@ func TestShouldUseSBOMResolution(t *testing.T) {
 		assert.True(t, shouldUseSBOMResolution(config, &nopLogger))
 	})
 
-	t.Run("returns true when uv feature flag is enabled and uv.lock is targeted via file flag", func(t *testing.T) {
+	t.Run("returns true when uv.lock is targeted via file flag", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
 		subdir := filepath.Join(dir, "sub")
@@ -95,7 +92,7 @@ func TestShouldUseSBOMResolution(t *testing.T) {
 		assert.True(t, shouldUseSBOMResolution(config, &nopLogger))
 	})
 
-	t.Run("returns false when uv feature flag is enabled and file flag targets a non-uv file", func(t *testing.T) {
+	t.Run("returns false when file flag targets a non-uv file", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
 

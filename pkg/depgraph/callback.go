@@ -30,21 +30,16 @@ func callback(ctx gafworkflow.InvocationContext, _ []gafworkflow.Data) ([]gafwor
 }
 
 func shouldUseSBOMResolution(config configuration.Configuration, logger *zerolog.Logger) bool {
-	if !uv.HasLockFile(
+	if !uv.IsUvProject(
 		config.GetString(configuration.INPUT_DIRECTORY),
 		config.GetString(workflow.FlagFile),
 		config.GetBool(workflow.FlagAllProjects),
-		logger,
+		config,
 	) {
 		return false
 	}
 
-	if !config.GetBool(workflow.FeatureFlagUvCLI) {
-		return false
-	}
-
 	logger.Info().Msg("uv.lock found and uv feature flag enabled, using SBOM resolution")
-
 	return true
 }
 
