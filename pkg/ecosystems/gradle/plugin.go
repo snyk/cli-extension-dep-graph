@@ -60,6 +60,10 @@ func (p Plugin) BuildDepGraphsFromDir(
 		log = logger.Nop()
 	}
 
+	if err := ValidateOptions(dir, options); err != nil {
+		return nil, fmt.Errorf("gradle: invalid options: %w", err)
+	}
+
 	files, err := p.discoverGradleFiles(ctx, dir, options)
 	if err != nil {
 		return nil, fmt.Errorf("gradle: failed to discover files: %w", err)
@@ -151,10 +155,7 @@ func (p Plugin) processGradleFiles(
 	defer cleanup()
 
 	// Build extra args once upfront - user init scripts should be relative to original scan directory
-	extraArgs, err := buildExtraArgs(dir, options)
-	if err != nil {
-		return nil, nil, fmt.Errorf("gradle: %w", err)
-	}
+	extraArgs := buildExtraArgs(dir, options)
 
 	for _, discoveredFile := range filesCopy {
 		relativeProjectDir := filepath.Dir(discoveredFile.RelPath)
@@ -336,7 +337,7 @@ func (p Plugin) convertProjects(
 		}
 		relFile := relativeTargetFile(dir, absFile)
 
-		depGraph, err := buildDepGraph(&proj)
+		depGraph, err := buildDepGraph(&proj, options)
 		if err != nil {
 			log.Error(ctx, "Failed to build dep graph for Gradle project",
 				logger.Attr("project_path", proj.Path),
@@ -415,12 +416,13 @@ func resolveInitScript() (path string, cleanup func(), err error) {
 
 // buildExtraArgs assembles any additional Gradle command-line arguments derived
 // from plugin options (e.g. user-provided init scripts, configuration flags).
-func buildExtraArgs(projectDir string, options *ecosystems.SCAPluginOptions) ([]string, error) {
+func buildExtraArgs(projectDir string, options *ecosystems.SCAPluginOptions) []string {
 	var args []string
 
 	// Add user-provided init script as an additional --init-script flag.
 	// The embedded Snyk init script is always used; this allows users to provide
 	// supplementary init scripts needed to make their Gradle build work.
+	// Note: validation is handled in ValidateOptions, so we just need to resolve the path.
 	if userInitScript := options.Gradle.InitScript; userInitScript != "" {
 		// Resolve relative paths against the project directory
 		initPath := userInitScript
@@ -428,20 +430,11 @@ func buildExtraArgs(projectDir string, options *ecosystems.SCAPluginOptions) ([]
 			initPath = filepath.Join(projectDir, userInitScript)
 		}
 
-		// Defensive validation: ensure the init script exists and is a file
-		info, err := os.Stat(initPath)
-		if err != nil {
-			return nil, fmt.Errorf("user init script not found: %s: %w", userInitScript, err)
-		}
-		if info.IsDir() {
-			return nil, fmt.Errorf("user init script is a directory, not a file: %s", userInitScript)
-		}
-
 		args = append(args, "--init-script", initPath)
 	}
 
 	// Reserved for future flag forwarding (e.g. --configuration, -P flags).
-	return args, nil
+	return args
 }
 
 // isBuildFile reports whether path refers to a Gradle build file.

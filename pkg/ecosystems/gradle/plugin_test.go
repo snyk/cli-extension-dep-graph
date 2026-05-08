@@ -326,8 +326,7 @@ func TestBuildExtraArgs(t *testing.T) {
 		dir := t.TempDir()
 		opts := &ecosystems.SCAPluginOptions{}
 
-		args, err := buildExtraArgs(dir, opts)
-		require.NoError(t, err)
+		args := buildExtraArgs(dir, opts)
 		assert.Empty(t, args)
 	})
 
@@ -340,8 +339,7 @@ func TestBuildExtraArgs(t *testing.T) {
 			Gradle: ecosystems.GradleOptions{InitScript: userScript},
 		}
 
-		args, err := buildExtraArgs(dir, opts)
-		require.NoError(t, err)
+		args := buildExtraArgs(dir, opts)
 		assert.Equal(t, []string{"--init-script", userScript}, args)
 	})
 
@@ -355,35 +353,38 @@ func TestBuildExtraArgs(t *testing.T) {
 			Gradle: ecosystems.GradleOptions{InitScript: "scripts/custom.gradle"},
 		}
 
-		args, err := buildExtraArgs(dir, opts)
-		require.NoError(t, err)
+		args := buildExtraArgs(dir, opts)
 		assert.Equal(t, []string{"--init-script", userScript}, args)
 	})
 
-	t.Run("returns error when user init script does not exist", func(t *testing.T) {
+	t.Run("handles relative user init script path", func(t *testing.T) {
 		dir := t.TempDir()
+		scriptsDir := filepath.Join(dir, "scripts")
+		require.NoError(t, os.MkdirAll(scriptsDir, 0o755))
+		validScript := filepath.Join(scriptsDir, "custom.gradle")
+		require.NoError(t, os.WriteFile(validScript, []byte("// custom script"), 0o644))
+
 		opts := &ecosystems.SCAPluginOptions{
-			Gradle: ecosystems.GradleOptions{InitScript: "nonexistent.gradle"},
+			Gradle: ecosystems.GradleOptions{InitScript: "scripts/custom.gradle"}, // relative path
 		}
 
-		_, err := buildExtraArgs(dir, opts)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "user init script not found")
-		assert.Contains(t, err.Error(), "nonexistent.gradle")
+		args := buildExtraArgs(dir, opts)
+		// Should resolve to absolute path
+		expectedPath := filepath.Join(dir, "scripts/custom.gradle")
+		assert.Equal(t, []string{"--init-script", expectedPath}, args)
 	})
 
-	t.Run("returns error when user init script is a directory", func(t *testing.T) {
+	t.Run("handles absolute user init script path", func(t *testing.T) {
 		dir := t.TempDir()
-		scriptDir := filepath.Join(dir, "scripts")
-		require.NoError(t, os.Mkdir(scriptDir, 0o755))
+		validScript := filepath.Join(dir, "valid.gradle")
+		require.NoError(t, os.WriteFile(validScript, []byte("// valid script"), 0o644))
 
 		opts := &ecosystems.SCAPluginOptions{
-			Gradle: ecosystems.GradleOptions{InitScript: scriptDir},
+			Gradle: ecosystems.GradleOptions{InitScript: validScript}, // absolute path
 		}
 
-		_, err := buildExtraArgs(dir, opts)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "user init script is a directory")
+		args := buildExtraArgs(dir, opts)
+		assert.Equal(t, []string{"--init-script", validScript}, args)
 	})
 }
 

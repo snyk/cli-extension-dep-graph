@@ -5,6 +5,7 @@ package gradle
 import (
 	"testing"
 
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -62,7 +63,7 @@ func TestBuildDepGraph(t *testing.T) {
 			}),
 		})
 
-		dg, err := buildDepGraph(&proj)
+		dg, err := buildDepGraph(&proj, nil)
 		require.NoError(t, err)
 		require.NotNil(t, dg)
 
@@ -85,7 +86,7 @@ func TestBuildDepGraph(t *testing.T) {
 			}),
 		})
 
-		dg, err := buildDepGraph(&proj)
+		dg, err := buildDepGraph(&proj, nil)
 		require.NoError(t, err)
 
 		ids := nodeIDSet(dg)
@@ -102,7 +103,7 @@ func TestBuildDepGraph(t *testing.T) {
 			}),
 		})
 
-		dg, err := buildDepGraph(&proj)
+		dg, err := buildDepGraph(&proj, nil)
 		require.NoError(t, err)
 
 		ids := nodeIDSet(dg)
@@ -117,7 +118,7 @@ func TestBuildDepGraph(t *testing.T) {
 			}),
 		})
 
-		dg, err := buildDepGraph(&proj)
+		dg, err := buildDepGraph(&proj, nil)
 		require.NoError(t, err)
 
 		ids := nodeIDSet(dg)
@@ -132,7 +133,7 @@ func TestBuildDepGraph(t *testing.T) {
 			}),
 		})
 
-		dg, err := buildDepGraph(&proj)
+		dg, err := buildDepGraph(&proj, nil)
 		require.NoError(t, err)
 
 		ids := nodeIDSet(dg)
@@ -148,7 +149,7 @@ func TestBuildDepGraph(t *testing.T) {
 			}),
 		})
 
-		dg, err := buildDepGraph(&proj)
+		dg, err := buildDepGraph(&proj, nil)
 		require.NoError(t, err)
 
 		ids := nodeIDSet(dg)
@@ -164,7 +165,7 @@ func TestBuildDepGraph(t *testing.T) {
 			}),
 		})
 
-		dg, err := buildDepGraph(&proj)
+		dg, err := buildDepGraph(&proj, nil)
 		require.NoError(t, err)
 
 		ids := nodeIDSet(dg)
@@ -176,7 +177,7 @@ func TestBuildDepGraph(t *testing.T) {
 			{Name: "runtimeClasspath", Error: "resolution failed"},
 		})
 
-		dg, err := buildDepGraph(&proj)
+		dg, err := buildDepGraph(&proj, nil)
 		require.NoError(t, err)
 
 		// Only the root node; no dependency nodes.
@@ -186,7 +187,7 @@ func TestBuildDepGraph(t *testing.T) {
 	t.Run("returns empty graph when no configurations present", func(t *testing.T) {
 		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{})
 
-		dg, err := buildDepGraph(&proj)
+		dg, err := buildDepGraph(&proj, nil)
 		require.NoError(t, err)
 		assert.Len(t, dg.Graph.Nodes, 1)
 	})
@@ -196,7 +197,7 @@ func TestBuildDepGraph(t *testing.T) {
 			makeConfig("runtimeClasspath", "com.example:app:unspecified", []gradleDep{}),
 		})
 
-		dg, err := buildDepGraph(&proj)
+		dg, err := buildDepGraph(&proj, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "", dg.Pkgs[0].Info.Version)
 	})
@@ -212,7 +213,7 @@ func TestBuildDepGraph(t *testing.T) {
 			}),
 		})
 
-		dg, err := buildDepGraph(&proj)
+		dg, err := buildDepGraph(&proj, nil)
 		require.NoError(t, err)
 
 		ids := nodeIDSet(dg)
@@ -235,7 +236,7 @@ func TestBuildDepGraph(t *testing.T) {
 			}),
 		})
 
-		dg, err := buildDepGraph(&proj)
+		dg, err := buildDepGraph(&proj, nil)
 		require.NoError(t, err)
 
 		ids := nodeIDSet(dg)
@@ -282,7 +283,7 @@ func TestBuildDepGraph_DoesNotDuplicateEdges(t *testing.T) {
 		makeConfig("testRuntimeClasspath", "com.example:app:1.0.0", []gradleDep{makeDep("com.google.guava:guava:32.1.2-jre")}),
 	})
 
-	dg, err := buildDepGraph(&proj)
+	dg, err := buildDepGraph(&proj, nil)
 	require.NoError(t, err)
 
 	rootNode := findNodeByID(t, dg, "root-node")
@@ -337,7 +338,7 @@ func TestBuildDepGraph_EdgePositionFromFirstDeclaringConfig(t *testing.T) {
 
 	proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{compileConfig, runtimeConfig})
 
-	dg, err := buildDepGraph(&proj)
+	dg, err := buildDepGraph(&proj, nil)
 	require.NoError(t, err)
 
 	rootNode := findNodeByID(t, dg, "root-node")
@@ -413,4 +414,217 @@ func TestSplitGAV(t *testing.T) {
 			assert.Equal(t, tt.wantVersion, version)
 		})
 	}
+}
+
+// ── Configuration Matching Tests ─────────────────────────────────────────────
+
+func TestBuildDepGraph_ConfigurationMatching(t *testing.T) {
+	t.Run("filters configurations by exact match", func(t *testing.T) {
+		proj := makeProject("com.example", "my-app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:my-app:1.0.0", []gradleDep{
+				makeDep("com.google.guava:guava:32.1.2-jre"),
+			}),
+			makeConfig("compileClasspath", "com.example:my-app:1.0.0", []gradleDep{
+				makeDep("org.apache.commons:commons-lang3:3.12.0"),
+			}),
+			makeConfig("testRuntimeClasspath", "com.example:my-app:1.0.0", []gradleDep{
+				makeDep("junit:junit:4.13.2"),
+			}),
+		})
+
+		options := &ecosystems.SCAPluginOptions{}
+		options.Gradle.ConfigurationMatching = "runtimeClasspath"
+
+		dg, err := buildDepGraph(&proj, options)
+		require.NoError(t, err)
+		require.NotNil(t, dg)
+
+		ids := nodeIDSet(dg)
+		assert.True(t, ids["com.google.guava:guava@32.1.2-jre"], "runtimeClasspath dep should be included")
+		assert.False(t, ids["org.apache.commons:commons-lang3@3.12.0"], "compileClasspath dep should be excluded")
+		assert.False(t, ids["junit:junit@4.13.2"], "testRuntimeClasspath dep should be excluded")
+	})
+
+	t.Run("filters configurations by regex pattern", func(t *testing.T) {
+		proj := makeProject("com.example", "my-app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:my-app:1.0.0", []gradleDep{
+				makeDep("com.google.guava:guava:32.1.2-jre"),
+			}),
+			makeConfig("compileClasspath", "com.example:my-app:1.0.0", []gradleDep{
+				makeDep("org.apache.commons:commons-lang3:3.12.0"),
+			}),
+			makeConfig("testRuntimeClasspath", "com.example:my-app:1.0.0", []gradleDep{
+				makeDep("junit:junit:4.13.2"),
+			}),
+			makeConfig("testCompileClasspath", "com.example:my-app:1.0.0", []gradleDep{
+				makeDep("org.mockito:mockito-core:5.1.1"),
+			}),
+		})
+
+		// Match all runtime classpaths (runtime and testRuntime) - case insensitive
+		options := &ecosystems.SCAPluginOptions{}
+		options.Gradle.ConfigurationMatching = "(?i).*runtime.*"
+
+		dg, err := buildDepGraph(&proj, options)
+		require.NoError(t, err)
+		require.NotNil(t, dg)
+
+		ids := nodeIDSet(dg)
+		assert.True(t, ids["com.google.guava:guava@32.1.2-jre"], "runtimeClasspath dep should be included")
+		assert.True(t, ids["junit:junit@4.13.2"], "testRuntimeClasspath dep should be included")
+		assert.False(t, ids["org.apache.commons:commons-lang3@3.12.0"], "compileClasspath dep should be excluded")
+		assert.False(t, ids["org.mockito:mockito-core@5.1.1"], "testCompileClasspath dep should be excluded")
+	})
+
+	t.Run("includes all configurations when no pattern specified", func(t *testing.T) {
+		proj := makeProject("com.example", "my-app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:my-app:1.0.0", []gradleDep{
+				makeDep("com.google.guava:guava:32.1.2-jre"),
+			}),
+			makeConfig("compileClasspath", "com.example:my-app:1.0.0", []gradleDep{
+				makeDep("org.apache.commons:commons-lang3:3.12.0"),
+			}),
+		})
+
+		dg, err := buildDepGraph(&proj, nil)
+		require.NoError(t, err)
+		require.NotNil(t, dg)
+
+		ids := nodeIDSet(dg)
+		assert.True(t, ids["com.google.guava:guava@32.1.2-jre"], "runtimeClasspath dep should be included")
+		assert.True(t, ids["org.apache.commons:commons-lang3@3.12.0"], "compileClasspath dep should be included")
+	})
+
+	t.Run("returns error for invalid regex pattern", func(t *testing.T) {
+		proj := makeProject("com.example", "my-app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:my-app:1.0.0", []gradleDep{}),
+		})
+
+		options := &ecosystems.SCAPluginOptions{}
+		options.Gradle.ConfigurationMatching = "[invalid-regex"
+
+		_, err := buildDepGraph(&proj, options)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid regex pattern")
+		assert.Contains(t, err.Error(), "[invalid-regex")
+	})
+
+	t.Run("returns empty graph when no configurations match pattern", func(t *testing.T) {
+		proj := makeProject("com.example", "my-app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:my-app:1.0.0", []gradleDep{
+				makeDep("com.google.guava:guava:32.1.2-jre"),
+			}),
+			makeConfig("compileClasspath", "com.example:my-app:1.0.0", []gradleDep{
+				makeDep("org.apache.commons:commons-lang3:3.12.0"),
+			}),
+		})
+
+		options := &ecosystems.SCAPluginOptions{}
+		options.Gradle.ConfigurationMatching = "nonExistentConfiguration"
+
+		dg, err := buildDepGraph(&proj, options)
+		require.NoError(t, err)
+		require.NotNil(t, dg)
+
+		// Only the root node should exist; no dependency nodes.
+		assert.Len(t, dg.Graph.Nodes, 1)
+	})
+
+	t.Run("preserves configuration processing order after filtering", func(t *testing.T) {
+		// Test that when multiple configurations match, they are processed in their original order
+		proj := makeProject("com.example", "my-app", "1.0.0", []gradleConfig{
+			makeConfig("compileClasspath", "com.example:my-app:1.0.0", []gradleDep{
+				makeDep("com.google.guava:guava:32.1.2-jre"),       // First occurrence
+				makeDep("org.apache.commons:commons-lang3:3.12.0"), // First occurrence
+			}),
+			makeConfig("runtimeClasspath", "com.example:my-app:1.0.0", []gradleDep{
+				makeDep("org.apache.commons:commons-lang3:3.12.0"), // Second occurrence (should be deduplicated)
+				makeDep("com.google.guava:guava:32.1.2-jre"),       // Second occurrence (should be deduplicated)
+			}),
+			makeConfig("testCompileClasspath", "com.example:my-app:1.0.0", []gradleDep{
+				makeDep("junit:junit:4.13.2"), // Should be excluded by pattern
+			}),
+		})
+
+		// Match compile and runtime classpaths but not test
+		options := &ecosystems.SCAPluginOptions{}
+		options.Gradle.ConfigurationMatching = "(compile|runtime)Classpath"
+
+		dg, err := buildDepGraph(&proj, options)
+		require.NoError(t, err)
+
+		rootNode := findNodeByID(t, dg, "root-node")
+		require.Len(t, rootNode.Deps, 2, "should have 2 dependencies from merged configurations")
+
+		// Verify order is preserved from first configuration (compileClasspath)
+		assert.Equal(t, "com.google.guava:guava@32.1.2-jre", rootNode.Deps[0].NodeID,
+			"order should be preserved from first matching configuration")
+		assert.Equal(t, "org.apache.commons:commons-lang3@3.12.0", rootNode.Deps[1].NodeID)
+
+		// Verify test dependency is excluded
+		ids := nodeIDSet(dg)
+		assert.False(t, ids["junit:junit@4.13.2"], "test dependency should be excluded")
+	})
+
+	t.Run("handles configuration matching with configurations that have errors", func(t *testing.T) {
+		proj := makeProject("com.example", "my-app", "1.0.0", []gradleConfig{
+			{Name: "runtimeClasspath", Error: "resolution failed"},
+			makeConfig("compileClasspath", "com.example:my-app:1.0.0", []gradleDep{
+				makeDep("com.google.guava:guava:32.1.2-jre"),
+			}),
+		})
+
+		options := &ecosystems.SCAPluginOptions{}
+		options.Gradle.ConfigurationMatching = ".*Classpath"
+
+		dg, err := buildDepGraph(&proj, options)
+		require.NoError(t, err)
+
+		// Only compileClasspath should contribute dependencies; runtimeClasspath has error
+		ids := nodeIDSet(dg)
+		assert.True(t, ids["com.google.guava:guava@32.1.2-jre"], "compileClasspath dep should be included")
+	})
+}
+
+func TestFilterConfigurationsByPattern(t *testing.T) {
+	configs := []gradleConfig{
+		{Name: "runtimeClasspath"},
+		{Name: "compileClasspath"},
+		{Name: "testRuntimeClasspath"},
+		{Name: "testCompileClasspath"},
+		{Name: "annotationProcessor"},
+	}
+
+	t.Run("filters by exact match", func(t *testing.T) {
+		filtered, err := filterConfigurationsByPattern(configs, "runtimeClasspath")
+		require.NoError(t, err)
+		require.Len(t, filtered, 1)
+		assert.Equal(t, "runtimeClasspath", filtered[0].Name)
+	})
+
+	t.Run("filters by regex pattern", func(t *testing.T) {
+		filtered, err := filterConfigurationsByPattern(configs, "(?i).*runtime.*")
+		require.NoError(t, err)
+		require.Len(t, filtered, 2)
+		assert.Equal(t, "runtimeClasspath", filtered[0].Name)
+		assert.Equal(t, "testRuntimeClasspath", filtered[1].Name)
+	})
+
+	t.Run("returns empty slice when no matches", func(t *testing.T) {
+		filtered, err := filterConfigurationsByPattern(configs, "nonExistent")
+		require.NoError(t, err)
+		assert.Len(t, filtered, 0)
+	})
+
+	t.Run("returns error for invalid regex", func(t *testing.T) {
+		_, err := filterConfigurationsByPattern(configs, "[invalid")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid regex pattern")
+	})
+
+	t.Run("matches all with .* pattern", func(t *testing.T) {
+		filtered, err := filterConfigurationsByPattern(configs, ".*")
+		require.NoError(t, err)
+		assert.Len(t, filtered, 5)
+	})
 }

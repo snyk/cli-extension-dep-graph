@@ -1,0 +1,340 @@
+[
+  {
+    "depGraph": {
+      "schemaVersion": "1.3.0",
+      "pkgManager": {
+        "name": "gradle"
+      },
+      "pkgs": [
+        {
+          "id": "com.snyk.fixtures:configuration-matching-app@1.0.0",
+          "info": {
+            "name": "com.snyk.fixtures:configuration-matching-app",
+            "version": "1.0.0"
+          }
+        },
+        {
+          "id": "org.apache.commons:commons-lang3@3.14.0",
+          "info": {
+            "name": "org.apache.commons:commons-lang3",
+            "version": "3.14.0"
+          }
+        },
+        {
+          "id": "com.google.guava:guava@30.1.1-jre",
+          "info": {
+            "name": "com.google.guava:guava",
+            "version": "30.1.1-jre"
+          }
+        },
+        {
+          "id": "com.google.guava:failureaccess@1.0.1",
+          "info": {
+            "name": "com.google.guava:failureaccess",
+            "version": "1.0.1"
+          }
+        },
+        {
+          "id": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava",
+          "info": {
+            "name": "com.google.guava:listenablefuture",
+            "version": "9999.0-empty-to-avoid-conflict-with-guava"
+          }
+        },
+        {
+          "id": "com.google.code.findbugs:jsr305@3.0.2",
+          "info": {
+            "name": "com.google.code.findbugs:jsr305",
+            "version": "3.0.2"
+          }
+        },
+        {
+          "id": "org.checkerframework:checker-qual@3.8.0",
+          "info": {
+            "name": "org.checkerframework:checker-qual",
+            "version": "3.8.0"
+          }
+        },
+        {
+          "id": "com.google.errorprone:error_prone_annotations@2.5.1",
+          "info": {
+            "name": "com.google.errorprone:error_prone_annotations",
+            "version": "2.5.1"
+          }
+        },
+        {
+          "id": "com.google.j2objc:j2objc-annotations@1.3",
+          "info": {
+            "name": "com.google.j2objc:j2objc-annotations",
+            "version": "1.3"
+          }
+        },
+        {
+          "id": "ch.qos.logback:logback-classic@1.2.12",
+          "info": {
+            "name": "ch.qos.logback:logback-classic",
+            "version": "1.2.12"
+          }
+        },
+        {
+          "id": "ch.qos.logback:logback-core@1.2.12",
+          "info": {
+            "name": "ch.qos.logback:logback-core",
+            "version": "1.2.12"
+          }
+        },
+        {
+          "id": "org.slf4j:slf4j-api@1.7.32",
+          "info": {
+            "name": "org.slf4j:slf4j-api",
+            "version": "1.7.32"
+          }
+        },
+        {
+          "id": "junit:junit@4.13.2",
+          "info": {
+            "name": "junit:junit",
+            "version": "4.13.2"
+          }
+        },
+        {
+          "id": "org.hamcrest:hamcrest-core@1.3",
+          "info": {
+            "name": "org.hamcrest:hamcrest-core",
+            "version": "1.3"
+          }
+        },
+        {
+          "id": "org.mockito:mockito-core@4.11.0",
+          "info": {
+            "name": "org.mockito:mockito-core",
+            "version": "4.11.0"
+          }
+        },
+        {
+          "id": "net.bytebuddy:byte-buddy@1.12.19",
+          "info": {
+            "name": "net.bytebuddy:byte-buddy",
+            "version": "1.12.19"
+          }
+        },
+        {
+          "id": "net.bytebuddy:byte-buddy-agent@1.12.19",
+          "info": {
+            "name": "net.bytebuddy:byte-buddy-agent",
+            "version": "1.12.19"
+          }
+        },
+        {
+          "id": "org.slf4j:slf4j-api@1.7.36",
+          "info": {
+            "name": "org.slf4j:slf4j-api",
+            "version": "1.7.36"
+          }
+        },
+        {
+          "id": "org.objenesis:objenesis@3.3",
+          "info": {
+            "name": "org.objenesis:objenesis",
+            "version": "3.3"
+          }
+        },
+        {
+          "id": "org.slf4j:slf4j-simple@1.7.36",
+          "info": {
+            "name": "org.slf4j:slf4j-simple",
+            "version": "1.7.36"
+          }
+        }
+      ],
+      "graph": {
+        "rootNodeId": "root-node",
+        "nodes": [
+          {
+            "nodeId": "root-node",
+            "pkgId": "com.snyk.fixtures:configuration-matching-app@1.0.0",
+            "deps": [
+              {
+                "nodeId": "org.apache.commons:commons-lang3@3.14.0"
+              },
+              {
+                "nodeId": "com.google.guava:guava@30.1.1-jre"
+              },
+              {
+                "nodeId": "ch.qos.logback:logback-classic@1.2.12"
+              },
+              {
+                "nodeId": "junit:junit@4.13.2"
+              },
+              {
+                "nodeId": "org.mockito:mockito-core@4.11.0"
+              },
+              {
+                "nodeId": "org.slf4j:slf4j-simple@1.7.36"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.apache.commons:commons-lang3@3.14.0",
+            "pkgId": "org.apache.commons:commons-lang3@3.14.0",
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.guava:guava@30.1.1-jre",
+            "pkgId": "com.google.guava:guava@30.1.1-jre",
+            "deps": [
+              {
+                "nodeId": "com.google.guava:failureaccess@1.0.1"
+              },
+              {
+                "nodeId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava"
+              },
+              {
+                "nodeId": "com.google.code.findbugs:jsr305@3.0.2"
+              },
+              {
+                "nodeId": "org.checkerframework:checker-qual@3.8.0"
+              },
+              {
+                "nodeId": "com.google.errorprone:error_prone_annotations@2.5.1"
+              },
+              {
+                "nodeId": "com.google.j2objc:j2objc-annotations@1.3"
+              }
+            ]
+          },
+          {
+            "nodeId": "com.google.guava:failureaccess@1.0.1",
+            "pkgId": "com.google.guava:failureaccess@1.0.1",
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava",
+            "pkgId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava",
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.code.findbugs:jsr305@3.0.2",
+            "pkgId": "com.google.code.findbugs:jsr305@3.0.2",
+            "deps": []
+          },
+          {
+            "nodeId": "org.checkerframework:checker-qual@3.8.0",
+            "pkgId": "org.checkerframework:checker-qual@3.8.0",
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.errorprone:error_prone_annotations@2.5.1",
+            "pkgId": "com.google.errorprone:error_prone_annotations@2.5.1",
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.j2objc:j2objc-annotations@1.3",
+            "pkgId": "com.google.j2objc:j2objc-annotations@1.3",
+            "deps": []
+          },
+          {
+            "nodeId": "ch.qos.logback:logback-classic@1.2.12",
+            "pkgId": "ch.qos.logback:logback-classic@1.2.12",
+            "deps": [
+              {
+                "nodeId": "ch.qos.logback:logback-core@1.2.12"
+              },
+              {
+                "nodeId": "org.slf4j:slf4j-api@1.7.32"
+              },
+              {
+                "nodeId": "org.slf4j:slf4j-api@1.7.36"
+              }
+            ]
+          },
+          {
+            "nodeId": "ch.qos.logback:logback-core@1.2.12",
+            "pkgId": "ch.qos.logback:logback-core@1.2.12",
+            "deps": []
+          },
+          {
+            "nodeId": "org.slf4j:slf4j-api@1.7.32",
+            "pkgId": "org.slf4j:slf4j-api@1.7.32",
+            "deps": []
+          },
+          {
+            "nodeId": "junit:junit@4.13.2",
+            "pkgId": "junit:junit@4.13.2",
+            "deps": [
+              {
+                "nodeId": "org.hamcrest:hamcrest-core@1.3"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.hamcrest:hamcrest-core@1.3",
+            "pkgId": "org.hamcrest:hamcrest-core@1.3",
+            "deps": []
+          },
+          {
+            "nodeId": "org.mockito:mockito-core@4.11.0",
+            "pkgId": "org.mockito:mockito-core@4.11.0",
+            "deps": [
+              {
+                "nodeId": "net.bytebuddy:byte-buddy@1.12.19"
+              },
+              {
+                "nodeId": "net.bytebuddy:byte-buddy-agent@1.12.19"
+              },
+              {
+                "nodeId": "org.objenesis:objenesis@3.3"
+              }
+            ]
+          },
+          {
+            "nodeId": "net.bytebuddy:byte-buddy@1.12.19",
+            "pkgId": "net.bytebuddy:byte-buddy@1.12.19",
+            "deps": []
+          },
+          {
+            "nodeId": "net.bytebuddy:byte-buddy-agent@1.12.19",
+            "pkgId": "net.bytebuddy:byte-buddy-agent@1.12.19",
+            "deps": []
+          },
+          {
+            "nodeId": "org.slf4j:slf4j-api@1.7.36",
+            "pkgId": "org.slf4j:slf4j-api@1.7.36",
+            "deps": []
+          },
+          {
+            "nodeId": "org.objenesis:objenesis@3.3",
+            "pkgId": "org.objenesis:objenesis@3.3",
+            "deps": []
+          },
+          {
+            "nodeId": "org.slf4j:slf4j-simple@1.7.36",
+            "pkgId": "org.slf4j:slf4j-simple@1.7.36",
+            "deps": [
+              {
+                "nodeId": "org.slf4j:slf4j-api@1.7.36:pruned"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.slf4j:slf4j-api@1.7.36:pruned",
+            "pkgId": "org.slf4j:slf4j-api@1.7.36",
+            "info": {
+              "labels": {
+                "pruned": "true"
+              }
+            },
+            "deps": []
+          }
+        ]
+      }
+    },
+    "projectDescriptor": {
+      "identity": {
+        "type": "gradle",
+        "targetFile": "build.gradle",
+        "rootComponentName": "com.snyk.fixtures:configuration-matching-app"
+      }
+    }
+  }
+]
