@@ -117,6 +117,40 @@ func pluginTestCases() map[string]PluginTestCase {
 			Fixture: "dynamic-versions",
 			Options: ecosystems.NewPluginOptions(),
 		},
+		// Exercises --configuration-matching flag functionality using a fixture with dependencies
+		// in multiple configurations: implementation (guava), runtimeOnly (logback), compileOnly (commons-lang3),
+		// testImplementation (junit, mockito), and testRuntimeOnly (slf4j-simple).
+		// This validates that the regex filtering correctly includes/excludes configurations.
+
+		// Full scan (baseline) - includes all configurations
+		"configuration_matching_full_scan": {
+			Fixture: "configuration-matching",
+			Options: ecosystems.NewPluginOptions(),
+		},
+		// Runtime configurations only - includes implementation + runtimeOnly + testRuntimeOnly
+		"configuration_matching_runtime_only": {
+			Fixture:      "configuration-matching",
+			Options:      ecosystems.NewPluginOptions().WithGradleConfigurationMatching("(?i).*runtime.*"),
+			ExpectedFile: "expected_plugin_runtime_only.json",
+		},
+		// Compile configurations only - includes compileOnly + compileClasspath
+		"configuration_matching_compile_only": {
+			Fixture:      "configuration-matching",
+			Options:      ecosystems.NewPluginOptions().WithGradleConfigurationMatching("compile.*"),
+			ExpectedFile: "expected_plugin_compile_only.json",
+		},
+		// Test configurations only - includes testImplementation + testRuntimeOnly
+		"configuration_matching_test_only": {
+			Fixture:      "configuration-matching",
+			Options:      ecosystems.NewPluginOptions().WithGradleConfigurationMatching("(?i)test.*"),
+			ExpectedFile: "expected_plugin_test_only.json",
+		},
+		// Exact match for single configuration - includes only runtimeClasspath
+		"configuration_matching_exact": {
+			Fixture:      "configuration-matching",
+			Options:      ecosystems.NewPluginOptions().WithGradleConfigurationMatching("^runtimeClasspath$"),
+			ExpectedFile: "expected_plugin_exact_runtime.json",
+		},
 	}
 }
 
@@ -128,7 +162,7 @@ func TestGradleWrapper_BinaryResolution(t *testing.T) {
 	// Check JDK compatibility - Gradle 8.4 (used by wrapper) supports at most Java 21
 	jdkVersion, err := jdkRuntime()
 	require.NoErrorf(t, err, "could not detect jdk runtime version")
-	
+
 	if jdkVersion.Major() > 21 {
 		t.Skipf("Gradle 8.4 wrapper supports at most Java 21; running on Java %d", jdkVersion.Major())
 	}

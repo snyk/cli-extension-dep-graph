@@ -2,16 +2,21 @@ package gradle
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
+
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 )
 
 const pkgManagerName = "gradle"
 
 // buildDepGraph converts a single gradleProject into a *depgraph.DepGraph by
 // merging the resolved dependencies from all available configurations.
-func buildDepGraph(proj *gradleProject) (*depgraph.DepGraph, error) {
+// If options.Gradle.ConfigurationMatching is set, only configurations matching
+// the regex pattern will be included.
+func buildDepGraph(proj *gradleProject, options *ecosystems.SCAPluginOptions) (*depgraph.DepGraph, error) {
 	// Derive a stable root name (group:artifact) and version from the GAV.
 	rootName, rootVersion := splitGAV(proj.GAV)
 	if rootName == "" {
@@ -57,17 +62,24 @@ func buildDepGraph(proj *gradleProject) (*depgraph.DepGraph, error) {
 		return nil
 	}
 
-	// Merge all configurations into a single graph.  Per-configuration
-	// filtering (e.g. --configuration-matching, preferring runtimeClasspath)
-	// will be added when feature parity work begins.
-	//
+	// Filter configurations based on --configuration-matching if specified
+	configurationsToProcess := proj.Configurations
+	if options != nil && options.Gradle.ConfigurationMatching != "" {
+		var err error
+		configurationsToProcess, err = filterConfigurationsByPattern(proj.Configurations, options.Gradle.ConfigurationMatching)
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply configuration matching pattern '%s': %w", options.Gradle.ConfigurationMatching, err)
+		}
+	}
+
+	// Merge all configurations into a single graph.
 	// Iterate configurations in Gradle declaration order (preserved by the array
 	// format from the init script). The init script processes configurations via
 	// project.configurations.matching{...}.each{...}, which iterates in the
 	// order configurations were declared. When the same edge appears in multiple
 	// configurations, its position in the merged graph is taken from the first
 	// configuration that contributes it.
-	for _, cfg := range proj.Configurations {
+	for _, cfg := range configurationsToProcess {
 		if cfg.Error != "" {
 			continue
 		}
@@ -159,4 +171,22 @@ func splitGAV(gav string) (name, version string) {
 	}
 
 	return gav, ""
+}
+
+// filterConfigurationsByPattern filters gradle configurations based on a regex pattern.
+// Returns only configurations whose names match the provided regex pattern.
+func filterConfigurationsByPattern(configurations []gradleConfig, pattern string) ([]gradleConfig, error) {
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("invalid regex pattern: %w", err)
+	}
+
+	var filtered []gradleConfig
+	for _, config := range configurations {
+		if regex.MatchString(config.Name) {
+			filtered = append(filtered, config)
+		}
+	}
+
+	return filtered, nil
 }
