@@ -432,7 +432,16 @@ func buildExtraArgs(projectDir string, options *ecosystems.SCAPluginOptions) []s
 		args = append(args, "--init-script", initPath)
 	}
 
-	// Reserved for future flag forwarding (e.g. --configuration, -P flags).
+	// When --target-file is set, scope the Gradle scan to the matching sub-project only.
+	// The init script reads this property and skips dependency resolution for all other projects.
+	if tf := options.Global.TargetFile; tf != nil {
+		absTarget := *tf
+		if !filepath.IsAbs(absTarget) {
+			absTarget = filepath.Join(projectDir, absTarget)
+		}
+		args = append(args, "-PsnykTargetBuildFile="+absTarget)
+	}
+
 	return args
 }
 

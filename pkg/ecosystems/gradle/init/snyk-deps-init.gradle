@@ -5,6 +5,10 @@
 //   Line 1:    metadata JSON object
 //   Lines 2+:  one project JSON object per line (newline-delimited JSON)
 //
+// Optional property: -PsnykTargetBuildFile=<absolutePath>
+//   When set, only the project whose build file matches the path runs (skips all others).
+//   Used by the Go plugin when --target-file points to a specific sub-project build file.
+//
 // Uses Gradle's ResolutionResult API (Gradle 4.4+) to programmatically
 // walk the resolved dependency graph per-project, per-configuration.
 //
@@ -15,9 +19,15 @@
 gradle.projectsEvaluated { g ->
     def root = g.rootProject
 
+    // When snykTargetBuildFile is set, only the matching project runs its task.
+    // Otherwise all projects participate (default behaviour).
+    def targetBuildFile = root.findProperty('snykTargetBuildFile')?.toString()
+
     // One task per project, each writing to its own output file.
     // Isolation makes parallel execution safe; snykDependencyGraph depends on all of these.
-    def perProjectTasks = root.allprojects.collect { proj ->
+    def perProjectTasks = root.allprojects
+        .findAll { proj -> !targetBuildFile || getBuildFilePath(proj) == targetBuildFile }
+        .collect { proj ->
         // Resolved at configuration time so outputs.file() can register it for up-to-date checking.
         def outputFile = resolveReportsFile(proj, "snyk-project.ndjson")
 
@@ -228,13 +238,11 @@ def getBuildFilePath(project) {
     try {
         if (project.hasProperty('layout') && project.layout.hasProperty('projectDirectory')) {
             def projectDir = project.layout.projectDirectory.asFile
-            ['build.gradle', 'build.gradle.kts'].each { fileName ->
-                def buildFile = new File(projectDir, fileName)
-                if (buildFile.exists()) {
-                    return buildFile.absolutePath
-                }
+            def found = ['build.gradle', 'build.gradle.kts'].find { fileName ->
+                new File(projectDir, fileName).exists()
             }
-            return new File(projectDir, 'build.gradle').absolutePath
+            return found ? new File(projectDir, found).absolutePath
+                         : new File(projectDir, 'build.gradle').absolutePath
         }
     } catch (Exception e) {
         // Fallback for older Gradle versions or API failures

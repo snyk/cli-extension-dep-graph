@@ -150,7 +150,7 @@
     "projectDescriptor": {
       "identity": {
         "type": "gradle",
-        "targetFile": "build.gradle",
+        "targetFile": "build.gradle.kts",
         "rootComponentName": "com.snyk.fixtures:kts-simple"
       }
     }
