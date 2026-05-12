@@ -59,9 +59,11 @@ This results in both versions appearing in the merged graph, potentially causing
 
 **Future considerations**: Per-configuration filtering will likely be added when feature parity work begins, allowing clients to request specific configuration scopes.
 
-#### Edge deduplication and ordering
+#### Edge deduplication and DAG structure
 
 When the same `(parent, child)` edge is contributed by more than one configuration (for example a direct dependency that appears in `compileClasspath`, `runtimeClasspath`, `testCompileClasspath` and `testRuntimeClasspath`), the merged graph contains the edge **exactly once** rather than once per contributing configuration. The dep-graph schema treats each parent's `Deps` as a set of edges, so multi-edges would be schema violations and would inflate downstream vulnerable-path counts.
+
+The resolver produces a **directed acyclic graph (DAG)** where shared dependencies appear as single nodes with multiple parents, rather than duplicated as separate "pruned" nodes. This provides accurate representation of the actual dependency structure where the same component can be reached through different dependency paths.
 
 Configurations are walked in **Gradle's natural evaluation order**, preserving the sequence that Gradle itself uses during dependency resolution. When the same edge appears in multiple configurations, its position in the parent's `Deps` slice is taken from the first configuration in evaluation order that contributes it. This makes the merged graph deterministic across runs and across JDK / Gradle versions, and crucially means that cross-configuration edge ordering **is semantically meaningful** — it reflects Gradle's actual dependency processing sequence rather than arbitrary alphabetical sorting. This provides more accurate representation for clients that need declaration order semantics (for example, to surface the most relevant "nearest" path for a CVE), though `--configuration-matching` will still be valuable for configuration-specific analysis once that lands.
 
@@ -79,6 +81,17 @@ The resolver currently does not capture or report Maven classifiers at all. Depe
 **Implementation**: The init script extracts dependency IDs using `${group}:${name}:${version}` format only. Artifacts with classifiers (e.g., `commons-io:commons-io:2.6:sources`) are treated identically to their main artifacts, potentially causing different classifier variants to be merged in the dependency graph.
 
 This limitation should be addressed if classifier-specific vulnerabilities become relevant or if upstream services begin requiring classifier information for accurate analysis.
+
+### Constraint Edge Handling
+
+**Constraint vs artifact dependencies**
+
+The resolver distinguishes between **constraint edges** (which influence version selection) and **artifact edges** (which represent actual dependencies that appear in classpaths):
+
+- **Constraint sources**: Platform BOMs (`implementation platform(...)`), dependency locking (`gradle.lockfile`), explicit constraints (`constraints {}` blocks)
+- **Representation**: Constraint edges appear as separate nodes with a `:constraint` suffix and appropriate labels, allowing consumers to distinguish them from real artifact dependencies
+
+This separation prevents constraint-derived edges from interfering with the actual dependency graph structure while preserving diagnostic information about what constraints influenced version resolution.
 
 ## Technical Implementation Notes
 
