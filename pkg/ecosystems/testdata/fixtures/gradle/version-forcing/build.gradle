@@ -1,0 +1,24 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.snyk.fixtures'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+// Regression fixture: resolutionStrategy.force is a version-selection rule,
+// not a constraint edge. The forced module must appear as a normal node in
+// its existing graph position (under guice as a transitive), with the forced
+// version selected — never as a `:constraint`-suffixed leaf.
+configurations.all {
+    resolutionStrategy {
+        force 'com.google.guava:guava:32.0.1-jre'
+    }
+}
+
+dependencies {
+    implementation 'com.google.inject:guice:5.1.0'
+}

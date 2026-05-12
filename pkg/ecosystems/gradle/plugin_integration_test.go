@@ -91,6 +91,28 @@ func pluginTestCases() map[string]PluginTestCase {
 			Fixture: "platform-bom",
 			Options: ecosystems.NewPluginOptions(),
 		},
+		// Exercises the `constraints {}` DSL: pins the resolved version of a
+		// transitive dep without declaring a real edge. Asserts the constraint
+		// edge surfaces as a `:constraint`-suffixed leaf and does not poison
+		// the visited set for the real transitive edge to the same module.
+		"dependency_constraints": {
+			Fixture: "dependency-constraints",
+			Options: ecosystems.NewPluginOptions(),
+		},
+		// Regression fixture for resolutionStrategy.force. `force` is a
+		// version-selection rule, not a constraint edge — the forced module
+		// must appear as a normal node, never as a `:constraint` leaf.
+		"version_forcing": {
+			Fixture: "version-forcing",
+			Options: ecosystems.NewPluginOptions(),
+		},
+		// Regression fixture for dependencySubstitution. Substitution replaces
+		// the target component on an existing edge — the substituted module
+		// must appear as a normal node, never as a `:constraint` leaf.
+		"dependency_substitution": {
+			Fixture: "dependency-substitution",
+			Options: ecosystems.NewPluginOptions(),
+		},
 		// Smoke test that the Kotlin DSL build file (build.gradle.kts) is
 		// discovered and resolved equivalently to its Groovy counterpart.
 		"kts_simple": {

@@ -1,0 +1,24 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.snyk.fixtures'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+// Regression fixture: dependencySubstitution replaces the target component on
+// an existing edge. The substituted module replaces the original on the same
+// edge — no `:constraint` node should appear.
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        substitute module('commons-logging:commons-logging') using module('org.slf4j:jcl-over-slf4j:1.7.36')
+    }
+}
+
+dependencies {
+    implementation 'commons-logging:commons-logging:1.2'
+    implementation 'org.slf4j:slf4j-api:1.7.36'
+}

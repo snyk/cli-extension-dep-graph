@@ -75,9 +75,15 @@ func (p pruneReason) IsPruned() bool {
 }
 
 // gradleDep is one node in the resolved dependency tree.
+//
+// Constraint edges originate from platform BOMs, dependency locking, and
+// explicit constraints {} blocks. They influence version selection but do not
+// represent real artifact dependencies, and the init script always emits them
+// as leaves (no Dependencies, no Pruned).
 type gradleDep struct {
 	ID           string      `json:"id"`
 	Pruned       pruneReason `json:"pruned,omitempty"`
+	Constraint   bool        `json:"constraint,omitempty"`
 	Unresolved   bool        `json:"unresolved,omitempty"`
 	Reason       string      `json:"reason,omitempty"`
 	Dependencies []gradleDep `json:"dependencies"`

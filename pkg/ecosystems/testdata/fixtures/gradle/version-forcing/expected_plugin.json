@@ -7,17 +7,31 @@
       },
       "pkgs": [
         {
-          "id": "com.snyk.fixtures:with-lock-file@1.0.0",
+          "id": "com.snyk.fixtures:version-forcing@1.0.0",
           "info": {
-            "name": "com.snyk.fixtures:with-lock-file",
+            "name": "com.snyk.fixtures:version-forcing",
             "version": "1.0.0"
           }
         },
         {
-          "id": "org.codehaus.groovy:groovy@3.0.3",
+          "id": "com.google.inject:guice@5.1.0",
           "info": {
-            "name": "org.codehaus.groovy:groovy",
-            "version": "3.0.3"
+            "name": "com.google.inject:guice",
+            "version": "5.1.0"
+          }
+        },
+        {
+          "id": "javax.inject:javax.inject@1",
+          "info": {
+            "name": "javax.inject:javax.inject",
+            "version": "1"
+          }
+        },
+        {
+          "id": "aopalliance:aopalliance@1.0",
+          "info": {
+            "name": "aopalliance:aopalliance",
+            "version": "1.0"
           }
         },
         {
@@ -75,53 +89,36 @@
         "nodes": [
           {
             "nodeId": "root-node",
-            "pkgId": "com.snyk.fixtures:with-lock-file@1.0.0",
+            "pkgId": "com.snyk.fixtures:version-forcing@1.0.0",
             "deps": [
               {
-                "nodeId": "org.codehaus.groovy:groovy@3.0.3"
-              },
-              {
-                "nodeId": "org.codehaus.groovy:groovy@3.0.3:constraint"
-              },
-              {
-                "nodeId": "com.google.guava:guava@32.0.1-jre"
-              },
-              {
-                "nodeId": "com.google.guava:guava@32.0.1-jre:constraint"
-              },
-              {
-                "nodeId": "com.google.guava:failureaccess@1.0.1:constraint"
-              },
-              {
-                "nodeId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava:constraint"
-              },
-              {
-                "nodeId": "com.google.code.findbugs:jsr305@3.0.2:constraint"
-              },
-              {
-                "nodeId": "org.checkerframework:checker-qual@3.33.0:constraint"
-              },
-              {
-                "nodeId": "com.google.errorprone:error_prone_annotations@2.18.0:constraint"
-              },
-              {
-                "nodeId": "com.google.j2objc:j2objc-annotations@2.8:constraint"
+                "nodeId": "com.google.inject:guice@5.1.0"
               }
             ]
           },
           {
-            "nodeId": "org.codehaus.groovy:groovy@3.0.3",
-            "pkgId": "org.codehaus.groovy:groovy@3.0.3",
+            "nodeId": "com.google.inject:guice@5.1.0",
+            "pkgId": "com.google.inject:guice@5.1.0",
+            "deps": [
+              {
+                "nodeId": "javax.inject:javax.inject@1"
+              },
+              {
+                "nodeId": "aopalliance:aopalliance@1.0"
+              },
+              {
+                "nodeId": "com.google.guava:guava@32.0.1-jre"
+              }
+            ]
+          },
+          {
+            "nodeId": "javax.inject:javax.inject@1",
+            "pkgId": "javax.inject:javax.inject@1",
             "deps": []
           },
           {
-            "nodeId": "org.codehaus.groovy:groovy@3.0.3:constraint",
-            "pkgId": "org.codehaus.groovy:groovy@3.0.3",
-            "info": {
-              "labels": {
-                "constraint": "true"
-              }
-            },
+            "nodeId": "aopalliance:aopalliance@1.0",
+            "pkgId": "aopalliance:aopalliance@1.0",
             "deps": []
           },
           {
@@ -177,76 +174,6 @@
             "nodeId": "com.google.j2objc:j2objc-annotations@2.8",
             "pkgId": "com.google.j2objc:j2objc-annotations@2.8",
             "deps": []
-          },
-          {
-            "nodeId": "com.google.guava:guava@32.0.1-jre:constraint",
-            "pkgId": "com.google.guava:guava@32.0.1-jre",
-            "info": {
-              "labels": {
-                "constraint": "true"
-              }
-            },
-            "deps": []
-          },
-          {
-            "nodeId": "com.google.guava:failureaccess@1.0.1:constraint",
-            "pkgId": "com.google.guava:failureaccess@1.0.1",
-            "info": {
-              "labels": {
-                "constraint": "true"
-              }
-            },
-            "deps": []
-          },
-          {
-            "nodeId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava:constraint",
-            "pkgId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava",
-            "info": {
-              "labels": {
-                "constraint": "true"
-              }
-            },
-            "deps": []
-          },
-          {
-            "nodeId": "com.google.code.findbugs:jsr305@3.0.2:constraint",
-            "pkgId": "com.google.code.findbugs:jsr305@3.0.2",
-            "info": {
-              "labels": {
-                "constraint": "true"
-              }
-            },
-            "deps": []
-          },
-          {
-            "nodeId": "org.checkerframework:checker-qual@3.33.0:constraint",
-            "pkgId": "org.checkerframework:checker-qual@3.33.0",
-            "info": {
-              "labels": {
-                "constraint": "true"
-              }
-            },
-            "deps": []
-          },
-          {
-            "nodeId": "com.google.errorprone:error_prone_annotations@2.18.0:constraint",
-            "pkgId": "com.google.errorprone:error_prone_annotations@2.18.0",
-            "info": {
-              "labels": {
-                "constraint": "true"
-              }
-            },
-            "deps": []
-          },
-          {
-            "nodeId": "com.google.j2objc:j2objc-annotations@2.8:constraint",
-            "pkgId": "com.google.j2objc:j2objc-annotations@2.8",
-            "info": {
-              "labels": {
-                "constraint": "true"
-              }
-            },
-            "deps": []
           }
         ]
       }
@@ -255,7 +182,7 @@
       "identity": {
         "type": "gradle",
         "targetFile": "build.gradle",
-        "rootComponentName": "com.snyk.fixtures:with-lock-file"
+        "rootComponentName": "com.snyk.fixtures:version-forcing"
       }
     }
   }

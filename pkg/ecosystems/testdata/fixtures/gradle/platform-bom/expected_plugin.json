@@ -65,15 +65,45 @@
             "pkgId": "org.springframework.boot:spring-boot-dependencies@1.5.8.RELEASE",
             "deps": [
               {
-                "nodeId": "com.google.code.gson:gson@2.8.2"
+                "nodeId": "com.google.code.gson:gson@2.8.2:constraint"
               },
               {
-                "nodeId": "dom4j:dom4j@1.6.1"
+                "nodeId": "dom4j:dom4j@1.6.1:constraint"
               },
               {
-                "nodeId": "xml-apis:xml-apis@1.4.01"
+                "nodeId": "xml-apis:xml-apis@1.4.01:constraint"
               }
             ]
+          },
+          {
+            "nodeId": "com.google.code.gson:gson@2.8.2:constraint",
+            "pkgId": "com.google.code.gson:gson@2.8.2",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "dom4j:dom4j@1.6.1:constraint",
+            "pkgId": "dom4j:dom4j@1.6.1",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "xml-apis:xml-apis@1.4.01:constraint",
+            "pkgId": "xml-apis:xml-apis@1.4.01",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
           },
           {
             "nodeId": "com.google.code.gson:gson@2.8.2",

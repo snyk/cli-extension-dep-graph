@@ -109,6 +109,10 @@ func buildDepGraph(proj *gradleProject, options *ecosystems.SCAPluginOptions) (*
 //   - Components flagged with `pruned: "visited"` (or already in `processed`)
 //     are connected to their existing node instead of creating pruned nodes,
 //     allowing multiple parents while avoiding infinite recursion.
+//   - Components flagged with `constraint: true` (from platform BOMs, dependency
+//     locking, or constraints {} blocks) become labeled `constraint` leaves
+//     with a `:constraint` node-ID suffix. They do not affect `processed`, so a
+//     real edge to the same component will still be expanded normally.
 //
 // connectOnce wraps depgraph.Builder.ConnectNodes with deduplication so that
 // the same (parent, child) edge is only added once across the entire merged
@@ -119,6 +123,20 @@ func addDep(builder *depgraph.Builder, dep *gradleDep, parentID string, processe
 	}
 
 	nodeID, name, version := depNodeParts(dep.ID)
+
+	if dep.Constraint {
+		// Constraint edges are a separate node so consumers can distinguish
+		// version-influencing constraints from real artifact dependencies.
+		// Do not mark `processed` — the real edge to this component (if any)
+		// must still be expanded fully.
+		constraintID := nodeID + ":constraint"
+		builder.AddNode(constraintID, &depgraph.PkgInfo{Name: name, Version: version},
+			depgraph.WithNodeInfo(&depgraph.NodeInfo{
+				Labels: map[string]string{"constraint": "true"},
+			}),
+		)
+		return connectOnce(parentID, constraintID)
+	}
 
 	if dep.Pruned == pruneCycle {
 		// Record a pruned leaf for cycles to maintain DAG property and avoid

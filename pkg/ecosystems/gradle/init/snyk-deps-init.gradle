@@ -160,7 +160,20 @@ def walkDependencies(component, Set<String> processed, Set<String> ancestry) {
             // ResolvedDependencyResult
             def id = componentId(selected)
 
-            if (ancestry.contains(id)) {
+            // Constraint edges originate from platform BOMs, dependency locking, and
+            // explicit constraints {} blocks. They influence version selection but do
+            // not represent real artifact dependencies. Emit them as leaves and do not
+            // recurse, mark the target as visited, or affect ancestry — otherwise a
+            // real edge to the same component would be incorrectly reported as
+            // pruned: visited. Property check guards against older Gradle versions
+            // (pre-4.6) where DependencyResult.isConstraint() does not exist.
+            def isConstraintEdge = dep.hasProperty('constraint') && dep.constraint
+            if (isConstraintEdge) {
+                children << [
+                    id        : id,
+                    constraint: true,
+                ]
+            } else if (ancestry.contains(id)) {
                 // True cycle — this component is on the current ancestor chain
                 children << [
                     id    : id,
