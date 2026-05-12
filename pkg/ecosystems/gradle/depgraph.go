@@ -99,15 +99,16 @@ func buildDepGraph(proj *gradleProject, options *ecosystems.SCAPluginOptions) (*
 // DFS spanning tree of the resolved dependency DAG: each component's children
 // appear under exactly one parent per configuration; every subsequent
 // reference to the same component is emitted with `pruned: "visited"` or
-// `pruned: "cycle"` and no children.  We mirror that shape here:
+// `pruned: "cycle"` and no children.  We produce a DAG by handling pruning as:
 //
 //   - `processed` records every component we've already expanded in this
 //     configuration so a malformed input that includes the same expanded
 //     subtree twice would still be walked at most once.
-//   - Components flagged with any `pruned` value by the init script (or already in
-//     `processed`) become labeled `pruned` leaves so the tree shape matches
-//     `gradle dependencies` text output and downstream "vulnerable path"
-//     counts remain meaningful.
+//   - Components flagged with `pruned: "cycle"` become labeled `pruned` leaves
+//     to maintain the DAG property and avoid infinite recursion.
+//   - Components flagged with `pruned: "visited"` (or already in `processed`)
+//     are connected to their existing node instead of creating pruned nodes,
+//     allowing multiple parents while avoiding infinite recursion.
 //
 // connectOnce wraps depgraph.Builder.ConnectNodes with deduplication so that
 // the same (parent, child) edge is only added once across the entire merged
@@ -119,8 +120,8 @@ func addDep(builder *depgraph.Builder, dep *gradleDep, parentID string, processe
 
 	nodeID, name, version := depNodeParts(dep.ID)
 
-	if dep.Pruned.IsPruned() || processed[nodeID] {
-		// Record a pruned leaf so the dep-graph is still complete, but avoid
+	if dep.Pruned == pruneCycle {
+		// Record a pruned leaf for cycles to maintain DAG property and avoid
 		// infinite recursion.
 		prunedID := nodeID + ":pruned"
 		builder.AddNode(prunedID, &depgraph.PkgInfo{Name: name, Version: version},
@@ -129,6 +130,11 @@ func addDep(builder *depgraph.Builder, dep *gradleDep, parentID string, processe
 			}),
 		)
 		return connectOnce(parentID, prunedID)
+	} else if dep.Pruned == pruneVisited || processed[nodeID] {
+		// For visited nodes, connect to the existing node instead of creating
+		// a pruned version. This produces a DAG where nodes can have multiple
+		// parents but no cycles.
+		return connectOnce(parentID, nodeID)
 	}
 
 	builder.AddNode(nodeID, &depgraph.PkgInfo{Name: name, Version: version})

@@ -82,7 +82,7 @@
                 "nodeId": "commons-lang:commons-lang@2.5"
               },
               {
-                "nodeId": "commons-logging:commons-logging@1.1.1:pruned"
+                "nodeId": "commons-logging:commons-logging@1.1.1"
               },
               {
                 "nodeId": "net.sf.ezmorph:ezmorph@1.0.6"
@@ -114,33 +114,13 @@
             "deps": []
           },
           {
-            "nodeId": "commons-logging:commons-logging@1.1.1:pruned",
-            "pkgId": "commons-logging:commons-logging@1.1.1",
-            "info": {
-              "labels": {
-                "pruned": "true"
-              }
-            },
-            "deps": []
-          },
-          {
             "nodeId": "net.sf.ezmorph:ezmorph@1.0.6",
             "pkgId": "net.sf.ezmorph:ezmorph@1.0.6",
             "deps": [
               {
-                "nodeId": "commons-lang:commons-lang@2.5:pruned"
+                "nodeId": "commons-lang:commons-lang@2.5"
               }
             ]
-          },
-          {
-            "nodeId": "commons-lang:commons-lang@2.5:pruned",
-            "pkgId": "commons-lang:commons-lang@2.5",
-            "info": {
-              "labels": {
-                "pruned": "true"
-              }
-            },
-            "deps": []
           }
         ]
       }

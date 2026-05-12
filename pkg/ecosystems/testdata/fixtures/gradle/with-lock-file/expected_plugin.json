@@ -81,47 +81,31 @@
                 "nodeId": "org.codehaus.groovy:groovy@3.0.3"
               },
               {
-                "nodeId": "org.codehaus.groovy:groovy@3.0.3:pruned"
-              },
-              {
                 "nodeId": "com.google.guava:guava@32.0.1-jre"
               },
               {
-                "nodeId": "com.google.guava:guava@32.0.1-jre:pruned"
+                "nodeId": "com.google.guava:failureaccess@1.0.1"
               },
               {
-                "nodeId": "com.google.guava:failureaccess@1.0.1:pruned"
+                "nodeId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava"
               },
               {
-                "nodeId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava:pruned"
+                "nodeId": "com.google.code.findbugs:jsr305@3.0.2"
               },
               {
-                "nodeId": "com.google.code.findbugs:jsr305@3.0.2:pruned"
+                "nodeId": "org.checkerframework:checker-qual@3.33.0"
               },
               {
-                "nodeId": "org.checkerframework:checker-qual@3.33.0:pruned"
+                "nodeId": "com.google.errorprone:error_prone_annotations@2.18.0"
               },
               {
-                "nodeId": "com.google.errorprone:error_prone_annotations@2.18.0:pruned"
-              },
-              {
-                "nodeId": "com.google.j2objc:j2objc-annotations@2.8:pruned"
+                "nodeId": "com.google.j2objc:j2objc-annotations@2.8"
               }
             ]
           },
           {
             "nodeId": "org.codehaus.groovy:groovy@3.0.3",
             "pkgId": "org.codehaus.groovy:groovy@3.0.3",
-            "deps": []
-          },
-          {
-            "nodeId": "org.codehaus.groovy:groovy@3.0.3:pruned",
-            "pkgId": "org.codehaus.groovy:groovy@3.0.3",
-            "info": {
-              "labels": {
-                "pruned": "true"
-              }
-            },
             "deps": []
           },
           {
@@ -176,76 +160,6 @@
           {
             "nodeId": "com.google.j2objc:j2objc-annotations@2.8",
             "pkgId": "com.google.j2objc:j2objc-annotations@2.8",
-            "deps": []
-          },
-          {
-            "nodeId": "com.google.guava:guava@32.0.1-jre:pruned",
-            "pkgId": "com.google.guava:guava@32.0.1-jre",
-            "info": {
-              "labels": {
-                "pruned": "true"
-              }
-            },
-            "deps": []
-          },
-          {
-            "nodeId": "com.google.guava:failureaccess@1.0.1:pruned",
-            "pkgId": "com.google.guava:failureaccess@1.0.1",
-            "info": {
-              "labels": {
-                "pruned": "true"
-              }
-            },
-            "deps": []
-          },
-          {
-            "nodeId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava:pruned",
-            "pkgId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava",
-            "info": {
-              "labels": {
-                "pruned": "true"
-              }
-            },
-            "deps": []
-          },
-          {
-            "nodeId": "com.google.code.findbugs:jsr305@3.0.2:pruned",
-            "pkgId": "com.google.code.findbugs:jsr305@3.0.2",
-            "info": {
-              "labels": {
-                "pruned": "true"
-              }
-            },
-            "deps": []
-          },
-          {
-            "nodeId": "org.checkerframework:checker-qual@3.33.0:pruned",
-            "pkgId": "org.checkerframework:checker-qual@3.33.0",
-            "info": {
-              "labels": {
-                "pruned": "true"
-              }
-            },
-            "deps": []
-          },
-          {
-            "nodeId": "com.google.errorprone:error_prone_annotations@2.18.0:pruned",
-            "pkgId": "com.google.errorprone:error_prone_annotations@2.18.0",
-            "info": {
-              "labels": {
-                "pruned": "true"
-              }
-            },
-            "deps": []
-          },
-          {
-            "nodeId": "com.google.j2objc:j2objc-annotations@2.8:pruned",
-            "pkgId": "com.google.j2objc:j2objc-annotations@2.8",
-            "info": {
-              "labels": {
-                "pruned": "true"
-              }
-            },
             "deps": []
           }
         ]

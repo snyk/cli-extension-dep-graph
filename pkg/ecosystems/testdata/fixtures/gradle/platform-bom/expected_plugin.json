@@ -53,10 +53,10 @@
                 "nodeId": "org.springframework.boot:spring-boot-dependencies@1.5.8.RELEASE"
               },
               {
-                "nodeId": "com.google.code.gson:gson@2.8.2:pruned"
+                "nodeId": "com.google.code.gson:gson@2.8.2"
               },
               {
-                "nodeId": "dom4j:dom4j@1.6.1:pruned"
+                "nodeId": "dom4j:dom4j@1.6.1"
               }
             ]
           },
@@ -71,7 +71,7 @@
                 "nodeId": "dom4j:dom4j@1.6.1"
               },
               {
-                "nodeId": "xml-apis:xml-apis@1.4.01:pruned"
+                "nodeId": "xml-apis:xml-apis@1.4.01"
               }
             ]
           },
@@ -92,36 +92,6 @@
           {
             "nodeId": "xml-apis:xml-apis@1.4.01",
             "pkgId": "xml-apis:xml-apis@1.4.01",
-            "deps": []
-          },
-          {
-            "nodeId": "xml-apis:xml-apis@1.4.01:pruned",
-            "pkgId": "xml-apis:xml-apis@1.4.01",
-            "info": {
-              "labels": {
-                "pruned": "true"
-              }
-            },
-            "deps": []
-          },
-          {
-            "nodeId": "com.google.code.gson:gson@2.8.2:pruned",
-            "pkgId": "com.google.code.gson:gson@2.8.2",
-            "info": {
-              "labels": {
-                "pruned": "true"
-              }
-            },
-            "deps": []
-          },
-          {
-            "nodeId": "dom4j:dom4j@1.6.1:pruned",
-            "pkgId": "dom4j:dom4j@1.6.1",
-            "info": {
-              "labels": {
-                "pruned": "true"
-              }
-            },
             "deps": []
           }
         ]

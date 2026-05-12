@@ -126,10 +126,13 @@ func TestBuildDepGraph(t *testing.T) {
 		assert.False(t, ids["com.example:a@1.0.0"], "cycle-pruned dep should not appear as normal node")
 	})
 
-	t.Run("handles visited-pruned dependencies as pruned nodes", func(t *testing.T) {
+	t.Run("handles visited-pruned dependencies by connecting to existing nodes", func(t *testing.T) {
+		// Test that visited-pruned dependencies connect to existing nodes instead of creating pruned versions.
+		// We simulate a case where a node is expanded under one parent and then referenced as pruned under another.
 		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
 			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
-				{ID: "com.example:b:2.0.0", Pruned: pruneVisited},
+				makeDep("com.example:a:1.0.0", makeDep("com.example:shared:1.0.0")),                             // First occurrence - creates the node
+				makeDep("com.example:b:1.0.0", gradleDep{ID: "com.example:shared:1.0.0", Pruned: pruneVisited}), // Second occurrence - should connect to existing
 			}),
 		})
 
@@ -137,8 +140,18 @@ func TestBuildDepGraph(t *testing.T) {
 		require.NoError(t, err)
 
 		ids := nodeIDSet(dg)
-		assert.True(t, ids["com.example:b@2.0.0:pruned"], "visited-pruned dep should appear as pruned node")
-		assert.False(t, ids["com.example:b@2.0.0"], "visited-pruned dep should not appear as normal node")
+		assert.True(t, ids["com.example:shared@1.0.0"], "visited-pruned dep should connect to existing node")
+		assert.False(t, ids["com.example:shared@1.0.0:pruned"], "visited-pruned dep should not create pruned node")
+
+		// Verify the shared node has two different parents
+		aNode := findNodeByID(t, dg, "com.example:a@1.0.0")
+		bNode := findNodeByID(t, dg, "com.example:b@1.0.0")
+
+		sharedEdgesFromA := countEdgesTo(aNode, "com.example:shared@1.0.0")
+		sharedEdgesFromB := countEdgesTo(bNode, "com.example:shared@1.0.0")
+
+		assert.Equal(t, 1, sharedEdgesFromA, "a should reference shared node once")
+		assert.Equal(t, 1, sharedEdgesFromB, "b should reference the same shared node")
 	})
 
 	t.Run("skips unresolved dependencies", func(t *testing.T) {
@@ -202,10 +215,11 @@ func TestBuildDepGraph(t *testing.T) {
 		assert.Equal(t, "", dg.Pkgs[0].Info.Version)
 	})
 
-	t.Run("prunes subsequent references to same dependency per configuration", func(t *testing.T) {
+	t.Run("connects subsequent references to same dependency per configuration", func(t *testing.T) {
 		// This test simulates the common case where two parents reference the same child.
 		// The init script would emit the child's full subtree under the first parent and
-		// mark subsequent references as pruned: "visited".
+		// mark subsequent references as pruned: "visited". With DAG behavior, we connect
+		// to the existing node instead of creating pruned versions.
 		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
 			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
 				makeDep("com.example:a:1.0.0", makeDep("com.example:c:1.0.0")),
@@ -217,8 +231,18 @@ func TestBuildDepGraph(t *testing.T) {
 		require.NoError(t, err)
 
 		ids := nodeIDSet(dg)
-		assert.True(t, ids["com.example:c@1.0.0"], "first occurrence should appear as normal node")
-		assert.True(t, ids["com.example:c@1.0.0:pruned"], "subsequent occurrence should appear as pruned node")
+		assert.True(t, ids["com.example:c@1.0.0"], "dependency should appear as normal node")
+		assert.False(t, ids["com.example:c@1.0.0:pruned"], "should not create pruned version for visited nodes")
+
+		// Verify both parents reference the same node
+		aNode := findNodeByID(t, dg, "com.example:a@1.0.0")
+		bNode := findNodeByID(t, dg, "com.example:b@1.0.0")
+
+		cEdgesFromA := countEdgesTo(aNode, "com.example:c@1.0.0")
+		cEdgesFromB := countEdgesTo(bNode, "com.example:c@1.0.0")
+
+		assert.Equal(t, 1, cEdgesFromA, "a should reference c once")
+		assert.Equal(t, 1, cEdgesFromB, "b should reference the same c node")
 	})
 
 	t.Run("preserves different versions of same transitive dependency across configurations", func(t *testing.T) {
