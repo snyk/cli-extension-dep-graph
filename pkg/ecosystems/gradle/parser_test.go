@@ -12,45 +12,8 @@ import (
 
 func TestParseDependencyGraphJSON(t *testing.T) {
 	t.Run("parses valid JSON with a single project", func(t *testing.T) {
-		input := []byte(`{
-			"metadata": {
-				"gradleVersion": "8.5",
-				"javaVersion": "17.0.9",
-				"generatedAt": "2024-01-01T00:00:00Z",
-				"rootProject": {
-					"name": "my-app",
-					"group": "com.example",
-					"version": "1.0.0",
-					"path": "/projects/my-app"
-				}
-			},
-			"projects": [
-				{
-					"name": "my-app",
-					"group": "com.example",
-					"version": "1.0.0",
-					"path": ":",
-					"gav": "com.example:my-app:1.0.0",
-					"buildFile": "/projects/my-app/build.gradle",
-					"configurations": [
-						{
-							"name": "runtimeClasspath",
-							"description": "Runtime classpath",
-							"root": {
-								"id": "com.example:my-app:1.0.0",
-								"dependencies": [
-									{
-										"id": "com.google.guava:guava:32.1.2-jre",
-										"dependencies": []
-									}
-								]
-							},
-							"allDependencies": []
-						}
-					]
-				}
-			]
-		}`)
+		input := []byte(`{"gradleVersion":"8.5","javaVersion":"17.0.9","generatedAt":"2024-01-01T00:00:00Z","rootProject":{"name":"my-app","group":"com.example","version":"1.0.0","path":"/projects/my-app"}}
+{"name":"my-app","group":"com.example","version":"1.0.0","path":":","gav":"com.example:my-app:1.0.0","buildFile":"/projects/my-app/build.gradle","configurations":[{"name":"runtimeClasspath","description":"Runtime classpath","root":{"id":"com.example:my-app:1.0.0","dependencies":[{"id":"com.google.guava:guava:32.1.2-jre","dependencies":[]}]},"allDependencies":[]}]}`)
 
 		result, err := parseDependencyGraphJSON(bytes.NewReader(input))
 		require.NoError(t, err)
@@ -74,13 +37,9 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 	})
 
 	t.Run("parses multiple projects", func(t *testing.T) {
-		input := []byte(`{
-			"metadata": {"gradleVersion": "8.5", "javaVersion": "17", "generatedAt": "", "rootProject": {"name": "root", "group": "", "version": "", "path": ""}},
-			"projects": [
-				{"name": "root", "group": "com.example", "version": "1.0", "path": ":", "gav": "com.example:root:1.0", "buildFile": "", "configurations": []},
-				{"name": "app", "group": "com.example", "version": "1.0", "path": ":app", "gav": "com.example:app:1.0", "buildFile": "", "configurations": []}
-			]
-		}`)
+		input := []byte(`{"gradleVersion":"8.5","javaVersion":"17","generatedAt":"","rootProject":{"name":"root","group":"","version":"","path":""}}
+{"name":"root","group":"com.example","version":"1.0","path":":","gav":"com.example:root:1.0","buildFile":"","configurations":[]}
+{"name":"app","group":"com.example","version":"1.0","path":":app","gav":"com.example:app:1.0","buildFile":"","configurations":[]}`)
 
 		result, err := parseDependencyGraphJSON(bytes.NewReader(input))
 		require.NoError(t, err)
@@ -100,29 +59,8 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 	})
 
 	t.Run("parses pruned and unresolved dependencies", func(t *testing.T) {
-		input := []byte(`{
-			"metadata": {"gradleVersion": "8.5", "javaVersion": "17", "generatedAt": "", "rootProject": {"name": "root", "group": "", "version": "", "path": ""}},
-			"projects": [
-				{
-					"name": "root", "group": "com.example", "version": "1.0", "path": ":", "gav": "com.example:root:1.0", "buildFile": "",
-					"configurations": [
-						{
-							"name": "runtimeClasspath",
-							"description": "",
-							"root": {
-								"id": "com.example:root:1.0",
-								"dependencies": [
-									{"id": "com.example:a:1.0", "pruned": "cycle", "dependencies": []},
-									{"id": "com.example:b:1.0", "pruned": "visited", "dependencies": []},
-									{"id": "com.example:c:1.0", "unresolved": true, "reason": "not found", "dependencies": []}
-								]
-							},
-							"allDependencies": []
-						}
-					]
-				}
-			]
-		}`)
+		input := []byte(`{"gradleVersion":"8.5","javaVersion":"17","generatedAt":"","rootProject":{"name":"root","group":"","version":"","path":""}}
+{"name":"root","group":"com.example","version":"1.0","path":":","gav":"com.example:root:1.0","buildFile":"","configurations":[{"name":"runtimeClasspath","description":"","root":{"id":"com.example:root:1.0","dependencies":[{"id":"com.example:a:1.0","pruned":"cycle","dependencies":[]},{"id":"com.example:b:1.0","pruned":"visited","dependencies":[]},{"id":"com.example:c:1.0","unresolved":true,"reason":"not found","dependencies":[]}]},"allDependencies":[]}]}`)
 
 		result, err := parseDependencyGraphJSON(bytes.NewReader(input))
 		require.NoError(t, err)
@@ -137,17 +75,8 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 	})
 
 	t.Run("parses configuration error field", func(t *testing.T) {
-		input := []byte(`{
-			"metadata": {"gradleVersion": "8.5", "javaVersion": "17", "generatedAt": "", "rootProject": {"name": "root", "group": "", "version": "", "path": ""}},
-			"projects": [
-				{
-					"name": "root", "group": "", "version": "1.0", "path": ":", "gav": ":root:1.0", "buildFile": "",
-					"configurations": [
-						{"name": "brokenConfig", "description": "", "root": {"id": "", "dependencies": []}, "allDependencies": [], "error": "resolution failed"}
-					]
-				}
-			]
-		}`)
+		input := []byte(`{"gradleVersion":"8.5","javaVersion":"17","generatedAt":"","rootProject":{"name":"root","group":"","version":"","path":""}}
+{"name":"root","group":"","version":"1.0","path":":","gav":":root:1.0","buildFile":"","configurations":[{"name":"brokenConfig","description":"","root":{"id":"","dependencies":[]},"allDependencies":[],"error":"resolution failed"}]}`)
 
 		result, err := parseDependencyGraphJSON(bytes.NewReader(input))
 		require.NoError(t, err)
@@ -166,5 +95,12 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 	t.Run("returns error for empty input", func(t *testing.T) {
 		_, err := parseDependencyGraphJSON(bytes.NewReader([]byte(``)))
 		require.Error(t, err)
+		assert.Contains(t, err.Error(), "NDJSON output is empty")
+	})
+
+	t.Run("returns error for file with only blank lines", func(t *testing.T) {
+		_, err := parseDependencyGraphJSON(bytes.NewReader([]byte("\n\n\n")))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "NDJSON output is empty")
 	})
 }

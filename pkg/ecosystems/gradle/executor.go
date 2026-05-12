@@ -13,12 +13,12 @@ import (
 
 const (
 	// snykDepsMarker is the prefix the init script prints on the line that
-	// contains the absolute path to the generated JSON output file.
-	snykDepsMarker = "SNYK_DEPS_JSON "
+	// contains the absolute path to the generated NDJSON output file.
+	snykDepsMarker = "SNYK_DEPS_NDJSON "
 )
 
 // runInitScript runs `gradle :snykDependencyGraph` with the embedded init script
-// and returns a ReadCloser for the generated JSON file.
+// and returns a ReadCloser for the generated NDJSON file.
 //
 // Always uses `:snykDependencyGraph` to run the task on the root project since
 // the task only exists at the root level.
@@ -26,12 +26,11 @@ const (
 // Fixed flags applied on every invocation:
 //
 //	--no-daemon          avoid background daemon processes
-//	--no-parallel        required for correctness on certain multi-project builds
 //	--console=plain      suppress progress animations that pollute output
 //	-Dorg.gradle.welcome=never       suppress "Welcome to Gradle" banner
 //
-// The returned ReadCloser must be closed by the caller. The JSON output is written
-// to <projectDir>/build/reports/snyk-dependency-graph.json with a fixed name, so it
+// The returned ReadCloser must be closed by the caller. The NDJSON output is written
+// to <projectDir>/build/reports/snyk-dependency-graph.ndjson with a fixed name, so it
 // is overwritten on each invocation rather than accumulating. It lives in Gradle's
 // build directory and is cleaned by `gradle clean` along with other build artifacts.
 // Preserved between runs as a debugging aid.
@@ -39,7 +38,6 @@ func runInitScript(ctx context.Context, projectDir, gradleBinary, initScriptPath
 	args := append([]string{
 		"--init-script", initScriptPath,
 		"--no-daemon",
-		"--no-parallel",
 		"--console=plain",
 		"-Dorg.gradle.welcome=never",
 		":snykDependencyGraph",
@@ -89,7 +87,7 @@ func runInitScript(ctx context.Context, projectDir, gradleBinary, initScriptPath
 }
 
 // parseSnykDepsMarkerFromStream scans Gradle's stdout stream for the line emitted by
-// the init script: "SNYK_DEPS_JSON /absolute/path/to/file.json".
+// the init script: "SNYK_DEPS_NDJSON /absolute/path/to/file.ndjson".
 // Returns the file path when found, empty string if not found, or an error if multiple
 // marker lines are detected (which could indicate tampering or malicious behavior).
 func parseSnykDepsMarkerFromStream(stdout io.Reader) (string, error) {
@@ -104,7 +102,7 @@ func parseSnykDepsMarkerFromStream(stdout io.Reader) (string, error) {
 		if strings.HasPrefix(line, snykDepsMarker) {
 			markerCount++
 			if markerCount > 1 {
-				return "", fmt.Errorf("multiple SNYK_DEPS_JSON marker lines detected, possible tampering attempt")
+				return "", fmt.Errorf("multiple SNYK_DEPS_NDJSON marker lines detected, possible tampering attempt")
 			}
 			foundPath = strings.TrimSpace(strings.TrimPrefix(line, snykDepsMarker))
 		}

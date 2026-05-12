@@ -1,62 +1,69 @@
 // Snyk Dependency Extraction Init Script
 // Usage: gradle --init-script snyk-deps-init.gradle snykDependencyGraph
 //
-// Produces: build/reports/snyk-dependency-graph.json
+// Produces: build/reports/snyk-dependency-graph.ndjson
+//   Line 1:    metadata JSON object
+//   Lines 2+:  one project JSON object per line (newline-delimited JSON)
 //
 // Uses Gradle's ResolutionResult API (Gradle 4.4+) to programmatically
 // walk the resolved dependency graph per-project, per-configuration.
-// Output is clean JSON written directly to file — no stdout parsing needed.
 //
 // Compatibility: Gradle 5.0+ (uses fully qualified groovy.json.JsonOutput to avoid init script classloading issues)
-// Configuration Cache: Not compatible (streaming for memory efficiency on large projects)
+// Configuration Cache: Not compatible
 // Build Files: Auto-detects build.gradle and build.gradle.kts
-// Memory: Optimized for large projects (streaming JSON, minimal data retention)
 
 gradle.projectsEvaluated { g ->
     def root = g.rootProject
 
+    // One task per project, each writing to its own output file.
+    // Isolation makes parallel execution safe; snykDependencyGraph depends on all of these.
+    def perProjectTasks = root.allprojects.collect { proj ->
+        // Resolved at configuration time so outputs.file() can register it for up-to-date checking.
+        def outputFile = resolveReportsFile(proj, "snyk-project.ndjson")
+
+        proj.task('snykDependencyGraphProject') {
+            group = 'reporting'
+            description = "Snyk: resolve dependency graph for ${proj.path}"
+            outputs.file(outputFile)
+            try {
+                notCompatibleWithConfigurationCache("Snyk dependency resolution")
+            } catch (Exception ignored) {
+                // Older Gradle versions don't have this method
+            }
+            doLast {
+                outputFile.parentFile.mkdirs()
+                outputFile.text = groovy.json.JsonOutput.toJson(buildProjectEntry(proj))
+            }
+        }
+    }
+
+    def aggregateOutputFile = resolveReportsFile(root, "snyk-dependency-graph.ndjson")
+
     root.task('snykDependencyGraph') {
         group = 'reporting'
-        description = 'Generate machine-readable dependency graph JSON for all projects'
-
-        // Not configuration cache compatible due to streaming approach for memory efficiency
+        description = 'Snyk: aggregate dependency graph for all projects'
+        dependsOn perProjectTasks
+        // No outputs.file declared: this task must always run to print the SNYK_DEPS_NDJSON marker.
         try {
-            notCompatibleWithConfigurationCache("Streaming dependency resolution for large projects")
+            notCompatibleWithConfigurationCache("Snyk dependency resolution")
         } catch (Exception ignored) {
             // Older Gradle versions don't have this method
         }
-
         doLast {
-            // Compatible with Gradle 6-9: try new API first, fallback to deprecated API
-            def outputDir
-            try {
-                outputDir = root.layout.buildDirectory.dir("reports").get().asFile
-            } catch (Exception e) {
-                outputDir = file("${root.buildDir}/reports")
-            }
-            outputDir.mkdirs()
-            def outputFile = file("${outputDir}/snyk-dependency-graph.json")
-
-            // Stream JSON output to avoid memory accumulation for large projects
-            outputFile.withWriter('UTF-8') { writer ->
-                writer.print('{"metadata":')
-                writer.print(groovy.json.JsonOutput.toJson(buildMetadata(root)))
-                writer.print(',"projects":[')
-                def first = true
-                root.allprojects.each { proj ->
-                    def projEntry = buildProjectEntry(proj)
-                    if (projEntry != null) {
-                        if (!first) {
-                            writer.print(',')
-                        }
-                        writer.print(groovy.json.JsonOutput.toJson(projEntry))
-                        first = false
-                        projEntry = null  // Release memory immediately
+            aggregateOutputFile.parentFile.mkdirs()
+            aggregateOutputFile.withWriter('UTF-8') { writer ->
+                // Line 1: metadata
+                writer.println(groovy.json.JsonOutput.toJson(buildMetadata(root)))
+                // One line per project, read from each per-project task output then clean up
+                perProjectTasks.each { task ->
+                    def projectFile = task.outputs.files.singleFile
+                    if (projectFile.exists()) {
+                        writer.println(projectFile.text.trim())
+                        projectFile.delete()
                     }
                 }
-                writer.print(']}')
             }
-            println "SNYK_DEPS_JSON ${outputFile.absolutePath}"
+            println "SNYK_DEPS_NDJSON ${aggregateOutputFile.absolutePath}"
         }
     }
 }
@@ -231,4 +238,14 @@ def componentId(component) {
     }
     // Fallback for project components
     return component.id.toString()
+}
+
+// Returns <proj.buildDir>/reports/<fileName>. Uses layout API (Gradle 6+);
+// falls back to the deprecated buildDir property for Gradle 5.
+def resolveReportsFile(project, String fileName) {
+    try {
+        return new File(project.layout.buildDirectory.dir("reports").get().asFile, fileName)
+    } catch (Exception e) {
+        return new File(project.buildDir, "reports/${fileName}")
+    }
 }

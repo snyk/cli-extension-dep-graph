@@ -49,8 +49,7 @@ func (p Plugin) GetName() string {
 //     passed to Gradle via --init-script (required for dependency graph generation).
 //     Users can provide additional init scripts via --init-script which are passed
 //     as supplementary --init-script flags.
-//   - The Gradle invocation always uses --no-daemon, --no-parallel for predictable,
-//     isolated execution.
+//   - The Gradle invocation always uses --no-daemon for predictable, isolated execution.
 //   - The init script traverses all sub-projects automatically; each sub-project
 //     yields one SCAResult.  Use --gradle-sub-project to filter to a single one.
 func (p Plugin) BuildDepGraphsFromDir(

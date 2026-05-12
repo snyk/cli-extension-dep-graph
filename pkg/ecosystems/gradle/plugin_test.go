@@ -395,97 +395,13 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 	log := logger.Nop()
 	p := Plugin{}
 
-	// Simulate the JSON that would be returned by Gradle's :snykDependencyGraph task
-	// This represents a multi-project build with root, app, and lib subprojects
-	mockMultiProjectJSON := `{
-  "metadata": {
-    "gradleVersion": "8.0",
-    "javaVersion": "17.0.1",
-    "generatedAt": "2023-01-01T12:00:00Z",
-    "rootProject": {
-      "name": "myproject",
-      "group": "com.example",
-      "version": "1.0.0",
-      "path": "/project"
-    }
-  },
-  "projects": [
-    {
-      "name": "myproject",
-      "group": "com.example",
-      "version": "1.0.0",
-      "path": ":",
-      "gav": "com.example:myproject:1.0.0",
-      "buildFile": "/project/build.gradle",
-      "plugins": ["java"],
-      "configurations": [
-        {
-          "name": "compileClasspath",
-          "description": "Compile classpath",
-          "root": {
-            "id": "com.example:myproject:1.0.0",
-            "dependencies": []
-          },
-          "allDependencies": []
-        }
-      ]
-    },
-    {
-      "name": "app",
-      "group": "com.example",
-      "version": "1.0.0",
-      "path": ":app",
-      "gav": "com.example:app:1.0.0",
-      "buildFile": "/project/app/build.gradle",
-      "plugins": ["java", "application"],
-      "configurations": [
-        {
-          "name": "compileClasspath",
-          "description": "Compile classpath",
-          "root": {
-            "id": "com.example:app:1.0.0",
-            "dependencies": [
-              {
-                "id": "org.slf4j:slf4j-api:1.7.36",
-                "dependencies": []
-              }
-            ]
-          },
-          "allDependencies": [
-            { "id": "org.slf4j:slf4j-api:1.7.36" }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "lib",
-      "group": "com.example", 
-      "version": "1.0.0",
-      "path": ":lib",
-      "gav": "com.example:lib:1.0.0",
-      "buildFile": "/project/lib/build.gradle",
-      "plugins": ["java-library"],
-      "configurations": [
-        {
-          "name": "compileClasspath",
-          "description": "Compile classpath",
-          "root": {
-            "id": "com.example:lib:1.0.0",
-            "dependencies": [
-              {
-                "id": "com.google.guava:guava:31.1-jre",
-                "dependencies": []
-              }
-            ]
-          },
-          "allDependencies": [
-            { "id": "com.google.guava:guava:31.1-jre" }
-          ]
-        }
-      ]
-    }
-  ]
-}`
+	// Simulate the NDJSON that would be returned by Gradle's :snykDependencyGraph task.
+	// This represents a multi-project build with root, app, and lib subprojects.
+	// Line 1: metadata; lines 2-4: one project per line.
+	mockMultiProjectJSON := `{"gradleVersion":"8.0","javaVersion":"17.0.1","generatedAt":"2023-01-01T12:00:00Z","rootProject":{"name":"myproject","group":"com.example","version":"1.0.0","path":"/project"}}
+{"name":"myproject","group":"com.example","version":"1.0.0","path":":","gav":"com.example:myproject:1.0.0","buildFile":"/project/build.gradle","configurations":[{"name":"compileClasspath","description":"Compile classpath","root":{"id":"com.example:myproject:1.0.0","dependencies":[]},"allDependencies":[]}]}
+{"name":"app","group":"com.example","version":"1.0.0","path":":app","gav":"com.example:app:1.0.0","buildFile":"/project/app/build.gradle","configurations":[{"name":"compileClasspath","description":"Compile classpath","root":{"id":"com.example:app:1.0.0","dependencies":[{"id":"org.slf4j:slf4j-api:1.7.36","dependencies":[]}]},"allDependencies":[{"id":"org.slf4j:slf4j-api:1.7.36"}]}]}
+{"name":"lib","group":"com.example","version":"1.0.0","path":":lib","gav":"com.example:lib:1.0.0","buildFile":"/project/lib/build.gradle","configurations":[{"name":"compileClasspath","description":"Compile classpath","root":{"id":"com.example:lib:1.0.0","dependencies":[{"id":"com.google.guava:guava:31.1-jre","dependencies":[]}]},"allDependencies":[{"id":"com.google.guava:guava:31.1-jre"}]}]}`
 
 	t.Run("demonstrates multi-project output gets filtered to single project", func(t *testing.T) {
 		// Parse the mock JSON as if it came from Gradle

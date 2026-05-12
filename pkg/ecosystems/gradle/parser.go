@@ -1,12 +1,15 @@
 package gradle
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 )
 
 // dependencyGraphJSON is the top-level output produced by snyk-deps-init.gradle.
+// The file is NDJSON: line 1 is the metadata object, each subsequent line is one project.
 type dependencyGraphJSON struct {
 	Metadata struct {
 		GradleVersion string `json:"gradleVersion"`
@@ -85,12 +88,43 @@ type allDepEntry struct {
 	ID string `json:"id"`
 }
 
-// parseDependencyGraphJSON deserialises the JSON file produced by snyk-deps-init.gradle.
+// parseDependencyGraphJSON deserialises the NDJSON file produced by snyk-deps-init.gradle.
+// Line 1 is parsed as metadata; each subsequent non-blank line is parsed as a project.
 func parseDependencyGraphJSON(reader io.Reader) (*dependencyGraphJSON, error) {
+	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024*1024) // 1GB max line size
+
 	var result dependencyGraphJSON
-	decoder := json.NewDecoder(reader)
-	if err := decoder.Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to parse snyk-deps-init.gradle output: %w", err)
+	var recordsRead int
+
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		recordsRead++
+
+		if recordsRead == 1 {
+			if err := json.Unmarshal(line, &result.Metadata); err != nil {
+				return nil, fmt.Errorf("failed to parse metadata line: %w", err)
+			}
+			continue
+		}
+
+		var proj gradleProject
+		if err := json.Unmarshal(line, &proj); err != nil {
+			return nil, fmt.Errorf("failed to parse project line %d: %w", recordsRead, err)
+		}
+		result.Projects = append(result.Projects, proj)
 	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading NDJSON output: %w", err)
+	}
+
+	if recordsRead == 0 {
+		return nil, fmt.Errorf("NDJSON output is empty")
+	}
+
 	return &result, nil
 }
