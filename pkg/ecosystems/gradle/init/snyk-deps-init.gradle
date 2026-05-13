@@ -26,6 +26,12 @@ gradle.projectsEvaluated { g ->
     // Check if provenance (checksums) should be included
     def includeProvenance = root.findProperty('snykIncludeProvenance')?.toBoolean() ?: false
 
+    // Parse configuration-attributes filter once upfront for all projects
+    def confAttrSpec = null
+    if (root.hasProperty('snykConfAttr')) {
+        confAttrSpec = root.snykConfAttr.toLowerCase().tokenize(',').collect { it.tokenize(':') }
+    }
+
     // One task per project, each writing to its own output file.
     // Isolation makes parallel execution safe; snykDependencyGraph depends on all of these.
     def perProjectTasks = root.allprojects
@@ -45,7 +51,7 @@ gradle.projectsEvaluated { g ->
             }
             doLast {
                 outputFile.parentFile.mkdirs()
-                outputFile.text = groovy.json.JsonOutput.toJson(buildProjectEntry(proj, includeProvenance))
+                outputFile.text = groovy.json.JsonOutput.toJson(buildProjectEntry(proj, confAttrSpec, includeProvenance))
             }
         }
     }
@@ -104,8 +110,19 @@ def buildMetadata(rootProject) {
 
 // ── Per-project entry ───────────────────────────────────────────────
 
-def buildProjectEntry(project, includeProvenance = false) {
-    def resolvableConfigs = project.configurations.matching { it.canBeResolved }
+def buildProjectEntry(project, confAttrSpec, includeProvenance = false) {
+    def resolvableConfigs = project.configurations.matching { config ->
+        if (!config.canBeResolved) {
+            return false
+        }
+        
+        // Apply attribute filter if specified
+        if (confAttrSpec != null && !matchesAttributeFilter(config, confAttrSpec)) {
+            return false
+        }
+        
+        return true
+    }
 
     def gav = "${project.group}:${project.name}:${project.version}"
 
@@ -288,6 +305,72 @@ def collectAllDependencies(resolutionResult, includeProvenance, artifactLookup) 
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
+// matchesAttributeKey determines if an attribute matches a user-provided key.
+// Supports multiple matching strategies for maximum compatibility:
+// 1. Exact match on logical name (e.g., 'org.gradle.usage')  
+// 2. Match on last dotted segment (e.g., 'usage' matches 'org.gradle.usage')
+// 3. Match on attribute type simple class name (e.g., 'BuildType' matches BuildTypeAttr)
+// 4. Legacy fallback: case-insensitive substring matching on logical name
+def matchesAttributeKey(attr, key) {
+    def lcKey = key.toLowerCase()
+
+    // 1. Exact match on logical name (standard Gradle attrs: org.gradle.usage, etc.)
+    if (attr.name.toLowerCase() == lcKey) {
+        return true
+    }
+
+    // 2. Match on the last dotted segment of the logical name
+    // (so 'usage' matches 'org.gradle.usage')
+    def tail = attr.name.tokenize('.').last().toLowerCase()
+    if (tail == lcKey) {
+        return true
+    }
+
+    // 3. Match on the attribute's type simple class name when available
+    // (so 'buildtype' or 'buildtypeattr' matches Android's BuildTypeAttr)
+    if (attr.hasProperty('type') && attr.type != null) {
+        def simple = attr.type.simpleName.toLowerCase()
+        if (simple == lcKey || simple == lcKey + 'attr') {
+            return true
+        }
+    }
+
+    // 4. Legacy fallback: case-insensitive substring on the logical name,
+    // preserved so existing CLI invocations keep working.
+    return attr.name.toLowerCase().contains(lcKey)
+}
+
+// matchesAttributeFilter determines if a configuration matches the attribute filter spec.
+// Returns true only if ALL specified attribute constraints are satisfied.
+def matchesAttributeFilter(config, confAttrSpec) {
+    def attrs = config.attributes
+
+    // All constraints must be satisfied
+    for (keyValueFilter in confAttrSpec) {
+        def key = keyValueFilter[0]
+        def expectedValue = keyValueFilter[1]
+
+        def found = false
+        // Look for any attribute that matches this key
+        for (attr in attrs.keySet()) {
+            if (matchesAttributeKey(attr, key)) {
+                found = true
+                def actualValue = attrs.getAttribute(attr).toString().toLowerCase()
+                if (actualValue != expectedValue) {
+                    return false
+                }
+                break // Found matching attribute with correct value, check next constraint
+            }
+        }
+
+        if (!found) {
+            return false
+        }
+    }
+
+    return true
+}
+
 def getBuildFilePath(project) {
     try {
         if (project.hasProperty('layout') && project.layout.hasProperty('projectDirectory')) {
@@ -301,7 +384,7 @@ def getBuildFilePath(project) {
     } catch (Exception e) {
         // Fallback for older Gradle versions or API failures
     }
-    
+
     // Fallback to deprecated API for compatibility with Gradle < 6
     return project.buildFile?.absolutePath ?: ''
 }

@@ -25,6 +25,13 @@ func ValidateOptions(dir string, options *ecosystems.SCAPluginOptions) error {
 		}
 	}
 
+	// Validate Gradle configuration attributes if provided
+	if options.Gradle.ConfigurationAttributes != "" {
+		if err := validateConfigurationAttributes(options.Gradle.ConfigurationAttributes); err != nil {
+			return err
+		}
+	}
+
 	// Validate user init script if provided
 	if userInitScript := options.Gradle.InitScript; userInitScript != "" {
 		if err := validateInitScript(dir, userInitScript); err != nil {
@@ -57,6 +64,46 @@ func validateInitScript(projectDir, initPath string) error {
 	}
 	if info.IsDir() {
 		return fmt.Errorf("user init script is a directory, not a file: %s", initPath)
+	}
+
+	return nil
+}
+
+// validateConfigurationAttributes validates the configuration-attributes flag format.
+// Expected format: "key1:value1,key2:value2" where keys and values are non-empty.
+func validateConfigurationAttributes(attributes string) error {
+	// Basic sanity check
+	if strings.TrimSpace(attributes) == "" {
+		return fmt.Errorf("--configuration-attributes cannot be empty")
+	}
+
+	// Split on commas to get individual key:value pairs
+	pairs := strings.Split(attributes, ",")
+	if len(pairs) == 0 {
+		return fmt.Errorf("--configuration-attributes must contain at least one key:value pair")
+	}
+
+	for i, pair := range pairs {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			return fmt.Errorf("--configuration-attributes entry %d is empty", i+1)
+		}
+
+		// Each pair must contain exactly one colon
+		parts := strings.Split(pair, ":")
+		if len(parts) != 2 {
+			return fmt.Errorf("--configuration-attributes entry '%s' must be in 'key:value' format", pair)
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		if key == "" {
+			return fmt.Errorf("--configuration-attributes entry '%s' has empty key", pair)
+		}
+		if value == "" {
+			return fmt.Errorf("--configuration-attributes entry '%s' has empty value", pair)
+		}
 	}
 
 	return nil
