@@ -1,0 +1,346 @@
+[
+  {
+    "depGraph": {
+      "schemaVersion": "1.3.0",
+      "pkgManager": {
+        "name": "gradle"
+      },
+      "pkgs": [
+        {
+          "id": ":multi-module-bom@",
+          "info": {
+            "name": ":multi-module-bom"
+          }
+        }
+      ],
+      "graph": {
+        "rootNodeId": "root-node",
+        "nodes": [
+          {
+            "nodeId": "root-node",
+            "pkgId": ":multi-module-bom@",
+            "deps": []
+          }
+        ]
+      }
+    },
+    "projectDescriptor": {
+      "identity": {
+        "type": "gradle",
+        "targetFile": "build.gradle",
+        "rootComponentName": ":multi-module-bom"
+      }
+    }
+  },
+  {
+    "depGraph": {
+      "schemaVersion": "1.3.0",
+      "pkgManager": {
+        "name": "gradle"
+      },
+      "pkgs": [
+        {
+          "id": "com.snyk.fixtures:consumer@1.0.0",
+          "info": {
+            "name": "com.snyk.fixtures:consumer",
+            "version": "1.0.0"
+          }
+        },
+        {
+          "id": "com.snyk.fixtures:platform@1.0.0",
+          "info": {
+            "name": "com.snyk.fixtures:platform",
+            "version": "1.0.0"
+          }
+        },
+        {
+          "id": "com.fasterxml.jackson:jackson-bom@2.15.2",
+          "info": {
+            "name": "com.fasterxml.jackson:jackson-bom",
+            "version": "2.15.2"
+          }
+        },
+        {
+          "id": "com.fasterxml.jackson.core:jackson-core@2.15.2",
+          "info": {
+            "name": "com.fasterxml.jackson.core:jackson-core",
+            "version": "2.15.2"
+          }
+        },
+        {
+          "id": "org.slf4j:slf4j-bom@2.0.9",
+          "info": {
+            "name": "org.slf4j:slf4j-bom",
+            "version": "2.0.9"
+          }
+        },
+        {
+          "id": "org.slf4j:slf4j-api@2.0.9",
+          "info": {
+            "name": "org.slf4j:slf4j-api",
+            "version": "2.0.9"
+          }
+        },
+        {
+          "id": "org.apache.commons:commons-lang3@3.13.0",
+          "info": {
+            "name": "org.apache.commons:commons-lang3",
+            "version": "3.13.0"
+          }
+        },
+        {
+          "id": "commons-io:commons-io@2.14.0",
+          "info": {
+            "name": "commons-io:commons-io",
+            "version": "2.14.0"
+          }
+        },
+        {
+          "id": "ch.qos.logback:logback-classic@1.4.11",
+          "info": {
+            "name": "ch.qos.logback:logback-classic",
+            "version": "1.4.11"
+          }
+        },
+        {
+          "id": "ch.qos.logback:logback-core@1.4.11",
+          "info": {
+            "name": "ch.qos.logback:logback-core",
+            "version": "1.4.11"
+          }
+        }
+      ],
+      "graph": {
+        "rootNodeId": "root-node",
+        "nodes": [
+          {
+            "nodeId": "root-node",
+            "pkgId": "com.snyk.fixtures:consumer@1.0.0",
+            "deps": [
+              {
+                "nodeId": "com.snyk.fixtures:platform@1.0.0"
+              },
+              {
+                "nodeId": "com.fasterxml.jackson.core:jackson-core@2.15.2"
+              },
+              {
+                "nodeId": "org.slf4j:slf4j-api@2.0.9"
+              },
+              {
+                "nodeId": "ch.qos.logback:logback-classic@1.4.11"
+              },
+              {
+                "nodeId": "org.apache.commons:commons-lang3@3.13.0"
+              },
+              {
+                "nodeId": "commons-io:commons-io@2.14.0"
+              }
+            ]
+          },
+          {
+            "nodeId": "com.snyk.fixtures:platform@1.0.0",
+            "pkgId": "com.snyk.fixtures:platform@1.0.0",
+            "deps": [
+              {
+                "nodeId": "com.fasterxml.jackson:jackson-bom@2.15.2"
+              },
+              {
+                "nodeId": "org.slf4j:slf4j-bom@2.0.9"
+              },
+              {
+                "nodeId": "org.apache.commons:commons-lang3@3.13.0:constraint"
+              },
+              {
+                "nodeId": "commons-io:commons-io@2.14.0:constraint"
+              },
+              {
+                "nodeId": "ch.qos.logback:logback-classic@1.4.11:constraint"
+              }
+            ]
+          },
+          {
+            "nodeId": "com.fasterxml.jackson:jackson-bom@2.15.2",
+            "pkgId": "com.fasterxml.jackson:jackson-bom@2.15.2",
+            "deps": [
+              {
+                "nodeId": "com.fasterxml.jackson.core:jackson-core@2.15.2:constraint"
+              }
+            ]
+          },
+          {
+            "nodeId": "com.fasterxml.jackson.core:jackson-core@2.15.2:constraint",
+            "pkgId": "com.fasterxml.jackson.core:jackson-core@2.15.2",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.slf4j:slf4j-bom@2.0.9",
+            "pkgId": "org.slf4j:slf4j-bom@2.0.9",
+            "deps": [
+              {
+                "nodeId": "org.slf4j:slf4j-api@2.0.9:constraint"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.slf4j:slf4j-api@2.0.9:constraint",
+            "pkgId": "org.slf4j:slf4j-api@2.0.9",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.apache.commons:commons-lang3@3.13.0:constraint",
+            "pkgId": "org.apache.commons:commons-lang3@3.13.0",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "commons-io:commons-io@2.14.0:constraint",
+            "pkgId": "commons-io:commons-io@2.14.0",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "ch.qos.logback:logback-classic@1.4.11:constraint",
+            "pkgId": "ch.qos.logback:logback-classic@1.4.11",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "com.fasterxml.jackson.core:jackson-core@2.15.2",
+            "pkgId": "com.fasterxml.jackson.core:jackson-core@2.15.2",
+            "deps": [
+              {
+                "nodeId": "com.fasterxml.jackson:jackson-bom@2.15.2"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.slf4j:slf4j-api@2.0.9",
+            "pkgId": "org.slf4j:slf4j-api@2.0.9",
+            "deps": []
+          },
+          {
+            "nodeId": "ch.qos.logback:logback-classic@1.4.11",
+            "pkgId": "ch.qos.logback:logback-classic@1.4.11",
+            "deps": [
+              {
+                "nodeId": "ch.qos.logback:logback-core@1.4.11"
+              },
+              {
+                "nodeId": "org.slf4j:slf4j-api@2.0.9"
+              }
+            ]
+          },
+          {
+            "nodeId": "ch.qos.logback:logback-core@1.4.11",
+            "pkgId": "ch.qos.logback:logback-core@1.4.11",
+            "deps": []
+          },
+          {
+            "nodeId": "org.apache.commons:commons-lang3@3.13.0",
+            "pkgId": "org.apache.commons:commons-lang3@3.13.0",
+            "deps": []
+          },
+          {
+            "nodeId": "commons-io:commons-io@2.14.0",
+            "pkgId": "commons-io:commons-io@2.14.0",
+            "deps": []
+          }
+        ]
+      }
+    },
+    "projectDescriptor": {
+      "identity": {
+        "type": "gradle",
+        "targetFile": "consumer/build.gradle",
+        "rootComponentName": "com.snyk.fixtures:consumer"
+      }
+    }
+  },
+  {
+    "depGraph": {
+      "schemaVersion": "1.3.0",
+      "pkgManager": {
+        "name": "gradle"
+      },
+      "pkgs": [
+        {
+          "id": "com.snyk.fixtures:platform@1.0.0",
+          "info": {
+            "name": "com.snyk.fixtures:platform",
+            "version": "1.0.0"
+          }
+        },
+        {
+          "id": "com.fasterxml.jackson:jackson-bom@2.15.2",
+          "info": {
+            "name": "com.fasterxml.jackson:jackson-bom",
+            "version": "2.15.2"
+          }
+        },
+        {
+          "id": "org.slf4j:slf4j-bom@2.0.9",
+          "info": {
+            "name": "org.slf4j:slf4j-bom",
+            "version": "2.0.9"
+          }
+        }
+      ],
+      "graph": {
+        "rootNodeId": "root-node",
+        "nodes": [
+          {
+            "nodeId": "root-node",
+            "pkgId": "com.snyk.fixtures:platform@1.0.0",
+            "deps": [
+              {
+                "nodeId": "com.fasterxml.jackson:jackson-bom@2.15.2"
+              },
+              {
+                "nodeId": "org.slf4j:slf4j-bom@2.0.9"
+              }
+            ]
+          },
+          {
+            "nodeId": "com.fasterxml.jackson:jackson-bom@2.15.2",
+            "pkgId": "com.fasterxml.jackson:jackson-bom@2.15.2",
+            "deps": []
+          },
+          {
+            "nodeId": "org.slf4j:slf4j-bom@2.0.9",
+            "pkgId": "org.slf4j:slf4j-bom@2.0.9",
+            "deps": []
+          }
+        ]
+      }
+    },
+    "projectDescriptor": {
+      "identity": {
+        "type": "gradle",
+        "targetFile": "platform/build.gradle",
+        "rootComponentName": "com.snyk.fixtures:platform"
+      }
+    }
+  }
+]

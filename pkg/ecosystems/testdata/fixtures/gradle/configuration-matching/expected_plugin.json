@@ -312,19 +312,9 @@
             "pkgId": "org.slf4j:slf4j-simple@1.7.36",
             "deps": [
               {
-                "nodeId": "org.slf4j:slf4j-api@1.7.36:pruned"
+                "nodeId": "org.slf4j:slf4j-api@1.7.36"
               }
             ]
-          },
-          {
-            "nodeId": "org.slf4j:slf4j-api@1.7.36:pruned",
-            "pkgId": "org.slf4j:slf4j-api@1.7.36",
-            "info": {
-              "labels": {
-                "pruned": "true"
-              }
-            },
-            "deps": []
           }
         ]
       }

@@ -1,0 +1,461 @@
+[
+  {
+    "depGraph": {
+      "schemaVersion": "1.3.0",
+      "pkgManager": {
+        "name": "gradle"
+      },
+      "pkgs": [
+        {
+          "id": "com.snyk.fixtures:nested-bom-constraints@1.0.0",
+          "info": {
+            "name": "com.snyk.fixtures:nested-bom-constraints",
+            "version": "1.0.0"
+          }
+        },
+        {
+          "id": "org.springframework.boot:spring-boot-dependencies@2.7.14",
+          "info": {
+            "name": "org.springframework.boot:spring-boot-dependencies",
+            "version": "2.7.14"
+          }
+        },
+        {
+          "id": "com.fasterxml.jackson.core:jackson-core@2.13.5",
+          "info": {
+            "name": "com.fasterxml.jackson.core:jackson-core",
+            "version": "2.13.5"
+          }
+        },
+        {
+          "id": "org.eclipse.jetty:jetty-server@9.4.51.v20230217",
+          "info": {
+            "name": "org.eclipse.jetty:jetty-server",
+            "version": "9.4.51.v20230217"
+          }
+        },
+        {
+          "id": "org.eclipse.jetty:jetty-servlet@9.4.51.v20230217",
+          "info": {
+            "name": "org.eclipse.jetty:jetty-servlet",
+            "version": "9.4.51.v20230217"
+          }
+        },
+        {
+          "id": "org.springframework:spring-web@5.3.29",
+          "info": {
+            "name": "org.springframework:spring-web",
+            "version": "5.3.29"
+          }
+        },
+        {
+          "id": "javax.servlet:javax.servlet-api@4.0.1",
+          "info": {
+            "name": "javax.servlet:javax.servlet-api",
+            "version": "4.0.1"
+          }
+        },
+        {
+          "id": "org.eclipse.jetty:jetty-http@9.4.51.v20230217",
+          "info": {
+            "name": "org.eclipse.jetty:jetty-http",
+            "version": "9.4.51.v20230217"
+          }
+        },
+        {
+          "id": "org.eclipse.jetty:jetty-io@9.4.51.v20230217",
+          "info": {
+            "name": "org.eclipse.jetty:jetty-io",
+            "version": "9.4.51.v20230217"
+          }
+        },
+        {
+          "id": "org.eclipse.jetty:jetty-security@9.4.51.v20230217",
+          "info": {
+            "name": "org.eclipse.jetty:jetty-security",
+            "version": "9.4.51.v20230217"
+          }
+        },
+        {
+          "id": "org.eclipse.jetty:jetty-util-ajax@9.4.51.v20230217",
+          "info": {
+            "name": "org.eclipse.jetty:jetty-util-ajax",
+            "version": "9.4.51.v20230217"
+          }
+        },
+        {
+          "id": "org.springframework:spring-beans@5.3.29",
+          "info": {
+            "name": "org.springframework:spring-beans",
+            "version": "5.3.29"
+          }
+        },
+        {
+          "id": "org.springframework:spring-core@5.3.29",
+          "info": {
+            "name": "org.springframework:spring-core",
+            "version": "5.3.29"
+          }
+        },
+        {
+          "id": "org.eclipse.jetty:jetty-util@9.4.51.v20230217",
+          "info": {
+            "name": "org.eclipse.jetty:jetty-util",
+            "version": "9.4.51.v20230217"
+          }
+        },
+        {
+          "id": "org.springframework:spring-jcl@5.3.29",
+          "info": {
+            "name": "org.springframework:spring-jcl",
+            "version": "5.3.29"
+          }
+        },
+        {
+          "id": "com.fasterxml.jackson:jackson-bom@2.13.5",
+          "info": {
+            "name": "com.fasterxml.jackson:jackson-bom",
+            "version": "2.13.5"
+          }
+        }
+      ],
+      "graph": {
+        "rootNodeId": "root-node",
+        "nodes": [
+          {
+            "nodeId": "root-node",
+            "pkgId": "com.snyk.fixtures:nested-bom-constraints@1.0.0",
+            "deps": [
+              {
+                "nodeId": "org.springframework.boot:spring-boot-dependencies@2.7.14"
+              },
+              {
+                "nodeId": "com.fasterxml.jackson.core:jackson-core@2.13.5"
+              },
+              {
+                "nodeId": "org.eclipse.jetty:jetty-server@9.4.51.v20230217"
+              },
+              {
+                "nodeId": "org.eclipse.jetty:jetty-servlet@9.4.51.v20230217"
+              },
+              {
+                "nodeId": "org.springframework:spring-web@5.3.29"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.springframework.boot:spring-boot-dependencies@2.7.14",
+            "pkgId": "org.springframework.boot:spring-boot-dependencies@2.7.14",
+            "deps": [
+              {
+                "nodeId": "com.fasterxml.jackson.core:jackson-core@2.13.5:constraint"
+              },
+              {
+                "nodeId": "org.eclipse.jetty:jetty-server@9.4.51.v20230217:constraint"
+              },
+              {
+                "nodeId": "org.eclipse.jetty:jetty-servlet@9.4.51.v20230217:constraint"
+              },
+              {
+                "nodeId": "org.springframework:spring-web@5.3.29:constraint"
+              },
+              {
+                "nodeId": "javax.servlet:javax.servlet-api@4.0.1:constraint"
+              },
+              {
+                "nodeId": "org.eclipse.jetty:jetty-http@9.4.51.v20230217:constraint"
+              },
+              {
+                "nodeId": "org.eclipse.jetty:jetty-io@9.4.51.v20230217:constraint"
+              },
+              {
+                "nodeId": "org.eclipse.jetty:jetty-security@9.4.51.v20230217:constraint"
+              },
+              {
+                "nodeId": "org.eclipse.jetty:jetty-util-ajax@9.4.51.v20230217:constraint"
+              },
+              {
+                "nodeId": "org.springframework:spring-beans@5.3.29:constraint"
+              },
+              {
+                "nodeId": "org.springframework:spring-core@5.3.29:constraint"
+              },
+              {
+                "nodeId": "org.eclipse.jetty:jetty-util@9.4.51.v20230217:constraint"
+              },
+              {
+                "nodeId": "org.springframework:spring-jcl@5.3.29:constraint"
+              }
+            ]
+          },
+          {
+            "nodeId": "com.fasterxml.jackson.core:jackson-core@2.13.5:constraint",
+            "pkgId": "com.fasterxml.jackson.core:jackson-core@2.13.5",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.eclipse.jetty:jetty-server@9.4.51.v20230217:constraint",
+            "pkgId": "org.eclipse.jetty:jetty-server@9.4.51.v20230217",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.eclipse.jetty:jetty-servlet@9.4.51.v20230217:constraint",
+            "pkgId": "org.eclipse.jetty:jetty-servlet@9.4.51.v20230217",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.springframework:spring-web@5.3.29:constraint",
+            "pkgId": "org.springframework:spring-web@5.3.29",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "javax.servlet:javax.servlet-api@4.0.1:constraint",
+            "pkgId": "javax.servlet:javax.servlet-api@4.0.1",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.eclipse.jetty:jetty-http@9.4.51.v20230217:constraint",
+            "pkgId": "org.eclipse.jetty:jetty-http@9.4.51.v20230217",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.eclipse.jetty:jetty-io@9.4.51.v20230217:constraint",
+            "pkgId": "org.eclipse.jetty:jetty-io@9.4.51.v20230217",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.eclipse.jetty:jetty-security@9.4.51.v20230217:constraint",
+            "pkgId": "org.eclipse.jetty:jetty-security@9.4.51.v20230217",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.eclipse.jetty:jetty-util-ajax@9.4.51.v20230217:constraint",
+            "pkgId": "org.eclipse.jetty:jetty-util-ajax@9.4.51.v20230217",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.springframework:spring-beans@5.3.29:constraint",
+            "pkgId": "org.springframework:spring-beans@5.3.29",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.springframework:spring-core@5.3.29:constraint",
+            "pkgId": "org.springframework:spring-core@5.3.29",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.eclipse.jetty:jetty-util@9.4.51.v20230217:constraint",
+            "pkgId": "org.eclipse.jetty:jetty-util@9.4.51.v20230217",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.springframework:spring-jcl@5.3.29:constraint",
+            "pkgId": "org.springframework:spring-jcl@5.3.29",
+            "info": {
+              "labels": {
+                "constraint": "true"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "com.fasterxml.jackson.core:jackson-core@2.13.5",
+            "pkgId": "com.fasterxml.jackson.core:jackson-core@2.13.5",
+            "deps": [
+              {
+                "nodeId": "com.fasterxml.jackson:jackson-bom@2.13.5"
+              }
+            ]
+          },
+          {
+            "nodeId": "com.fasterxml.jackson:jackson-bom@2.13.5",
+            "pkgId": "com.fasterxml.jackson:jackson-bom@2.13.5",
+            "deps": [
+              {
+                "nodeId": "com.fasterxml.jackson.core:jackson-core@2.13.5:constraint"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.eclipse.jetty:jetty-server@9.4.51.v20230217",
+            "pkgId": "org.eclipse.jetty:jetty-server@9.4.51.v20230217",
+            "deps": [
+              {
+                "nodeId": "javax.servlet:javax.servlet-api@4.0.1"
+              },
+              {
+                "nodeId": "org.eclipse.jetty:jetty-http@9.4.51.v20230217"
+              },
+              {
+                "nodeId": "org.eclipse.jetty:jetty-io@9.4.51.v20230217"
+              }
+            ]
+          },
+          {
+            "nodeId": "javax.servlet:javax.servlet-api@4.0.1",
+            "pkgId": "javax.servlet:javax.servlet-api@4.0.1",
+            "deps": []
+          },
+          {
+            "nodeId": "org.eclipse.jetty:jetty-http@9.4.51.v20230217",
+            "pkgId": "org.eclipse.jetty:jetty-http@9.4.51.v20230217",
+            "deps": [
+              {
+                "nodeId": "org.eclipse.jetty:jetty-util@9.4.51.v20230217"
+              },
+              {
+                "nodeId": "org.eclipse.jetty:jetty-io@9.4.51.v20230217"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.eclipse.jetty:jetty-util@9.4.51.v20230217",
+            "pkgId": "org.eclipse.jetty:jetty-util@9.4.51.v20230217",
+            "deps": []
+          },
+          {
+            "nodeId": "org.eclipse.jetty:jetty-io@9.4.51.v20230217",
+            "pkgId": "org.eclipse.jetty:jetty-io@9.4.51.v20230217",
+            "deps": [
+              {
+                "nodeId": "org.eclipse.jetty:jetty-util@9.4.51.v20230217"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.eclipse.jetty:jetty-servlet@9.4.51.v20230217",
+            "pkgId": "org.eclipse.jetty:jetty-servlet@9.4.51.v20230217",
+            "deps": [
+              {
+                "nodeId": "org.eclipse.jetty:jetty-security@9.4.51.v20230217"
+              },
+              {
+                "nodeId": "org.eclipse.jetty:jetty-util-ajax@9.4.51.v20230217"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.eclipse.jetty:jetty-security@9.4.51.v20230217",
+            "pkgId": "org.eclipse.jetty:jetty-security@9.4.51.v20230217",
+            "deps": [
+              {
+                "nodeId": "org.eclipse.jetty:jetty-server@9.4.51.v20230217"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.eclipse.jetty:jetty-util-ajax@9.4.51.v20230217",
+            "pkgId": "org.eclipse.jetty:jetty-util-ajax@9.4.51.v20230217",
+            "deps": [
+              {
+                "nodeId": "org.eclipse.jetty:jetty-util@9.4.51.v20230217"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.springframework:spring-web@5.3.29",
+            "pkgId": "org.springframework:spring-web@5.3.29",
+            "deps": [
+              {
+                "nodeId": "org.springframework:spring-beans@5.3.29"
+              },
+              {
+                "nodeId": "org.springframework:spring-core@5.3.29"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.springframework:spring-beans@5.3.29",
+            "pkgId": "org.springframework:spring-beans@5.3.29",
+            "deps": [
+              {
+                "nodeId": "org.springframework:spring-core@5.3.29"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.springframework:spring-core@5.3.29",
+            "pkgId": "org.springframework:spring-core@5.3.29",
+            "deps": [
+              {
+                "nodeId": "org.springframework:spring-jcl@5.3.29"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.springframework:spring-jcl@5.3.29",
+            "pkgId": "org.springframework:spring-jcl@5.3.29",
+            "deps": []
+          }
+        ]
+      }
+    },
+    "projectDescriptor": {
+      "identity": {
+        "type": "gradle",
+        "targetFile": "build.gradle",
+        "rootComponentName": "com.snyk.fixtures:nested-bom-constraints"
+      }
+    }
+  }
+]

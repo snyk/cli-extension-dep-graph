@@ -1,0 +1,24 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.snyk.fixtures'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Import our local platform as a BOM - which itself imports nested BOMs
+    implementation platform(project(':platform'))
+    
+    // Dependencies without versions - should be constrained by nested BOMs through platform
+    implementation 'com.fasterxml.jackson.core:jackson-core'
+    implementation 'org.slf4j:slf4j-api'
+    implementation 'ch.qos.logback:logback-classic'
+    
+    // Dependencies constrained by platform's direct constraints
+    implementation 'org.apache.commons:commons-lang3'
+    implementation 'commons-io:commons-io'
+}

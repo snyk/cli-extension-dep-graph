@@ -126,10 +126,13 @@ func TestBuildDepGraph(t *testing.T) {
 		assert.False(t, ids["com.example:a@1.0.0"], "cycle-pruned dep should not appear as normal node")
 	})
 
-	t.Run("handles visited-pruned dependencies as pruned nodes", func(t *testing.T) {
+	t.Run("handles visited-pruned dependencies by connecting to existing nodes", func(t *testing.T) {
+		// Test that visited-pruned dependencies connect to existing nodes instead of creating pruned versions.
+		// We simulate a case where a node is expanded under one parent and then referenced as pruned under another.
 		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
 			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
-				{ID: "com.example:b:2.0.0", Pruned: pruneVisited},
+				makeDep("com.example:a:1.0.0", makeDep("com.example:shared:1.0.0")),                             // First occurrence - creates the node
+				makeDep("com.example:b:1.0.0", gradleDep{ID: "com.example:shared:1.0.0", Pruned: pruneVisited}), // Second occurrence - should connect to existing
 			}),
 		})
 
@@ -137,8 +140,18 @@ func TestBuildDepGraph(t *testing.T) {
 		require.NoError(t, err)
 
 		ids := nodeIDSet(dg)
-		assert.True(t, ids["com.example:b@2.0.0:pruned"], "visited-pruned dep should appear as pruned node")
-		assert.False(t, ids["com.example:b@2.0.0"], "visited-pruned dep should not appear as normal node")
+		assert.True(t, ids["com.example:shared@1.0.0"], "visited-pruned dep should connect to existing node")
+		assert.False(t, ids["com.example:shared@1.0.0:pruned"], "visited-pruned dep should not create pruned node")
+
+		// Verify the shared node has two different parents
+		aNode := findNodeByID(t, dg, "com.example:a@1.0.0")
+		bNode := findNodeByID(t, dg, "com.example:b@1.0.0")
+
+		sharedEdgesFromA := countEdgesTo(aNode, "com.example:shared@1.0.0")
+		sharedEdgesFromB := countEdgesTo(bNode, "com.example:shared@1.0.0")
+
+		assert.Equal(t, 1, sharedEdgesFromA, "a should reference shared node once")
+		assert.Equal(t, 1, sharedEdgesFromB, "b should reference the same shared node")
 	})
 
 	t.Run("skips unresolved dependencies", func(t *testing.T) {
@@ -155,6 +168,95 @@ func TestBuildDepGraph(t *testing.T) {
 		ids := nodeIDSet(dg)
 		assert.False(t, ids["com.example:missing@1.0.0"], "unresolved dep should be skipped")
 		assert.True(t, ids["com.google.guava:guava@32.1.2-jre"], "resolved dep should be present")
+	})
+
+	t.Run("renders constraint dependencies as labelled :constraint leaves", func(t *testing.T) {
+		// Constraint edges (from platform BOMs, dependency locking, constraints {}
+		// blocks) should appear as a separate suffixed node so consumers can
+		// distinguish them from real artifact dependencies.
+		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
+				{ID: "com.google.code.gson:gson:2.8.2", Constraint: true},
+			}),
+		})
+
+		dg, err := buildDepGraph(&proj, nil)
+		require.NoError(t, err)
+
+		ids := nodeIDSet(dg)
+		assert.True(t, ids["com.google.code.gson:gson@2.8.2:constraint"], "constraint dep should appear as :constraint node")
+		assert.False(t, ids["com.google.code.gson:gson@2.8.2"], "constraint-only dep should not also appear as a normal node")
+
+		constraintNode := findNodeByID(t, dg, "com.google.code.gson:gson@2.8.2:constraint")
+		require.NotNil(t, constraintNode.Info)
+		assert.Equal(t, "true", constraintNode.Info.Labels["constraint"])
+	})
+
+	t.Run("constraint nodes are leaves and do not recurse", func(t *testing.T) {
+		// Even if the init script were to (incorrectly) attach children to a
+		// constraint node, addDep should not walk them — constraint edges are
+		// always treated as leaves.
+		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
+				{
+					ID:         "com.google.code.gson:gson:2.8.2",
+					Constraint: true,
+					Dependencies: []gradleDep{
+						makeDep("should.not.appear:child:1.0.0"),
+					},
+				},
+			}),
+		})
+
+		dg, err := buildDepGraph(&proj, nil)
+		require.NoError(t, err)
+
+		ids := nodeIDSet(dg)
+		assert.True(t, ids["com.google.code.gson:gson@2.8.2:constraint"])
+		assert.False(t, ids["should.not.appear:child@1.0.0"], "constraint nodes must not recurse")
+	})
+
+	t.Run("constraint edge does not poison visited set for real edge to same component", func(t *testing.T) {
+		// Regression for the platform-BOM / lock-file case: a constraint edge
+		// to module X must not cause a subsequent real edge to X to be treated
+		// as already-visited. The real edge must still expand its full subtree.
+		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
+				{ID: "dom4j:dom4j:1.6.1", Constraint: true},
+				makeDep("dom4j:dom4j:1.6.1", makeDep("xml-apis:xml-apis:1.4.01")),
+			}),
+		})
+
+		dg, err := buildDepGraph(&proj, nil)
+		require.NoError(t, err)
+
+		ids := nodeIDSet(dg)
+		assert.True(t, ids["dom4j:dom4j@1.6.1:constraint"], "constraint edge should produce :constraint node")
+		assert.True(t, ids["dom4j:dom4j@1.6.1"], "real edge should still produce normal node")
+		assert.True(t, ids["xml-apis:xml-apis@1.4.01"], "real edge subtree must expand fully")
+
+		dom4jNode := findNodeByID(t, dg, "dom4j:dom4j@1.6.1")
+		assert.Equal(t, 1, countEdgesTo(dom4jNode, "xml-apis:xml-apis@1.4.01"),
+			"transitive child should be reachable via the real (non-constraint) parent")
+	})
+
+	t.Run("preserves emission order for mixed constraint and real edges", func(t *testing.T) {
+		// When a parent has both constraint and real edges, their order in the
+		// resulting Deps slice should match the input order from the init script.
+		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
+				{ID: "com.example:locked:1.0.0", Constraint: true},
+				makeDep("com.example:real:1.0.0"),
+			}),
+		})
+
+		dg, err := buildDepGraph(&proj, nil)
+		require.NoError(t, err)
+
+		rootNode := findNodeByID(t, dg, "root-node")
+		require.Len(t, rootNode.Deps, 2)
+		assert.Equal(t, "com.example:locked@1.0.0:constraint", rootNode.Deps[0].NodeID)
+		assert.Equal(t, "com.example:real@1.0.0", rootNode.Deps[1].NodeID)
 	})
 
 	t.Run("skips configurations with errors", func(t *testing.T) {
@@ -202,10 +304,11 @@ func TestBuildDepGraph(t *testing.T) {
 		assert.Equal(t, "", dg.Pkgs[0].Info.Version)
 	})
 
-	t.Run("prunes subsequent references to same dependency per configuration", func(t *testing.T) {
+	t.Run("connects subsequent references to same dependency per configuration", func(t *testing.T) {
 		// This test simulates the common case where two parents reference the same child.
 		// The init script would emit the child's full subtree under the first parent and
-		// mark subsequent references as pruned: "visited".
+		// mark subsequent references as pruned: "visited". With DAG behavior, we connect
+		// to the existing node instead of creating pruned versions.
 		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
 			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
 				makeDep("com.example:a:1.0.0", makeDep("com.example:c:1.0.0")),
@@ -217,8 +320,18 @@ func TestBuildDepGraph(t *testing.T) {
 		require.NoError(t, err)
 
 		ids := nodeIDSet(dg)
-		assert.True(t, ids["com.example:c@1.0.0"], "first occurrence should appear as normal node")
-		assert.True(t, ids["com.example:c@1.0.0:pruned"], "subsequent occurrence should appear as pruned node")
+		assert.True(t, ids["com.example:c@1.0.0"], "dependency should appear as normal node")
+		assert.False(t, ids["com.example:c@1.0.0:pruned"], "should not create pruned version for visited nodes")
+
+		// Verify both parents reference the same node
+		aNode := findNodeByID(t, dg, "com.example:a@1.0.0")
+		bNode := findNodeByID(t, dg, "com.example:b@1.0.0")
+
+		cEdgesFromA := countEdgesTo(aNode, "com.example:c@1.0.0")
+		cEdgesFromB := countEdgesTo(bNode, "com.example:c@1.0.0")
+
+		assert.Equal(t, 1, cEdgesFromA, "a should reference c once")
+		assert.Equal(t, 1, cEdgesFromB, "b should reference the same c node")
 	})
 
 	t.Run("preserves different versions of same transitive dependency across configurations", func(t *testing.T) {

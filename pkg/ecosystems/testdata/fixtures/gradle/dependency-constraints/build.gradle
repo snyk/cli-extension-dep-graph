@@ -1,0 +1,25 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.snyk.fixtures'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+// Exercises the `constraints {}` DSL: pins the resolved version of a transitive
+// dependency without declaring a real edge to it. Produces an isConstraint()
+// edge from the configuration root, which the init script must emit as a
+// constraint leaf rather than a real artifact dependency.
+dependencies {
+    // Real transitive pulls jcl-over-slf4j 1.7.30; the constraint below upgrades it.
+    implementation 'org.slf4j:jcl-over-slf4j:1.7.30'
+
+    constraints {
+        implementation('org.slf4j:jcl-over-slf4j:1.7.36') {
+            because 'Pin to a known-good version'
+        }
+    }
+}

@@ -1,0 +1,28 @@
+plugins {
+    id 'java-platform'
+}
+
+group = 'com.snyk.fixtures'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+// Enable dependencies in platform - needed to import other BOMs
+javaPlatform {
+    allowDependencies()
+}
+
+dependencies {
+    // Import external BOMs - this creates a nested BOM hierarchy
+    api platform('com.fasterxml.jackson:jackson-bom:2.15.2')
+    api platform('org.slf4j:slf4j-bom:2.0.9')
+    
+    constraints {
+        // Additional direct constraints not covered by imported BOMs
+        api 'org.apache.commons:commons-lang3:3.13.0'
+        api 'commons-io:commons-io:2.14.0'
+        api 'ch.qos.logback:logback-classic:1.4.11'
+    }
+}

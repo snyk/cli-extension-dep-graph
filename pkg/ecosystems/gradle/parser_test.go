@@ -58,20 +58,23 @@ func TestParseDependencyGraphJSON(t *testing.T) {
 		assert.True(t, foundApp, "should contain app project")
 	})
 
-	t.Run("parses pruned and unresolved dependencies", func(t *testing.T) {
+	t.Run("parses pruned, constraint and unresolved dependencies", func(t *testing.T) {
 		input := []byte(`{"gradleVersion":"8.5","javaVersion":"17","generatedAt":"","rootProject":{"name":"root","group":"","version":"","path":""}}
-{"name":"root","group":"com.example","version":"1.0","path":":","gav":"com.example:root:1.0","buildFile":"","configurations":[{"name":"runtimeClasspath","description":"","root":{"id":"com.example:root:1.0","dependencies":[{"id":"com.example:a:1.0","pruned":"cycle","dependencies":[]},{"id":"com.example:b:1.0","pruned":"visited","dependencies":[]},{"id":"com.example:c:1.0","unresolved":true,"reason":"not found","dependencies":[]}]},"allDependencies":[]}]}`)
+{"name":"root","group":"com.example","version":"1.0","path":":","gav":"com.example:root:1.0","buildFile":"","configurations":[{"name":"runtimeClasspath","description":"","root":{"id":"com.example:root:1.0","dependencies":[{"id":"com.example:a:1.0","pruned":"cycle","dependencies":[]},{"id":"com.example:b:1.0","pruned":"visited","dependencies":[]},{"id":"com.example:c:1.0","unresolved":true,"reason":"not found","dependencies":[]},{"id":"com.example:d:1.0","constraint":true}]},"allDependencies":[]}]}`)
 
 		result, err := parseDependencyGraphJSON(bytes.NewReader(input))
 		require.NoError(t, err)
 
 		deps := result.Projects[0].Configurations[0].Root.Dependencies
-		require.Len(t, deps, 3)
+		require.Len(t, deps, 4)
 		assert.Equal(t, pruneCycle, deps[0].Pruned)
 		assert.Equal(t, pruneVisited, deps[1].Pruned)
 		assert.True(t, deps[2].Pruned.IsEmpty())
 		assert.True(t, deps[2].Unresolved)
 		assert.Equal(t, "not found", deps[2].Reason)
+		assert.True(t, deps[3].Constraint)
+		assert.True(t, deps[3].Pruned.IsEmpty())
+		assert.False(t, deps[3].Unresolved)
 	})
 
 	t.Run("parses configuration error field", func(t *testing.T) {
