@@ -42,6 +42,7 @@ func getFlagSet() *pflag.FlagSet {
 	flagSet.Int(workflow.FlagUnmanagedMaxDepth, 0, "Specify the maximum level of archive extraction for unmanaged scanning.")
 	flagSet.Bool(workflow.FlagIncludeProvenance, false, "Include checksums in purl to support package provenance.")
 	flagSet.Bool(workflow.FlagUseSBOMResolution, false, "Use SBOM resolution instead of legacy CLI.")
+	flagSet.Bool(workflow.FlagPrune, false, "When set, controls graph output format. true=pruned JSONL, false=complete JSONL.")
 	flagSet.Bool(workflow.FlagPrintEffectiveGraph, false, "Return the pruned dependency graph.")
 	flagSet.Bool(workflow.FlagPrintEffectiveGraphWithErrors, false, "Return errors in the pruned dependency graph output.")
 	flagSet.Bool(workflow.FlagDotnetRuntimeResolution, false, "Required. You must use this option when you test .NET projects using Runtime Resolution Scanning.")

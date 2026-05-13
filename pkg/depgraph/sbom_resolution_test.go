@@ -1524,8 +1524,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 }
 
-func Test_executeLegacyWorkflow_FlagPrintOutputJsonlWithErrors(t *testing.T) {
-	t.Run("GIVEN FlagPrintOutputJsonlWithErrors set WHEN executeLegacyWorkflow THEN disables effective-graph-with-errors in legacy config", func(t *testing.T) {
+func Test_executeLegacyWorkflow_FlagPrune(t *testing.T) {
+	t.Run("GIVEN any config WHEN executeLegacyWorkflow THEN sets FlagPrune=false and unsets legacy flags", func(t *testing.T) {
 		// GIVEN
 		ctx := setupTestContext(t, false)
 		ctx.config.Set(workflow.FlagPrintOutputJsonlWithErrors, true)
@@ -1545,18 +1545,25 @@ func Test_executeLegacyWorkflow_FlagPrintOutputJsonlWithErrors(t *testing.T) {
 		// THEN
 		require.NoError(t, err)
 		require.True(t, resolutionHandler.Called, "legacy resolution handler should have been called")
-		assert.True(t, resolutionHandler.Config.GetBool(workflow.FlagPrintOutputJsonlWithErrors),
-			"FlagPrintOutputJsonlWithErrors should be forwarded to legacy config")
-		assert.False(t, resolutionHandler.Config.GetBool(workflow.FlagPrintEffectiveGraphWithErrors),
-			"FlagPrintEffectiveGraphWithErrors must be disabled when FlagPrintOutputJsonlWithErrors is used")
+		assert.True(t, resolutionHandler.Config.IsSet(workflow.FlagPrune),
+			"FlagPrune should be set in legacy config")
+		assert.False(t, resolutionHandler.Config.GetBool(workflow.FlagPrune),
+			"FlagPrune should be false (complete JSONL) for SBOM resolution")
+		assert.True(t, resolutionHandler.Config.IsSet(workflow.FlagFailFast),
+			"FlagFailFast should be set in legacy config")
+		assert.False(t, resolutionHandler.Config.GetBool(workflow.FlagFailFast),
+			"FlagFailFast should be false so error-only entries pass through")
 		assert.False(t, resolutionHandler.Config.GetBool(workflow.FlagPrintEffectiveGraph),
 			"FlagPrintEffectiveGraph should be unset in legacy config")
+		assert.False(t, resolutionHandler.Config.GetBool(workflow.FlagPrintEffectiveGraphWithErrors),
+			"FlagPrintEffectiveGraphWithErrors should be unset in legacy config")
+		assert.False(t, resolutionHandler.Config.GetBool(workflow.FlagPrintOutputJsonlWithErrors),
+			"FlagPrintOutputJsonlWithErrors should be unset in legacy config")
 	})
 
-	t.Run("GIVEN FlagPrintOutputJsonlWithErrors not set WHEN executeLegacyWorkflow THEN enables effective-graph-with-errors by default", func(t *testing.T) {
+	t.Run("GIVEN default config WHEN executeLegacyWorkflow THEN sets FlagPrune=false", func(t *testing.T) {
 		// GIVEN
 		ctx := setupTestContext(t, false)
-		// FlagPrintOutputJsonlWithErrors is false by default
 
 		resolutionHandler := NewCalledResolutionHandlerFunc([]gafworkflow.Data{}, nil)
 		mockPlugin := &mockScaPlugin{}
@@ -1573,15 +1580,17 @@ func Test_executeLegacyWorkflow_FlagPrintOutputJsonlWithErrors(t *testing.T) {
 		// THEN
 		require.NoError(t, err)
 		require.True(t, resolutionHandler.Called, "legacy resolution handler should have been called")
-		assert.True(t, resolutionHandler.Config.GetBool(workflow.FlagPrintEffectiveGraphWithErrors),
-			"FlagPrintEffectiveGraphWithErrors must be enabled by default for SBOM resolution")
-		assert.False(t, resolutionHandler.Config.GetBool(workflow.FlagPrintOutputJsonlWithErrors),
-			"FlagPrintOutputJsonlWithErrors should remain false when not explicitly set")
-		assert.False(t, resolutionHandler.Config.GetBool(workflow.FlagPrintEffectiveGraph),
-			"FlagPrintEffectiveGraph should be unset in legacy config")
+		assert.True(t, resolutionHandler.Config.IsSet(workflow.FlagPrune),
+			"FlagPrune should be set in legacy config")
+		assert.False(t, resolutionHandler.Config.GetBool(workflow.FlagPrune),
+			"FlagPrune should be false (complete JSONL) for SBOM resolution")
+		assert.True(t, resolutionHandler.Config.IsSet(workflow.FlagFailFast),
+			"FlagFailFast should be set in legacy config")
+		assert.False(t, resolutionHandler.Config.GetBool(workflow.FlagFailFast),
+			"FlagFailFast should be false so error-only entries pass through")
 	})
 
-	t.Run("GIVEN FlagPrintOutputJsonlWithErrors is set WHEN executeLegacyWorkflow runs THEN parent config is not mutated", func(t *testing.T) {
+	t.Run("GIVEN config with legacy flags WHEN executeLegacyWorkflow runs THEN parent config is not mutated", func(t *testing.T) {
 		// GIVEN
 		ctx := setupTestContext(t, false)
 		ctx.config.Set(workflow.FlagPrintOutputJsonlWithErrors, true)

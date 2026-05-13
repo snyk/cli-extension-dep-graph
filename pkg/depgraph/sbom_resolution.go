@@ -299,13 +299,14 @@ func executeLegacyWorkflow(
 ) ([]gafworkflow.Data, error) {
 	legacyConfig := config.Clone()
 	legacyConfig.Unset(workflow.FlagPrintEffectiveGraph)
+	legacyConfig.Unset(workflow.FlagPrintEffectiveGraphWithErrors)
+	legacyConfig.Unset(workflow.FlagPrintOutputJsonlWithErrors)
 
-	if config.GetBool(workflow.FlagPrintOutputJsonlWithErrors) {
-		legacyConfig.Set(workflow.FlagPrintOutputJsonlWithErrors, true)
-		legacyConfig.Set(workflow.FlagPrintEffectiveGraphWithErrors, false)
-	} else {
-		legacyConfig.Set(workflow.FlagPrintEffectiveGraphWithErrors, true)
-	}
+	// New model: SBOM always wants complete (unpruned) JSONL with embedded errors.
+	// FlagPrune=false signals unpruned JSONL; FlagFailFast=false tells
+	// shouldThrowOnErrors to let error-only entries pass through instead of throwing.
+	legacyConfig.Set(workflow.FlagPrune, false)
+	legacyConfig.Set(workflow.FlagFailFast, false)
 
 	legacyData, err := depGraphWorkflowFunc(ctx, legacyConfig, logger)
 	if err == nil {

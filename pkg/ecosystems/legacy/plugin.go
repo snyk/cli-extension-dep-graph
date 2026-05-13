@@ -103,9 +103,9 @@ func getDepGraphsFromLegacy(
 }
 
 func invokeLegacyCLI(ictx workflow.InvocationContext, opts *ecosystems.SCAPluginOptions, ignores []string) ([]workflow.Data, error) {
-	// Add --print-effective-graph-with-errors for JSONL output with error handling
+	// Use new two-mode print-graph model: pruned JSONL with errors
 	cmdArgs := append([]string(nil), opts.Global.RawFlags...)
-	cmdArgs = append(cmdArgs, "--print-effective-graph-with-errors")
+	cmdArgs = append(cmdArgs, "--print-graph", "--prune")
 
 	for i := range ignores {
 		_, fileName := path.Split(ignores[i])

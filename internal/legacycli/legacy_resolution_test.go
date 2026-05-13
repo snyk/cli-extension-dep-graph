@@ -26,6 +26,9 @@ var jsonlPayload string
 //go:embed testdata/jsonl_dep_graph_with_error_output
 var jsonlDepGraphWithErrorPayload string
 
+//go:embed testdata/jsonl_error_only_output
+var jsonlErrorOnlyPayload string
+
 //go:embed testdata/expected_dep_graph.json
 var expectedDepGraph string
 
@@ -232,6 +235,22 @@ func Test_LegacyResolution(t *testing.T) {
 		assert.NotContains(t, cmdArgs, "--print-output-jsonl-with-errors")
 	})
 
+	t.Run("GIVEN FlagPrune is set alongside FlagPrintOutputJsonlWithErrors WHEN PrepareLegacyFlags THEN legacy flag is NOT appended", func(t *testing.T) {
+		isolatedConfig := configuration.New()
+		isolatedConfig.Set(workflow.FlagPrune, false)
+		isolatedConfig.Set(workflow.FlagPrintOutputJsonlWithErrors, true)
+
+		nopLog := zerolog.Nop()
+		PrepareLegacyFlags("--print-graph", isolatedConfig, &nopLog)
+
+		cmdArgs, ok := isolatedConfig.Get(configuration.RAW_CMD_ARGS).([]string)
+		require.True(t, ok, "RAW_CMD_ARGS should be a []string")
+		assert.NotContains(t, cmdArgs, "--print-output-jsonl-with-errors",
+			"legacy flag should not be appended when FlagPrune is set")
+		assert.Contains(t, cmdArgs, "--jsonl",
+			"--jsonl should be appended for FlagPrune=false")
+	})
+
 	t.Run("should not include target directory if file flag provided", func(t *testing.T) {
 		config.Set(workflow.FlagFile, "path/to/target/file.js")
 		config.Set("targetDirectory", "path/to/target")
@@ -326,6 +345,140 @@ func Test_LegacyResolution(t *testing.T) {
 	})
 }
 
+func Test_HandleLegacyResolution_ErrorChecking(t *testing.T) {
+	nopLogger := zerolog.Nop()
+
+	setupMocks := func(t *testing.T) (*frameworkmocks.MockEngine, *frameworkmocks.MockInvocationContext) {
+		t.Helper()
+		ctrl := gomock.NewController(t)
+		engineMock := frameworkmocks.NewMockEngine(ctrl)
+		invocationContextMock := frameworkmocks.NewMockInvocationContext(ctrl)
+		invocationContextMock.EXPECT().GetEngine().Return(engineMock).AnyTimes()
+		invocationContextMock.EXPECT().GetConfiguration().Return(configuration.New()).AnyTimes()
+		invocationContextMock.EXPECT().GetEnhancedLogger().Return(&nopLogger).AnyTimes()
+		return engineMock, invocationContextMock
+	}
+
+	t.Run("GIVEN FlagPrune with mixed JSONL WHEN HandleLegacyResolution THEN returns error", func(t *testing.T) {
+		engineMock, invocationContextMock := setupMocks(t)
+		config := configuration.New()
+		config.Set(workflow.FlagPrune, true)
+
+		dataIdentifier := gafworkflow.NewTypeIdentifier(workflow.WorkflowID, workflow.WorkflowIDStr)
+		data := gafworkflow.NewData(dataIdentifier, workflow.ContentTypeJSON, []byte(jsonlDepGraphWithErrorPayload))
+		engineMock.EXPECT().InvokeWithConfig(legacyWorkflowID, config).Return([]gafworkflow.Data{data}, nil).Times(1)
+
+		_, err := HandleLegacyResolution(invocationContextMock, config, &nopLogger)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Unspecified Error")
+	})
+
+	t.Run("GIVEN FlagPrune with fail-fast=false and mixed JSONL WHEN HandleLegacyResolution THEN embeds errors in workflow data", func(t *testing.T) {
+		engineMock, invocationContextMock := setupMocks(t)
+		config := configuration.New()
+		config.Set(workflow.FlagPrune, true)
+		config.Set(workflow.FlagFailFast, false)
+
+		dataIdentifier := gafworkflow.NewTypeIdentifier(workflow.WorkflowID, workflow.WorkflowIDStr)
+		data := gafworkflow.NewData(dataIdentifier, workflow.ContentTypeJSON, []byte(jsonlDepGraphWithErrorPayload))
+		engineMock.EXPECT().InvokeWithConfig(legacyWorkflowID, config).Return([]gafworkflow.Data{data}, nil).Times(1)
+
+		depGraphs, err := HandleLegacyResolution(invocationContextMock, config, &nopLogger)
+		require.NoError(t, err)
+		require.Len(t, depGraphs, 2)
+
+		errorList := depGraphs[1].GetErrorList()
+		require.Len(t, errorList, 1)
+		assert.Equal(t, "SNYK-CLI-0000", errorList[0].ErrorCode)
+	})
+
+	t.Run("GIVEN FlagPrune with error-only JSONL WHEN HandleLegacyResolution THEN returns error", func(t *testing.T) {
+		engineMock, invocationContextMock := setupMocks(t)
+		config := configuration.New()
+		config.Set(workflow.FlagPrune, true)
+
+		dataIdentifier := gafworkflow.NewTypeIdentifier(workflow.WorkflowID, workflow.WorkflowIDStr)
+		data := gafworkflow.NewData(dataIdentifier, workflow.ContentTypeJSON, []byte(jsonlErrorOnlyPayload))
+		engineMock.EXPECT().InvokeWithConfig(legacyWorkflowID, config).Return([]gafworkflow.Data{data}, nil).Times(1)
+
+		_, err := HandleLegacyResolution(invocationContextMock, config, &nopLogger)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Unspecified Error")
+	})
+}
+
+func Test_shouldThrowOnErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(configuration.Configuration)
+		expected bool
+	}{
+		{
+			name:     "default config throws",
+			setup:    func(_ configuration.Configuration) {},
+			expected: true,
+		},
+		{
+			name: "FlagPrintEffectiveGraphWithErrors does not throw",
+			setup: func(c configuration.Configuration) {
+				c.Set(workflow.FlagPrintEffectiveGraphWithErrors, true)
+			},
+			expected: false,
+		},
+		{
+			name: "FlagPrintOutputJsonlWithErrors does not throw",
+			setup: func(c configuration.Configuration) {
+				c.Set(workflow.FlagPrintOutputJsonlWithErrors, true)
+			},
+			expected: false,
+		},
+		{
+			name: "fail-fast=false does not throw",
+			setup: func(c configuration.Configuration) {
+				c.Set(workflow.FlagFailFast, false)
+			},
+			expected: false,
+		},
+		{
+			name: "fail-fast=true throws",
+			setup: func(c configuration.Configuration) {
+				c.Set(workflow.FlagFailFast, true)
+			},
+			expected: true,
+		},
+		{
+			name: "prune=true without fail-fast throws",
+			setup: func(c configuration.Configuration) {
+				c.Set(workflow.FlagPrune, true)
+			},
+			expected: true,
+		},
+		{
+			name: "prune=false without fail-fast throws",
+			setup: func(c configuration.Configuration) {
+				c.Set(workflow.FlagPrune, false)
+			},
+			expected: true,
+		},
+		{
+			name: "prune=false with fail-fast=false does not throw",
+			setup: func(c configuration.Configuration) {
+				c.Set(workflow.FlagPrune, false)
+				c.Set(workflow.FlagFailFast, false)
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := configuration.New()
+			tt.setup(config)
+			assert.Equal(t, tt.expected, shouldThrowOnErrors(config))
+		})
+	}
+}
+
 func invokeWithConfigAndGetTestCmdArgs(
 	t *testing.T,
 	engineMock *frameworkmocks.MockEngine,
@@ -393,6 +546,37 @@ func Test_chooseGraphArgument(t *testing.T) {
 		arg, parser := ChooseGraphArgument(config)
 
 		assert.Equal(t, "--print-effective-graph-with-errors", arg)
+		assert.IsType(t, &parsers.JSONLOutputParser{}, parser)
+	})
+
+	t.Run("GIVEN FlagPrune is true WHEN ChooseGraphArgument THEN returns --print-graph with JSONL parser", func(t *testing.T) {
+		config := configuration.New()
+		config.Set(workflow.FlagPrune, true)
+
+		arg, parser := ChooseGraphArgument(config)
+
+		assert.Equal(t, "--print-graph", arg)
+		assert.IsType(t, &parsers.JSONLOutputParser{}, parser)
+	})
+
+	t.Run("GIVEN FlagPrune is false WHEN ChooseGraphArgument THEN returns --print-graph with JSONL parser", func(t *testing.T) {
+		config := configuration.New()
+		config.Set(workflow.FlagPrune, false)
+
+		arg, parser := ChooseGraphArgument(config)
+
+		assert.Equal(t, "--print-graph", arg)
+		assert.IsType(t, &parsers.JSONLOutputParser{}, parser)
+	})
+
+	t.Run("GIVEN FlagPrune set alongside legacy flags WHEN ChooseGraphArgument THEN prune takes priority", func(t *testing.T) {
+		config := configuration.New()
+		config.Set(workflow.FlagPrune, true)
+		config.Set(workflow.FlagPrintEffectiveGraph, true)
+
+		arg, parser := ChooseGraphArgument(config)
+
+		assert.Equal(t, "--print-graph", arg)
 		assert.IsType(t, &parsers.JSONLOutputParser{}, parser)
 	})
 }

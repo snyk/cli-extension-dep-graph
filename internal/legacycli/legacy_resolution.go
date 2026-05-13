@@ -40,6 +40,23 @@ func HandleLegacyResolution(ctx gafworkflow.InvocationContext, config configurat
 	if err != nil {
 		return nil, fmt.Errorf("error parsing dep graphs: %w", err)
 	}
+
+	// DEPRECATION: Remove this block once all consumers handle embedded errors
+	// directly from workflow.Data (via GetErrorList). At that point, error-only
+	// entries should always pass through and this throw-on-error bridge is no
+	// longer needed.
+	if shouldThrowOnErrors(config) {
+		for i := range depGraphs {
+			dg := &depGraphs[i]
+			if len(dg.DepGraph) == 0 && len(dg.Error) > 0 {
+				if snykErr, ok := parseJSONAPIError(dg.Error); ok {
+					return nil, snykErr
+				}
+				return nil, snyk_errors.Error{Title: string(dg.Error)}
+			}
+		}
+	}
+
 	if len(depGraphs) == 0 {
 		return nil, ErrNoDepGraphsFound
 	}
@@ -50,6 +67,12 @@ func HandleLegacyResolution(ctx gafworkflow.InvocationContext, config configurat
 }
 
 func ChooseGraphArgument(config configuration.Configuration) (string, parsers.OutputParser) {
+	// New model: prune presence (any value) signals JSONL output
+	if config.IsSet(workflow.FlagPrune) {
+		return printGraphCliArg, parsers.NewJSONL()
+	}
+
+	// Legacy flags (preserved for backward compat)
 	if config.GetBool(workflow.FlagPrintEffectiveGraph) {
 		return "--print-effective-graph", parsers.NewJSONL()
 	}
@@ -62,6 +85,7 @@ func ChooseGraphArgument(config configuration.Configuration) (string, parsers.Ou
 		return printGraphCliArg, parsers.NewJSONL()
 	}
 
+	// Default: bare --print-graph, plaintext
 	return printGraphCliArg, parsers.NewPlainText()
 }
 
@@ -102,7 +126,7 @@ func PrepareLegacyFlags(argument string, cfg configuration.Configuration, logger
 		cmdArgs = append(cmdArgs, "--all-projects")
 	}
 
-	if cfg.GetBool(workflow.FlagPrintOutputJsonlWithErrors) {
+	if !cfg.IsSet(workflow.FlagPrune) && cfg.GetBool(workflow.FlagPrintOutputJsonlWithErrors) {
 		cmdArgs = append(cmdArgs, printOutputJsonlWithErrorsCliArg)
 	}
 
@@ -264,5 +288,32 @@ func PrepareLegacyFlags(argument string, cfg configuration.Configuration, logger
 		logger.Print("Dotnet target framework:", tf)
 	}
 
+	// PHASE 2: --jsonl will be removed once the dep-graph router handles unpruned
+	// output natively. At that point, prune=false consumers will not need this flag.
+	if cfg.IsSet(workflow.FlagPrune) {
+		if cfg.GetBool(workflow.FlagPrune) {
+			cmdArgs = append(cmdArgs, "--prune")
+		} else {
+			cmdArgs = append(cmdArgs, "--jsonl")
+		}
+		logger.Print("Prune: ", cfg.GetBool(workflow.FlagPrune))
+	}
+
 	cfg.Set(configuration.RAW_CMD_ARGS, cmdArgs)
+}
+
+// shouldThrowOnErrors returns true when consumers expect (nil, error) on
+// error-only JSONL entries. Returns false when a consumer has opted in to
+// handling embedded errors itself (legacy -with-errors flags, or fail-fast=false).
+// DEPRECATION: Remove this function along with the throw-on-error block in
+// HandleLegacyResolution once all consumers handle embedded errors directly.
+func shouldThrowOnErrors(config configuration.Configuration) bool {
+	if config.GetBool(workflow.FlagPrintEffectiveGraphWithErrors) ||
+		config.GetBool(workflow.FlagPrintOutputJsonlWithErrors) {
+		return false
+	}
+	if config.IsSet(workflow.FlagFailFast) && !config.GetBool(workflow.FlagFailFast) {
+		return false
+	}
+	return true
 }
