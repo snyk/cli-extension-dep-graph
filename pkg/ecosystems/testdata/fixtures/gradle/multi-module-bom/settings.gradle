@@ -1,0 +1,4 @@
+rootProject.name = 'multi-module-bom'
+
+include 'platform'
+include 'consumer'

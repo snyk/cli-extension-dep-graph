@@ -173,6 +173,20 @@ func pluginTestCases() map[string]PluginTestCase {
 			Options:      ecosystems.NewPluginOptions().WithGradleConfigurationMatching("^runtimeClasspath$"),
 			ExpectedFile: "expected_plugin_exact_runtime.json",
 		},
+		// Exercises nested BOM resolution with complex constraint hierarchy.
+		// Validates that imported BOMs produce `:constraint` leaves while
+		// allowing the real dependency paths to be fully expanded.
+		"nested_bom_constraints": {
+			Fixture: "nested-bom-constraints",
+			Options: ecosystems.NewPluginOptions(),
+		},
+		// Multi-module project with platform BOM that imports external BOMs.
+		// Demonstrates nested BOM hierarchy where platform -> external BOMs
+		// -> component constraints, ensuring proper DAG structure.
+		"multi_module_bom": {
+			Fixture: "multi-module-bom",
+			Options: ecosystems.NewPluginOptions(),
+		},
 	}
 }
 

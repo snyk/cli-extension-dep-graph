@@ -1,0 +1,30 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.snyk.fixtures'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+// Test nested BOM constraint scenario: Spring Boot BOM internally imports
+// jackson-bom, jetty-bom, jersey-bom, etc. via Maven <scope>import</scope>.
+// This tests whether our "constraint edges are leaves" approach loses any
+// important diagnostic information about BOM hierarchies.
+dependencies {
+    // Spring Boot BOM - internally imports jackson-bom, jetty-bom, etc.
+    implementation platform('org.springframework.boot:spring-boot-dependencies:2.7.14')
+    
+    // Jackson dependencies - versions should be constrained by nested jackson-bom
+    implementation 'com.fasterxml.jackson.core:jackson-core'
+    // Skip databind to avoid version conflicts for this test
+    
+    // Jetty dependencies - versions should be constrained by nested jetty-bom  
+    implementation 'org.eclipse.jetty:jetty-server'
+    implementation 'org.eclipse.jetty:jetty-servlet'
+    
+    // Spring dependency for good measure
+    implementation 'org.springframework:spring-web'
+}
