@@ -444,6 +444,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 			expectedWorkflowDataLen          int
 			expectLegacyResolutionToBeCalled bool
 			expectedExclude                  string
+			expectedExcludePaths             string
 			pluginsShouldNotBeCalled         []int
 		}{
 			{
@@ -463,6 +464,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				expectedWorkflowDataLen:          2,
 				expectLegacyResolutionToBeCalled: false,
 				expectedExclude:                  "",
+				expectedExcludePaths:             "",
 			},
 			{
 				name:           "should return all findings when FlagAllProjects is true",
@@ -479,7 +481,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				// Expected: 2 SBOM findings + 1 legacy workflow depgraph = 3
 				expectedWorkflowDataLen:          3,
 				expectLegacyResolutionToBeCalled: true,
-				expectedExclude:                  "uv.lock,pyproject.toml,requirements.txt,setup.py",
+				expectedExclude:                  "",
+				expectedExcludePaths:             "uv.lock,pyproject.toml,requirements.txt,setup.py",
 			},
 			{
 				name:           "should continue to next plugin when first plugin returns zero findings and FlagAllProjects is false",
@@ -496,6 +499,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				expectedWorkflowDataLen:          1,
 				expectLegacyResolutionToBeCalled: false,
 				expectedExclude:                  "",
+				expectedExcludePaths:             "",
 			},
 			{
 				name:           "should stop at first plugin and return its findings when FlagAllProjects is false",
@@ -516,6 +520,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				expectedWorkflowDataLen:          2,
 				expectLegacyResolutionToBeCalled: false,
 				expectedExclude:                  "",
+				expectedExcludePaths:             "",
 				pluginsShouldNotBeCalled:         []int{1},
 			},
 			{
@@ -539,7 +544,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				// Expected: 4 SBOM findings + 1 legacy workflow depgraph = 5
 				expectedWorkflowDataLen:          5,
 				expectLegacyResolutionToBeCalled: true,
-				expectedExclude:                  "uv.lock,pyproject.toml,requirements.txt,setup.py,package.json,go.mod",
+				expectedExclude:                  "",
+				expectedExcludePaths:             "uv.lock,pyproject.toml,requirements.txt,setup.py,package.json,go.mod",
 			},
 			{
 				name:           "should call legacy resolution workflow when no SBOM findings are found and FlagAllProjects is false",
@@ -552,9 +558,10 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				expectedWorkflowDataLen:          1,
 				expectLegacyResolutionToBeCalled: true,
 				expectedExclude:                  "",
+				expectedExcludePaths:             "",
 			},
 			{
-				name:           "should append ProcessedFiles to existing FlagExclude when FlagAllProjects is true",
+				name:           "should put ProcessedFiles in FlagExcludePaths and leave user FlagExclude untouched",
 				allProjects:    true,
 				initialExclude: "existing-file.txt,another-file.py",
 				plugins: []ecosystems.SCAPlugin{
@@ -568,7 +575,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				// Expected: 2 SBOM findings + 1 legacy workflow depgraph = 3
 				expectedWorkflowDataLen:          3,
 				expectLegacyResolutionToBeCalled: true,
-				expectedExclude:                  "existing-file.txt,another-file.py,uv.lock,pyproject.toml,requirements.txt,setup.py",
+				expectedExclude:                  "existing-file.txt,another-file.py",
+				expectedExcludePaths:             "uv.lock,pyproject.toml,requirements.txt,setup.py",
 			},
 		}
 
@@ -619,8 +627,10 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				assert.Equal(t, tc.expectLegacyResolutionToBeCalled, resolutionHandler.Called)
 
 				if tc.expectLegacyResolutionToBeCalled {
-					actualExclude := resolutionHandler.Config.GetString(workflow.FlagExclude)
-					assert.Equal(t, tc.expectedExclude, actualExclude, "FlagExclude should contain ProcessedFiles from plugins")
+					assert.Equal(t, tc.expectedExclude, resolutionHandler.Config.GetString(workflow.FlagExclude),
+						"FlagExclude should retain user-supplied value (not be modified by ProcessedFiles)")
+					assert.Equal(t, tc.expectedExcludePaths, resolutionHandler.Config.GetString(workflow.FlagExcludePaths),
+						"FlagExcludePaths should contain ProcessedFiles from plugins")
 				}
 
 				for _, idx := range tc.pluginsShouldNotBeCalled {
@@ -676,7 +686,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Len(t, workflowData, 1)
 		// Legacy resolution should have been called
 		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
-		assert.Equal(t, "uv.lock", resolutionHandler.Config.GetString(workflow.FlagExclude), "ProcessedFiles should be excluded from legacy resolution")
+		assert.Equal(t, "uv.lock", resolutionHandler.Config.GetString(workflow.FlagExcludePaths),
+			"ProcessedFiles should be excluded via FlagExcludePaths")
 	})
 
 	t.Run("should handle exit code 3 when no SBOM findings are found", func(t *testing.T) {
@@ -750,7 +761,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.Nil(t, workflowData)
 		// Legacy resolution should have been called
 		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
-		assert.Equal(t, "uv.lock", resolutionHandler.Config.GetString(workflow.FlagExclude), "ProcessedFiles should be excluded from legacy resolution")
+		assert.Equal(t, "uv.lock", resolutionHandler.Config.GetString(workflow.FlagExcludePaths),
+			"ProcessedFiles should be excluded via FlagExcludePaths")
 	})
 
 	t.Run("should skip findings with errors when legacy workflow returns no data", func(t *testing.T) {
@@ -799,8 +811,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		assert.NotNil(t, workflowData)
 		assert.Len(t, workflowData, 1, "Should return only the valid finding since legacy workflow returns nil")
 		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
-		assert.Equal(t, "project1/uv.lock,project2/uv.lock", resolutionHandler.Config.GetString(workflow.FlagExclude),
-			"ProcessedFiles should be excluded from legacy resolution")
+		assert.Equal(t, "project1/uv.lock,project2/uv.lock", resolutionHandler.Config.GetString(workflow.FlagExcludePaths),
+			"ProcessedFiles should be excluded from legacy resolution via FlagExcludePaths")
 	})
 
 	t.Run("should log snyk_errors.Error details for support debugging", func(t *testing.T) {
@@ -1351,7 +1363,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 		assert.True(t, resolutionHandler.Called, "ResolutionHandlerFunc should be called")
-		assert.Equal(t, "project1/uv.lock", resolutionHandler.Config.GetString(workflow.FlagExclude), "ProcessedFiles should be excluded from legacy resolution")
+		assert.Equal(t, "project1/uv.lock", resolutionHandler.Config.GetString(workflow.FlagExcludePaths),
+			"ProcessedFiles should be excluded via FlagExcludePaths")
 		assert.Contains(t, capturedOutput, "project1/uv.lock")
 	})
 
@@ -1511,8 +1524,8 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, workflowData)
 
-		assert.Equal(t, "project1/uv.lock,project2/uv.lock", resolutionHandler.Config.GetString(workflow.FlagExclude),
-			"ProcessedFiles should be excluded from legacy resolution")
+		assert.Equal(t, "project1/uv.lock,project2/uv.lock", resolutionHandler.Config.GetString(workflow.FlagExcludePaths),
+			"ProcessedFiles should be excluded from legacy resolution via FlagExcludePaths")
 		assert.Contains(t, capturedOutput, "project1/uv.lock", "Output should mention the first problem file")
 		assert.Contains(t, capturedOutput, "project2/uv.lock", "Output should mention the second problem file")
 		assert.Contains(t, capturedOutput, "Detailed error to help the customer debug the issue",
@@ -1711,51 +1724,51 @@ func Test_extractProblemResults(t *testing.T) {
 
 func Test_applyProcessedFilesExclusions(t *testing.T) {
 	testCases := []struct {
-		name            string
-		initialExclude  string
-		processedFiles  []string
-		expectedExclude string
+		name                 string
+		initialExcludePaths  string
+		processedFiles       []string
+		expectedExcludePaths string
 	}{
 		{
-			name:            "no processed files does not modify config",
-			initialExclude:  "",
-			processedFiles:  []string{},
-			expectedExclude: "",
+			name:                 "no processed files does not modify config",
+			initialExcludePaths:  "",
+			processedFiles:       []string{},
+			expectedExcludePaths: "",
 		},
 		{
-			name:            "nil processed files does not modify config",
-			initialExclude:  "",
-			processedFiles:  nil,
-			expectedExclude: "",
+			name:                 "nil processed files does not modify config",
+			initialExcludePaths:  "",
+			processedFiles:       nil,
+			expectedExcludePaths: "",
 		},
 		{
-			name:            "single processed file",
-			processedFiles:  []string{"file1.py"},
-			expectedExclude: "file1.py",
+			name:                 "single processed file",
+			processedFiles:       []string{"file1.py"},
+			expectedExcludePaths: "file1.py",
 		},
 		{
-			name:            "multiple processed files",
-			processedFiles:  []string{"file1.py", "file2.py", "file3.py"},
-			expectedExclude: "file1.py,file2.py,file3.py",
+			name:                 "multiple processed files",
+			processedFiles:       []string{"file1.py", "file2.py", "file3.py"},
+			expectedExcludePaths: "file1.py,file2.py,file3.py",
 		},
 		{
-			name:            "appends to existing exclude",
-			initialExclude:  "existing.txt",
-			processedFiles:  []string{"file1.py", "file2.py"},
-			expectedExclude: "existing.txt,file1.py,file2.py",
+			name:                 "appends to existing exclude-paths",
+			initialExcludePaths:  "existing.txt",
+			processedFiles:       []string{"file1.py", "file2.py"},
+			expectedExcludePaths: "existing.txt,file1.py,file2.py",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			config := configuration.New()
-			if tc.initialExclude != "" {
-				config.Set(workflow.FlagExclude, tc.initialExclude)
+			if tc.initialExcludePaths != "" {
+				config.Set(workflow.FlagExcludePaths, tc.initialExcludePaths)
 			}
 
 			applyProcessedFilesExclusions(config, tc.processedFiles)
 
-			assert.Equal(t, tc.expectedExclude, config.GetString(workflow.FlagExclude))
+			assert.Equal(t, tc.expectedExcludePaths, config.GetString(workflow.FlagExcludePaths))
 		})
 	}
 }
@@ -1807,9 +1820,9 @@ func Test_processedFilesFlowFromPluginsToExcludeConfig(t *testing.T) {
 
 	require.NoError(t, err)
 	require.True(t, resolutionHandler.Called)
-	actualExclude := resolutionHandler.Config.GetString(workflow.FlagExclude)
-	assert.Equal(t, "file1.py,file2.py,file3.py", actualExclude,
-		"ProcessedFiles from all plugins should be combined into FlagExclude")
+	actualExcludePaths := resolutionHandler.Config.GetString(workflow.FlagExcludePaths)
+	assert.Equal(t, "file1.py,file2.py,file3.py", actualExcludePaths,
+		"ProcessedFiles from all plugins should be combined into FlagExcludePaths")
 }
 
 func Test_uvWorkspacePackages_passesOptionToPlugin(t *testing.T) {

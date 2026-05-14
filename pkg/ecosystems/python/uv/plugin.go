@@ -185,13 +185,6 @@ func (p Plugin) buildResults(
 		result.Results = append(result.Results, res)
 	}
 
-	// TODO(uv): remove the below when we are able to pass these to the CLI correctly. Currently the
-	// `--exclude` flag does not accept paths, it only accepts file or dir names, which does not
-	// work for our use case.
-	if true {
-		result.ProcessedFiles = []string{}
-	}
-
 	return result, nil
 }
 

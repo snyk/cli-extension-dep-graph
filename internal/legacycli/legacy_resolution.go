@@ -115,6 +115,11 @@ func PrepareLegacyFlags(argument string, cfg configuration.Configuration, logger
 		logger.Print("Exclude:", exclude)
 	}
 
+	if excludePaths := cfg.GetString(workflow.FlagExcludePaths); excludePaths != "" {
+		cmdArgs = append(cmdArgs, "--exclude-paths="+excludePaths)
+		logger.Print("Exclude paths:", excludePaths)
+	}
+
 	if detectionDepth := cfg.GetString(workflow.FlagDetectionDepth); detectionDepth != "" {
 		cmdArgs = append(cmdArgs, "--detection-depth="+detectionDepth)
 		logger.Print("Detection depth:", detectionDepth)

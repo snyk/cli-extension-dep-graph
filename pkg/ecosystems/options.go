@@ -22,6 +22,7 @@ type GlobalOptions struct {
 	AllProjects                   bool                 `arg:"--all-projects"`
 	IncludeDev                    bool                 `arg:"--dev,-d"`
 	Exclude                       CommaSeparatedString `arg:"--exclude"`
+	ExcludePaths                  CommaSeparatedString `arg:"--exclude-paths"`
 	FailFast                      bool                 `arg:"--fail-fast"`
 	AllowOutOfSync                bool                 // Derived from --strict-out-of-sync (inverted); parsed in NewPluginOptionsFromRawFlags.
 	ForceSingleGraph              bool                 `arg:"--force-single-graph"`
@@ -122,6 +123,11 @@ func (o *SCAPluginOptions) WithRawFlags(rawflags string) *SCAPluginOptions {
 
 func (o *SCAPluginOptions) WithExclude(exclude []string) *SCAPluginOptions {
 	o.Global.Exclude = append(o.Global.Exclude, exclude...)
+	return o
+}
+
+func (o *SCAPluginOptions) WithExcludePaths(excludePaths []string) *SCAPluginOptions {
+	o.Global.ExcludePaths = append(o.Global.ExcludePaths, excludePaths...)
 	return o
 }
 

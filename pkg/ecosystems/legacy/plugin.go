@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path"
 	"strings"
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
@@ -107,12 +106,12 @@ func invokeLegacyCLI(ictx workflow.InvocationContext, opts *ecosystems.SCAPlugin
 	cmdArgs := append([]string(nil), opts.Global.RawFlags...)
 	cmdArgs = append(cmdArgs, "--print-effective-graph-with-errors")
 
-	for i := range ignores {
-		_, fileName := path.Split(ignores[i])
-		ignores[i] = fileName
-	}
+	// Use --exclude-paths so the legacy CLI matches exact paths rather than
+	// basenames. --exclude would incorrectly exclude every manifest that
+	// shares a basename with one of the processed files (e.g. all
+	// package.json files in a workspace).
 	if len(ignores) > 0 {
-		cmdArgs = append(cmdArgs, "--exclude="+strings.Join(ignores, ","))
+		cmdArgs = mergeExcludePathsArg(cmdArgs, ignores)
 	}
 
 	// Clone config and set the command args
@@ -129,6 +128,38 @@ func invokeLegacyCLI(ictx workflow.InvocationContext, opts *ecosystems.SCAPlugin
 	}
 
 	return legacyData, err //nolint:wrapcheck // Bubble up error so it can be extracted by caller.
+}
+
+// mergeExcludePathsArg appends ignores to the args, merging with any
+// user-supplied --exclude-paths value already present in cmdArgs so user
+// input is not silently dropped.
+func mergeExcludePathsArg(cmdArgs, ignores []string) []string {
+	const flag = "--exclude-paths"
+	const flagEq = flag + "="
+
+	for i, arg := range cmdArgs {
+		if strings.HasPrefix(arg, flagEq) {
+			existing := strings.TrimPrefix(arg, flagEq)
+			cmdArgs[i] = flagEq + joinNonEmpty(existing, strings.Join(ignores, ","))
+			return cmdArgs
+		}
+		if arg == flag && i+1 < len(cmdArgs) {
+			cmdArgs[i+1] = joinNonEmpty(cmdArgs[i+1], strings.Join(ignores, ","))
+			return cmdArgs
+		}
+	}
+	return append(cmdArgs, flagEq+strings.Join(ignores, ","))
+}
+
+func joinNonEmpty(a, b string) string {
+	switch {
+	case a == "":
+		return b
+	case b == "":
+		return a
+	default:
+		return a + "," + b
+	}
 }
 
 // tryBuildResultsFromLegacyPayload extracts payload from legacyData, parses JSONL, and returns SCAResults.
