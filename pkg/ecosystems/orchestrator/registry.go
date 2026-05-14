@@ -37,9 +37,6 @@ func NewDefaultPluginRegistry() (*PluginRegistry, error) {
 		return nil, fmt.Errorf("failed to register bun plugin: %w", err)
 	}
 	// python
-	if err := r.register(uv.Plugin{}); err != nil {
-		return nil, fmt.Errorf("failed to register uv plugin: %w", err)
-	}
 	if err := r.register(pip.Plugin{}, uv.PluginName); err != nil {
 		return nil, fmt.Errorf("failed to register pip plugin: %w", err)
 	}

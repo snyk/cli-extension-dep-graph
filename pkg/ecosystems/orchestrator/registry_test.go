@@ -92,11 +92,10 @@ func TestPluginRegistry_DefaultRegistryOrder(t *testing.T) {
 	r, err := NewDefaultPluginRegistry()
 	require.NoError(t, err)
 
-	require.Len(t, r.plugins, 4)
+	require.Len(t, r.plugins, 3)
 	assert.Equal(t, "bun", r.plugins[0].GetName())
-	assert.Equal(t, "uv", r.plugins[1].GetName())
-	assert.Equal(t, "pip", r.plugins[2].GetName())
-	assert.Equal(t, "pipenv", r.plugins[3].GetName())
+	assert.Equal(t, "pip", r.plugins[1].GetName())
+	assert.Equal(t, "pipenv", r.plugins[2].GetName())
 }
 
 func TestPluginRegistry_DefaultRegistryHasNoCircularDependencies(t *testing.T) {
@@ -105,7 +104,7 @@ func TestPluginRegistry_DefaultRegistryHasNoCircularDependencies(t *testing.T) {
 	require.NoError(t, err, "NewDefaultPluginRegistry should not return error for valid dependency graph")
 	assert.NotNil(t, r)
 	assert.NotNil(t, r.plugins, "plugins should be successfully sorted without circular dependencies")
-	assert.Len(t, r.plugins, 4, "all 4 plugins should be registered")
+	assert.Len(t, r.plugins, 3, "all 3 plugins should be registered")
 }
 
 func TestPluginRegistry_CircularDependencyReturnsError(t *testing.T) {
