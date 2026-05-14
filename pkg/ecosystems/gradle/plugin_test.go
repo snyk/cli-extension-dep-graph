@@ -386,6 +386,32 @@ func TestBuildExtraArgs(t *testing.T) {
 		args := buildExtraArgs(dir, opts)
 		assert.Equal(t, []string{"--init-script", validScript}, args)
 	})
+
+	t.Run("adds snykTargetBuildFile for relative target file", func(t *testing.T) {
+		tf := "app/build.gradle"
+		opts := &ecosystems.SCAPluginOptions{
+			Global: ecosystems.GlobalOptions{TargetFile: &tf},
+		}
+		args := buildExtraArgs("/project", opts)
+		assert.Contains(t, args, "-PsnykTargetBuildFile=/project/app/build.gradle")
+	})
+
+	t.Run("adds snykTargetBuildFile for absolute target file unchanged", func(t *testing.T) {
+		tf := "/other/app/build.gradle"
+		opts := &ecosystems.SCAPluginOptions{
+			Global: ecosystems.GlobalOptions{TargetFile: &tf},
+		}
+		args := buildExtraArgs("/project", opts)
+		assert.Contains(t, args, "-PsnykTargetBuildFile=/other/app/build.gradle")
+	})
+
+	t.Run("does not add snykTargetBuildFile when target file is not set", func(t *testing.T) {
+		opts := &ecosystems.SCAPluginOptions{}
+		args := buildExtraArgs("/project", opts)
+		for _, arg := range args {
+			assert.NotContains(t, arg, "snykTargetBuildFile")
+		}
+	})
 }
 
 // ── Target file filtering behavior demonstration ──────────────────────────────
