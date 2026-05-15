@@ -53,7 +53,8 @@ type GradleOptions struct {
 	// ConfigurationAttributes filters configurations by attribute values (key:value,key:value).
 	ConfigurationAttributes string `arg:"--configuration-attributes"`
 	// SubProject restricts scanning to a single named Gradle sub-project.
-	SubProject string `arg:"--gradle-sub-project"`
+	// Accepts both --gradle-sub-project and --sub-project (legacy alias).
+	SubProject string `arg:"--gradle-sub-project,--sub-project"`
 	// AllSubProjects scans all sub-projects in a multi-project build.
 	AllSubProjects bool `arg:"--all-sub-projects"`
 	// InitScript overrides the built-in init script with a user-supplied path.
