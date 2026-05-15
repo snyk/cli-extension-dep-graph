@@ -86,6 +86,7 @@ func handleSBOMResolutionDI(
 	}
 	allowOutOfSync := !strictOutOfSync
 	exclude := parseExcludeFlag(config.GetString(workflow.FlagExclude))
+	excludePaths := parseExcludeFlag(config.GetString(workflow.FlagExcludePaths))
 	failFast := config.GetBool(workflow.FlagFailFast)
 	forceSingleGraph := config.GetBool(workflow.FlagForceSingleGraph)
 
@@ -95,6 +96,7 @@ func handleSBOMResolutionDI(
 		WithIncludeDev(dev).
 		WithAllowOutOfSync(allowOutOfSync).
 		WithExclude(exclude).
+		WithExcludePaths(excludePaths).
 		WithFailFast(failFast).
 		WithForceSingleGraph(forceSingleGraph)
 	if targetFile != "" {
@@ -282,12 +284,15 @@ func applyProcessedFilesExclusions(config configuration.Configuration, processed
 		return
 	}
 
-	exclude := config.GetString(workflow.FlagExclude)
-	if exclude != "" {
-		exclude = fmt.Sprintf("%s,", exclude)
+	// Use --exclude-paths (not --exclude) so processed file paths are matched
+	// exactly. --exclude only matches by basename, which would incorrectly
+	// exclude all same-named manifests across a workspace.
+	parts := make([]string, 0, len(processedFiles)+1)
+	if existing := config.GetString(workflow.FlagExcludePaths); existing != "" {
+		parts = append(parts, existing)
 	}
-	exclude = fmt.Sprintf("%s%s", exclude, strings.Join(processedFiles, ","))
-	config.Set(workflow.FlagExclude, exclude)
+	parts = append(parts, processedFiles...)
+	config.Set(workflow.FlagExcludePaths, strings.Join(parts, ","))
 }
 
 func executeLegacyWorkflow(

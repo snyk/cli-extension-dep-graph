@@ -22,6 +22,7 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 				"--all-projects",
 				"--dev",
 				"--exclude", "foo",
+				"--exclude-paths", "packages/api/package.json",
 				"--no-build-isolation",
 				"--fail-fast",
 				"--strict-out-of-sync", "false",
@@ -39,6 +40,7 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 					AllProjects:                   true,
 					IncludeDev:                    true,
 					Exclude:                       []string{"foo"},
+					ExcludePaths:                  []string{"packages/api/package.json"},
 					FailFast:                      true,
 					AllowOutOfSync:                true,
 					ForceSingleGraph:              true,
@@ -172,6 +174,18 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 			expected: &SCAPluginOptions{
 				Global: GlobalOptions{
 					Exclude: []string{"test1", "test2", "test3"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "exclude-paths with multiple comma-separated values",
+			rawFlags: []string{
+				"--exclude-paths=packages/api/package.json,packages/web/package.json",
+			},
+			expected: &SCAPluginOptions{
+				Global: GlobalOptions{
+					ExcludePaths: []string{"packages/api/package.json", "packages/web/package.json"},
 				},
 			},
 			wantErr: false,
