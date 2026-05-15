@@ -33,6 +33,7 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 				"--all-sub-projects",
 				"--init-script", "custom.gradle",
 				"--gradle-skip-wrapper",
+				"--include-provenance",
 			},
 			expected: &SCAPluginOptions{
 				Global: GlobalOptions{
@@ -45,6 +46,7 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 					AllowOutOfSync:                true,
 					ForceSingleGraph:              true,
 					ForceIncludeWorkspacePackages: true,
+					IncludeProvenance:             true,
 				},
 				Python: PythonOptions{
 					NoBuildIsolation: true,
@@ -315,4 +317,18 @@ func TestNewPluginOptionsFromRawFlags_UnknownFlags(t *testing.T) {
 	assert.NotNil(t, got.Global.TargetFile)
 	assert.Equal(t, "package.json", *got.Global.TargetFile)
 	assert.True(t, got.Global.IncludeDev)
+}
+
+func TestNewPluginOptionsFromRawFlags_IncludeProvenance(t *testing.T) {
+	got, err := NewPluginOptionsFromRawFlags([]string{"--include-provenance"})
+	assert.NoError(t, err)
+	assert.True(t, got.Global.IncludeProvenance)
+}
+
+func TestWithIncludeProvenance(t *testing.T) {
+	options := NewPluginOptions().WithIncludeProvenance(true)
+	assert.True(t, options.Global.IncludeProvenance)
+
+	options = NewPluginOptions().WithIncludeProvenance(false)
+	assert.False(t, options.Global.IncludeProvenance)
 }

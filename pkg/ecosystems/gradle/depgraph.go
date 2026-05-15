@@ -39,37 +39,27 @@ func buildDepGraph(proj *gradleProject, options *ecosystems.SCAPluginOptions) (*
 
 	rootNodeID := builder.GetRootNode().NodeID
 
-	// edges tracks (parent → set of children) across the entire merged graph
-	// so that an edge contributed by more than one configuration is added to
-	// the dep-graph builder exactly once. The dep-graph schema treats Deps as
-	// a set of edges, but depgraph.Builder.ConnectNodes is not idempotent —
-	// without this guard, a dep present in N configurations would appear as
-	// N parallel edges from the same parent.
-	edges := make(map[string]map[string]bool)
-	connectOnce := func(parentID, childID string) error {
-		children := edges[parentID]
-		if children == nil {
-			children = make(map[string]bool)
-			edges[parentID] = children
-		}
-		if children[childID] {
-			return nil
-		}
-		children[childID] = true
-		if err := builder.ConnectNodes(parentID, childID); err != nil {
-			return fmt.Errorf("failed to connect %s -> %s: %w", parentID, childID, err)
-		}
-		return nil
-	}
+	// Create a map of dependency ID to provenance information for quick lookups
+	provenanceMap := buildProvenanceMap(proj.Configurations, options)
+
+	// Create function to ensure each edge is added only once across configurations
+	connectOnce := createEdgeDeduplicator(builder)
 
 	// Filter configurations based on --configuration-matching if specified
-	configurationsToProcess := proj.Configurations
-	if options != nil && options.Gradle.ConfigurationMatching != "" {
-		var err error
-		configurationsToProcess, err = filterConfigurationsByPattern(proj.Configurations, options.Gradle.ConfigurationMatching)
-		if err != nil {
-			return nil, fmt.Errorf("failed to apply configuration matching pattern '%s': %w", options.Gradle.ConfigurationMatching, err)
-		}
+	var configurationMatching string
+	if options != nil {
+		configurationMatching = options.Gradle.ConfigurationMatching
+	}
+	configurationsToProcess, err := filterConfigurationsByPattern(proj.Configurations, configurationMatching)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply configuration matching pattern '%s': %w", configurationMatching, err)
+	}
+
+	// Create context with shared state for dependency graph building
+	ctx := &depGraphContext{
+		builder:       builder,
+		connectOnce:   connectOnce,
+		provenanceMap: provenanceMap,
 	}
 
 	// Merge all configurations into a single graph.
@@ -85,13 +75,21 @@ func buildDepGraph(proj *gradleProject, options *ecosystems.SCAPluginOptions) (*
 		}
 		processed := make(map[string]bool) // Fresh processed set per configuration; tracks components whose subtree we've expanded in this configuration
 		for _, dep := range cfg.Root.Dependencies {
-			if err := addDep(builder, &dep, rootNodeID, processed, connectOnce); err != nil {
+			if err := ctx.addDep(&dep, rootNodeID, processed); err != nil {
 				return nil, fmt.Errorf("project %s: %w", proj.Path, err)
 			}
 		}
 	}
 
 	return builder.Build(), nil
+}
+
+// depGraphContext holds shared state for building a dependency graph from Gradle data.
+// This avoids passing multiple parameters through recursive calls.
+type depGraphContext struct {
+	builder       *depgraph.Builder
+	connectOnce   func(parentID, childID string) error
+	provenanceMap map[string]*allDepEntry
 }
 
 // addDep recursively adds a resolved dependency node and its children to the
@@ -113,11 +111,7 @@ func buildDepGraph(proj *gradleProject, options *ecosystems.SCAPluginOptions) (*
 //     locking, or constraints {} blocks) become labeled `constraint` leaves
 //     with a `:constraint` node-ID suffix. They do not affect `processed`, so a
 //     real edge to the same component will still be expanded normally.
-//
-// connectOnce wraps depgraph.Builder.ConnectNodes with deduplication so that
-// the same (parent, child) edge is only added once across the entire merged
-// graph (configurations are merged into one dep-graph per project).
-func addDep(builder *depgraph.Builder, dep *gradleDep, parentID string, processed map[string]bool, connectOnce func(parentID, childID string) error) error {
+func (ctx *depGraphContext) addDep(dep *gradleDep, parentID string, processed map[string]bool) error {
 	if dep.ID == "" || dep.Unresolved {
 		return nil
 	}
@@ -130,39 +124,54 @@ func addDep(builder *depgraph.Builder, dep *gradleDep, parentID string, processe
 		// Do not mark `processed` — the real edge to this component (if any)
 		// must still be expanded fully.
 		constraintID := nodeID + ":constraint"
-		builder.AddNode(constraintID, &depgraph.PkgInfo{Name: name, Version: version},
+		// Constraints don't get PURLs as they're not real downloadable artifacts
+		pkgInfo := &depgraph.PkgInfo{
+			Name:    name,
+			Version: version,
+		}
+		ctx.builder.AddNode(constraintID, pkgInfo,
 			depgraph.WithNodeInfo(&depgraph.NodeInfo{
 				Labels: map[string]string{"constraint": "true"},
 			}),
 		)
-		return connectOnce(parentID, constraintID)
+		return ctx.connectOnce(parentID, constraintID)
 	}
 
 	if dep.Pruned == pruneCycle {
 		// Record a pruned leaf for cycles to maintain DAG property and avoid
 		// infinite recursion.
 		prunedID := nodeID + ":pruned"
-		builder.AddNode(prunedID, &depgraph.PkgInfo{Name: name, Version: version},
+		var provenanceEntry *allDepEntry
+		if ctx.provenanceMap != nil {
+			provenanceEntry = ctx.provenanceMap[dep.ID]
+		}
+		pkgInfo := createPkgInfo(name, version, provenanceEntry, ctx.provenanceMap != nil)
+		ctx.builder.AddNode(prunedID, pkgInfo,
 			depgraph.WithNodeInfo(&depgraph.NodeInfo{
 				Labels: map[string]string{"pruned": "true"},
 			}),
 		)
-		return connectOnce(parentID, prunedID)
+		return ctx.connectOnce(parentID, prunedID)
 	} else if dep.Pruned == pruneVisited || processed[nodeID] {
 		// For visited nodes, connect to the existing node instead of creating
 		// a pruned version. This produces a DAG where nodes can have multiple
 		// parents but no cycles.
-		return connectOnce(parentID, nodeID)
+		return ctx.connectOnce(parentID, nodeID)
 	}
 
-	builder.AddNode(nodeID, &depgraph.PkgInfo{Name: name, Version: version})
-	if err := connectOnce(parentID, nodeID); err != nil {
+	var provenanceEntry *allDepEntry
+	if ctx.provenanceMap != nil {
+		provenanceEntry = ctx.provenanceMap[dep.ID]
+	}
+	pkgInfo := createPkgInfo(name, version, provenanceEntry, ctx.provenanceMap != nil)
+	ctx.builder.AddNode(nodeID, pkgInfo)
+	if err := ctx.connectOnce(parentID, nodeID); err != nil {
 		return err
 	}
 
 	processed[nodeID] = true
 	for _, child := range dep.Dependencies {
-		if err := addDep(builder, &child, nodeID, processed, connectOnce); err != nil {
+		if err := ctx.addDep(&child, nodeID, processed); err != nil {
 			return err
 		}
 	}
@@ -199,7 +208,12 @@ func splitGAV(gav string) (name, version string) {
 
 // filterConfigurationsByPattern filters gradle configurations based on a regex pattern.
 // Returns only configurations whose names match the provided regex pattern.
+// If pattern is empty, returns all configurations (no filtering).
 func filterConfigurationsByPattern(configurations []gradleConfig, pattern string) ([]gradleConfig, error) {
+	if pattern == "" {
+		return configurations, nil
+	}
+
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("invalid regex pattern: %w", err)
@@ -213,4 +227,92 @@ func filterConfigurationsByPattern(configurations []gradleConfig, pattern string
 	}
 
 	return filtered, nil
+}
+
+// buildProvenanceMap creates a map from dependency ID to provenance information
+// for quick lookups during graph building. When --include-provenance is enabled,
+// this allows us to attach checksum and type information to dependencies.
+//
+// Note: If multiple configurations resolve the same dependency ID to different
+// artifacts (different checksums), this takes the first one encountered.
+// This could potentially be improved to handle per-configuration artifacts.
+func buildProvenanceMap(configurations []gradleConfig, options *ecosystems.SCAPluginOptions) map[string]*allDepEntry {
+	if options == nil || !options.Global.IncludeProvenance {
+		return nil
+	}
+
+	provenanceMap := make(map[string]*allDepEntry)
+	for _, cfg := range configurations {
+		for i := range cfg.AllDependencies {
+			entry := &cfg.AllDependencies[i]
+			if entry.Checksum != "" {
+				// Only store if we haven't seen this dependency ID before
+				// This preserves the "first configuration wins" behavior
+				if _, exists := provenanceMap[entry.ID]; !exists {
+					provenanceMap[entry.ID] = entry
+				}
+			}
+		}
+	}
+	return provenanceMap
+}
+
+// createEdgeDeduplicator creates a function that ensures each edge is only
+// added once to the dependency graph, even when the same edge appears in
+// multiple configurations.
+func createEdgeDeduplicator(builder *depgraph.Builder) func(parentID, childID string) error {
+	// edges tracks (parent → set of children) across the entire merged graph
+	// so that an edge contributed by more than one configuration is added to
+	// the dep-graph builder exactly once. The dep-graph schema treats Deps as
+	// a set of edges, but depgraph.Builder.ConnectNodes is not idempotent —
+	// without this guard, a dep present in N configurations would appear as
+	// N parallel edges from the same parent.
+	edges := make(map[string]map[string]bool)
+
+	return func(parentID, childID string) error {
+		children := edges[parentID]
+		if children == nil {
+			children = make(map[string]bool)
+			edges[parentID] = children
+		}
+		if children[childID] {
+			return nil
+		}
+		children[childID] = true
+		if err := builder.ConnectNodes(parentID, childID); err != nil {
+			return fmt.Errorf("failed to connect %s -> %s: %w", parentID, childID, err)
+		}
+		return nil
+	}
+}
+
+// createPkgInfo creates a PkgInfo for standard Gradle dependencies.
+// If provenance is enabled and data is available, PURL with checksum information is included.
+func createPkgInfo(name, version string, provenanceEntry *allDepEntry, provenanceEnabled bool) *depgraph.PkgInfo {
+	pkgInfo := &depgraph.PkgInfo{
+		Name:    name,
+		Version: version,
+	}
+
+	// Only generate PURL when provenance is enabled
+	if provenanceEnabled {
+		// Generate PURL for standard group:artifact dependencies
+		parts := strings.SplitN(name, ":", 2)
+		if len(parts) == 2 {
+			group := parts[0]
+			artifact := parts[1]
+
+			// Create base PURL
+			purl := fmt.Sprintf("pkg:gradle/%s/%s@%s", group, artifact, version)
+
+			// Add checksum qualifier if provenance data is available
+			if provenanceEntry != nil && provenanceEntry.Checksum != "" {
+				purl += fmt.Sprintf("?checksum=sha1:%s", provenanceEntry.Checksum)
+			}
+
+			pkgInfo.PackageURL = purl
+		}
+	}
+
+	return pkgInfo
 }

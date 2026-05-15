@@ -93,6 +93,19 @@ The resolver distinguishes between **constraint edges** (which influence version
 
 This separation prevents constraint-derived edges from interfering with the actual dependency graph structure while preserving diagnostic information about what constraints influenced version resolution.
 
+### Provenance and Checksum Collection
+
+**`--include-provenance` flag support**
+
+The resolver supports collecting SHA1 checksums and generating Package URLs (PURLs) with checksum qualifiers when the `--include-provenance` flag is enabled:
+
+- Uses Gradle's internal `ChecksumService` for optimal performance when available
+- Falls back to manual SHA1 calculation for compatibility
+- Generates PURLs in `pkg:gradle/group/artifact@version?checksum=sha1:hash` format
+- Skips provenance for BOM/platform dependencies (metadata-only)
+
+This focuses on downloadable artifacts rather than constraint dependencies.
+
 ## Technical Implementation Notes
 
 ### File and Project Discovery

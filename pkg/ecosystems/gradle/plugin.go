@@ -442,6 +442,11 @@ func buildExtraArgs(projectDir string, options *ecosystems.SCAPluginOptions) []s
 		args = append(args, "-PsnykTargetBuildFile="+absTarget)
 	}
 
+	// Pass --include-provenance flag to the init script as a Gradle property
+	if options.Global.IncludeProvenance {
+		args = append(args, "-PsnykIncludeProvenance=true")
+	}
+
 	return args
 }
 

@@ -91,7 +91,9 @@ type gradleDep struct {
 
 // allDepEntry is a member of the flat allDependencies list.
 type allDepEntry struct {
-	ID string `json:"id"`
+	ID       string `json:"id"`
+	Checksum string `json:"checksum,omitempty"`
+	Type     string `json:"type,omitempty"`
 }
 
 // parseDependencyGraphJSON deserialises the NDJSON file produced by snyk-deps-init.gradle.
