@@ -158,6 +158,8 @@ func TestClassifyPipError(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			if errors.Is(tt.err, context.Canceled) {
 				cancel()
+			} else {
+				defer cancel()
 			}
 			err := classifyPipError(ctx, nil, tt.err)
 
