@@ -6,7 +6,7 @@ orbs:
 parameters:
   go_version:
     type: string
-    default: "1.25"
+    default: "1.26.3"
   run-python-tests:
     type: boolean
     default: false
@@ -61,7 +61,7 @@ jobs:
       - run:
           name: Install Go
           command: |
-            wget -qO- https://go.dev/dl/go<< pipeline.parameters.go_version >>.0.linux-amd64.tar.gz | sudo tar -C /usr/local -xz
+            wget -qO- https://go.dev/dl/go<< pipeline.parameters.go_version >>.linux-amd64.tar.gz | sudo tar -C /usr/local -xz
             echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
             source $BASH_ENV
       - restore_cache:
@@ -198,7 +198,7 @@ jobs:
       - run:
           name: Install Go
           command: |
-            wget -qO- https://go.dev/dl/go<< pipeline.parameters.go_version >>.0.linux-amd64.tar.gz | tar -C /usr/local -xz
+            wget -qO- https://go.dev/dl/go<< pipeline.parameters.go_version >>.linux-amd64.tar.gz | tar -C /usr/local -xz
             echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
             source $BASH_ENV
             go version
