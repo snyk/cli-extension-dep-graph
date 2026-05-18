@@ -763,7 +763,7 @@ func TestCreatePkgInfo(t *testing.T) {
 
 		assert.Equal(t, "org.example:artifact", pkgInfo.Name)
 		assert.Equal(t, "1.0.0", pkgInfo.Version)
-		assert.Equal(t, "pkg:gradle/org.example/artifact@1.0.0", pkgInfo.PackageURL) // Base PURL when provenance enabled
+		assert.Equal(t, "pkg:maven/org.example/artifact@1.0.0", pkgInfo.PackageURL) // Base PURL when provenance enabled
 	})
 
 	t.Run("creates PkgInfo with checksum PURL when provenance available", func(t *testing.T) {
@@ -777,7 +777,7 @@ func TestCreatePkgInfo(t *testing.T) {
 
 		assert.Equal(t, "org.example:artifact", pkgInfo.Name)
 		assert.Equal(t, "1.0.0", pkgInfo.Version)
-		assert.Equal(t, "pkg:gradle/org.example/artifact@1.0.0?checksum=sha1:abcd1234567890", pkgInfo.PackageURL)
+		assert.Equal(t, "pkg:maven/org.example/artifact@1.0.0?checksum=sha1:abcd1234567890", pkgInfo.PackageURL)
 	})
 
 	t.Run("creates PkgInfo with SHA1 checksum in PURL", func(t *testing.T) {
@@ -789,7 +789,7 @@ func TestCreatePkgInfo(t *testing.T) {
 
 		pkgInfo := createPkgInfo("org.example:artifact", "1.0.0", provenanceEntry, true)
 
-		assert.Equal(t, "pkg:gradle/org.example/artifact@1.0.0?checksum=sha1:abcd1234567890", pkgInfo.PackageURL)
+		assert.Equal(t, "pkg:maven/org.example/artifact@1.0.0?checksum=sha1:abcd1234567890", pkgInfo.PackageURL)
 	})
 
 	t.Run("creates PURL without checksum when checksum is empty", func(t *testing.T) {
@@ -800,7 +800,7 @@ func TestCreatePkgInfo(t *testing.T) {
 
 		pkgInfo := createPkgInfo("org.example:artifact", "1.0.0", provenanceEntry, true)
 
-		assert.Equal(t, "pkg:gradle/org.example/artifact@1.0.0", pkgInfo.PackageURL)
+		assert.Equal(t, "pkg:maven/org.example/artifact@1.0.0", pkgInfo.PackageURL)
 	})
 
 	t.Run("skips PURL for non-standard dependency ID format", func(t *testing.T) {

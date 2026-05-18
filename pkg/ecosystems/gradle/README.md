@@ -101,10 +101,14 @@ The resolver supports collecting SHA1 checksums and generating Package URLs (PUR
 
 - Uses Gradle's internal `ChecksumService` for optimal performance when available
 - Falls back to manual SHA1 calculation for compatibility
-- Generates PURLs in `pkg:gradle/group/artifact@version?checksum=sha1:hash` format
+- Generates PURLs in `pkg:maven/group/artifact@version?checksum=sha1:hash` format
 - Skips provenance for BOM/platform dependencies (metadata-only)
 
 This focuses on downloadable artifacts rather than constraint dependencies.
+
+**PURL Type Selection**
+
+The resolver uses `pkg:maven` for standard dependencies following Maven coordinate format (group:artifact:version), not `pkg:gradle`. According to the [PURL specification](https://github.com/package-url/purl-spec/blob/main/types-doc/maven-definition.md), `pkg:maven` is the correct type for "Maven JARs and related artifacts" using groupId/artifactId coordinates. The `pkg:gradle` type is [reserved specifically for Gradle plugins](https://github.com/package-url/purl-spec/blob/main/docs/candidate-purl-types.md) from the Gradle Plugin Portal, not for standard Maven-format dependencies resolved by Gradle builds.
 
 ## Technical Implementation Notes
 

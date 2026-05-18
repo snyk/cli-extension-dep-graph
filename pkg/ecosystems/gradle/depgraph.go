@@ -302,8 +302,11 @@ func createPkgInfo(name, version string, provenanceEntry *allDepEntry, provenanc
 			group := parts[0]
 			artifact := parts[1]
 
-			// Create base PURL
-			purl := fmt.Sprintf("pkg:gradle/%s/%s@%s", group, artifact, version)
+			// Create base PURL using pkg:maven for standard Maven coordinates
+			// Note: This assumes all dependencies use Maven coordinate format (group:artifact:version).
+			// If we later need to surface actual Gradle plugins from the Plugin Portal,
+			// we would need to detect and use pkg:gradle for those instead.
+			purl := fmt.Sprintf("pkg:maven/%s/%s@%s", group, artifact, version)
 
 			// Add checksum qualifier if provenance data is available
 			if provenanceEntry != nil && provenanceEntry.Checksum != "" {
