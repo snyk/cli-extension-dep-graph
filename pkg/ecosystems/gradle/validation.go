@@ -89,14 +89,15 @@ func validateConfigurationAttributes(attributes string) error {
 			return fmt.Errorf("--configuration-attributes entry %d is empty", i+1)
 		}
 
-		// Each pair must contain exactly one colon
-		parts := strings.Split(pair, ":")
-		if len(parts) != 2 {
+		// Verify that each pair is in 'key:value' format
+		// Allows colon in values, e.g. "buildtype:release:debug"
+		key, value, found := strings.Cut(pair, ":")
+		if !found {
 			return fmt.Errorf("--configuration-attributes entry '%s' must be in 'key:value' format", pair)
 		}
 
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
 
 		if key == "" {
 			return fmt.Errorf("--configuration-attributes entry '%s' has empty key", pair)

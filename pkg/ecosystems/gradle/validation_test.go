@@ -89,6 +89,19 @@ func TestValidateOptions(t *testing.T) {
 			"buildtype:release,usage:java-runtime",
 			"buildType:debug,usage:java-api,category:library",
 			"BUILDTYPE:DEBUG", // case doesn't matter in values
+			// Colons in values are allowed (split on first colon only)
+			"buildtype:release:debug",
+			"target:jvm:11",
+			"version:1.2.3:SNAPSHOT",
+			"key:value:with:many:colons",
+			"version:1.0.0:SNAPSHOT:final",
+			// Whitespace handling
+			" buildtype : release ",
+			"buildtype:release, usage:java-runtime",
+			"  buildtype  :  release  ,  usage  :  java-runtime  ",
+			"\tkey\t:\tvalue\t",
+			"key: value with spaces ",
+			" key : value:with:colons ",
 		}
 
 		for _, attrs := range testCases {
@@ -117,11 +130,11 @@ func TestValidateOptions(t *testing.T) {
 			{"missing value", "buildtype:", "has empty value"},
 			{"missing key", ":release", "has empty key"},
 			{"no colon", "buildtype", "must be in 'key:value' format"},
-			{"multiple colons", "build:type:release", "must be in 'key:value' format"},
 			{"empty entry in list", "buildtype:release,,usage:java-runtime", "entry 2 is empty"},
 			{"whitespace only", "   ", "cannot be empty"},
 			{"missing key with whitespace", "  :release", "has empty key"},
 			{"missing value with whitespace", "buildtype:  ", "has empty value"},
+			{"empty middle entry after trimming", "key1:value1,  , key2:value2", "entry 2 is empty"},
 		}
 
 		for _, tc := range testCases {

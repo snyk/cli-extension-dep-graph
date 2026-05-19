@@ -177,10 +177,11 @@ func pluginTestCases() map[string]PluginTestCase {
 		// in multiple configurations. Standard Java plugin sets attributes like org.gradle.usage
 		// on configurations. This validates attribute-based filtering works correctly.
 
-		// Filter by usage:java-runtime - should include runtime configurations
+		// Filter by usage:java-runtime with whitespace - should include runtime configurations
+		// Additionally, tests validation trimming and Groovy parsing trimming
 		"configuration_attributes_java_runtime": {
 			Fixture:      "configuration-matching",
-			Options:      ecosystems.NewPluginOptions().WithGradleConfigurationAttributes("usage:java-runtime"),
+			Options:      ecosystems.NewPluginOptions().WithGradleConfigurationAttributes(" usage : java-runtime "),
 			ExpectedFile: "expected_plugin_attributes_java_runtime.json",
 		},
 		// Exercises nested BOM resolution with complex constraint hierarchy.

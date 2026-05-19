@@ -27,10 +27,8 @@ gradle.projectsEvaluated { g ->
     def includeProvenance = root.findProperty('snykIncludeProvenance')?.toBoolean() ?: false
 
     // Parse configuration-attributes filter once upfront for all projects
-    def confAttrSpec = null
-    if (root.hasProperty('snykConfAttr')) {
-        confAttrSpec = root.snykConfAttr.toLowerCase().tokenize(',').collect { it.tokenize(':') }
-    }
+    def confAttrSpec = root.hasProperty('snykConfAttr') ? 
+        parseConfigurationAttributes(root.snykConfAttr) : null
 
     // One task per project, each writing to its own output file.
     // Isolation makes parallel execution safe; snykDependencyGraph depends on all of these.
@@ -304,6 +302,21 @@ def collectAllDependencies(resolutionResult, includeProvenance, artifactLookup) 
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
+
+// parseConfigurationAttributes parses a comma-separated list of key:value pairs.
+// Matches the Go validation logic: splits on first colon, trims whitespace.
+def parseConfigurationAttributes(attributeString) {
+    return attributeString.toLowerCase().tokenize(',').collect { pair ->
+        pair = pair.trim()
+        def colonIndex = pair.indexOf(':')
+        if (colonIndex == -1) {
+            throw new IllegalArgumentException("Invalid configuration attribute pair: ${pair}")
+        }
+        def key = pair.substring(0, colonIndex).trim().toLowerCase()
+        def value = pair.substring(colonIndex + 1).trim().toLowerCase()
+        [key, value]
+    }
+}
 
 // matchesAttributeKey determines if an attribute matches a user-provided key.
 // Supports multiple matching strategies for maximum compatibility:
