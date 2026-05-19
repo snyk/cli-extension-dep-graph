@@ -23,6 +23,9 @@ gradle.projectsEvaluated { g ->
     // Otherwise all projects participate (default behaviour).
     def targetBuildFile = root.findProperty('snykTargetBuildFile')?.toString()
 
+    // Check if provenance (checksums) should be included
+    def includeProvenance = root.findProperty('snykIncludeProvenance')?.toBoolean() ?: false
+
     // One task per project, each writing to its own output file.
     // Isolation makes parallel execution safe; snykDependencyGraph depends on all of these.
     def perProjectTasks = root.allprojects
@@ -42,7 +45,7 @@ gradle.projectsEvaluated { g ->
             }
             doLast {
                 outputFile.parentFile.mkdirs()
-                outputFile.text = groovy.json.JsonOutput.toJson(buildProjectEntry(proj))
+                outputFile.text = groovy.json.JsonOutput.toJson(buildProjectEntry(proj, includeProvenance))
             }
         }
     }
@@ -101,7 +104,7 @@ def buildMetadata(rootProject) {
 
 // ── Per-project entry ───────────────────────────────────────────────
 
-def buildProjectEntry(project) {
+def buildProjectEntry(project, includeProvenance = false) {
     def resolvableConfigs = project.configurations.matching { it.canBeResolved }
 
     def gav = "${project.group}:${project.name}:${project.version}"
@@ -119,7 +122,7 @@ def buildProjectEntry(project) {
 
     resolvableConfigs.each { config ->
         try {
-            def configEntry = resolveConfiguration(config, project)
+            def configEntry = resolveConfiguration(config, includeProvenance)
             if (configEntry != null) {
                 entry.configurations << configEntry
             }
@@ -136,7 +139,7 @@ def buildProjectEntry(project) {
 
 // ── Configuration resolution ────────────────────────────────────────
 
-def resolveConfiguration(config, project) {
+def resolveConfiguration(config, includeProvenance = false) {
     def resolutionResult = config.incoming.resolutionResult
     def rootComponent = resolutionResult.root
 
@@ -144,6 +147,12 @@ def resolveConfiguration(config, project) {
     def processed = new HashSet<String>()
     def ancestry = new HashSet<String>()
     def tree = walkDependencies(rootComponent, processed, ancestry)
+
+    // Build artifact lookup map once per configuration for O(1) lookups
+    def artifactLookup = null
+    if (includeProvenance) {
+        artifactLookup = buildArtifactLookup(config)
+    }
 
     return [
         name            : config.name,
@@ -153,7 +162,7 @@ def resolveConfiguration(config, project) {
             dependencies: tree,
         ],
         // Flat list of all resolved components for quick lookups
-        allDependencies: collectAllDependencies(resolutionResult),
+        allDependencies: collectAllDependencies(resolutionResult, includeProvenance, artifactLookup),
     ]
 }
 
@@ -200,7 +209,6 @@ def walkDependencies(component, Set<String> processed, Set<String> ancestry) {
                 ancestry.add(id)
                 children << [
                     id          : id,
-                    // Omit 'requested' field to reduce memory usage
                     dependencies: walkDependencies(selected, processed, ancestry),
                 ]
                 ancestry.remove(id)
@@ -218,15 +226,61 @@ def walkDependencies(component, Set<String> processed, Set<String> ancestry) {
     return children
 }
 
+// ── Artifact lookup optimization ───────────────────────────────────
+
+// Builds a lookup map from ComponentIdentifier -> List<ResolvedArtifactResult>
+// This converts O(C*A) artifact searches into O(1) lookups per component
+def buildArtifactLookup(config) {
+    def lookup = [:].withDefault { [] }
+    try {
+        def artifactCollection = config.incoming.artifacts
+        def resolvedArtifacts = null
+
+        // Try different API approaches for Gradle version compatibility
+        // We use capability-based detection rather than gradle.gradleVersion parsing
+        // to handle custom builds, snapshots, and vendor distributions robustly
+        try {
+            // Gradle 7+ approach - resolvedArtifacts property
+            def artifactsProvider = artifactCollection.resolvedArtifacts
+            resolvedArtifacts = artifactsProvider.get()
+        } catch (Exception e1) {
+            // Gradle 6 approach - direct iteration over artifact collection
+            resolvedArtifacts = []
+            artifactCollection.each { artifact ->
+                if (artifact instanceof org.gradle.api.artifacts.result.ResolvedArtifactResult) {
+                    resolvedArtifacts << artifact
+                }
+            }
+        }
+
+        resolvedArtifacts.each { artifact ->
+            def componentId = artifact.id.componentIdentifier
+            lookup[componentId] << artifact
+        }
+
+        return lookup
+    } catch (Exception e) {
+        return [:] // Return empty map on any error
+    }
+}
+
 // ── Flat dependency collection ──────────────────────────────────────
 
-def collectAllDependencies(resolutionResult) {
+def collectAllDependencies(resolutionResult, includeProvenance, artifactLookup) {
     def all = []
 
     resolutionResult.allComponents.each { component ->
-        all << [
+        def entry = [
             id: componentId(component),
         ]
+
+        if (includeProvenance) {
+            def provenance = computeProvenance(component, artifactLookup)
+            if (provenance != null) {
+                entry.putAll(provenance)
+            }
+        }
+        all << entry
     }
 
     return all
@@ -268,5 +322,99 @@ def resolveReportsFile(project, String fileName) {
         return new File(project.layout.buildDirectory.dir("reports").get().asFile, fileName)
     } catch (Exception e) {
         return new File(project.buildDir, "reports/${fileName}")
+    }
+}
+
+// Computes provenance information (SHA1 hash and file type) for a resolved component
+// Uses the current configuration's artifacts to find the right artifact for this component
+def computeProvenance(component, artifactLookup) {
+    try {
+        // Check if this is a ModuleComponentIdentifier (external dependency)
+        def id = component.id
+        if (!id.hasProperty('group') || !id.hasProperty('module') || !id.hasProperty('version')) {
+            // Skip project components or components without standard GAV coordinates
+            return null
+        }
+
+        def moduleVersion = component.moduleVersion
+        if (moduleVersion == null) {
+            return null
+        }
+
+        // Use O(1) artifact lookup
+        def matchingArtifacts = artifactLookup[component.id] ?: []
+
+        if (!matchingArtifacts.empty) {
+            // Use the first matching artifact (typically the main JAR)
+            def artifact = matchingArtifacts.first()
+            def file = artifact.file
+
+            // Extract artifact type from file extension (most reliable approach)
+            def type = file.name.lastIndexOf('.') >= 0 ? 
+                file.name.substring(file.name.lastIndexOf('.') + 1) : 'jar'
+
+            // Try to get checksum from Gradle's built-in mechanisms first
+            def checksum = getGradleChecksum(file, artifact)
+            if (checksum == null) {
+                // Fallback to manual calculation if Gradle doesn't provide it
+                checksum = computeSHA1(file)
+            }
+
+            if (checksum != null) {
+                return [
+                    checksum: checksum,
+                    type: type
+                ]
+            }
+        }
+        // Note: BOM/platform dependencies typically don't have traditional artifacts
+        // with files that can be checksummed, so we skip provenance for these
+
+        return null
+    } catch (Exception e) {
+        // Return null on any error to avoid breaking the build
+        return null
+    }
+}
+
+// Attempts to get checksum from Gradle's built-in ChecksumService
+// Returns null if not available, falling back to manual calculation
+def getGradleChecksum(File file, artifact) {
+    // Use Gradle's internal ChecksumService for optimized SHA1 calculation
+    // This is available in Gradle 6+ and provides fast, cached checksums
+
+    if (file.exists()) {
+        try {
+            def services = gradle.services
+            def checksumService = services.get(org.gradle.internal.hash.ChecksumService)
+            def hashCode = checksumService.sha1(file)
+            def result = hashCode.toString()
+            return result
+        } catch (Exception e) {
+            // ChecksumService may not be available in all Gradle versions or builds
+        }
+    }
+    return null
+}
+
+// Computes SHA1 hash of a file manually
+def computeSHA1(File file) {
+    try {
+        if (!file.exists()) {
+            return null
+        }
+
+        def digest = java.security.MessageDigest.getInstance('SHA-1')
+        file.withInputStream { stream ->
+            def buffer = new byte[8192]
+            int bytesRead
+            while ((bytesRead = stream.read(buffer)) != -1) {
+                digest.update(buffer, 0, bytesRead)
+            }
+        }
+        def result = digest.digest().encodeHex().toString()
+        return result
+    } catch (Exception e) {
+        return null
     }
 }

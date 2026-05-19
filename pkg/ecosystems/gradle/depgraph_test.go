@@ -740,4 +740,78 @@ func TestFilterConfigurationsByPattern(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, filtered, 5)
 	})
+
+	t.Run("returns all configurations when pattern is empty", func(t *testing.T) {
+		filtered, err := filterConfigurationsByPattern(configs, "")
+		require.NoError(t, err)
+		assert.Len(t, filtered, 5)
+		assert.Equal(t, configs, filtered) // Should return the exact same slice
+	})
+}
+
+func TestCreatePkgInfo(t *testing.T) {
+	t.Run("creates basic PkgInfo without provenance enabled", func(t *testing.T) {
+		pkgInfo := createPkgInfo("org.example:artifact", "1.0.0", nil, false)
+
+		assert.Equal(t, "org.example:artifact", pkgInfo.Name)
+		assert.Equal(t, "1.0.0", pkgInfo.Version)
+		assert.Empty(t, pkgInfo.PackageURL) // No PURL when provenance disabled
+	})
+
+	t.Run("creates PkgInfo with base PURL when provenance enabled but no provenance data", func(t *testing.T) {
+		pkgInfo := createPkgInfo("org.example:artifact", "1.0.0", nil, true)
+
+		assert.Equal(t, "org.example:artifact", pkgInfo.Name)
+		assert.Equal(t, "1.0.0", pkgInfo.Version)
+		assert.Equal(t, "pkg:maven/org.example/artifact@1.0.0", pkgInfo.PackageURL) // Base PURL when provenance enabled
+	})
+
+	t.Run("creates PkgInfo with checksum PURL when provenance available", func(t *testing.T) {
+		provenanceEntry := &allDepEntry{
+			ID:       "org.example:artifact:1.0.0",
+			Checksum: "abcd1234567890",
+			Type:     "jar",
+		}
+
+		pkgInfo := createPkgInfo("org.example:artifact", "1.0.0", provenanceEntry, true)
+
+		assert.Equal(t, "org.example:artifact", pkgInfo.Name)
+		assert.Equal(t, "1.0.0", pkgInfo.Version)
+		assert.Equal(t, "pkg:maven/org.example/artifact@1.0.0?checksum=sha1:abcd1234567890", pkgInfo.PackageURL)
+	})
+
+	t.Run("creates PkgInfo with SHA1 checksum in PURL", func(t *testing.T) {
+		provenanceEntry := &allDepEntry{
+			ID:       "org.example:artifact:1.0.0",
+			Checksum: "abcd1234567890",
+			Type:     "jar",
+		}
+
+		pkgInfo := createPkgInfo("org.example:artifact", "1.0.0", provenanceEntry, true)
+
+		assert.Equal(t, "pkg:maven/org.example/artifact@1.0.0?checksum=sha1:abcd1234567890", pkgInfo.PackageURL)
+	})
+
+	t.Run("creates PURL without checksum when checksum is empty", func(t *testing.T) {
+		provenanceEntry := &allDepEntry{
+			ID:   "org.example:artifact:1.0.0",
+			Type: "jar",
+		}
+
+		pkgInfo := createPkgInfo("org.example:artifact", "1.0.0", provenanceEntry, true)
+
+		assert.Equal(t, "pkg:maven/org.example/artifact@1.0.0", pkgInfo.PackageURL)
+	})
+
+	t.Run("skips PURL for non-standard dependency ID format", func(t *testing.T) {
+		provenanceEntry := &allDepEntry{
+			ID:       "invalid-id",
+			Checksum: "abcd1234567890",
+			Type:     "jar",
+		}
+
+		pkgInfo := createPkgInfo("invalid-id", "", provenanceEntry, true)
+
+		assert.Empty(t, pkgInfo.PackageURL)
+	})
 }

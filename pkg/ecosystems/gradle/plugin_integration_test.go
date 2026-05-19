@@ -187,6 +187,23 @@ func pluginTestCases() map[string]PluginTestCase {
 			Fixture: "multi-module-bom",
 			Options: ecosystems.NewPluginOptions(),
 		},
+		// Provenance integration tests - exercises --include-provenance flag
+		// to verify SHA1 checksums are computed and included in PURLs.
+		"simple_with_provenance": {
+			Fixture:      "simple",
+			Options:      ecosystems.NewPluginOptions().WithIncludeProvenance(true),
+			ExpectedFile: "expected_plugin_with_provenance.json",
+		},
+		"platform_bom_with_provenance": {
+			Fixture:      "platform-bom",
+			Options:      ecosystems.NewPluginOptions().WithIncludeProvenance(true),
+			ExpectedFile: "expected_plugin_with_provenance.json",
+		},
+		"multi_module_with_provenance": {
+			Fixture:      "multi-module",
+			Options:      ecosystems.NewPluginOptions().WithIncludeProvenance(true),
+			ExpectedFile: "expected_plugin_with_provenance.json",
+		},
 	}
 }
 

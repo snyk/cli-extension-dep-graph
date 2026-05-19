@@ -28,6 +28,7 @@ type GlobalOptions struct {
 	ForceSingleGraph              bool                 `arg:"--force-single-graph"`
 	ForceIncludeWorkspacePackages bool                 `arg:"--internal-uv-workspace-packages"`
 	ProjectName                   *string              `arg:"--project-name"`
+	IncludeProvenance             bool                 `arg:"--include-provenance"`
 	RawFlags                      []string
 }
 
@@ -178,5 +179,10 @@ func (o *SCAPluginOptions) WithGradleInitScript(initScript string) *SCAPluginOpt
 
 func (o *SCAPluginOptions) WithGradleSkipWrapper(skipWrapper bool) *SCAPluginOptions {
 	o.Gradle.SkipWrapper = skipWrapper
+	return o
+}
+
+func (o *SCAPluginOptions) WithIncludeProvenance(includeProvenance bool) *SCAPluginOptions {
+	o.Global.IncludeProvenance = includeProvenance
 	return o
 }
