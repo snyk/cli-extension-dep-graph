@@ -306,6 +306,43 @@ func TestNewPluginOptionsFromRawFlags_StrictOutOfSync(t *testing.T) {
 	}
 }
 
+func TestNewPluginOptionsFromRawFlags_SubProjectAlias(t *testing.T) {
+	tests := []struct {
+		name            string
+		rawFlags        []string
+		expectedProject string
+	}{
+		{
+			name:            "--gradle-sub-project sets SubProject",
+			rawFlags:        []string{"--gradle-sub-project", "app"},
+			expectedProject: "app",
+		},
+		{
+			name:            "--sub-project sets SubProject as legacy alias",
+			rawFlags:        []string{"--sub-project", "app"},
+			expectedProject: "app",
+		},
+		{
+			name:            "--gradle-sub-project with equals syntax",
+			rawFlags:        []string{"--gradle-sub-project=app"},
+			expectedProject: "app",
+		},
+		{
+			name:            "--sub-project with equals syntax",
+			rawFlags:        []string{"--sub-project=app"},
+			expectedProject: "app",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewPluginOptionsFromRawFlags(tt.rawFlags)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedProject, got.Gradle.SubProject)
+		})
+	}
+}
+
 func TestNewPluginOptionsFromRawFlags_UnknownFlags(t *testing.T) {
 	rawFlags := []string{
 		"--unknown-flag", "value",
