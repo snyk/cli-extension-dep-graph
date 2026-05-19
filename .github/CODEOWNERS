@@ -1,6 +1,6 @@
-* @snyk/open-source_unify @snyk/open-source_composition-analysis 
+* @snyk/open-source_unify @snyk/open-source_open-source-leadership @snyk/open-source_composition-analysis
 
 /pkg/ecosystems/ @snyk/open-source_composition-analysis
-/pkg/ecosystems/python/uv/ @snyk/open-source_unify @snyk/open-source_composition-analysis
-/pkg/depgraph @snyk/open-source_unify
-/pkg/sca_plugin @snyk/open-source_unify 
+/pkg/ecosystems/python/uv/ @snyk/open-source_unify @snyk/open-source_open-source-leadership @snyk/open-source_composition-analysis
+/pkg/depgraph @snyk/open-source_unify @snyk/open-source_open-source-leadership
+/pkg/sca_plugin @snyk/open-source_unify @snyk/open-source_open-source-leadership
