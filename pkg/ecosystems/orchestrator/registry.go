@@ -11,9 +11,6 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/javascript/bun"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/legacy"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pip"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pipenv"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/uv"
 )
 
 type pluginEntry struct {
@@ -22,39 +19,34 @@ type pluginEntry struct {
 }
 
 type PluginRegistry struct {
+	ictx    workflow.InvocationContext
 	entries []pluginEntry
 	plugins []ecosystems.SCAPlugin
 }
 
-func NewDefaultPluginRegistry() (*PluginRegistry, error) {
+func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry, error) {
 	r := &PluginRegistry{
+		ictx:    ictx,
 		entries: make([]pluginEntry, 0),
 		plugins: make([]ecosystems.SCAPlugin, 0),
 	}
 
 	// javascript
-	if err := r.register(bun.Plugin{}); err != nil {
+	if err := r.register(bun.Plugin{}, ""); err != nil {
 		return nil, fmt.Errorf("failed to register bun plugin: %w", err)
-	}
-	// python
-	if err := r.register(pip.Plugin{}, uv.PluginName); err != nil {
-		return nil, fmt.Errorf("failed to register pip plugin: %w", err)
-	}
-	if err := r.register(pipenv.Plugin{}, uv.PluginName); err != nil {
-		return nil, fmt.Errorf("failed to register pipenv plugin: %w", err)
 	}
 
 	return r, nil
 }
 
-func (r *PluginRegistry) ResolveDepgraphs(ictx workflow.InvocationContext, dir string, opts *ecosystems.SCAPluginOptions) <-chan ecosystems.SCAResult {
+func (r *PluginRegistry) ResolveDepgraphs(dir string, opts *ecosystems.SCAPluginOptions) <-chan ecosystems.SCAResult {
 	resultsChan := make(chan ecosystems.SCAResult)
 
 	go func() {
 		defer close(resultsChan)
 
-		ctx := ictx.Context()
-		enhancedLogger := ictx.GetEnhancedLogger()
+		ctx := r.ictx.Context()
+		enhancedLogger := r.ictx.GetEnhancedLogger()
 		processedFiles := make([]string, 0)
 
 		for _, plugin := range r.plugins {
@@ -78,13 +70,19 @@ func (r *PluginRegistry) ResolveDepgraphs(ictx workflow.InvocationContext, dir s
 		default:
 		}
 
-		executePluginWithResults(ctx, legacy.NewLegacyResolver(ictx, processedFiles), enhancedLogger, dir, opts, resultsChan)
+		executePluginWithResults(ctx, legacy.NewLegacyResolver(r.ictx, processedFiles), enhancedLogger, dir, opts, resultsChan)
 	}()
 
 	return resultsChan
 }
 
-func (r *PluginRegistry) register(plugin ecosystems.SCAPlugin, dependencies ...string) error {
+//nolint:unparam // unset for now but ready for when we need FFs
+func (r *PluginRegistry) register(plugin ecosystems.SCAPlugin, flag string, dependencies ...string) error {
+	if flag != "" {
+		if !r.ictx.GetConfiguration().GetBool(flag) {
+			return nil
+		}
+	}
 	r.entries = append(r.entries, pluginEntry{
 		plugin:       plugin,
 		dependencies: dependencies,
