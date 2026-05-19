@@ -82,6 +82,73 @@ func TestValidateOptions(t *testing.T) {
 		}
 	})
 
+	t.Run("accepts valid configuration attributes", func(t *testing.T) {
+		testCases := []string{
+			"buildtype:release",
+			"usage:java-runtime",
+			"buildtype:release,usage:java-runtime",
+			"buildType:debug,usage:java-api,category:library",
+			"BUILDTYPE:DEBUG", // case doesn't matter in values
+			// Colons in values are allowed (split on first colon only)
+			"buildtype:release:debug",
+			"target:jvm:11",
+			"version:1.2.3:SNAPSHOT",
+			"key:value:with:many:colons",
+			"version:1.0.0:SNAPSHOT:final",
+			// Whitespace handling
+			" buildtype : release ",
+			"buildtype:release, usage:java-runtime",
+			"  buildtype  :  release  ,  usage  :  java-runtime  ",
+			"\tkey\t:\tvalue\t",
+			"key: value with spaces ",
+			" key : value:with:colons ",
+		}
+
+		for _, attrs := range testCases {
+			t.Run(attrs, func(t *testing.T) {
+				options := &ecosystems.SCAPluginOptions{}
+				options.Gradle.ConfigurationAttributes = attrs
+				err := ValidateOptions(tempDir, options)
+				require.NoError(t, err, "attributes %q should be valid", attrs)
+			})
+		}
+	})
+
+	t.Run("accepts empty configuration attributes string", func(t *testing.T) {
+		options := &ecosystems.SCAPluginOptions{}
+		options.Gradle.ConfigurationAttributes = ""
+		err := ValidateOptions(tempDir, options)
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects invalid configuration attributes", func(t *testing.T) {
+		testCases := []struct {
+			name   string
+			attrs  string
+			errMsg string
+		}{
+			{"missing value", "buildtype:", "has empty value"},
+			{"missing key", ":release", "has empty key"},
+			{"no colon", "buildtype", "must be in 'key:value' format"},
+			{"empty entry in list", "buildtype:release,,usage:java-runtime", "entry 2 is empty"},
+			{"whitespace only", "   ", "cannot be empty"},
+			{"missing key with whitespace", "  :release", "has empty key"},
+			{"missing value with whitespace", "buildtype:  ", "has empty value"},
+			{"empty middle entry after trimming", "key1:value1,  , key2:value2", "entry 2 is empty"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				options := &ecosystems.SCAPluginOptions{}
+				options.Gradle.ConfigurationAttributes = tc.attrs
+				err := ValidateOptions(tempDir, options)
+				require.Error(t, err, "attributes %q should be invalid", tc.attrs)
+				assert.Contains(t, err.Error(), "--configuration-attributes")
+				assert.Contains(t, err.Error(), tc.errMsg)
+			})
+		}
+	})
+
 	t.Run("validates absolute init script paths", func(t *testing.T) {
 		dir := t.TempDir()
 
@@ -192,5 +259,26 @@ func TestValidateOptions_Integration_BuildDepGraphsFromDir(t *testing.T) {
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "gradle: invalid options:")
 		assert.Contains(t, err.Error(), "user init script not found")
+	})
+
+	t.Run("BuildDepGraphsFromDir fails fast with invalid configuration attributes", func(t *testing.T) {
+		dir := t.TempDir()
+		buildFile := filepath.Join(dir, "build.gradle")
+		require.NoError(t, os.WriteFile(buildFile, []byte(""), 0o644))
+
+		options := &ecosystems.SCAPluginOptions{}
+		options.Gradle.ConfigurationAttributes = "buildtype:" // missing value
+
+		ctx := context.Background()
+		log := logger.Nop()
+		plugin := Plugin{}
+
+		// This should fail fast during validation, before any file discovery or Gradle execution
+		result, err := plugin.BuildDepGraphsFromDir(ctx, log, dir, options)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "gradle: invalid options:")
+		assert.Contains(t, err.Error(), "--configuration-attributes")
+		assert.Contains(t, err.Error(), "has empty value")
 	})
 }

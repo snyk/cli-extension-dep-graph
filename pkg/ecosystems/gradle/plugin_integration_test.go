@@ -173,6 +173,17 @@ func pluginTestCases() map[string]PluginTestCase {
 			Options:      ecosystems.NewPluginOptions().WithGradleConfigurationMatching("^runtimeClasspath$"),
 			ExpectedFile: "expected_plugin_exact_runtime.json",
 		},
+		// Exercises --configuration-attributes flag functionality using a fixture with dependencies
+		// in multiple configurations. Standard Java plugin sets attributes like org.gradle.usage
+		// on configurations. This validates attribute-based filtering works correctly.
+
+		// Filter by usage:java-runtime with whitespace - should include runtime configurations
+		// Additionally, tests validation trimming and Groovy parsing trimming
+		"configuration_attributes_java_runtime": {
+			Fixture:      "configuration-matching",
+			Options:      ecosystems.NewPluginOptions().WithGradleConfigurationAttributes(" usage : java-runtime "),
+			ExpectedFile: "expected_plugin_attributes_java_runtime.json",
+		},
 		// Exercises nested BOM resolution with complex constraint hierarchy.
 		// Validates that imported BOMs produce `:constraint` leaves while
 		// allowing the real dependency paths to be fully expanded.

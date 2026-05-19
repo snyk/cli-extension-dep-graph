@@ -50,6 +50,8 @@ type PythonOptions struct {
 type GradleOptions struct {
 	// ConfigurationMatching is a regex to select only matching Gradle configurations.
 	ConfigurationMatching string `arg:"--configuration-matching"`
+	// ConfigurationAttributes filters configurations by attribute values (key:value,key:value).
+	ConfigurationAttributes string `arg:"--configuration-attributes"`
 	// SubProject restricts scanning to a single named Gradle sub-project.
 	SubProject string `arg:"--gradle-sub-project"`
 	// AllSubProjects scans all sub-projects in a multi-project build.
@@ -159,6 +161,11 @@ func (o *SCAPluginOptions) WithProjectName(projectName string) *SCAPluginOptions
 
 func (o *SCAPluginOptions) WithGradleConfigurationMatching(pattern string) *SCAPluginOptions {
 	o.Gradle.ConfigurationMatching = pattern
+	return o
+}
+
+func (o *SCAPluginOptions) WithGradleConfigurationAttributes(attributes string) *SCAPluginOptions {
+	o.Gradle.ConfigurationAttributes = attributes
 	return o
 }
 

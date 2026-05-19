@@ -412,6 +412,45 @@ func TestBuildExtraArgs(t *testing.T) {
 			assert.NotContains(t, arg, "snykTargetBuildFile")
 		}
 	})
+
+	t.Run("adds configuration attributes as project property when provided", func(t *testing.T) {
+		dir := t.TempDir()
+		opts := &ecosystems.SCAPluginOptions{
+			Gradle: ecosystems.GradleOptions{ConfigurationAttributes: "buildtype:release,usage:java-runtime"},
+		}
+
+		args := buildExtraArgs(dir, opts)
+		assert.Equal(t, []string{"-PsnykConfAttr=buildtype:release,usage:java-runtime"}, args)
+	})
+
+	t.Run("combines init script and configuration attributes", func(t *testing.T) {
+		dir := t.TempDir()
+		validScript := filepath.Join(dir, "custom.gradle")
+		require.NoError(t, os.WriteFile(validScript, []byte("// custom"), 0o644))
+
+		opts := &ecosystems.SCAPluginOptions{
+			Gradle: ecosystems.GradleOptions{
+				InitScript:              validScript,
+				ConfigurationAttributes: "buildtype:debug",
+			},
+		}
+
+		args := buildExtraArgs(dir, opts)
+		assert.Equal(t, []string{"--init-script", validScript, "-PsnykConfAttr=buildtype:debug"}, args)
+	})
+
+	t.Run("returns empty args when all options are empty", func(t *testing.T) {
+		dir := t.TempDir()
+		opts := &ecosystems.SCAPluginOptions{
+			Gradle: ecosystems.GradleOptions{
+				InitScript:              "",
+				ConfigurationAttributes: "",
+			},
+		}
+
+		args := buildExtraArgs(dir, opts)
+		assert.Empty(t, args)
+	})
 }
 
 // ── Target file filtering behavior demonstration ──────────────────────────────

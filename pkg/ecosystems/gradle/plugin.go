@@ -447,6 +447,11 @@ func buildExtraArgs(projectDir string, options *ecosystems.SCAPluginOptions) []s
 		args = append(args, "-PsnykIncludeProvenance=true")
 	}
 
+	// Forward configuration-attributes as a project property to the init script.
+	if configAttrs := options.Gradle.ConfigurationAttributes; configAttrs != "" {
+		args = append(args, "-PsnykConfAttr="+configAttrs)
+	}
+
 	return args
 }
 
