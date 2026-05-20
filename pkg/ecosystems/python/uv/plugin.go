@@ -80,6 +80,10 @@ func (p Plugin) BuildDepGraphsFromDir(
 						TargetFile:  &lockFilePath,
 					},
 				},
+				ResolverMetadata: &scaecosystems.ResolverMetadata{
+					PluginName:           PluginName,
+					NormalisedTargetFile: lockFilePath,
+				},
 				Error: wrappedErr,
 			}
 			combined.Results = append(combined.Results, errorResult)
@@ -126,6 +130,10 @@ func (p Plugin) buildResults(
 						ProjectType: "uv",
 						TargetFile:  &lockFilePath,
 					},
+				},
+				ResolverMetadata: &scaecosystems.ResolverMetadata{
+					PluginName:           PluginName,
+					NormalisedTargetFile: lockFilePath,
 				},
 				Error: noRootErr,
 			}},

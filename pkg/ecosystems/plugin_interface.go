@@ -10,8 +10,9 @@ import (
 )
 
 type ResolverMetadata struct {
-	PluginName       string            `json:"pluginName,omitempty"`
-	VersionBuildInfo map[string]string `json:"versionBuildInfo,omitempty"`
+	PluginName           string            `json:"pluginName,omitempty"`
+	VersionBuildInfo     map[string]string `json:"versionBuildInfo,omitempty"`
+	NormalisedTargetFile string            `json:"normalisedTargetFile,omitempty"`
 }
 
 // SCAResult represents the result of a Software Composition Analysis (SCA),

@@ -106,6 +106,10 @@ func (p Plugin) buildResults(
 					TargetFile:  &rootTargetFile,
 				},
 			},
+			ResolverMetadata: &ecosystems.ResolverMetadata{
+				PluginName:           PluginName,
+				NormalisedTargetFile: rootTargetFile,
+			},
 			Error: err,
 		}}
 	}
