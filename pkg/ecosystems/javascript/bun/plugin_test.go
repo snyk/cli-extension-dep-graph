@@ -366,3 +366,31 @@ func TestParseWhyOutput_ReaderInterface(t *testing.T) {
 	assert.Contains(t, out.ProdDeps, "debug@4.4.3")
 	assert.Contains(t, out.Graph, "ms@2.1.3")
 }
+
+// TestPlugin_DiscoverLockFiles_HonorsExcludePaths locks in that the bun plugin reads
+// `opts.Global.ExcludePaths` and passes those paths through to the discovery layer's
+// exclude filter — same contract as the other discovery plugins.
+func TestPlugin_DiscoverLockFiles_HonorsExcludePaths(t *testing.T) {
+	tmpDir := t.TempDir()
+	for _, rel := range []string{"bun.lock", "a/bun.lock", "b/bun.lock"} {
+		full := filepath.Join(tmpDir, rel)
+		require.NoError(t, os.MkdirAll(filepath.Dir(full), 0o755))
+		require.NoError(t, os.WriteFile(full, []byte(""), 0o600))
+	}
+
+	opts := ecosystems.NewPluginOptions().
+		WithAllProjects(true).
+		WithExcludePaths([]string{"a/bun.lock"})
+
+	got, err := Plugin{}.discoverLockFiles(t.Context(), tmpDir, opts)
+	require.NoError(t, err)
+
+	rels := make([]string, len(got))
+	for i, r := range got {
+		rels[i] = r.RelPath
+	}
+	assert.NotContains(t, rels, "a/bun.lock",
+		"discovery must skip the path supplied via opts.Global.ExcludePaths")
+	assert.Contains(t, rels, "bun.lock")
+	assert.Contains(t, rels, "b/bun.lock")
+}

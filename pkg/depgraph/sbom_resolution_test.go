@@ -1722,107 +1722,84 @@ func Test_extractProblemResults(t *testing.T) {
 	})
 }
 
-func Test_applyProcessedFilesExclusions(t *testing.T) {
+// Test_processedFilesFlowFromPluginsToExcludeConfig locks in the end-to-end contract that
+// the legacy CLI subprocess sees the full union of paths to skip: the user's --exclude-paths
+// flag combined with every plugin's ProcessedFiles. The union is built up on
+// pluginOptions.Global.ExcludePaths during the plugin loop and written verbatim to the
+// FlagExcludePaths config flag before the legacy workflow is invoked.
+func Test_processedFilesFlowFromPluginsToExcludeConfig(t *testing.T) {
+	dataIdentifier := gafworkflow.NewTypeIdentifier(WorkflowID, workflow.WorkflowIDStr)
+
+	pluginWithProcessedFiles := func(targetFile, name string, processedFiles []string) *mockScaPlugin {
+		return &mockScaPlugin{
+			result: &ecosystems.PluginResult{
+				Results: []ecosystems.SCAResult{{
+					DepGraph: createTestDepGraph(t, "pip", name, "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{TargetFile: stringPtr(targetFile)},
+					},
+				}},
+				ProcessedFiles: processedFiles,
+			},
+		}
+	}
+
 	testCases := []struct {
 		name                 string
-		initialExcludePaths  string
-		processedFiles       []string
+		userExcludePaths     string
+		plugins              []ecosystems.SCAPlugin
 		expectedExcludePaths string
 	}{
 		{
-			name:                 "no processed files does not modify config",
-			initialExcludePaths:  "",
-			processedFiles:       []string{},
-			expectedExcludePaths: "",
-		},
-		{
-			name:                 "nil processed files does not modify config",
-			initialExcludePaths:  "",
-			processedFiles:       nil,
-			expectedExcludePaths: "",
-		},
-		{
-			name:                 "single processed file",
-			processedFiles:       []string{"file1.py"},
-			expectedExcludePaths: "file1.py",
-		},
-		{
-			name:                 "multiple processed files",
-			processedFiles:       []string{"file1.py", "file2.py", "file3.py"},
+			name: "union of every plugin's ProcessedFiles",
+			plugins: []ecosystems.SCAPlugin{
+				pluginWithProcessedFiles("pyproject.toml", "project-1", []string{"file1.py", "file2.py"}),
+				pluginWithProcessedFiles("package.json", "project-2", []string{"file3.py"}),
+			},
 			expectedExcludePaths: "file1.py,file2.py,file3.py",
 		},
 		{
-			name:                 "appends to existing exclude-paths",
-			initialExcludePaths:  "existing.txt",
-			processedFiles:       []string{"file1.py", "file2.py"},
-			expectedExcludePaths: "existing.txt,file1.py,file2.py",
+			name:             "user --exclude-paths value is preserved alongside processed files",
+			userExcludePaths: "user-supplied.txt",
+			plugins: []ecosystems.SCAPlugin{
+				pluginWithProcessedFiles("pyproject.toml", "project-1", []string{"file1.py"}),
+			},
+			expectedExcludePaths: "user-supplied.txt,file1.py",
+		},
+		{
+			name:                 "user --exclude-paths value alone when no plugin produced ProcessedFiles",
+			userExcludePaths:     "user-supplied.txt",
+			plugins:              []ecosystems.SCAPlugin{&mockScaPlugin{result: &ecosystems.PluginResult{}}},
+			expectedExcludePaths: "user-supplied.txt",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			config := configuration.New()
-			if tc.initialExcludePaths != "" {
-				config.Set(workflow.FlagExcludePaths, tc.initialExcludePaths)
+			ctx := setupTestContext(t, true)
+			ctx.config.Set(workflow.FlagAllProjects, true)
+			if tc.userExcludePaths != "" {
+				ctx.config.Set(workflow.FlagExcludePaths, tc.userExcludePaths)
 			}
 
-			applyProcessedFilesExclusions(config, tc.processedFiles)
+			resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
+			resolutionHandler.ReturnData = []gafworkflow.Data{
+				gafworkflow.NewData(dataIdentifier, "application/json", []byte(`{"mock":"data"}`)),
+			}
 
-			assert.Equal(t, tc.expectedExcludePaths, config.GetString(workflow.FlagExcludePaths))
+			_, err := handleSBOMResolutionDI(
+				ctx.invocationContext,
+				ctx.config,
+				&nopLogger,
+				tc.plugins,
+				resolutionHandler.Func(),
+			)
+
+			require.NoError(t, err)
+			require.True(t, resolutionHandler.Called)
+			assert.Equal(t, tc.expectedExcludePaths, resolutionHandler.Config.GetString(workflow.FlagExcludePaths))
 		})
 	}
-}
-
-func Test_processedFilesFlowFromPluginsToExcludeConfig(t *testing.T) {
-	ctx := setupTestContext(t, true)
-	resolutionHandler := NewCalledResolutionHandlerFunc(nil, nil)
-	ctx.config.Set(workflow.FlagAllProjects, true)
-
-	dataIdentifier := gafworkflow.NewTypeIdentifier(WorkflowID, workflow.WorkflowIDStr)
-	resolutionHandler.ReturnData = []gafworkflow.Data{
-		gafworkflow.NewData(dataIdentifier, "application/json", []byte(`{"mock":"data"}`)),
-	}
-
-	mockPlugin1 := &mockScaPlugin{
-		result: &ecosystems.PluginResult{
-			Results: []ecosystems.SCAResult{{
-				DepGraph: createTestDepGraph(t, "pip", "project-1", "1.0.0"),
-				ProjectDescriptor: identity.ProjectDescriptor{
-					Identity: identity.ProjectIdentity{
-						TargetFile: stringPtr("pyproject.toml"),
-					},
-				},
-			}},
-			ProcessedFiles: []string{"file1.py", "file2.py"},
-		},
-	}
-	mockPlugin2 := &mockScaPlugin{
-		result: &ecosystems.PluginResult{
-			Results: []ecosystems.SCAResult{{
-				DepGraph: createTestDepGraph(t, "pip", "project-2", "2.0.0"),
-				ProjectDescriptor: identity.ProjectDescriptor{
-					Identity: identity.ProjectIdentity{
-						TargetFile: stringPtr("package.json"),
-					},
-				},
-			}},
-			ProcessedFiles: []string{"file3.py"},
-		},
-	}
-
-	_, err := handleSBOMResolutionDI(
-		ctx.invocationContext,
-		ctx.config,
-		&nopLogger,
-		[]ecosystems.SCAPlugin{mockPlugin1, mockPlugin2},
-		resolutionHandler.Func(),
-	)
-
-	require.NoError(t, err)
-	require.True(t, resolutionHandler.Called)
-	actualExcludePaths := resolutionHandler.Config.GetString(workflow.FlagExcludePaths)
-	assert.Equal(t, "file1.py,file2.py,file3.py", actualExcludePaths,
-		"ProcessedFiles from all plugins should be combined into FlagExcludePaths")
 }
 
 func Test_uvWorkspacePackages_passesOptionToPlugin(t *testing.T) {
