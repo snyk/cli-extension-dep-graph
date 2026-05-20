@@ -241,6 +241,10 @@ func depGraphOutputToSCAResult(ictx workflow.InvocationContext, output *parsers.
 				TargetRuntime: output.TargetRuntime,
 			},
 		},
+		ResolverMetadata: &ecosystems.ResolverMetadata{
+			PluginName:           "legacy",
+			NormalisedTargetFile: output.NormalisedTargetFile,
+		},
 	}
 
 	// If there's an error in the output, parse as ErrorCatalog so os-flows can render it (expected with --print-effective-graph-with-errors).

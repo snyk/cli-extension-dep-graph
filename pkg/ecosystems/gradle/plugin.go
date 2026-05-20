@@ -296,15 +296,6 @@ func (p Plugin) convertProjects(
 		}
 	}
 
-	resolverMetadata := ecosystems.ResolverMetadata{
-		PluginName: PluginName,
-		VersionBuildInfo: map[string]string{
-			metadata.GradleVersion:  parsed.Metadata.GradleVersion,
-			metadata.JavaVersion:    parsed.Metadata.JavaVersion,
-			metadata.BuildTimestamp: parsed.Metadata.GeneratedAt,
-		},
-	}
-
 	// Iterate projects in Gradle evaluation order (preserved by the array format).
 	// The init script outputs projects via root.allprojects.each, which visits
 	// in evaluation order: root first, then subprojects in settings.gradle
@@ -335,6 +326,16 @@ func (p Plugin) convertProjects(
 			absFile = discoveredBuildFile
 		}
 		relFile := relativeTargetFile(dir, absFile)
+
+		resolverMetadata := ecosystems.ResolverMetadata{
+			PluginName: PluginName,
+			VersionBuildInfo: map[string]string{
+				metadata.GradleVersion:  parsed.Metadata.GradleVersion,
+				metadata.JavaVersion:    parsed.Metadata.JavaVersion,
+				metadata.BuildTimestamp: parsed.Metadata.GeneratedAt,
+			},
+			NormalisedTargetFile: relFile,
+		}
 
 		depGraph, err := buildDepGraph(&proj, options)
 		if err != nil {

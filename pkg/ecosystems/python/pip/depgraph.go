@@ -12,20 +12,6 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
 
-// PkgManagerName represents the package manager name for dependency graphs.
-type PkgManagerName string
-
-// Package manager name constants.
-const (
-	PkgManagerPip    PkgManagerName = "pip"
-	PkgManagerPipenv PkgManagerName = "pipenv"
-)
-
-// String returns the string representation of the package manager name.
-func (p PkgManagerName) String() string {
-	return string(p)
-}
-
 // depStringPattern extracts the package name from a dependency string.
 // Example: "urllib3 (<3,>=1.21.1)" -> "urllib3".
 // Example: "certifi (>=2017.4.17)" -> "certifi".
@@ -64,9 +50,8 @@ func getNodeID(item *InstallItem) string {
 
 // ToDependencyGraph converts a pip install Report into a DepGraph using the dep-graph builder.
 // The root node represents the project and points to all direct dependencies.
-// The pkgManager parameter specifies the package manager name (e.g., PkgManagerPip, PkgManagerPipenv).
 // The projectName parameter sets the root package name (defaults to "root" if empty).
-func (r *Report) ToDependencyGraph(ctx context.Context, log logger.Logger, pkgManager PkgManagerName, projectName string) (*depgraph.DepGraph, error) {
+func (r *Report) ToDependencyGraph(ctx context.Context, log logger.Logger, projectName string) (*depgraph.DepGraph, error) {
 	if r == nil {
 		return nil, fmt.Errorf("report cannot be nil")
 	}
@@ -81,7 +66,7 @@ func (r *Report) ToDependencyGraph(ctx context.Context, log logger.Logger, pkgMa
 
 	// Create a builder with the specified package manager and a root package
 	builder, err := depgraph.NewBuilder(
-		&depgraph.PkgManager{Name: pkgManager.String()},
+		&depgraph.PkgManager{Name: "pip"},
 		&depgraph.PkgInfo{Name: projectName, Version: "0.0.0"},
 	)
 	if err != nil {

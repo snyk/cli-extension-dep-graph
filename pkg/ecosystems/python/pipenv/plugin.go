@@ -205,7 +205,7 @@ func (p Plugin) buildDepGraphFromPipfile(
 	}
 
 	// Convert report to dependency graph
-	depGraph, err := report.ToDependencyGraph(ctx, log, pip.PkgManagerPipenv, projectName)
+	depGraph, err := report.ToDependencyGraph(ctx, log, projectName)
 	if err != nil {
 		return ecosystems.SCAResult{}, fmt.Errorf("failed to convert pip report to dependency graph: %w", err)
 	}
@@ -232,6 +232,7 @@ func (p Plugin) buildDepGraphFromPipfile(
 			VersionBuildInfo: map[string]string{
 				metadata.PythonVersion: pythonVersion,
 			},
+			NormalisedTargetFile: file.RelPath,
 		},
 	}, nil
 }
