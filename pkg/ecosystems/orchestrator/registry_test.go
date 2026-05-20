@@ -93,6 +93,7 @@ func TestPluginRegistry_DefaultRegistryOrder(t *testing.T) {
 	r, err := NewDefaultPluginRegistry(setupMockInvocationContext(t))
 	require.NoError(t, err)
 
+	// Gradle is behind a FF that is off by default.
 	require.Len(t, r.plugins, 1)
 	assert.Equal(t, "bun", r.plugins[0].GetName())
 }
@@ -104,6 +105,27 @@ func TestPluginRegistry_DefaultRegistryHasNoCircularDependencies(t *testing.T) {
 	assert.NotNil(t, r)
 	assert.NotNil(t, r.plugins, "plugins should be successfully sorted without circular dependencies")
 	assert.Len(t, r.plugins, 1, "all 1 plugins should be registered")
+}
+
+func TestPluginRegistry_GradleRegisteredWhenFFEnabled(t *testing.T) {
+	ictx := setupMockInvocationContextWithConfig(t, func(cfg configuration.Configuration) {
+		cfg.Set(FlagNewGradleResolver.Key, true)
+	})
+
+	r, err := NewDefaultPluginRegistry(ictx)
+	require.NoError(t, err)
+
+	require.Len(t, r.plugins, 2)
+	assert.Equal(t, "bun", r.plugins[0].GetName())
+	assert.Equal(t, "gradle", r.plugins[1].GetName())
+}
+
+func TestPluginRegistry_GradleNotRegisteredWhenFFDisabled(t *testing.T) {
+	r, err := NewDefaultPluginRegistry(setupMockInvocationContext(t))
+	require.NoError(t, err)
+
+	require.Len(t, r.plugins, 1)
+	assert.NotEqual(t, "gradle", r.plugins[0].GetName())
 }
 
 func TestPluginRegistry_CircularDependencyReturnsError(t *testing.T) {
@@ -266,11 +288,19 @@ func TestPluginRegistry_ResolveDepgraphs_ContinuesWhenNoResults(t *testing.T) {
 
 func setupMockInvocationContext(t *testing.T) workflow.InvocationContext {
 	t.Helper()
+	return setupMockInvocationContextWithConfig(t, nil)
+}
+
+func setupMockInvocationContextWithConfig(t *testing.T, configure func(configuration.Configuration)) workflow.InvocationContext {
+	t.Helper()
 
 	ctrl := gomock.NewController(t)
 	ictx := gafmocks.NewMockInvocationContext(ctrl)
 	engine := gafmocks.NewMockEngine(ctrl)
 	cfg := configuration.New()
+	if configure != nil {
+		configure(cfg)
+	}
 	logger := zerolog.Nop()
 
 	ictx.EXPECT().GetConfiguration().Return(cfg).AnyTimes()

@@ -10,8 +10,14 @@ var FlagUnifiedTestAPIOsCLI = flag{
 	Value: "unified-test-api-os-cli",
 }
 
+var FlagNewGradleResolver = flag{
+	Key:   "internal_new_gradle_resolver",
+	Value: "internal-new-gradle-resolver",
+}
+
 var allFlags = []flag{
 	FlagUnifiedTestAPIOsCLI,
+	FlagNewGradleResolver,
 }
 
 // GetAllFlags returns all feature flags as a map of key to flag name.

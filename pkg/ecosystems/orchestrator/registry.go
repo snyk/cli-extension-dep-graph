@@ -8,6 +8,7 @@ import (
 	"github.com/snyk/go-application-framework/pkg/workflow"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/gradle"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/javascript/bun"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/legacy"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
@@ -34,6 +35,10 @@ func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry,
 	// javascript
 	if err := r.register(bun.Plugin{}, ""); err != nil {
 		return nil, fmt.Errorf("failed to register bun plugin: %w", err)
+	}
+	// gradle (opt-in via feature flag)
+	if err := r.register(gradle.Plugin{}, FlagNewGradleResolver.Key); err != nil {
+		return nil, fmt.Errorf("failed to register gradle plugin: %w", err)
 	}
 
 	return r, nil
@@ -76,7 +81,6 @@ func (r *PluginRegistry) ResolveDepgraphs(dir string, opts *ecosystems.SCAPlugin
 	return resultsChan
 }
 
-//nolint:unparam // unset for now but ready for when we need FFs
 func (r *PluginRegistry) register(plugin ecosystems.SCAPlugin, flag string, dependencies ...string) error {
 	if flag != "" {
 		if !r.ictx.GetConfiguration().GetBool(flag) {
