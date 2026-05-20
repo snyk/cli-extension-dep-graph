@@ -17,6 +17,7 @@ import (
 type pluginEntry struct {
 	plugin       ecosystems.SCAPlugin
 	dependencies []string
+	skip         bool
 }
 
 type PluginRegistry struct {
@@ -33,11 +34,11 @@ func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry,
 	}
 
 	// javascript
-	if err := r.register(bun.Plugin{}, ""); err != nil {
+	if err := r.register(bun.Plugin{}); err != nil {
 		return nil, fmt.Errorf("failed to register bun plugin: %w", err)
 	}
 	// gradle (opt-in via feature flag)
-	if err := r.register(gradle.Plugin{}, FlagNewGradleResolver.Key); err != nil {
+	if err := r.register(gradle.Plugin{}, withFeatureFlag(FlagNewGradleResolver)); err != nil {
 		return nil, fmt.Errorf("failed to register gradle plugin: %w", err)
 	}
 
@@ -81,16 +82,17 @@ func (r *PluginRegistry) ResolveDepgraphs(dir string, opts *ecosystems.SCAPlugin
 	return resultsChan
 }
 
-func (r *PluginRegistry) register(plugin ecosystems.SCAPlugin, flag string, dependencies ...string) error {
-	if flag != "" {
-		if !r.ictx.GetConfiguration().GetBool(flag) {
-			return nil
-		}
+func (r *PluginRegistry) register(plugin ecosystems.SCAPlugin, opts ...registerOpt) error {
+	entry := pluginEntry{plugin: plugin}
+	for _, opt := range opts {
+		opt(r, &entry)
 	}
-	r.entries = append(r.entries, pluginEntry{
-		plugin:       plugin,
-		dependencies: dependencies,
-	})
+
+	if entry.skip {
+		return nil
+	}
+
+	r.entries = append(r.entries, entry)
 	sorted := r.sortPlugins()
 	if sorted == nil {
 		return fmt.Errorf("circular dependency detected involving plugin: %s", plugin.GetName())
