@@ -67,7 +67,8 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 		name         string
 		files        []string // files to create relative to root
 		allProjects  bool
-		exclude      []string // directory/file names to exclude
+		exclude      []string // basename/dirname patterns (--exclude semantic)
+		excludePaths []string // exact path patterns (--exclude-paths semantic / processed-files channel)
 		expectedDirs []string // expected directories (relative paths) that should be processed
 		expectedErr  string   // if non-empty, expect error containing this string
 	}{
@@ -155,6 +156,33 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 			expectedDirs: []string{"."},
 		},
 
+		// CLI exclude-paths flag (also covers cross-plugin processed-files propagation, since
+		// orchestrators push processed file paths through this same opts.Global.ExcludePaths channel).
+		{
+			name: "excludes exact paths via excludePaths",
+			files: []string{
+				"uv.lock",
+				"dir1/uv.lock",
+				"dir2/uv.lock",
+			},
+			allProjects:  true,
+			excludePaths: []string{"dir1/uv.lock"},
+			expectedDirs: []string{".", "dir2"},
+		},
+		{
+			name: "exclude and excludePaths combine",
+			files: []string{
+				"uv.lock",
+				"dir1/uv.lock",
+				"dir2/uv.lock",
+				"dir3/uv.lock",
+			},
+			allProjects:  true,
+			exclude:      []string{"dir1"},
+			excludePaths: []string{"dir2/uv.lock"},
+			expectedDirs: []string{".", "dir3"},
+		},
+
 		// Edge cases
 		{
 			name:         "no files found",
@@ -193,7 +221,10 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 
 			// Execute
 			ctx := context.Background()
-			options := ecosystems.NewPluginOptions().WithAllProjects(tt.allProjects).WithExclude(tt.exclude)
+			options := ecosystems.NewPluginOptions().
+				WithAllProjects(tt.allProjects).
+				WithExclude(tt.exclude).
+				WithExcludePaths(tt.excludePaths)
 			pluginResult, err := plugin.BuildDepGraphsFromDir(ctx, testLogger, tmpDir, options)
 
 			// Check error
@@ -431,6 +462,7 @@ func TestBuildFindings_Success(t *testing.T) {
 	assert.NotNil(t, findings[0].DepGraph)
 	assert.Equal(t, "pyproject.toml", findings[0].ProjectDescriptor.GetTargetFile())
 	assert.Nil(t, findings[0].Error)
+	assert.Equal(t, []string{"uv.lock", "pyproject.toml", "requirements.txt"}, buildResult.ProcessedFiles)
 }
 
 func TestBuildFindings_NoProjectRoot_ReturnsErrorFinding(t *testing.T) {

@@ -106,7 +106,6 @@ func handleSBOMResolutionDI(
 	// Generate Results
 	pluginLogger := ecosystemslogger.NewFromZerolog(logger)
 	results := []ecosystems.SCAResult{}
-	var processedFiles []string
 	for _, sp := range scaPlugins {
 		pluginResult, err := sp.BuildDepGraphsFromDir(
 			ctx.Context(),
@@ -128,7 +127,7 @@ func handleSBOMResolutionDI(
 		}
 
 		results = append(results, pluginResult.Results...)
-		processedFiles = append(processedFiles, pluginResult.ProcessedFiles...)
+		pluginOptions.WithExcludePaths(pluginResult.ProcessedFiles)
 		if !allProjects && len(pluginResult.Results) > 0 {
 			break
 		}
@@ -159,7 +158,9 @@ func handleSBOMResolutionDI(
 	totalResults := len(results)
 
 	if totalResults == 0 || allProjects {
-		applyProcessedFilesExclusions(config, processedFiles)
+		// pluginOptions.Global.ExcludePaths holds both the user's --exclude-paths plus every plugin's
+		// ProcessedFiles. Write the union back to the config flag so the legacy CLI sees it.
+		config.Set(workflow.FlagExcludePaths, strings.Join(pluginOptions.Global.ExcludePaths, ","))
 
 		legacyData, err := executeLegacyWorkflow(ctx, config, logger, depGraphWorkflowFunc, results)
 		if err != nil {
@@ -277,22 +278,6 @@ func parseExcludeFlag(excludeFlag string) []string {
 		return nil
 	}
 	return result
-}
-
-func applyProcessedFilesExclusions(config configuration.Configuration, processedFiles []string) {
-	if len(processedFiles) == 0 {
-		return
-	}
-
-	// Use --exclude-paths (not --exclude) so processed file paths are matched
-	// exactly. --exclude only matches by basename, which would incorrectly
-	// exclude all same-named manifests across a workspace.
-	parts := make([]string, 0, len(processedFiles)+1)
-	if existing := config.GetString(workflow.FlagExcludePaths); existing != "" {
-		parts = append(parts, existing)
-	}
-	parts = append(parts, processedFiles...)
-	config.Set(workflow.FlagExcludePaths, strings.Join(parts, ","))
 }
 
 func executeLegacyWorkflow(

@@ -66,7 +66,7 @@ func (r *PluginRegistry) ResolveDepgraphs(dir string, opts *ecosystems.SCAPlugin
 				return
 			}
 			processedFiles = append(processedFiles, files...)
-			opts.WithExclude(files)
+			opts.WithExcludePaths(files)
 		}
 
 		select {

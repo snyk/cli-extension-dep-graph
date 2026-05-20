@@ -286,6 +286,9 @@ func (p Plugin) discoverLockFiles(
 		if len(options.Global.Exclude) > 0 {
 			findOpts = append(findOpts, discovery.WithExcludes(options.Global.Exclude...))
 		}
+		if len(options.Global.ExcludePaths) > 0 {
+			findOpts = append(findOpts, discovery.WithExcludes(options.Global.ExcludePaths...))
+		}
 	default:
 		if targetFile != "" {
 			findOpts = append(findOpts, discovery.WithTargetFile(targetFile))

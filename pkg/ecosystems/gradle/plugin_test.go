@@ -606,3 +606,31 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 		assert.Len(t, files, 0)
 	})
 }
+
+// TestPlugin_DiscoverAllGradleProjects_HonorsExcludePaths locks in that the gradle plugin
+// reads `opts.Global.ExcludePaths` and passes those paths through to the discovery layer's
+// exclude filter — same contract as the other discovery plugins.
+func TestPlugin_DiscoverAllGradleProjects_HonorsExcludePaths(t *testing.T) {
+	tmpDir := t.TempDir()
+	for _, rel := range []string{"build.gradle", "a/build.gradle", "b/build.gradle"} {
+		full := filepath.Join(tmpDir, rel)
+		require.NoError(t, os.MkdirAll(filepath.Dir(full), 0o755))
+		require.NoError(t, os.WriteFile(full, []byte(""), 0o644))
+	}
+
+	opts := ecosystems.NewPluginOptions().
+		WithAllProjects(true).
+		WithExcludePaths([]string{"a/build.gradle"})
+
+	got, err := Plugin{}.discoverAllGradleProjects(t.Context(), tmpDir, opts)
+	require.NoError(t, err)
+
+	rels := make([]string, len(got))
+	for i, r := range got {
+		rels[i] = r.RelPath
+	}
+	assert.NotContains(t, rels, "a/build.gradle",
+		"discovery must skip the path supplied via opts.Global.ExcludePaths")
+	assert.Contains(t, rels, "build.gradle")
+	assert.Contains(t, rels, "b/build.gradle")
+}

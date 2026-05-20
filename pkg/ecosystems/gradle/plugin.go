@@ -262,6 +262,9 @@ func (p Plugin) discoverAllGradleProjects(ctx context.Context, dir string, optio
 	if len(options.Global.Exclude) > 0 {
 		findOpts = append(findOpts, discovery.WithExcludes(options.Global.Exclude...))
 	}
+	if len(options.Global.ExcludePaths) > 0 {
+		findOpts = append(findOpts, discovery.WithExcludes(options.Global.ExcludePaths...))
+	}
 
 	files, err := discovery.FindFiles(ctx, dir, findOpts...)
 	if err != nil {
