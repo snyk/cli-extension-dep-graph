@@ -2,7 +2,7 @@ package orchestrator
 
 type registerOpt func(*PluginRegistry, *pluginEntry)
 
-func withFeatureFlag(flag flag) registerOpt {
+func withFeatureFlagCheck(flag flag) registerOpt {
 	return func(reg *PluginRegistry, entry *pluginEntry) {
 		if reg.ictx.GetConfiguration().GetBool(flag.Key) {
 			return
@@ -13,6 +13,6 @@ func withFeatureFlag(flag flag) registerOpt {
 
 func withPluginDependencies(deps ...string) registerOpt {
 	return func(_ *PluginRegistry, entry *pluginEntry) {
-		entry.dependencies = deps
+		entry.dependencies = append(entry.dependencies, deps...)
 	}
 }

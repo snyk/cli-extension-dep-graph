@@ -337,6 +337,26 @@ func TestPluginRegistry_ResolveDepgraphs_PropagatesProcessedFilesAsExcludePaths(
 		"processed files must NOT leak onto opts.Global.Exclude — that channel is for basename patterns only")
 }
 
+func TestPluginRegistry_Register_WithFeatureFlag(t *testing.T) {
+	r := &PluginRegistry{
+		ictx:    setupMockInvocationContext(t),
+		entries: make([]pluginEntry, 0),
+		plugins: make([]ecosystems.SCAPlugin, 0),
+	}
+	// Disable the feature flag
+	r.ictx.GetConfiguration().Set("this-ff-is-disabled", false)
+	// should get skipped
+	pluginA := &mockPlugin{name: "plugin-a"}
+	err := r.register(pluginA, withFeatureFlagCheck(flag{Key: "this-ff-is-disabled"}))
+	require.NoError(t, err)
+	// should get registered
+	pluginB := &mockPlugin{name: "plugin-b"}
+	err = r.register(pluginB)
+	require.NoError(t, err)
+
+	assert.Equal(t, []ecosystems.SCAPlugin{pluginB}, r.plugins, "only registers plugin-b")
+}
+
 func setupMockInvocationContext(t *testing.T) workflow.InvocationContext {
 	t.Helper()
 	return setupMockInvocationContextWithConfig(t, nil)
