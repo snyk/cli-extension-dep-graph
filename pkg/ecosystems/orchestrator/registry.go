@@ -38,7 +38,7 @@ func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry,
 		return nil, fmt.Errorf("failed to register bun plugin: %w", err)
 	}
 	// gradle (opt-in via feature flag)
-	if err := r.register(gradle.Plugin{}, withFeatureFlag(FlagNewGradleResolver)); err != nil {
+	if err := r.register(gradle.Plugin{}, withFeatureFlagCheck(FlagNewGradleResolver)); err != nil {
 		return nil, fmt.Errorf("failed to register gradle plugin: %w", err)
 	}
 
