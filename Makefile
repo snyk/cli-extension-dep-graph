@@ -13,10 +13,17 @@ all:
 fmt:
 	@go fmt ./...
 
+install-golangci-lint:
+	@if [ -x .bin/golangci-lint ] && .bin/golangci-lint version 2>&1 | grep -q "$(GOLANGCI_LINT_V:v%=%)"; then \
+		echo "golangci-lint $(GOLANGCI_LINT_V) already installed."; \
+	else \
+		echo "Installing golangci-lint $(GOLANGCI_LINT_V)..."; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_LINT_V)/install.sh | sh -s -- -b .bin $(GOLANGCI_LINT_V); \
+	fi
+
 install-tools:
-	@echo "Installing golangci-lint..."
 	@mkdir -p .bin
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_LINT_V)/install.sh | sh -s -- -b .bin $(GOLANGCI_LINT_V)
+	@$(MAKE) install-golangci-lint
 
 lint: install-tools
 	.bin/golangci-lint run -v
@@ -36,4 +43,4 @@ test-gradle-integration:
 update-gradle-fixtures:
 	UPDATE_FIXTURES=1 $(GOTEST) -v -tags="integration,gradle" -timeout=15m ./pkg/ecosystems/gradle/
 
-.PHONY: install-req fmt test test-python-integration test-gradle-integration update-gradle-fixtures lint tidy imports
+.PHONY: install-req fmt test test-python-integration test-gradle-integration update-gradle-fixtures lint tidy imports install-tools install-golangci-lint
