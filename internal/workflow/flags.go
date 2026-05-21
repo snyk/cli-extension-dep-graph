@@ -31,6 +31,7 @@ const (
 	FlagUnmanagedMaxDepth             = "max-depth"
 	FlagIncludeProvenance             = "include-provenance"
 	FlagUseSBOMResolution             = "use-sbom-resolution"
+	FlagPrune                         = "prune"
 	FlagPrintEffectiveGraph           = "effective-graph"
 	FlagPrintEffectiveGraphWithErrors = "effective-graph-with-errors"
 	FlagDotnetRuntimeResolution       = "dotnet-runtime-resolution"
