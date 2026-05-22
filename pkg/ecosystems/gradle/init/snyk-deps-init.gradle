@@ -158,10 +158,25 @@ def resolveConfiguration(config, includeProvenance = false) {
     def resolutionResult = config.incoming.resolutionResult
     def rootComponent = resolutionResult.root
 
+    // Per-config set of resolved group:module names; used to avoid surfacing false unresolved deps that strict locking emits alongside real resolved deps.
+    def resolvedNames = new HashSet<String>()
+    try {
+        resolutionResult.allComponents.each { component ->
+            def mv = component.moduleVersion
+            if (mv != null && mv.group && mv.name) {
+                // .toString() is load-bearing — GStrings and Strings hash differently.
+                resolvedNames.add("${mv.group}:${mv.name}".toString())
+            }
+        }
+    } catch (Exception ignored) {
+        // allComponents may be unavailable in very old Gradle versions; proceed
+        // without noise filtering rather than failing the whole configuration.
+    }
+
     def rootId = componentId(rootComponent)
     def processed = new HashSet<String>()
     def ancestry = new HashSet<String>()
-    def tree = walkDependencies(rootComponent, processed, ancestry)
+    def tree = walkDependencies(rootComponent, processed, ancestry, resolvedNames)
 
     // Build artifact lookup map once per configuration for O(1) lookups
     def artifactLookup = null
@@ -183,7 +198,7 @@ def resolveConfiguration(config, includeProvenance = false) {
 
 // ── Recursive tree walk ─────────────────────────────────────────────
 
-def walkDependencies(component, Set<String> processed, Set<String> ancestry) {
+def walkDependencies(component, Set<String> processed, Set<String> ancestry, Set<String> resolvedNames = new HashSet<>()) {
     def children = []
 
     component.dependencies.each { dep ->
@@ -224,14 +239,25 @@ def walkDependencies(component, Set<String> processed, Set<String> ancestry) {
                 ancestry.add(id)
                 children << [
                     id          : id,
-                    dependencies: walkDependencies(selected, processed, ancestry),
+                    dependencies: walkDependencies(selected, processed, ancestry, resolvedNames),
                 ]
                 ancestry.remove(id)
             }
         } else if (dep.hasProperty('attempted')) {
-            // UnresolvedDependencyResult
+            // UnresolvedDependencyResult: use attempted when available, fall back to requested.
+            def selector = dep.hasProperty('attempted') && dep.attempted != null
+                ? dep.attempted
+                : (dep.hasProperty('requested') ? dep.requested : null)
+            // Skip project deps and other non-Maven selectors that have no GAV coordinate.
+            if (selector == null || !selector.hasProperty('group') || !selector.hasProperty('module')) return
+            // Skip lock-rejected requests — the module resolved fine at the locked version.
+            def selectorName = "${selector.group}:${selector.module}".toString()
+            if (resolvedNames.contains(selectorName)) return
+            def vc = selector.hasProperty('versionConstraint') ? selector.versionConstraint : null
+            def simpleVersion = selector.hasProperty('version') ? (selector.version ?: 'unspecified') : 'unspecified'
+            def selectorVersion = vc?.requiredVersion ?: vc?.preferredVersion ?: simpleVersion
             children << [
-                id        : dep.attempted.toString(),
+                id        : "${selector.group}:${selector.module}:${selectorVersion}".toString(),
                 unresolved: true,
                 reason    : dep.failure?.message ?: 'unknown',
             ]

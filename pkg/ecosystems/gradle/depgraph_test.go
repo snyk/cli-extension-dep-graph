@@ -154,10 +154,10 @@ func TestBuildDepGraph(t *testing.T) {
 		assert.Equal(t, 1, sharedEdgesFromB, "b should reference the same shared node")
 	})
 
-	t.Run("skips unresolved dependencies", func(t *testing.T) {
+	t.Run("emits unresolved dependencies as labeled leaf nodes", func(t *testing.T) {
 		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
 			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
-				{ID: "com.example:missing:1.0.0", Unresolved: true, Reason: "not found"},
+				{ID: "com.example:missing:1.0.0", Unresolved: true, Reason: "Could not resolve com.example:missing:1.0.0"},
 				makeDep("com.google.guava:guava:32.1.2-jre"),
 			}),
 		})
@@ -166,8 +166,51 @@ func TestBuildDepGraph(t *testing.T) {
 		require.NoError(t, err)
 
 		ids := nodeIDSet(dg)
-		assert.False(t, ids["com.example:missing@1.0.0"], "unresolved dep should be skipped")
-		assert.True(t, ids["com.google.guava:guava@32.1.2-jre"], "resolved dep should be present")
+		assert.True(t, ids["com.example:missing@1.0.0:unresolved"], "unresolved dep should appear as :unresolved leaf")
+		assert.False(t, ids["com.example:missing@1.0.0"], "unresolved dep should not appear as a normal node")
+		assert.True(t, ids["com.google.guava:guava@32.1.2-jre"], "resolved dep should still be present")
+
+		unresolvedNode := findNodeByID(t, dg, "com.example:missing@1.0.0:unresolved")
+		require.NotNil(t, unresolvedNode.Info)
+		assert.Equal(t, "true", unresolvedNode.Info.Labels["unresolved"])
+		_, hasReason := unresolvedNode.Info.Labels["reason"]
+		assert.False(t, hasReason, "Gradle failure messages must not be copied onto dep-graph labels")
+	})
+
+	t.Run("unresolved dep node ID does not collide with a successfully-resolved node", func(t *testing.T) {
+		// Under different configurations the same coordinate could resolve in one
+		// and fail in another. Both nodes must coexist in the merged graph.
+		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
+			makeConfig("compileClasspath", "com.example:app:1.0.0", []gradleDep{
+				makeDep("com.example:lib:1.0.0"),
+			}),
+			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
+				{ID: "com.example:lib:1.0.0", Unresolved: true, Reason: "content filter"},
+			}),
+		})
+
+		dg, err := buildDepGraph(&proj, nil)
+		require.NoError(t, err)
+
+		ids := nodeIDSet(dg)
+		assert.True(t, ids["com.example:lib@1.0.0"], "resolved node should be present")
+		assert.True(t, ids["com.example:lib@1.0.0:unresolved"], "unresolved node should also be present under different ID")
+	})
+
+	t.Run("skips unresolved dep with empty ID", func(t *testing.T) {
+		proj := makeProject("com.example", "app", "1.0.0", []gradleConfig{
+			makeConfig("runtimeClasspath", "com.example:app:1.0.0", []gradleDep{
+				{ID: "", Unresolved: true, Reason: "selector has no coordinate"},
+				makeDep("com.google.guava:guava:32.1.2-jre"),
+			}),
+		})
+
+		dg, err := buildDepGraph(&proj, nil)
+		require.NoError(t, err)
+
+		ids := nodeIDSet(dg)
+		assert.True(t, ids["com.google.guava:guava@32.1.2-jre"])
+		assert.Equal(t, 2, len(ids), "no node should be created for an empty-ID unresolved dep")
 	})
 
 	t.Run("renders constraint dependencies as labelled :constraint leaves", func(t *testing.T) {
