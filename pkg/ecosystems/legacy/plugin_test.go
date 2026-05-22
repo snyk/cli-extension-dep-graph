@@ -48,11 +48,15 @@ func TestPlugin_MapsTargetFramework(t *testing.T) {
 	assert.Equal(t, "net6.0", *results.Results[0].ProjectDescriptor.Identity.TargetRuntime)
 }
 
-// TestPlugin_TargetFileForwarding verifies the plugin forwards the legacy CLI's
-// `targetFileFromPlugin` field verbatim onto Identity.TargetFile, and its
-// `normalisedTargetFile` onto ResolverMetadata.NormalisedTargetFile. Downstream
-// emission of MetaKeyTargetFileFromPlugin depends on Identity.TargetFile's nilness
-// exactly matching the CLI's own.
+// TestPlugin_TargetFileForwarding pins how the legacy CLI's `targetFileFromPlugin`
+// flows onto Identity.TargetFile (via mapToDesiredTargetFile) and its
+// `normalisedTargetFile` onto ResolverMetadata.NormalisedTargetFile.
+//
+// Identity.TargetFile MUST mirror body.targetFile so existing monitor projects stay
+// identifiable. When targetFileFromPlugin is omitted, Identity.TargetFile MUST stay
+// nil — do not substitute NormalisedTargetFile, that would create duplicate project
+// records for workspaces, maven, sbt, rubygems and any other plugin emitting no
+// plugin.targetFile.
 func TestPlugin_TargetFileForwarding(t *testing.T) {
 	cases := map[string]struct {
 		body                 string
@@ -62,12 +66,12 @@ func TestPlugin_TargetFileForwarding(t *testing.T) {
 		"CLI emits targetFileFromPlugin → forwarded verbatim": {
 			body:                 `{"depGraph":{"pkgManager":{"name":"nuget"}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json"}`,
 			wantNormalisedTarget: "project.assets.json",
-			wantPluginTargetFile: stringPtr("project.assets.json"),
+			wantPluginTargetFile: new("project.assets.json"),
 		},
 		"CLI emits a distinct targetFileFromPlugin → forwarded verbatim": {
 			body:                 `{"depGraph":{"pkgManager":{"name":"gradle"}},"normalisedTargetFile":"build.gradle.kts","targetFileFromPlugin":"something-else.kts"}`,
 			wantNormalisedTarget: "build.gradle.kts",
-			wantPluginTargetFile: stringPtr("something-else.kts"),
+			wantPluginTargetFile: new("something-else.kts"),
 		},
 		"CLI omits targetFileFromPlugin → forwarded as nil": {
 			body:                 `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package-lock.json"}`,
@@ -78,6 +82,20 @@ func TestPlugin_TargetFileForwarding(t *testing.T) {
 			body:                 `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package-lock.json","workspace":{"type":"npm"}}`,
 			wantNormalisedTarget: "package-lock.json",
 			wantPluginTargetFile: nil,
+		},
+		// Explicit guard against the "default to NormalisedTargetFile when nil" refactor.
+		// NormalisedTargetFile is populated with a meaningful path and targetFileFromPlugin
+		// is omitted — Identity.TargetFile must still be nil, not the normalised path.
+		"NormalisedTargetFile must not substitute for nil targetFileFromPlugin": {
+			body:                 `{"depGraph":{"pkgManager":{"name":"maven"}},"normalisedTargetFile":"subdir/pom.xml"}`,
+			wantNormalisedTarget: "subdir/pom.xml",
+			wantPluginTargetFile: nil,
+		},
+		// Mirror registry's exact-string poetry.lock → pyproject.toml compatibility shim.
+		"targetFileFromPlugin == 'poetry.lock' → rewritten to 'pyproject.toml'": {
+			body:                 `{"depGraph":{"pkgManager":{"name":"poetry"}},"normalisedTargetFile":"pyproject.toml","targetFileFromPlugin":"poetry.lock"}`,
+			wantNormalisedTarget: "pyproject.toml",
+			wantPluginTargetFile: new("pyproject.toml"),
 		},
 	}
 
@@ -104,8 +122,6 @@ func TestPlugin_TargetFileForwarding(t *testing.T) {
 		})
 	}
 }
-
-func stringPtr(s string) *string { return &s }
 
 func TestPlugin_MapsRootComponentName(t *testing.T) {
 	ictx, _ := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"nuget"},"pkgs":[{"id":"my-project@","info":{"name":"my-project"}}],"graph":{"rootNodeId":"root","nodes":[{"nodeId":"root","pkgId":"my-project@"}]}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json","target":{}}`, nil)
