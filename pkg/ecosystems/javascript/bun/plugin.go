@@ -153,13 +153,15 @@ func (p Plugin) buildResults(
 			DepGraph: gr.graph,
 			ProjectDescriptor: identity.ProjectDescriptor{
 				Identity: identity.ProjectIdentity{
-					ProjectType: pkgManager,
-					TargetFile:  &tf,
+					ProjectType:       pkgManager,
+					TargetFile:        &tf,
+					RootComponentName: gr.graph.GetRootPkg().Info.Name,
 				},
 			},
 			ResolverMetadata: &ecosystems.ResolverMetadata{
-				PluginName:       PluginName,
-				VersionBuildInfo: map[string]string{},
+				PluginName:           PluginName,
+				VersionBuildInfo:     map[string]string{},
+				NormalisedTargetFile: tf,
 			},
 		}
 	}
