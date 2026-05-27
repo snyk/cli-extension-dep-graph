@@ -13,6 +13,7 @@ import (
 	gafworkflow "github.com/snyk/go-application-framework/pkg/workflow"
 
 	"github.com/snyk/cli-extension-dep-graph/internal/legacycli"
+	"github.com/snyk/cli-extension-dep-graph/internal/ptrutil"
 	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
 	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
@@ -100,16 +101,27 @@ func buildLegacyConfig(src configuration.Configuration, opts *ecosystems.SCAPlug
 	return cfg
 }
 
+// mapToTargetFileIdentity mirrors registry's mapping from `targetFileFromPlugin` to target file identifier.
+func mapToTargetFileIdentity(ctx context.Context, log logger.Logger, targetFile *string) *string {
+	if ptrutil.DerefOr(targetFile, "") == "poetry.lock" {
+		log.Info(ctx, "rewriting targetFileFromPlugin: 'poetry.lock' → 'pyproject.toml'")
+		return new("pyproject.toml")
+	}
+	return targetFile
+}
+
 // depGraphOutputToSCAResult converts a parsed legacy CLI output line to an SCAResult.
-// Per-result errors are placed on result.Error; a partial dep graph alongside an error
-// is preserved. The legacy CLI's `normalisedTargetFile` is forwarded onto
-// ResolverMetadata.NormalisedTargetFile (the canonical manifest path); its
-// `targetFileFromPlugin` is forwarded onto Identity.TargetFile (the plugin-reported name).
+// Per-result errors land on result.Error; a partial dep graph alongside an error is
+// preserved.
+//
+// Identity.TargetFile is derived from `targetFileFromPlugin` via mapToDesiredTargetFile
+// so it mirrors the both the legacy CLI's body.targetFile and transformation in registry,
+// to preserve the identity of projects.
 func depGraphOutputToSCAResult(ctx context.Context, log logger.Logger, output *parsers.DepGraphOutput) ecosystems.SCAResult {
 	result := ecosystems.SCAResult{
 		ProjectDescriptor: identity.ProjectDescriptor{
 			Identity: identity.ProjectIdentity{
-				TargetFile:    output.TargetFileFromPlugin,
+				TargetFile:    mapToTargetFileIdentity(ctx, log, output.TargetFileFromPlugin),
 				TargetRuntime: output.TargetRuntime,
 			},
 		},
