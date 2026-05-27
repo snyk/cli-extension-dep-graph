@@ -132,6 +132,13 @@ func pluginTestCases() map[string]PluginTestCase {
 			Fixture: "same-name-subprojects",
 			Options: ecosystems.NewPluginOptions(),
 		},
+		// Verifies that a user-defined configuration with canBeConsumed=true and its own
+		// declared dependency is still walked. Guards against the publication-config filter
+		// (which skips default/archives) accidentally excluding user-defined configs.
+		"user_defined_config": {
+			Fixture: "custom-config",
+			Options: ecosystems.NewPluginOptions(),
+		},
 		// Exercises dynamic version selectors (range `[a, b)`, open `+`) and
 		// resolutionStrategy.force. Resolved versions are wildcarded in the
 		// snapshot to stay resilient to Maven Central transitive bumps.
