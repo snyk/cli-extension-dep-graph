@@ -37,10 +37,15 @@ func (p Plugin) GetName() string {
 // Compile-time check to ensure Plugin implements SCAPlugin interface.
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
-// BuildDepGraphsFromDir discovers and builds dependency graphs for Python pip projects.
+// BuildDepGraphsFromDir discovers and builds dependency graphs for
+// Python pip projects. Build work runs concurrently (bounded by
+// maxConcurrentInstalls) but onGraph invocations are serialized under
+// a mutex to satisfy the SCAPlugin contract — callbacks need not be
+// goroutine-safe.
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context, log logger.Logger, dir string, options *ecosystems.SCAPluginOptions,
-) (*ecosystems.PluginResult, error) {
+	onGraph func(ecosystems.SCAResult) error,
+) error {
 	if log == nil {
 		log = logger.Nop()
 	}
@@ -48,24 +53,23 @@ func (p Plugin) BuildDepGraphsFromDir(
 	// Discover requirements.txt files
 	files, err := p.discoverRequirementsFiles(ctx, dir, options)
 	if err != nil {
-		return nil, fmt.Errorf("failed to discover requirements files: %w", err)
+		return fmt.Errorf("failed to discover requirements files: %w", err)
 	}
 
 	if len(files) == 0 {
 		log.Info(ctx, "No requirements.txt files found", logger.Attr("dir", dir))
-		return &ecosystems.PluginResult{}, nil
+		return nil
 	}
 
 	// Get Python runtime version
 	pythonVersion, err := GetPythonVersion()
 	if err != nil {
-		return nil, fmt.Errorf("failed to detect Python version: %w", err)
+		return fmt.Errorf("failed to detect Python version: %w", err)
 	}
 
-	// Build dependency graphs concurrently for each requirements file
-	// Limit concurrency to avoid overwhelming the system
-	var mu sync.Mutex
-	results := make([]ecosystems.SCAResult, 0, len(files))
+	// emitMu serializes onGraph calls; the first non-nil onGraph error
+	// is captured and surfaced to errgroup to cancel sibling builds.
+	var emitMu sync.Mutex
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(maxConcurrentInstalls)
@@ -96,27 +100,18 @@ func (p Plugin) BuildDepGraphsFromDir(
 					Error: err,
 				}
 			}
+			result.ProcessedFiles = []string{file.RelPath}
 
-			mu.Lock()
-			results = append(results, result)
-			mu.Unlock()
-			return nil
+			emitMu.Lock()
+			defer emitMu.Unlock()
+			return onGraph(result)
 		})
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, fmt.Errorf("error building dependency graphs: %w", err)
+		return fmt.Errorf("error building dependency graphs: %w", err)
 	}
-
-	processedFiles := make([]string, 0, len(files))
-	for _, file := range files {
-		processedFiles = append(processedFiles, file.RelPath)
-	}
-
-	return &ecosystems.PluginResult{
-		Results:        results,
-		ProcessedFiles: processedFiles,
-	}, nil
+	return nil
 }
 
 // discoverRequirementsFiles finds requirements.txt files based on the provided options.

@@ -21,6 +21,7 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/metadata"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/scatest"
 )
 
 // updateFixturesEnvVar, when set to a truthy value, causes the integration tests
@@ -266,16 +267,16 @@ func TestGradleWrapper_BinaryResolution(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absFixture, tc.options)
+			results, err := scatest.Run(ctx, plugin, logger.Nop(), absFixture, tc.options)
 
 			require.NoError(t, err, "gradle execution should succeed")
-			require.Len(t, result.Results, 1, "should process one project")
+			require.Len(t, results, 1, "should process one project")
 
 			// Assert gradle version from ResolverMetadata
-			require.NotNil(t, result.Results[0].ResolverMetadata, "metadata should be populated")
-			require.NotNil(t, result.Results[0].ResolverMetadata.VersionBuildInfo, "version build info should be populated")
+			require.NotNil(t, results[0].ResolverMetadata, "metadata should be populated")
+			require.NotNil(t, results[0].ResolverMetadata.VersionBuildInfo, "version build info should be populated")
 
-			actualGradleVersion := result.Results[0].ResolverMetadata.VersionBuildInfo[metadata.GradleVersion]
+			actualGradleVersion := results[0].ResolverMetadata.VersionBuildInfo[metadata.GradleVersion]
 			expectedVersion := tc.expectedVersionFunc()
 			if expectedVersion == "" {
 				t.Fatalf("failed to get expected gradle version for test case %q", tc.name)
@@ -283,8 +284,8 @@ func TestGradleWrapper_BinaryResolution(t *testing.T) {
 			assert.Equal(t, expectedVersion, actualGradleVersion, tc.versionDescription)
 
 			// Ensure basic execution works
-			assert.Equal(t, "com.snyk.fixtures:with-wrapper", result.Results[0].ProjectDescriptor.Identity.RootComponentName)
-			require.NotNil(t, result.Results[0].DepGraph, "dependency graph should be built")
+			assert.Equal(t, "com.snyk.fixtures:with-wrapper", results[0].ProjectDescriptor.Identity.RootComponentName)
+			require.NotNil(t, results[0].DepGraph, "dependency graph should be built")
 		})
 	}
 }
@@ -320,12 +321,12 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 			defer cancel()
 
 			plugin := Plugin{}
-			result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absFixture, testCase.Options)
+			results, err := scatest.Run(ctx, plugin, logger.Nop(), absFixture, testCase.Options)
 			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
-			require.NotNil(t, result, "plugin result should not be nil")
+			require.NotEmpty(t, results, "plugin must emit at least one result")
 
 			if updateFixtures {
-				writeExpectedSnapshot(t, filepath.Join(fixturePath, defaultExpectedFileName(testCase)), result.Results)
+				writeExpectedSnapshot(t, filepath.Join(fixturePath, defaultExpectedFileName(testCase)), results)
 				return
 			}
 
@@ -333,7 +334,7 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 			require.NoErrorf(t, err, "no expected snapshot for fixture %q; run with %s=1 to generate", testCase.Fixture, updateFixturesEnvVar)
 
 			expected := loadExpectedResults(t, expectedPath)
-			assertResultsMatchExpected(t, result.Results, expected, testCase.Fixture)
+			assertResultsMatchExpected(t, results, expected, testCase.Fixture)
 		})
 	}
 }
@@ -441,6 +442,9 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 		sortedActual[i].Error = nil
 		// ResolverMetadata contains runtime-specific info and is not part of the snapshot format.
 		sortedActual[i].ResolverMetadata = nil
+		// ProcessedFiles is implementation detail; per-graph attribution
+		// is verified separately.
+		sortedActual[i].ProcessedFiles = nil
 	}
 
 	actualJSON, err := json.Marshal(sortedActual)

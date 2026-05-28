@@ -20,6 +20,7 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/legacy"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/scatest"
 )
 
 func TestPlugin_GetName(t *testing.T) {
@@ -30,22 +31,22 @@ func TestPlugin_MapsProjectType(t *testing.T) {
 	ictx, _ := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","targetFileFromPlugin":"package.json","target":{}}`, nil)
 	plugin := legacy.NewPlugin(ictx)
 
-	results, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	results, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.NoError(t, err)
 
-	require.Len(t, results.Results, 1)
-	assert.Equal(t, "npm", results.Results[0].ProjectDescriptor.Identity.ProjectType)
+	require.Len(t, results, 1)
+	assert.Equal(t, "npm", results[0].ProjectDescriptor.Identity.ProjectType)
 }
 
 func TestPlugin_MapsTargetFramework(t *testing.T) {
 	ictx, _ := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"nuget"}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json","target":{},"targetRuntime":"net6.0"}`, nil)
 	plugin := legacy.NewPlugin(ictx)
 
-	results, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	results, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.NoError(t, err)
 
-	require.Len(t, results.Results, 1)
-	assert.Equal(t, "net6.0", *results.Results[0].ProjectDescriptor.Identity.TargetRuntime)
+	require.Len(t, results, 1)
+	assert.Equal(t, "net6.0", *results[0].ProjectDescriptor.Identity.TargetRuntime)
 }
 
 // TestPlugin_TargetFileForwarding verifies the plugin forwards the legacy CLI's
@@ -86,20 +87,20 @@ func TestPlugin_TargetFileForwarding(t *testing.T) {
 			ictx, _ := setupLegacyCLI(t, tc.body, nil)
 			plugin := legacy.NewPlugin(ictx)
 
-			res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+			results, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
 			require.NoError(t, err)
-			require.Len(t, res.Results, 1)
+			require.Len(t, results, 1)
 
-			require.NotNil(t, res.Results[0].ResolverMetadata, "legacy plugin must always populate ResolverMetadata")
-			assert.Equal(t, tc.wantNormalisedTarget, res.Results[0].ResolverMetadata.NormalisedTargetFile,
+			require.NotNil(t, results[0].ResolverMetadata, "legacy plugin must always populate ResolverMetadata")
+			assert.Equal(t, tc.wantNormalisedTarget, results[0].ResolverMetadata.NormalisedTargetFile,
 				"ResolverMetadata.NormalisedTargetFile must mirror the legacy CLI's normalisedTargetFile verbatim")
 
 			if tc.wantPluginTargetFile == nil {
-				assert.Nil(t, res.Results[0].ProjectDescriptor.Identity.TargetFile,
+				assert.Nil(t, results[0].ProjectDescriptor.Identity.TargetFile,
 					"Identity.TargetFile must be nil when the legacy CLI omitted targetFileFromPlugin")
 			} else {
-				require.NotNil(t, res.Results[0].ProjectDescriptor.Identity.TargetFile)
-				assert.Equal(t, *tc.wantPluginTargetFile, *res.Results[0].ProjectDescriptor.Identity.TargetFile)
+				require.NotNil(t, results[0].ProjectDescriptor.Identity.TargetFile)
+				assert.Equal(t, *tc.wantPluginTargetFile, *results[0].ProjectDescriptor.Identity.TargetFile)
 			}
 		})
 	}
@@ -111,23 +112,23 @@ func TestPlugin_MapsRootComponentName(t *testing.T) {
 	ictx, _ := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"nuget"},"pkgs":[{"id":"my-project@","info":{"name":"my-project"}}],"graph":{"rootNodeId":"root","nodes":[{"nodeId":"root","pkgId":"my-project@"}]}},"normalisedTargetFile":"project.assets.json","targetFileFromPlugin":"project.assets.json","target":{}}`, nil)
 	plugin := legacy.NewPlugin(ictx)
 
-	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	results, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.NoError(t, err)
 
-	require.Len(t, res.Results, 1)
-	assert.Equal(t, "my-project", res.Results[0].ProjectDescriptor.Identity.RootComponentName)
+	require.Len(t, results, 1)
+	assert.Equal(t, "my-project", results[0].ProjectDescriptor.Identity.RootComponentName)
 }
 
 func TestPlugin_PopulatesResolverMetadata(t *testing.T) {
 	ictx, _ := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`, nil)
 	plugin := legacy.NewPlugin(ictx)
 
-	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	results, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.NoError(t, err)
 
-	require.Len(t, res.Results, 1)
-	require.NotNil(t, res.Results[0].ResolverMetadata)
-	assert.Equal(t, "legacycli", res.Results[0].ResolverMetadata.PluginName)
+	require.Len(t, results, 1)
+	require.NotNil(t, results[0].ResolverMetadata)
+	assert.Equal(t, "legacycli", results[0].ResolverMetadata.PluginName)
 }
 
 func TestPlugin_ReturnsProcessedFiles(t *testing.T) {
@@ -135,10 +136,12 @@ func TestPlugin_ReturnsProcessedFiles(t *testing.T) {
 
 	plugin := legacy.NewPlugin(ictx)
 
-	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	results, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{"project.assets.json"}, res.ProcessedFiles)
+	require.Len(t, results, 1)
+	assert.Equal(t, []string{"project.assets.json"}, results[0].ProcessedFiles,
+		"each result carries the lockfile it was derived from")
 }
 
 func TestPlugin_PerResultErrorPopulatesSCAResultError(t *testing.T) {
@@ -146,13 +149,13 @@ func TestPlugin_PerResultErrorPopulatesSCAResultError(t *testing.T) {
 	ictx, _ := setupLegacyCLI(t, body, nil)
 	plugin := legacy.NewPlugin(ictx)
 
-	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	results, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.NoError(t, err)
-	require.Len(t, res.Results, 1)
+	require.Len(t, results, 1)
 
-	require.Error(t, res.Results[0].Error)
+	require.Error(t, results[0].Error)
 	var snykErr snyk_errors.Error
-	require.True(t, errors.As(res.Results[0].Error, &snykErr))
+	require.True(t, errors.As(results[0].Error, &snykErr))
 	assert.Equal(t, "SNYK-LEGACY-MOD-001", snykErr.ErrorCode)
 	assert.Equal(t, "Module failed", snykErr.Title)
 }
@@ -164,13 +167,13 @@ func TestPlugin_PerResultCLIErrorIsPreservedWhenDepGraphIsMalformed(t *testing.T
 	ictx, _ := setupLegacyCLI(t, body, nil)
 	plugin := legacy.NewPlugin(ictx)
 
-	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	results, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.NoError(t, err)
-	require.Len(t, res.Results, 1)
+	require.Len(t, results, 1)
 
-	require.Error(t, res.Results[0].Error)
+	require.Error(t, results[0].Error)
 	var snykErr snyk_errors.Error
-	require.True(t, errors.As(res.Results[0].Error, &snykErr), "upstream CLI error should be preserved, not overwritten by depgraph unmarshal failure")
+	require.True(t, errors.As(results[0].Error, &snykErr), "upstream CLI error should be preserved, not overwritten by depgraph unmarshal failure")
 	assert.Equal(t, "SNYK-LEGACY-MOD-002", snykErr.ErrorCode)
 }
 
@@ -178,18 +181,18 @@ func TestPlugin_ExitCode3ReturnsNilSuccess(t *testing.T) {
 	ictx := setupLegacyCLIWithError(t, exitCodeError{code: 3})
 	plugin := legacy.NewPlugin(ictx)
 
-	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	results, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.NoError(t, err)
-	assert.Nil(t, res, "no-projects-found is signaled by a nil PluginResult, not an empty one")
+	assert.Empty(t, results, "no-projects-found surfaces as no callback invocations")
 }
 
 func TestPlugin_ErrNoDepGraphsFoundReturnsNilSuccess(t *testing.T) {
 	ictx := setupLegacyCLIWithEmptyData(t)
 	plugin := legacy.NewPlugin(ictx)
 
-	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	results, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.NoError(t, err)
-	assert.Nil(t, res, "no-projects-found is signaled by a nil PluginResult, not an empty one")
+	assert.Empty(t, results, "no-projects-found surfaces as no callback invocations")
 }
 
 func TestPlugin_NonExitCode3ErrorIsWrapped(t *testing.T) {
@@ -197,17 +200,17 @@ func TestPlugin_NonExitCode3ErrorIsWrapped(t *testing.T) {
 	ictx := setupLegacyCLIWithError(t, underlying)
 	plugin := legacy.NewPlugin(ictx)
 
-	res, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	results, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "error handling legacy workflow")
 	assert.ErrorIs(t, err, underlying, "underlying error should remain in the chain via the snyk_errors.WithCause wrap")
-	assert.Nil(t, res)
+	assert.Empty(t, results)
 }
 
 func TestPlugin_NilOptionsReturnsError(t *testing.T) {
 	plugin := legacy.NewPlugin(nil)
 
-	_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", nil)
+	_, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "options")
 }
@@ -218,7 +221,7 @@ func TestPlugin_ExcludeBehaviour(t *testing.T) {
 		plugin := legacy.NewPlugin(ictx)
 
 		opts := ecosystems.NewPluginOptions().WithExclude([]string{"a.lock", "b.lock"})
-		_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", opts)
+		_, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", opts)
 		require.NoError(t, err)
 
 		assert.Equal(t, "", (*capturedConfig).GetString(workflow.FlagExclude),
@@ -231,7 +234,7 @@ func TestPlugin_ExcludeBehaviour(t *testing.T) {
 		plugin := legacy.NewPlugin(ictx)
 
 		opts := ecosystems.NewPluginOptions().WithExclude([]string{"a.lock"})
-		_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", opts)
+		_, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", opts)
 		require.NoError(t, err)
 
 		assert.Equal(t, "user-exclude.txt", (*capturedConfig).GetString(workflow.FlagExclude),
@@ -245,7 +248,7 @@ func TestPlugin_DoesNotMutateLiveConfig(t *testing.T) {
 	plugin := legacy.NewPlugin(ictx)
 
 	opts := ecosystems.NewPluginOptions().WithExclude([]string{"a.lock"})
-	_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", opts)
+	_, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", opts)
 	require.NoError(t, err)
 
 	assert.Equal(t, "user-exclude.txt", ictx.GetConfiguration().GetString(workflow.FlagExclude),
@@ -256,7 +259,7 @@ func TestPlugin_ForcesEffectiveGraphWithErrorsByDefault(t *testing.T) {
 	ictx, capturedConfig := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`, nil)
 	plugin := legacy.NewPlugin(ictx)
 
-	_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	_, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.NoError(t, err)
 
 	assert.True(t, (*capturedConfig).GetBool(workflow.FlagPrintEffectiveGraphWithErrors))
@@ -267,7 +270,7 @@ func TestPlugin_DisablesEffectiveGraphWithErrorsWhenJSONLWithErrorsRequested(t *
 	ictx, capturedConfig := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`, preexisting)
 	plugin := legacy.NewPlugin(ictx)
 
-	_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", ecosystems.NewPluginOptions())
+	_, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
 	require.NoError(t, err)
 
 	assert.False(t, (*capturedConfig).GetBool(workflow.FlagPrintEffectiveGraphWithErrors))
@@ -331,7 +334,7 @@ func TestPlugin_BuildLegacyConfig_WritesExcludePathsFromOpts(t *testing.T) {
 			if len(tc.optsExcludePaths) > 0 {
 				opts = opts.WithExcludePaths(tc.optsExcludePaths)
 			}
-			_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", opts)
+			_, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", opts)
 			require.NoError(t, err)
 
 			assert.Equal(t, tc.expectedExcludePaths, (*capturedConfig).GetString(workflow.FlagExcludePaths))
@@ -347,7 +350,7 @@ func TestPlugin_BuildLegacyConfig_DoesNotMutateLiveConfigExcludePaths(t *testing
 	plugin := legacy.NewPlugin(ictx)
 
 	opts := ecosystems.NewPluginOptions().WithExcludePaths([]string{"processed.lock"})
-	_, err := plugin.BuildDepGraphsFromDir(t.Context(), logger.Nop(), "", opts)
+	_, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", opts)
 	require.NoError(t, err)
 
 	assert.Equal(t, "user-supplied.lock", ictx.GetConfiguration().GetString(workflow.FlagExcludePaths),

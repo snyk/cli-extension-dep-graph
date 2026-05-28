@@ -16,6 +16,7 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/scatest"
 )
 
 // testFindResultByRoot finds the SCAResult whose root package name equals rootName.
@@ -60,12 +61,13 @@ func TestPlugin_Simple(t *testing.T) {
 	plugin := newPlugin(&fakeExecutor{outputFile: "testdata/simple/why_output.txt"})
 	opts := ecosystems.NewPluginOptions()
 
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), logger.Nop(), "testdata/simple", opts)
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), "testdata/simple", opts)
 	require.NoError(t, err)
-	require.Len(t, result.Results, 1)
-	assert.ElementsMatch(t, []string{"bun.lock", "package.json"}, result.ProcessedFiles)
+	require.Len(t, results, 1)
 
-	scaResult := result.Results[0]
+	scaResult := results[0]
+	assert.ElementsMatch(t, []string{"bun.lock", "package.json"}, scaResult.ProcessedFiles,
+		"single result lists both the lockfile and its own package.json")
 	require.NoError(t, scaResult.Error)
 	require.NotNil(t, scaResult.DepGraph)
 	assert.Equal(t, "my-app", scaResult.DepGraph.GetRootPkg().Info.Name)
@@ -95,12 +97,12 @@ func TestPlugin_Workspace_MultipleDepGraphs(t *testing.T) {
 	plugin := newPlugin(&fakeExecutor{outputFile: "testdata/workspace/why_output.txt"})
 	opts := ecosystems.NewPluginOptions()
 
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), logger.Nop(), "testdata/workspace", opts)
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), "testdata/workspace", opts)
 	require.NoError(t, err)
 
 	// Root graph + one per workspace package (logger + utils).
-	require.Len(t, result.Results, 3)
-	for _, r := range result.Results {
+	require.Len(t, results, 3)
+	for _, r := range results {
 		require.NoError(t, r.Error)
 		require.NotNil(t, r.DepGraph)
 
@@ -109,23 +111,20 @@ func TestPlugin_Workspace_MultipleDepGraphs(t *testing.T) {
 		assert.Equal(t, "bun", r.ResolverMetadata.PluginName)
 	}
 
-	rootResult := testFindResultByRoot(t, result.Results, "my-workspace")
-	loggerResult := testFindResultByRoot(t, result.Results, "@workspace/logger")
-	utilsResult := testFindResultByRoot(t, result.Results, "@workspace/utils")
+	rootResult := testFindResultByRoot(t, results, "my-workspace")
+	loggerResult := testFindResultByRoot(t, results, "@workspace/logger")
+	utilsResult := testFindResultByRoot(t, results, "@workspace/utils")
 
 	// Each dep graph's TargetFile should be the package.json for that workspace package.
 	assert.Equal(t, "package.json", rootResult.ProjectDescriptor.GetTargetFile())
 	assert.Equal(t, "packages/logger/package.json", loggerResult.ProjectDescriptor.GetTargetFile())
 	assert.Equal(t, "packages/utils/package.json", utilsResult.ProjectDescriptor.GetTargetFile())
 
-	// All package.jsons (root + workspace members) plus bun.lock must be marked processed
-	// so that other plugins (npm/yarn) don't re-scan them.
-	assert.ElementsMatch(t, []string{
-		"bun.lock",
-		"package.json",
-		"packages/logger/package.json",
-		"packages/utils/package.json",
-	}, result.ProcessedFiles)
+	// Every result lists bun.lock + its own package.json. Other plugins
+	// (npm/yarn) see the union via the orchestrator and skip these files.
+	assert.ElementsMatch(t, []string{"bun.lock", "package.json"}, rootResult.ProcessedFiles)
+	assert.ElementsMatch(t, []string{"bun.lock", "packages/logger/package.json"}, loggerResult.ProcessedFiles)
+	assert.ElementsMatch(t, []string{"bun.lock", "packages/utils/package.json"}, utilsResult.ProcessedFiles)
 
 	// Root graph: workspace packages are leaves; their transitive deps absent.
 	rootGraph := rootResult.DepGraph
@@ -147,50 +146,49 @@ func TestPlugin_NoBunLock_ReturnsEmpty(t *testing.T) {
 	opts := ecosystems.NewPluginOptions()
 
 	// Point at a directory with no bun.lock.
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), logger.Nop(), t.TempDir(), opts)
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), t.TempDir(), opts)
 	require.NoError(t, err)
-	assert.Empty(t, result.Results)
-	assert.Empty(t, result.ProcessedFiles)
+	assert.Empty(t, results)
 }
 
 func TestPlugin_BunNotFound_ReturnsErrorResult(t *testing.T) {
 	plugin := newPlugin(&fakeExecutor{err: errBunNotFound})
 	opts := ecosystems.NewPluginOptions()
 
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), logger.Nop(), "testdata/simple", opts)
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), "testdata/simple", opts)
 	require.NoError(t, err) // plugin-level error is per-result, not fatal
-	require.Len(t, result.Results, 1)
-	assert.Error(t, result.Results[0].Error)
-	assert.ErrorIs(t, result.Results[0].Error, errBunNotFound)
+	require.Len(t, results, 1)
+	assert.Error(t, results[0].Error)
+	assert.ErrorIs(t, results[0].Error, errBunNotFound)
 }
 
 func TestPlugin_BunVersionTooLow_ReturnsErrorResult(t *testing.T) {
 	plugin := newPlugin(&fakeExecutor{err: errBunVersionTooLow})
 	opts := ecosystems.NewPluginOptions()
 
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), logger.Nop(), "testdata/simple", opts)
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), "testdata/simple", opts)
 	require.NoError(t, err)
-	require.Len(t, result.Results, 1)
-	assert.ErrorIs(t, result.Results[0].Error, errBunVersionTooLow)
+	require.Len(t, results, 1)
+	assert.ErrorIs(t, results[0].Error, errBunVersionTooLow)
 }
 
 func TestPlugin_BunWhyError_ReturnsErrorResult(t *testing.T) {
 	plugin := newPlugin(&fakeExecutor{err: errors.New("bun why failed: exit status 1")})
 	opts := ecosystems.NewPluginOptions()
 
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), logger.Nop(), "testdata/simple", opts)
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), "testdata/simple", opts)
 	require.NoError(t, err)
-	require.Len(t, result.Results, 1)
-	assert.Error(t, result.Results[0].Error)
+	require.Len(t, results, 1)
+	assert.Error(t, results[0].Error)
 }
 
 func TestPlugin_TargetFileNotBunLock_ReturnsEmpty(t *testing.T) {
 	plugin := newPlugin(&fakeExecutor{outputFile: "testdata/simple/why_output.txt"})
 	opts := ecosystems.NewPluginOptions().WithTargetFile("package.json")
 
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), logger.Nop(), "testdata/simple", opts)
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), "testdata/simple", opts)
 	require.NoError(t, err)
-	assert.Empty(t, result.Results)
+	assert.Empty(t, results)
 }
 
 // TestPlugin_StreamingError verifies that an error surfaced mid-stream from the
@@ -209,10 +207,10 @@ func TestPlugin_StreamingError(t *testing.T) {
 	plugin := newPlugin(&streamExecutor{r: pr})
 	opts := ecosystems.NewPluginOptions()
 
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), logger.Nop(), "testdata/simple", opts)
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), "testdata/simple", opts)
 	require.NoError(t, err)
-	require.Len(t, result.Results, 1)
-	assert.Error(t, result.Results[0].Error)
+	require.Len(t, results, 1)
+	assert.Error(t, results[0].Error)
 }
 
 // streamExecutor injects an already-prepared io.Reader.
@@ -299,11 +297,11 @@ func TestPlugin_AllProjects_WorkspacesWithSubpackages(t *testing.T) {
 	plugin := newPlugin(exec)
 	opts := ecosystems.NewPluginOptions().WithAllProjects(true)
 
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), logger.Nop(), tmp, opts)
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), tmp, opts)
 	require.NoError(t, err)
-	require.Len(t, result.Results, 8, "4 dep graphs per workspace (root + 3 sub-packages) × 2 workspaces")
+	require.Len(t, results, 8, "4 dep graphs per workspace (root + 3 sub-packages) × 2 workspaces")
 
-	for i, r := range result.Results {
+	for i, r := range results {
 		require.NoError(t, r.Error, "result[%d] must not carry an error", i)
 		require.NotNil(t, r.DepGraph, "result[%d] must have a dep graph", i)
 
@@ -323,8 +321,8 @@ func TestPlugin_AllProjects_WorkspacesWithSubpackages(t *testing.T) {
 		"frontend/5/package.json",
 	}
 
-	gotTargetFiles := make([]string, len(result.Results))
-	for i, r := range result.Results {
+	gotTargetFiles := make([]string, len(results))
+	for i, r := range results {
 		gotTargetFiles[i] = r.ProjectDescriptor.GetTargetFile()
 	}
 
@@ -350,11 +348,11 @@ func TestPlugin_NoName_ReturnsError(t *testing.T) {
 	))
 
 	plugin := newPlugin(&fakeExecutor{}) // executor is never reached
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), logger.Nop(), tmp, ecosystems.NewPluginOptions())
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), tmp, ecosystems.NewPluginOptions())
 	require.NoError(t, err)
-	require.Len(t, result.Results, 1)
-	assert.Error(t, result.Results[0].Error)
-	assert.Contains(t, result.Results[0].Error.Error(), `"name"`)
+	require.Len(t, results, 1)
+	assert.Error(t, results[0].Error)
+	assert.Contains(t, results[0].Error.Error(), `"name"`)
 }
 
 // TestParseWhyOutput_ReaderInterface confirms parseWhyOutput works with strings.NewReader.
