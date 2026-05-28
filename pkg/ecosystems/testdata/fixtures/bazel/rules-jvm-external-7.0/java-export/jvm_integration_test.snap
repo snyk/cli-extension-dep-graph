@@ -1,0 +1,696 @@
+
+[TestPlugin_BuildDepGraphsFromDir_JavaExport_MatchJSON - 1]
+{
+ "processedFiles": [],
+ "results": [
+  {
+   "depGraph": {
+    "graph": {
+     "nodes": [
+      {
+       "deps": [
+        {
+         "nodeId": "//src/main/proto:proto"
+        },
+        {
+         "nodeId": "@maven//:com_google_guava_guava"
+        }
+       ],
+       "nodeId": "root-node",
+       "pkgId": "//src/main/java/com/github/bazelbuild/rulesjvmexternal/example/export:export@"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "//src/main/proto:example"
+        },
+        {
+         "nodeId": "@maven//:com_google_protobuf_protobuf_java"
+        }
+       ],
+       "nodeId": "//src/main/proto:proto",
+       "pkgId": "//src/main/proto:proto@"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:com_google_code_findbugs_jsr305"
+        },
+        {
+         "nodeId": "@maven//:com_google_errorprone_error_prone_annotations"
+        },
+        {
+         "nodeId": "@maven//:com_google_guava_failureaccess"
+        },
+        {
+         "nodeId": "@maven//:com_google_guava_listenablefuture"
+        },
+        {
+         "nodeId": "@maven//:com_google_j2objc_j2objc_annotations"
+        },
+        {
+         "nodeId": "@maven//:org_checkerframework_checker_qual"
+        }
+       ],
+       "nodeId": "@maven//:com_google_guava_guava",
+       "pkgId": "com.google.guava:guava@32.0.1-jre"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "//src/main/proto:example_proto"
+        }
+       ],
+       "nodeId": "//src/main/proto:example",
+       "pkgId": "//src/main/proto:example@"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_protobuf_protobuf_java",
+       "pkgId": "com.google.protobuf:protobuf-java@4.33.4"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_code_findbugs_jsr305",
+       "pkgId": "com.google.code.findbugs:jsr305@3.0.2"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_errorprone_error_prone_annotations",
+       "pkgId": "com.google.errorprone:error_prone_annotations@2.18.0"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_guava_failureaccess",
+       "pkgId": "com.google.guava:failureaccess@1.0.1"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_guava_listenablefuture",
+       "pkgId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_j2objc_j2objc_annotations",
+       "pkgId": "com.google.j2objc:j2objc-annotations@2.8"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:org_checkerframework_checker_qual",
+       "pkgId": "org.checkerframework:checker-qual@3.33.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@protobuf//:duration_proto"
+        }
+       ],
+       "nodeId": "//src/main/proto:example_proto",
+       "pkgId": "//src/main/proto:example_proto@"
+      },
+      {
+       "deps": [],
+       "nodeId": "@protobuf//:duration_proto",
+       "pkgId": "@protobuf//:duration_proto@"
+      }
+     ],
+     "rootNodeId": "root-node"
+    },
+    "pkgManager": {
+     "name": "maven"
+    },
+    "pkgs": [
+     {
+      "id": "//src/main/java/com/github/bazelbuild/rulesjvmexternal/example/export:export@",
+      "info": {
+       "name": "//src/main/java/com/github/bazelbuild/rulesjvmexternal/example/export:export"
+      }
+     },
+     {
+      "id": "//src/main/proto:proto@",
+      "info": {
+       "name": "//src/main/proto:proto"
+      }
+     },
+     {
+      "id": "com.google.guava:guava@32.0.1-jre",
+      "info": {
+       "name": "com.google.guava:guava",
+       "version": "32.0.1-jre"
+      }
+     },
+     {
+      "id": "//src/main/proto:example@",
+      "info": {
+       "name": "//src/main/proto:example"
+      }
+     },
+     {
+      "id": "com.google.protobuf:protobuf-java@4.33.4",
+      "info": {
+       "name": "com.google.protobuf:protobuf-java",
+       "version": "4.33.4"
+      }
+     },
+     {
+      "id": "com.google.code.findbugs:jsr305@3.0.2",
+      "info": {
+       "name": "com.google.code.findbugs:jsr305",
+       "version": "3.0.2"
+      }
+     },
+     {
+      "id": "com.google.errorprone:error_prone_annotations@2.18.0",
+      "info": {
+       "name": "com.google.errorprone:error_prone_annotations",
+       "version": "2.18.0"
+      }
+     },
+     {
+      "id": "com.google.guava:failureaccess@1.0.1",
+      "info": {
+       "name": "com.google.guava:failureaccess",
+       "version": "1.0.1"
+      }
+     },
+     {
+      "id": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava",
+      "info": {
+       "name": "com.google.guava:listenablefuture",
+       "version": "9999.0-empty-to-avoid-conflict-with-guava"
+      }
+     },
+     {
+      "id": "com.google.j2objc:j2objc-annotations@2.8",
+      "info": {
+       "name": "com.google.j2objc:j2objc-annotations",
+       "version": "2.8"
+      }
+     },
+     {
+      "id": "org.checkerframework:checker-qual@3.33.0",
+      "info": {
+       "name": "org.checkerframework:checker-qual",
+       "version": "3.33.0"
+      }
+     },
+     {
+      "id": "//src/main/proto:example_proto@",
+      "info": {
+       "name": "//src/main/proto:example_proto"
+      }
+     },
+     {
+      "id": "@protobuf//:duration_proto@",
+      "info": {
+       "name": "@protobuf//:duration_proto"
+      }
+     }
+    ],
+    "schemaVersion": "1.3.0"
+   },
+   "meta": {
+    "normalisedTargetFile": "//src/main/java/com/github/bazelbuild/rulesjvmexternal/example/export:export",
+    "pluginName": "bazel"
+   },
+   "projectDescriptor": {
+    "identity": {
+     "targetFile": "//src/main/java/com/github/bazelbuild/rulesjvmexternal/example/export:export",
+     "type": "maven"
+    }
+   }
+  },
+  {
+   "depGraph": {
+    "graph": {
+     "nodes": [
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:com_google_guava_guava"
+        }
+       ],
+       "nodeId": "root-node",
+       "pkgId": "//src/main/java/com/github/bazelbuild/rulesjvmexternal/example/io:io-lib@"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:com_google_code_findbugs_jsr305"
+        },
+        {
+         "nodeId": "@maven//:com_google_errorprone_error_prone_annotations"
+        },
+        {
+         "nodeId": "@maven//:com_google_guava_failureaccess"
+        },
+        {
+         "nodeId": "@maven//:com_google_guava_listenablefuture"
+        },
+        {
+         "nodeId": "@maven//:com_google_j2objc_j2objc_annotations"
+        },
+        {
+         "nodeId": "@maven//:org_checkerframework_checker_qual"
+        }
+       ],
+       "nodeId": "@maven//:com_google_guava_guava",
+       "pkgId": "com.google.guava:guava@32.0.1-jre"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_code_findbugs_jsr305",
+       "pkgId": "com.google.code.findbugs:jsr305@3.0.2"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_errorprone_error_prone_annotations",
+       "pkgId": "com.google.errorprone:error_prone_annotations@2.18.0"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_guava_failureaccess",
+       "pkgId": "com.google.guava:failureaccess@1.0.1"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_guava_listenablefuture",
+       "pkgId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_j2objc_j2objc_annotations",
+       "pkgId": "com.google.j2objc:j2objc-annotations@2.8"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:org_checkerframework_checker_qual",
+       "pkgId": "org.checkerframework:checker-qual@3.33.0"
+      }
+     ],
+     "rootNodeId": "root-node"
+    },
+    "pkgManager": {
+     "name": "maven"
+    },
+    "pkgs": [
+     {
+      "id": "//src/main/java/com/github/bazelbuild/rulesjvmexternal/example/io:io-lib@",
+      "info": {
+       "name": "//src/main/java/com/github/bazelbuild/rulesjvmexternal/example/io:io-lib"
+      }
+     },
+     {
+      "id": "com.google.guava:guava@32.0.1-jre",
+      "info": {
+       "name": "com.google.guava:guava",
+       "version": "32.0.1-jre"
+      }
+     },
+     {
+      "id": "com.google.code.findbugs:jsr305@3.0.2",
+      "info": {
+       "name": "com.google.code.findbugs:jsr305",
+       "version": "3.0.2"
+      }
+     },
+     {
+      "id": "com.google.errorprone:error_prone_annotations@2.18.0",
+      "info": {
+       "name": "com.google.errorprone:error_prone_annotations",
+       "version": "2.18.0"
+      }
+     },
+     {
+      "id": "com.google.guava:failureaccess@1.0.1",
+      "info": {
+       "name": "com.google.guava:failureaccess",
+       "version": "1.0.1"
+      }
+     },
+     {
+      "id": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava",
+      "info": {
+       "name": "com.google.guava:listenablefuture",
+       "version": "9999.0-empty-to-avoid-conflict-with-guava"
+      }
+     },
+     {
+      "id": "com.google.j2objc:j2objc-annotations@2.8",
+      "info": {
+       "name": "com.google.j2objc:j2objc-annotations",
+       "version": "2.8"
+      }
+     },
+     {
+      "id": "org.checkerframework:checker-qual@3.33.0",
+      "info": {
+       "name": "org.checkerframework:checker-qual",
+       "version": "3.33.0"
+      }
+     }
+    ],
+    "schemaVersion": "1.3.0"
+   },
+   "meta": {
+    "normalisedTargetFile": "//src/main/java/com/github/bazelbuild/rulesjvmexternal/example/io:io-lib",
+    "pluginName": "bazel"
+   },
+   "projectDescriptor": {
+    "identity": {
+     "targetFile": "//src/main/java/com/github/bazelbuild/rulesjvmexternal/example/io:io-lib",
+     "type": "maven"
+    }
+   }
+  },
+  {
+   "depGraph": {
+    "graph": {
+     "nodes": [
+      {
+       "deps": [
+        {
+         "nodeId": "//src/main/proto:example"
+        },
+        {
+         "nodeId": "@maven//:com_google_protobuf_protobuf_java"
+        }
+       ],
+       "nodeId": "root-node",
+       "pkgId": "//src/main/proto:proto@"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "//src/main/proto:example_proto"
+        }
+       ],
+       "nodeId": "//src/main/proto:example",
+       "pkgId": "//src/main/proto:example@"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_protobuf_protobuf_java",
+       "pkgId": "com.google.protobuf:protobuf-java@4.33.4"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@protobuf//:duration_proto"
+        }
+       ],
+       "nodeId": "//src/main/proto:example_proto",
+       "pkgId": "//src/main/proto:example_proto@"
+      },
+      {
+       "deps": [],
+       "nodeId": "@protobuf//:duration_proto",
+       "pkgId": "@protobuf//:duration_proto@"
+      }
+     ],
+     "rootNodeId": "root-node"
+    },
+    "pkgManager": {
+     "name": "maven"
+    },
+    "pkgs": [
+     {
+      "id": "//src/main/proto:proto@",
+      "info": {
+       "name": "//src/main/proto:proto"
+      }
+     },
+     {
+      "id": "//src/main/proto:example@",
+      "info": {
+       "name": "//src/main/proto:example"
+      }
+     },
+     {
+      "id": "com.google.protobuf:protobuf-java@4.33.4",
+      "info": {
+       "name": "com.google.protobuf:protobuf-java",
+       "version": "4.33.4"
+      }
+     },
+     {
+      "id": "//src/main/proto:example_proto@",
+      "info": {
+       "name": "//src/main/proto:example_proto"
+      }
+     },
+     {
+      "id": "@protobuf//:duration_proto@",
+      "info": {
+       "name": "@protobuf//:duration_proto"
+      }
+     }
+    ],
+    "schemaVersion": "1.3.0"
+   },
+   "meta": {
+    "normalisedTargetFile": "//src/main/proto:proto",
+    "pluginName": "bazel"
+   },
+   "projectDescriptor": {
+    "identity": {
+     "targetFile": "//src/main/proto:proto",
+     "type": "maven"
+    }
+   }
+  },
+  {
+   "depGraph": {
+    "graph": {
+     "nodes": [
+      {
+       "deps": [
+        {
+         "nodeId": "//src/main/java/com/github/bazelbuild/rulesjvmexternal/example/export:export"
+        }
+       ],
+       "nodeId": "root-node",
+       "pkgId": "//:example-export-lib@"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "//src/main/proto:proto"
+        },
+        {
+         "nodeId": "@maven//:com_google_guava_guava"
+        }
+       ],
+       "nodeId": "//src/main/java/com/github/bazelbuild/rulesjvmexternal/example/export:export",
+       "pkgId": "//src/main/java/com/github/bazelbuild/rulesjvmexternal/example/export:export@"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "//src/main/proto:example"
+        },
+        {
+         "nodeId": "@maven//:com_google_protobuf_protobuf_java"
+        }
+       ],
+       "nodeId": "//src/main/proto:proto",
+       "pkgId": "//src/main/proto:proto@"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@maven//:com_google_code_findbugs_jsr305"
+        },
+        {
+         "nodeId": "@maven//:com_google_errorprone_error_prone_annotations"
+        },
+        {
+         "nodeId": "@maven//:com_google_guava_failureaccess"
+        },
+        {
+         "nodeId": "@maven//:com_google_guava_listenablefuture"
+        },
+        {
+         "nodeId": "@maven//:com_google_j2objc_j2objc_annotations"
+        },
+        {
+         "nodeId": "@maven//:org_checkerframework_checker_qual"
+        }
+       ],
+       "nodeId": "@maven//:com_google_guava_guava",
+       "pkgId": "com.google.guava:guava@32.0.1-jre"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "//src/main/proto:example_proto"
+        }
+       ],
+       "nodeId": "//src/main/proto:example",
+       "pkgId": "//src/main/proto:example@"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_protobuf_protobuf_java",
+       "pkgId": "com.google.protobuf:protobuf-java@4.33.4"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_code_findbugs_jsr305",
+       "pkgId": "com.google.code.findbugs:jsr305@3.0.2"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_errorprone_error_prone_annotations",
+       "pkgId": "com.google.errorprone:error_prone_annotations@2.18.0"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_guava_failureaccess",
+       "pkgId": "com.google.guava:failureaccess@1.0.1"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_guava_listenablefuture",
+       "pkgId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:com_google_j2objc_j2objc_annotations",
+       "pkgId": "com.google.j2objc:j2objc-annotations@2.8"
+      },
+      {
+       "deps": [],
+       "nodeId": "@maven//:org_checkerframework_checker_qual",
+       "pkgId": "org.checkerframework:checker-qual@3.33.0"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "@protobuf//:duration_proto"
+        }
+       ],
+       "nodeId": "//src/main/proto:example_proto",
+       "pkgId": "//src/main/proto:example_proto@"
+      },
+      {
+       "deps": [],
+       "nodeId": "@protobuf//:duration_proto",
+       "pkgId": "@protobuf//:duration_proto@"
+      }
+     ],
+     "rootNodeId": "root-node"
+    },
+    "pkgManager": {
+     "name": "maven"
+    },
+    "pkgs": [
+     {
+      "id": "//:example-export-lib@",
+      "info": {
+       "name": "//:example-export-lib"
+      }
+     },
+     {
+      "id": "//src/main/java/com/github/bazelbuild/rulesjvmexternal/example/export:export@",
+      "info": {
+       "name": "//src/main/java/com/github/bazelbuild/rulesjvmexternal/example/export:export"
+      }
+     },
+     {
+      "id": "//src/main/proto:proto@",
+      "info": {
+       "name": "//src/main/proto:proto"
+      }
+     },
+     {
+      "id": "com.google.guava:guava@32.0.1-jre",
+      "info": {
+       "name": "com.google.guava:guava",
+       "version": "32.0.1-jre"
+      }
+     },
+     {
+      "id": "//src/main/proto:example@",
+      "info": {
+       "name": "//src/main/proto:example"
+      }
+     },
+     {
+      "id": "com.google.protobuf:protobuf-java@4.33.4",
+      "info": {
+       "name": "com.google.protobuf:protobuf-java",
+       "version": "4.33.4"
+      }
+     },
+     {
+      "id": "com.google.code.findbugs:jsr305@3.0.2",
+      "info": {
+       "name": "com.google.code.findbugs:jsr305",
+       "version": "3.0.2"
+      }
+     },
+     {
+      "id": "com.google.errorprone:error_prone_annotations@2.18.0",
+      "info": {
+       "name": "com.google.errorprone:error_prone_annotations",
+       "version": "2.18.0"
+      }
+     },
+     {
+      "id": "com.google.guava:failureaccess@1.0.1",
+      "info": {
+       "name": "com.google.guava:failureaccess",
+       "version": "1.0.1"
+      }
+     },
+     {
+      "id": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava",
+      "info": {
+       "name": "com.google.guava:listenablefuture",
+       "version": "9999.0-empty-to-avoid-conflict-with-guava"
+      }
+     },
+     {
+      "id": "com.google.j2objc:j2objc-annotations@2.8",
+      "info": {
+       "name": "com.google.j2objc:j2objc-annotations",
+       "version": "2.8"
+      }
+     },
+     {
+      "id": "org.checkerframework:checker-qual@3.33.0",
+      "info": {
+       "name": "org.checkerframework:checker-qual",
+       "version": "3.33.0"
+      }
+     },
+     {
+      "id": "//src/main/proto:example_proto@",
+      "info": {
+       "name": "//src/main/proto:example_proto"
+      }
+     },
+     {
+      "id": "@protobuf//:duration_proto@",
+      "info": {
+       "name": "@protobuf//:duration_proto"
+      }
+     }
+    ],
+    "schemaVersion": "1.3.0"
+   },
+   "meta": {
+    "normalisedTargetFile": "//:example-export-lib",
+    "pluginName": "bazel"
+   },
+   "projectDescriptor": {
+    "identity": {
+     "targetFile": "//:example-export-lib",
+     "type": "maven"
+    }
+   }
+  }
+ ]
+}
+---

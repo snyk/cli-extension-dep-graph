@@ -104,9 +104,23 @@ func TestPluginRegistry_DefaultRegistryOrder(t *testing.T) {
 	r, err := NewDefaultPluginRegistry(setupMockInvocationContext(t))
 	require.NoError(t, err)
 
-	// Gradle is behind a FF that is off by default.
-	require.Len(t, r.plugins, 1)
-	assert.Equal(t, "bun", r.plugins[0].GetName())
+	require.Len(t, r.plugins, 0)
+}
+
+func TestPluginRegistry_DefaultRegistryOrder_WithFeatureFlags(t *testing.T) {
+	ictx := setupMockInvocationContextWithConfig(t, func(cfg configuration.Configuration) {
+		cfg.Set(FlagBazelResolver.Key, true)
+		cfg.Set(FlagBunResolver.Key, true)
+		cfg.Set(FlagNewGradleResolver.Key, true)
+	})
+	r, err := NewDefaultPluginRegistry(ictx)
+	require.NoError(t, err)
+
+	require.Len(t, r.plugins, 3)
+	expectedOrder := []string{"bazel", "bun", "gradle"}
+	for i, plugin := range r.plugins {
+		assert.Equal(t, expectedOrder[i], plugin.GetName())
+	}
 }
 
 func TestPluginRegistry_DefaultRegistryHasNoCircularDependencies(t *testing.T) {
@@ -115,28 +129,21 @@ func TestPluginRegistry_DefaultRegistryHasNoCircularDependencies(t *testing.T) {
 	require.NoError(t, err, "NewDefaultPluginRegistry should not return error for valid dependency graph")
 	assert.NotNil(t, r)
 	assert.NotNil(t, r.plugins, "plugins should be successfully sorted without circular dependencies")
-	assert.Len(t, r.plugins, 1, "all 1 plugins should be registered")
+	assert.Len(t, r.plugins, 0, "all 0 plugins should be registered")
 }
 
-func TestPluginRegistry_GradleRegisteredWhenFFEnabled(t *testing.T) {
+func TestPluginRegistry_DefaultRegistryHasNoCircularDependencies_WithFeatureFlags(t *testing.T) {
+	// This test ensures NewDefaultPluginRegistry doesn't error due to circular dependencies
 	ictx := setupMockInvocationContextWithConfig(t, func(cfg configuration.Configuration) {
+		cfg.Set(FlagBazelResolver.Key, true)
+		cfg.Set(FlagBunResolver.Key, true)
 		cfg.Set(FlagNewGradleResolver.Key, true)
 	})
-
 	r, err := NewDefaultPluginRegistry(ictx)
-	require.NoError(t, err)
-
-	require.Len(t, r.plugins, 2)
-	assert.Equal(t, "bun", r.plugins[0].GetName())
-	assert.Equal(t, "gradle", r.plugins[1].GetName())
-}
-
-func TestPluginRegistry_GradleNotRegisteredWhenFFDisabled(t *testing.T) {
-	r, err := NewDefaultPluginRegistry(setupMockInvocationContext(t))
-	require.NoError(t, err)
-
-	require.Len(t, r.plugins, 1)
-	assert.NotEqual(t, "gradle", r.plugins[0].GetName())
+	require.NoError(t, err, "NewDefaultPluginRegistry should not return error for valid dependency graph")
+	assert.NotNil(t, r)
+	assert.NotNil(t, r.plugins, "plugins should be successfully sorted without circular dependencies")
+	assert.Len(t, r.plugins, 3, "all 3 plugins should be registered")
 }
 
 func TestPluginRegistry_CircularDependencyReturnsError(t *testing.T) {

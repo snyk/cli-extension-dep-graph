@@ -34,6 +34,12 @@ tidy:
 test:
 	$(GOTEST) ./... -coverprofile cp.out
 
+test-bazel-jvm-integration:
+	BAZEL_JVM_INTEGRATION_TESTS=1 $(GOTEST) -timeout=10m -coverprofile cp.out ./pkg/ecosystems/bazel/...
+
+test-bazel-go-integration:
+	BAZEL_GO_INTEGRATION_TESTS=1 $(GOTEST) -timeout=10m -coverprofile cp.out ./pkg/ecosystems/bazel/...
+
 test-python-integration:
 	$(GOTEST) -v -tags="integration,python" -timeout=10m ./pkg/ecosystems/python/pip/ -coverprofile cp.out
 
@@ -43,4 +49,4 @@ test-gradle-integration:
 update-gradle-fixtures:
 	UPDATE_FIXTURES=1 $(GOTEST) -v -tags="integration,gradle" -timeout=15m ./pkg/ecosystems/gradle/
 
-.PHONY: install-req fmt test test-python-integration test-gradle-integration update-gradle-fixtures lint tidy imports install-tools install-golangci-lint
+.PHONY: install-req fmt test test-bazel-jvm-integration test-bazel-go-integration test-python-integration test-gradle-integration update-gradle-fixtures lint tidy imports install-golangci-lint

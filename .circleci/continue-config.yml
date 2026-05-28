@@ -7,6 +7,9 @@ parameters:
   go_version:
     type: string
     default: "1.26.3"
+  android_version:
+    type: string
+    default: "2026.03"
   run-python-tests:
     type: boolean
     default: false
@@ -23,6 +26,11 @@ go_image: &go_image
   docker:
     - image: cimg/go:<< pipeline.parameters.go_version >>
 
+android_image: &android_image
+  resource_class: medium
+  docker:
+    - image: cimg/android:<< pipeline.parameters.android_version >>
+
 jobs:
   lint:
     <<: *go_image
@@ -34,7 +42,8 @@ jobs:
       - run:
           name: run lint check
           command: make lint
-  unit_test:
+
+  test:
     <<: *go_image
     steps:
       - checkout
@@ -46,8 +55,45 @@ jobs:
             source $BASH_ENV
             bun --version
       - run:
-          name: run unit tests
+          name: run tests
           command: make test
+
+  bazel_jvm_integration_test:
+    <<: *android_image
+    steps:
+      - checkout
+      - run:
+          name: Install Go
+          command: |
+            wget -qO- "https://go.dev/dl/go<< pipeline.parameters.go_version >>.linux-amd64.tar.gz" | sudo tar -C /usr/local -xz
+            echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
+            source $BASH_ENV
+            go version
+      - run:
+          name: Install Bazel
+          command: |
+            go install github.com/bazelbuild/bazelisk@latest
+            GOBIN="$(go env GOPATH)/bin"
+            ln -sf "$GOBIN/bazelisk" /usr/local/bin/bazel
+            bazel --version
+      - run:
+          name: Bazel JVM integration tests
+          command: make test-bazel-jvm-integration
+
+  bazel_go_integration_test:
+    <<: *go_image
+    steps:
+      - checkout
+      - run:
+          name: Install Bazel
+          command: |
+            go install github.com/bazelbuild/bazelisk@latest
+            GOBIN="$(go env GOPATH)/bin"
+            sudo ln -sf "$GOBIN/bazelisk" /usr/local/bin/bazel
+            bazel --version
+      - run:
+          name: Bazel Go integration tests
+          command: make test-bazel-go-integration
 
   python_integration_test:
     parameters:
@@ -315,7 +361,13 @@ workflows:
       - lint:
           <<: *filters_pr_only
 
-      - unit_test:
+      - test:
+          <<: *filters_pr_only
+
+      - bazel_jvm_integration_test:
+          <<: *filters_pr_only
+
+      - bazel_go_integration_test:
           <<: *filters_pr_only
 
       - prodsec/secrets-scan:
