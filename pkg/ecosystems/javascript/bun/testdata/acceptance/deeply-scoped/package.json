@@ -2,7 +2,7 @@
   "name": "deeply-scoped",
   "version": "0.0.0",
   "dependencies": {
-    "gatsby": "^4.3.0",
+    "gatsby": "^5.14.6",
     "gatsby-plugin-image": "^2.3.0",
     "gatsby-plugin-manifest": "^4.3.0",
     "gatsby-plugin-mdx": "^3.3.0",
@@ -34,7 +34,7 @@
     "@nrwl/cli": "14.0.5",
     "@nrwl/devkit": "14.0.5",
     "@nrwl/eslint-plugin-nx": "14.0.5",
-    "@nrwl/gatsby": "13.2.3",
+    "@nrwl/gatsby": "16.0.0",
     "@nrwl/jest": "14.0.5",
     "@nrwl/js": "14.0.5",
     "@nrwl/linter": "14.0.5",
