@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -395,6 +396,7 @@ func setupMockInvocationContextWithConfig(t *testing.T, configure func(configura
 	ctrl := gomock.NewController(t)
 	ictx := gafmocks.NewMockInvocationContext(ctrl)
 	engine := gafmocks.NewMockEngine(ctrl)
+	networkAccess := gafmocks.NewMockNetworkAccess(ctrl)
 	cfg := configuration.New()
 	if configure != nil {
 		configure(cfg)
@@ -405,6 +407,9 @@ func setupMockInvocationContextWithConfig(t *testing.T, configure func(configura
 	ictx.EXPECT().GetEngine().Return(engine).AnyTimes()
 	ictx.EXPECT().GetEnhancedLogger().Return(&logger).AnyTimes()
 	ictx.EXPECT().Context().Return(context.Background()).AnyTimes()
+	ictx.EXPECT().GetNetworkAccess().Return(networkAccess).AnyTimes()
+
+	networkAccess.EXPECT().GetHttpClient().Return(&http.Client{}).AnyTimes()
 
 	engine.EXPECT().
 		InvokeWithConfig(gomock.Any(), gomock.Any()).
