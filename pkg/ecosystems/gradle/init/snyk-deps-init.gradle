@@ -113,12 +113,15 @@ def buildProjectEntry(project, confAttrSpec, includeProvenance = false) {
         if (!config.canBeResolved) {
             return false
         }
-        
+        // Skip auto-created publication configs (default, archives) which have no
+        // directly-declared deps. User-defined configs with declared deps are kept.
+        if (config.canBeConsumed && config.dependencies.isEmpty()) {
+            return false
+        }
         // Apply attribute filter if specified
         if (confAttrSpec != null && !matchesAttributeFilter(config, confAttrSpec)) {
             return false
         }
-        
         return true
     }
 
