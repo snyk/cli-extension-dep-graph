@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/package-url/packageurl-go"
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
@@ -314,18 +315,20 @@ func createPkgInfo(name, version string, provenanceEntry *allDepEntry, provenanc
 			group := parts[0]
 			artifact := parts[1]
 
-			// Create base PURL using pkg:maven for standard Maven coordinates
+			// Build qualifiers for checksum if provenance data is available
+			var qualifiers packageurl.Qualifiers
+			if provenanceEntry != nil && provenanceEntry.Checksum != "" {
+				qualifiers = packageurl.Qualifiers{
+					{Key: "checksum", Value: "sha1:" + provenanceEntry.Checksum},
+				}
+			}
+
+			// Create PURL using pkg:maven for standard Maven coordinates
 			// Note: This assumes all dependencies use Maven coordinate format (group:artifact:version).
 			// If we later need to surface actual Gradle plugins from the Plugin Portal,
 			// we would need to detect and use pkg:gradle for those instead.
-			purl := fmt.Sprintf("pkg:maven/%s/%s@%s", group, artifact, version)
-
-			// Add checksum qualifier if provenance data is available
-			if provenanceEntry != nil && provenanceEntry.Checksum != "" {
-				purl += fmt.Sprintf("?checksum=sha1:%s", provenanceEntry.Checksum)
-			}
-
-			pkgInfo.PackageURL = purl
+			purl := packageurl.NewPackageURL(packageurl.TypeMaven, group, artifact, version, qualifiers, "")
+			pkgInfo.PackageURL = purl.ToString()
 		}
 	}
 

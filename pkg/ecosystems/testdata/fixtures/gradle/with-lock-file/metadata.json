@@ -1,4 +1,4 @@
 {
-  "gradle": ">=8",
-  "reason": "Gradle 6 and 7 have issues with dynamic versions in lock files"
+  "gradle": ">=7",
+  "reason": "Gradle 6 has issues with dynamic versions in lock files"
 }

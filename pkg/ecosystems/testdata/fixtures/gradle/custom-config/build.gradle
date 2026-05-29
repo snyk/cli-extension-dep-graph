@@ -1,0 +1,21 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.snyk.fixtures'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+// User-defined config: canBeResolved=true and canBeConsumed=true by default,
+// but has its own declared dependency so it must not be filtered out.
+configurations {
+    extraLibs
+}
+
+dependencies {
+    implementation 'org.apache.commons:commons-lang3:3.14.0'
+    extraLibs 'commons-io:commons-io:2.16.1'
+}
