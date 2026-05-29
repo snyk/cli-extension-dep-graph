@@ -113,8 +113,20 @@ type depGraphContext struct {
 //     with a `:constraint` node-ID suffix. They do not affect `processed`, so a
 //     real edge to the same component will still be expanded normally.
 func (ctx *depGraphContext) addDep(dep *gradleDep, parentID string, processed map[string]bool) error {
-	if dep.ID == "" || dep.Unresolved {
+	if dep.ID == "" {
 		return nil
+	}
+
+	if dep.Unresolved {
+		// ":unresolved" suffix avoids colliding with a resolved node for the same coordinate in another configuration.
+		nodeID, name, version := depNodeParts(dep.ID)
+		unresolvedID := nodeID + ":unresolved"
+		ctx.builder.AddNode(unresolvedID, createPkgInfo(name, version, nil, ctx.provenanceMap != nil),
+			depgraph.WithNodeInfo(&depgraph.NodeInfo{
+				Labels: map[string]string{"unresolved": "true"},
+			}),
+		)
+		return ctx.connectOnce(parentID, unresolvedID)
 	}
 
 	nodeID, name, version := depNodeParts(dep.ID)

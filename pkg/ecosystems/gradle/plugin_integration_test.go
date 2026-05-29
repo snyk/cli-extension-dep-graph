@@ -132,6 +132,13 @@ func pluginTestCases() map[string]PluginTestCase {
 			Fixture: "same-name-subprojects",
 			Options: ecosystems.NewPluginOptions(),
 		},
+		// Verifies that a dependency Gradle cannot resolve (non-existent version)
+		// surfaces as a labeled :unresolved leaf node rather than being silently dropped.
+		// The fixture also declares a resolvable dep to confirm the two coexist correctly.
+		"unresolved_dep": {
+			Fixture: "unresolved-dep",
+			Options: ecosystems.NewPluginOptions(),
+		},
 		// Verifies that a user-defined configuration with canBeConsumed=true and its own
 		// declared dependency is still walked. Guards against the publication-config filter
 		// (which skips default/archives) accidentally excluding user-defined configs.
