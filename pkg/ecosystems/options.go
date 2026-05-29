@@ -62,10 +62,9 @@ type GradleOptions struct {
 	InitScript string `arg:"--init-script"`
 	// SkipWrapper bypasses gradlew discovery and forces use of the gradle command.
 	SkipWrapper bool `arg:"--gradle-skip-wrapper"`
-	// Note: --gradle-normalize-deps is intentionally not yet supported here.
-	// It requires full JAR downloading for fingerprinting, which is incompatible
-	// with the metadata-only resolution approach used by this plugin.
-	// The flag is still forwarded to the legacy CLI as a fallback.
+	// NormalizeDeps uses the SHAs of the dependencies provided by the IncludeProvenance flag
+	// to lookup the canonical GAV coordinates of the dependency and rewrite the produced DepGraphs.
+	NormalizeDeps bool `arg:"--gradle-normalize-deps"`
 }
 
 // BazelOptions contains Bazel-specific options for dependency graph generation.
@@ -200,6 +199,11 @@ func (o *SCAPluginOptions) WithGradleInitScript(initScript string) *SCAPluginOpt
 
 func (o *SCAPluginOptions) WithGradleSkipWrapper(skipWrapper bool) *SCAPluginOptions {
 	o.Gradle.SkipWrapper = skipWrapper
+	return o
+}
+
+func (o *SCAPluginOptions) WithGradleNormalizeDeps(normalizeDeps bool) *SCAPluginOptions {
+	o.Gradle.NormalizeDeps = normalizeDeps
 	return o
 }
 

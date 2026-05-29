@@ -230,7 +230,7 @@ func TestValidateOptions_Integration_BuildDepGraphsFromDir(t *testing.T) {
 
 		ctx := context.Background()
 		log := logger.Nop()
-		plugin := Plugin{}
+		plugin := NewGradlePlugin()
 
 		// This should fail fast during validation, before any file discovery or Gradle execution
 		result, err := plugin.BuildDepGraphsFromDir(ctx, log, dir, options)
@@ -251,7 +251,7 @@ func TestValidateOptions_Integration_BuildDepGraphsFromDir(t *testing.T) {
 
 		ctx := context.Background()
 		log := logger.Nop()
-		plugin := Plugin{}
+		plugin := NewGradlePlugin()
 
 		// This should fail fast during validation, before any file discovery
 		result, err := plugin.BuildDepGraphsFromDir(ctx, log, dir, options)
@@ -271,7 +271,7 @@ func TestValidateOptions_Integration_BuildDepGraphsFromDir(t *testing.T) {
 
 		ctx := context.Background()
 		log := logger.Nop()
-		plugin := Plugin{}
+		plugin := NewGradlePlugin()
 
 		// This should fail fast during validation, before any file discovery or Gradle execution
 		result, err := plugin.BuildDepGraphsFromDir(ctx, log, dir, options)

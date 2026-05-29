@@ -27,13 +27,23 @@ const (
 
 // Plugin is the Gradle SCA plugin.  It has no exported fields; all
 // configuration is passed through ecosystems.SCAPluginOptions at call time.
-type Plugin struct{}
+type Plugin struct {
+	normalizeDepsPostHook NormalizeDepsPostHook
+}
 
 // Compile-time assertion that Plugin satisfies the SCAPlugin interface.
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
 func (p Plugin) GetName() string {
 	return PluginName
+}
+
+func NewGradlePlugin() *Plugin {
+	return &Plugin{normalizeDepsPostHook: nil}
+}
+
+func NewGradlePluginWithNormalizeDepsHook(normalizeDepsPostHook NormalizeDepsPostHook) *Plugin {
+	return &Plugin{normalizeDepsPostHook: normalizeDepsPostHook}
 }
 
 // BuildDepGraphsFromDir discovers and builds Gradle dependency graphs for the
@@ -75,6 +85,10 @@ func (p Plugin) BuildDepGraphsFromDir(
 	allResults, allProcessedFiles, err := p.processGradleFiles(ctx, log, files, dir, options)
 	if err != nil {
 		return nil, err
+	}
+
+	if options.Gradle.NormalizeDeps && p.normalizeDepsPostHook != nil {
+		allResults = p.normalizeDepsPostHook(ctx, log, allResults, options)
 	}
 
 	return &ecosystems.PluginResult{
@@ -447,7 +461,7 @@ func buildExtraArgs(projectDir string, options *ecosystems.SCAPluginOptions) []s
 	}
 
 	// Pass --include-provenance flag to the init script as a Gradle property
-	if options.Global.IncludeProvenance {
+	if options.Global.IncludeProvenance || options.Gradle.NormalizeDeps {
 		args = append(args, "-PsnykIncludeProvenance=true")
 	}
 
