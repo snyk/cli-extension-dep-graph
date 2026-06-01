@@ -133,6 +133,20 @@ func pluginTestCases() map[string]PluginTestCase {
 			Fixture: "same-name-subprojects",
 			Options: ecosystems.NewPluginOptions(),
 		},
+		// Verifies that a dependency Gradle cannot resolve (non-existent version)
+		// surfaces as a labeled :unresolved leaf node rather than being silently dropped.
+		// The fixture also declares a resolvable dep to confirm the two coexist correctly.
+		"unresolved_dep": {
+			Fixture: "unresolved-dep",
+			Options: ecosystems.NewPluginOptions(),
+		},
+		// Verifies that a user-defined configuration with canBeConsumed=true and its own
+		// declared dependency is still walked. Guards against the publication-config filter
+		// (which skips default/archives) accidentally excluding user-defined configs.
+		"user_defined_config": {
+			Fixture: "custom-config",
+			Options: ecosystems.NewPluginOptions(),
+		},
 		// Exercises dynamic version selectors (range `[a, b)`, open `+`) and
 		// resolutionStrategy.force. Resolved versions are wildcarded in the
 		// snapshot to stay resilient to Maven Central transitive bumps.
@@ -236,7 +250,7 @@ func TestGradleWrapper_BinaryResolution(t *testing.T) {
 	absFixture, err := filepath.Abs(wrapperFixture)
 	require.NoError(t, err, "failed to resolve wrapper fixture path")
 
-	plugin := Plugin{}
+	plugin := NewGradlePlugin()
 	ctx := context.Background()
 
 	testCases := []struct {
@@ -320,7 +334,7 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 			defer cancel()
 
-			plugin := Plugin{}
+			plugin := NewGradlePlugin()
 			results, err := scatest.Run(ctx, plugin, logger.Nop(), absFixture, testCase.Options)
 			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 			require.NotEmpty(t, results, "plugin must emit at least one result")
@@ -337,6 +351,73 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 			assertResultsMatchExpected(t, results, expected, testCase.Fixture)
 		})
 	}
+}
+
+// TestPlugin_NormalizeDepsPostHook_WiringIntegration verifies that the
+// normalizeDepsPostHook is invoked when --gradle-normalize-deps is set, and
+// is skipped when the flag is absent. It uses a spy hook so no real API
+// calls are made — this exercises only the wiring inside BuildDepGraphsFromDir.
+func TestPlugin_NormalizeDepsPostHook_WiringIntegration(t *testing.T) {
+	gradleVersion, err := gradleRuntime()
+	require.NoErrorf(t, err, "could not detect gradle runtime version")
+	jdkVersion, err := jdkRuntime()
+	require.NoErrorf(t, err, "could not detect jdk runtime version")
+	t.Logf("gradle %s / jdk %s", gradleVersion, jdkVersion)
+
+	fixtureDir := filepath.Join(fixturesRoot, "simple")
+	absFixture, err := filepath.Abs(fixtureDir)
+	require.NoError(t, err, "failed to resolve simple fixture path")
+
+	t.Run("hook_invoked_when_flag_set", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+
+		var hookInvoked bool
+		var hookReceivedResults []ecosystems.SCAResult
+		spyHook := func(
+			_ context.Context,
+			_ logger.Logger,
+			results []ecosystems.SCAResult,
+			_ *ecosystems.SCAPluginOptions,
+		) []ecosystems.SCAResult {
+			hookInvoked = true
+			hookReceivedResults = results
+			return results
+		}
+
+		plugin := NewGradlePluginWithNormalizeDepsHook(spyHook)
+		results, err := scatest.Run(ctx, plugin, logger.Nop(), absFixture,
+			ecosystems.NewPluginOptions().WithGradleNormalizeDeps(true))
+		require.NoError(t, err)
+		require.NotEmpty(t, results)
+
+		assert.True(t, hookInvoked, "post-hook should be invoked when --gradle-normalize-deps is set")
+		assert.Equal(t, results, hookReceivedResults,
+			"hook should have received the full result set")
+	})
+
+	t.Run("hook_not_invoked_when_flag_unset", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+
+		var hookInvoked bool
+		spyHook := func(
+			_ context.Context,
+			_ logger.Logger,
+			results []ecosystems.SCAResult,
+			_ *ecosystems.SCAPluginOptions,
+		) []ecosystems.SCAResult {
+			hookInvoked = true
+			return results
+		}
+
+		plugin := NewGradlePluginWithNormalizeDepsHook(spyHook)
+		_, err := scatest.Run(ctx, plugin, logger.Nop(), absFixture,
+			ecosystems.NewPluginOptions())
+		require.NoError(t, err)
+
+		assert.False(t, hookInvoked, "post-hook should not be invoked when --gradle-normalize-deps is unset")
+	})
 }
 
 // defaultExpectedFileName returns the snapshot filename used when writing

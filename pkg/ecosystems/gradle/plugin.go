@@ -27,13 +27,23 @@ const (
 
 // Plugin is the Gradle SCA plugin.  It has no exported fields; all
 // configuration is passed through ecosystems.SCAPluginOptions at call time.
-type Plugin struct{}
+type Plugin struct {
+	normalizeDepsPostHook NormalizeDepsPostHook
+}
 
 // Compile-time assertion that Plugin satisfies the SCAPlugin interface.
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
 func (p Plugin) GetName() string {
 	return PluginName
+}
+
+func NewGradlePlugin() *Plugin {
+	return &Plugin{normalizeDepsPostHook: nil}
+}
+
+func NewGradlePluginWithNormalizeDepsHook(normalizeDepsPostHook NormalizeDepsPostHook) *Plugin {
+	return &Plugin{normalizeDepsPostHook: normalizeDepsPostHook}
 }
 
 // BuildDepGraphsFromDir discovers and builds Gradle dependency graphs for the
@@ -70,6 +80,26 @@ func (p Plugin) BuildDepGraphsFromDir(
 	}
 	if len(files) == 0 {
 		log.Debug(ctx, "No Gradle files found, skipping", logger.Attr("dir", dir))
+		return nil
+	}
+
+	// The normalize-deps post-hook rewrites results as a batch (the
+	// hook resolves canonical Maven coordinates across results), so
+	// when it's configured we collect first, hook, then emit. The
+	// no-hook path streams straight through.
+	if options.Gradle.NormalizeDeps && p.normalizeDepsPostHook != nil {
+		var collected []ecosystems.SCAResult
+		if err := p.processGradleFiles(ctx, log, files, dir, options, func(r ecosystems.SCAResult) error {
+			collected = append(collected, r)
+			return nil
+		}); err != nil {
+			return err
+		}
+		for _, r := range p.normalizeDepsPostHook(ctx, log, collected, options) {
+			if err := onGraph(r); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 
@@ -445,7 +475,7 @@ func buildExtraArgs(projectDir string, options *ecosystems.SCAPluginOptions) []s
 	}
 
 	// Pass --include-provenance flag to the init script as a Gradle property
-	if options.Global.IncludeProvenance {
+	if options.Global.IncludeProvenance || options.Gradle.NormalizeDeps {
 		args = append(args, "-PsnykIncludeProvenance=true")
 	}
 

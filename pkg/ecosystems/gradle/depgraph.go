@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/package-url/packageurl-go"
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
@@ -112,8 +113,20 @@ type depGraphContext struct {
 //     with a `:constraint` node-ID suffix. They do not affect `processed`, so a
 //     real edge to the same component will still be expanded normally.
 func (ctx *depGraphContext) addDep(dep *gradleDep, parentID string, processed map[string]bool) error {
-	if dep.ID == "" || dep.Unresolved {
+	if dep.ID == "" {
 		return nil
+	}
+
+	if dep.Unresolved {
+		// ":unresolved" suffix avoids colliding with a resolved node for the same coordinate in another configuration.
+		nodeID, name, version := depNodeParts(dep.ID)
+		unresolvedID := nodeID + ":unresolved"
+		ctx.builder.AddNode(unresolvedID, createPkgInfo(name, version, nil, ctx.provenanceMap != nil),
+			depgraph.WithNodeInfo(&depgraph.NodeInfo{
+				Labels: map[string]string{"unresolved": "true"},
+			}),
+		)
+		return ctx.connectOnce(parentID, unresolvedID)
 	}
 
 	nodeID, name, version := depNodeParts(dep.ID)
@@ -302,18 +315,20 @@ func createPkgInfo(name, version string, provenanceEntry *allDepEntry, provenanc
 			group := parts[0]
 			artifact := parts[1]
 
-			// Create base PURL using pkg:maven for standard Maven coordinates
+			// Build qualifiers for checksum if provenance data is available
+			var qualifiers packageurl.Qualifiers
+			if provenanceEntry != nil && provenanceEntry.Checksum != "" {
+				qualifiers = packageurl.Qualifiers{
+					{Key: "checksum", Value: "sha1:" + provenanceEntry.Checksum},
+				}
+			}
+
+			// Create PURL using pkg:maven for standard Maven coordinates
 			// Note: This assumes all dependencies use Maven coordinate format (group:artifact:version).
 			// If we later need to surface actual Gradle plugins from the Plugin Portal,
 			// we would need to detect and use pkg:gradle for those instead.
-			purl := fmt.Sprintf("pkg:maven/%s/%s@%s", group, artifact, version)
-
-			// Add checksum qualifier if provenance data is available
-			if provenanceEntry != nil && provenanceEntry.Checksum != "" {
-				purl += fmt.Sprintf("?checksum=sha1:%s", provenanceEntry.Checksum)
-			}
-
-			pkgInfo.PackageURL = purl
+			purl := packageurl.NewPackageURL(packageurl.TypeMaven, group, artifact, version, qualifiers, "")
+			pkgInfo.PackageURL = purl.ToString()
 		}
 	}
 

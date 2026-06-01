@@ -1,0 +1,72 @@
+[
+  {
+    "depGraph": {
+      "schemaVersion": "1.3.0",
+      "pkgManager": {
+        "name": "gradle"
+      },
+      "pkgs": [
+        {
+          "id": "com.snyk.fixtures:unresolved-dep@1.0.0",
+          "info": {
+            "name": "com.snyk.fixtures:unresolved-dep",
+            "version": "1.0.0"
+          }
+        },
+        {
+          "id": "org.apache.commons:commons-lang3@3.14.0",
+          "info": {
+            "name": "org.apache.commons:commons-lang3",
+            "version": "3.14.0"
+          }
+        },
+        {
+          "id": "org.slf4j:slf4j-api@999.999.999",
+          "info": {
+            "name": "org.slf4j:slf4j-api",
+            "version": "999.999.999"
+          }
+        }
+      ],
+      "graph": {
+        "rootNodeId": "root-node",
+        "nodes": [
+          {
+            "nodeId": "root-node",
+            "pkgId": "com.snyk.fixtures:unresolved-dep@1.0.0",
+            "deps": [
+              {
+                "nodeId": "org.apache.commons:commons-lang3@3.14.0"
+              },
+              {
+                "nodeId": "org.slf4j:slf4j-api@999.999.999:unresolved"
+              }
+            ]
+          },
+          {
+            "nodeId": "org.apache.commons:commons-lang3@3.14.0",
+            "pkgId": "org.apache.commons:commons-lang3@3.14.0",
+            "deps": []
+          },
+          {
+            "nodeId": "org.slf4j:slf4j-api@999.999.999:unresolved",
+            "pkgId": "org.slf4j:slf4j-api@999.999.999",
+            "info": {
+              "labels": {
+                "unresolved": "true"
+              }
+            },
+            "deps": []
+          }
+        ]
+      }
+    },
+    "projectDescriptor": {
+      "identity": {
+        "type": "gradle",
+        "targetFile": "build.gradle",
+        "rootComponentName": "com.snyk.fixtures:unresolved-dep"
+      }
+    }
+  }
+]

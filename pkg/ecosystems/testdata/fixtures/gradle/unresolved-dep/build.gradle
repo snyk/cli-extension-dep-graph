@@ -1,0 +1,17 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.snyk.fixtures'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // A real dep that resolves successfully.
+    implementation 'org.apache.commons:commons-lang3:3.14.0'
+    // A dep with a non-existent version — intentionally unresolvable.
+    implementation 'org.slf4j:slf4j-api:999.999.999'
+}
