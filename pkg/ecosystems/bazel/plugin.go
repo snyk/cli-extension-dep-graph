@@ -32,7 +32,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 	log logger.Logger,
 	dir string,
 	options *ecosystems.SCAPluginOptions,
-	onGraph func(ecosystems.SCAResult) error,
+	onGraph ecosystems.OnGraphFunc,
 ) error {
 	if log == nil {
 		log = logger.Nop()

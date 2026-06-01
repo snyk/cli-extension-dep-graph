@@ -43,7 +43,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 	log logger.Logger,
 	inputDir string,
 	options *scaecosystems.SCAPluginOptions,
-	onGraph func(scaecosystems.SCAResult) error,
+	onGraph scaecosystems.OnGraphFunc,
 ) error {
 	var targetFile string
 	if options.Global.TargetFile != nil {
@@ -114,7 +114,7 @@ func (p Plugin) buildResults(
 	lockFileDir string,
 	options *scaecosystems.SCAPluginOptions,
 	log logger.Logger,
-	onGraph func(scaecosystems.SCAResult) error,
+	onGraph scaecosystems.OnGraphFunc,
 ) (int, error) {
 	parsedSbom, err := parseAndValidateSBOM(sbom)
 	if err != nil {

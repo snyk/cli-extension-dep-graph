@@ -46,7 +46,7 @@ func (l *Resolver) BuildDepGraphsFromDir(
 	log logger.Logger,
 	_ string,
 	opts *ecosystems.SCAPluginOptions,
-	onGraph func(ecosystems.SCAResult) error,
+	onGraph ecosystems.OnGraphFunc,
 ) error {
 	if opts == nil {
 		return fmt.Errorf("cannot resolve dependencies without options")

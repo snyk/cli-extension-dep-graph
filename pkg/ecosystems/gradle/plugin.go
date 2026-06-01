@@ -54,7 +54,7 @@ func (p Plugin) GetName() string {
 //     yields one SCAResult.  Use --gradle-sub-project to filter to a single one.
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context, log logger.Logger, dir string, options *ecosystems.SCAPluginOptions,
-	onGraph func(ecosystems.SCAResult) error,
+	onGraph ecosystems.OnGraphFunc,
 ) error {
 	if log == nil {
 		log = logger.Nop()
@@ -126,7 +126,7 @@ func (p Plugin) processGradleFiles(
 	files []discovery.FindResult,
 	dir string,
 	options *ecosystems.SCAPluginOptions,
-	onGraph func(ecosystems.SCAResult) error,
+	onGraph ecosystems.OnGraphFunc,
 ) error {
 	// Create a copy to avoid mutating the original slice, then sort by path depth to process parent directories first
 	filesCopy := make([]discovery.FindResult, len(files))
@@ -189,7 +189,7 @@ func (p Plugin) processGradleFile(
 	dir, initScriptPath string,
 	extraArgs []string,
 	options *ecosystems.SCAPluginOptions,
-	onGraph func(ecosystems.SCAResult) error,
+	onGraph ecosystems.OnGraphFunc,
 ) ([]string, error) {
 	projectDir := filepath.Dir(discoveredFile.Path)
 
@@ -277,7 +277,7 @@ func (p Plugin) convertProjects(
 	dir string,
 	discoveredBuildFile string,
 	options *ecosystems.SCAPluginOptions,
-	onGraph func(ecosystems.SCAResult) error,
+	onGraph ecosystems.OnGraphFunc,
 ) ([]string, error) {
 	subProject := options.Gradle.SubProject
 

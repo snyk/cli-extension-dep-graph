@@ -38,7 +38,7 @@ func (m *mockPlugin) BuildDepGraphsFromDir(
 	_ logger.Logger,
 	_ string,
 	opts *ecosystems.SCAPluginOptions,
-	onGraph func(ecosystems.SCAResult) error,
+	onGraph ecosystems.OnGraphFunc,
 ) error {
 	if opts != nil {
 		m.capturedExclude = append([]string(nil), opts.Global.Exclude...)

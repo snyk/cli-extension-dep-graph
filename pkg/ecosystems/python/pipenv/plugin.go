@@ -46,7 +46,7 @@ func (p Plugin) GetName() string {
 // mutex to satisfy the SCAPlugin contract.
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context, log logger.Logger, dir string, options *ecosystems.SCAPluginOptions,
-	onGraph func(ecosystems.SCAResult) error,
+	onGraph ecosystems.OnGraphFunc,
 ) error {
 	if log == nil {
 		log = logger.Nop()

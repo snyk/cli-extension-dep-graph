@@ -60,7 +60,7 @@ func (m *mockScaPlugin) BuildDepGraphsFromDir(
 	_ logger.Logger,
 	_ string,
 	options *ecosystems.SCAPluginOptions,
-	onGraph func(ecosystems.SCAResult) error,
+	onGraph ecosystems.OnGraphFunc,
 ) error {
 	m.options = options
 	if m.err != nil {

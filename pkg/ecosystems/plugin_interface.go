@@ -31,6 +31,10 @@ type SCAResult struct {
 	Error             error                      `json:"error,omitempty"`
 }
 
+// OnGraphFunc is the per-graph callback BuildDepGraphsFromDir invokes
+// for each emitted SCAResult. See SCAPlugin for the contract.
+type OnGraphFunc func(SCAResult) error
+
 // SCAPlugin builds dependency graphs from a directory containing
 // project files. Results are emitted one at a time via onGraph as the
 // plugin produces them — there is no aggregated return value. This
@@ -53,7 +57,7 @@ type SCAPlugin interface {
 		log logger.Logger,
 		dir string,
 		options *SCAPluginOptions,
-		onGraph func(SCAResult) error,
+		onGraph OnGraphFunc,
 	) error
 	GetName() string
 }

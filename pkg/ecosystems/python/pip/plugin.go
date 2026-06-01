@@ -44,7 +44,7 @@ var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 // goroutine-safe.
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context, log logger.Logger, dir string, options *ecosystems.SCAPluginOptions,
-	onGraph func(ecosystems.SCAResult) error,
+	onGraph ecosystems.OnGraphFunc,
 ) error {
 	if log == nil {
 		log = logger.Nop()
