@@ -5,58 +5,15 @@ package gradle
 import (
 	"context"
 	"errors"
-	"sync"
-	"sync/atomic"
 	"testing"
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
 )
-
-// fakeLookuper is a programmable packageLookuper used to drive the post-hook
-// without making real HTTP calls. It records the sequence of SHA1s queried so
-// tests can verify dedup behaviour.
-type fakeLookuper struct {
-	mu          sync.Mutex
-	calls       map[string]int
-	responses   map[string]string // sha1 -> canonical purl ("" = no mapping)
-	errors      map[string]error  // sha1 -> error to return
-	totalCalls  atomic.Int64
-	beforeReply func(sha1 string) // optional hook for synchronisation
-}
-
-func newFakeLookuper() *fakeLookuper {
-	return &fakeLookuper{
-		calls:     make(map[string]int),
-		responses: make(map[string]string),
-		errors:    make(map[string]error),
-	}
-}
-
-func (f *fakeLookuper) LookupMavenPackage(_ context.Context, q snykclient.MavenPackageQuery) (string, error) {
-	f.totalCalls.Add(1)
-	f.mu.Lock()
-	f.calls[q.Sha1]++
-	f.mu.Unlock()
-	if f.beforeReply != nil {
-		f.beforeReply(q.Sha1)
-	}
-	if err, ok := f.errors[q.Sha1]; ok {
-		return "", err
-	}
-	return f.responses[q.Sha1], nil
-}
-
-func (f *fakeLookuper) callCount(sha1 string) int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.calls[sha1]
-}
 
 // makeDepGraph builds a minimal DepGraph from a slice of pkgs and a
 // parent-child edge list. Node IDs match pkg IDs for ease of reading.
