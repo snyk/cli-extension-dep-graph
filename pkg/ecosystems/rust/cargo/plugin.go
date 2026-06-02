@@ -52,6 +52,10 @@ func (p Plugin) BuildDepGraphsFromDir(
 		log = logger.Nop()
 	}
 
+	if options == nil {
+		options = ecosystems.NewPluginOptions()
+	}
+
 	files, err := p.discoverLockFiles(ctx, dir, options)
 	if err != nil {
 		return nil, err
@@ -72,7 +76,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 	for _, file := range files {
 		lockFileAbsDir := filepath.Dir(file.Path)
 
-		fileResults := p.buildResults(ctx, log, file.RelPath, lockFileAbsDir, exec)
+		fileResults := p.buildResults(ctx, log, file.RelPath, lockFileAbsDir, exec, options)
 		for _, r := range fileResults {
 			if r.Error != nil {
 				log.Error(ctx, "Failed to build cargo dependency graph",
@@ -101,10 +105,8 @@ func (p Plugin) buildResults(
 	log logger.Logger,
 	lockFileRelPath, lockFileAbsDir string,
 	exec cargoRunner,
+	options *ecosystems.SCAPluginOptions,
 ) []ecosystems.SCAResult {
-	// TargetFile for error results: the Cargo.toml alongside Cargo.lock. For
-	// virtual workspaces this still exists (it's the workspace manifest); for
-	// non-workspace single crates it's the package's Cargo.toml.
 	lockFileDir := filepath.Dir(lockFileRelPath)
 	rootTargetFile := filepath.Join(lockFileDir, cargoTomlFile)
 
@@ -126,7 +128,6 @@ func (p Plugin) buildResults(
 
 	log.Info(ctx, "Building cargo dependency graphs", logger.Attr(logFieldLockFile, lockFileRelPath))
 
-	// Step 1: discover workspace members via cargo metadata.
 	members, err := p.discoverMembers(ctx, lockFileAbsDir, exec)
 	if err != nil {
 		return errResult(err)
@@ -135,19 +136,15 @@ func (p Plugin) buildResults(
 		return errResult(fmt.Errorf("cargo metadata returned no workspace members"))
 	}
 
-	// Build the "other members" set once — for each member's graph we'll pass
-	// the complement so the member's own ID is not stop-at-leaf-ed.
 	allMemberIDs := make(map[string]struct{}, len(members))
 	for _, m := range members {
 		allMemberIDs[m.Name+"@"+m.Version] = struct{}{}
 	}
 
-	// Step 2: for each member, run cargo tree scoped to it and build a graph
-	// with the other members stopped-at-leaf.
 	var results []ecosystems.SCAResult
 
 	for _, member := range members {
-		memberResult := p.buildMemberResult(ctx, log, lockFileRelPath, lockFileAbsDir, lockFileDir, member, allMemberIDs, exec)
+		memberResult := p.buildMemberResult(ctx, log, lockFileRelPath, lockFileAbsDir, lockFileDir, member, allMemberIDs, exec, options)
 		results = append(results, memberResult)
 	}
 
@@ -191,8 +188,8 @@ func (p Plugin) buildMemberResult(
 	member workspaceMember,
 	allMemberIDs map[string]struct{},
 	exec cargoRunner,
+	options *ecosystems.SCAPluginOptions,
 ) ecosystems.SCAResult {
-	// TargetFile = member's Cargo.toml, relative to the original dir.
 	relManifest, err := filepath.Rel(lockFileAbsDir, member.ManifestPath)
 	if err != nil {
 		relManifest = cargoTomlFile
@@ -220,7 +217,11 @@ func (p Plugin) buildMemberResult(
 		logger.Attr(logFieldMember, member.Name),
 	)
 
-	output, err := exec.RunTree(ctx, lockFileAbsDir, member.Name)
+	output, err := exec.RunTree(ctx, lockFileAbsDir, cargoTreeOpts{
+		Pkg:            member.Name,
+		IncludeDev:     options.Global.IncludeDev,
+		AllowOutOfSync: options.Global.AllowOutOfSync,
+	})
 	if err != nil {
 		return memberErrResult(p.wrapRunError(err))
 	}
@@ -231,7 +232,6 @@ func (p Plugin) buildMemberResult(
 		return memberErrResult(fmt.Errorf("parsing cargo tree output for member %s: %w", member.Name, err))
 	}
 
-	// Build the stop-at set: every other member (not this one).
 	memberID := member.Name + "@" + member.Version
 	otherMembers := make(map[string]struct{}, len(allMemberIDs)-1)
 	for id := range allMemberIDs {
@@ -285,11 +285,22 @@ func (p Plugin) discoverLockFiles(
 
 	switch {
 	case options.Global.TargetFile != nil:
-		if filepath.Base(*options.Global.TargetFile) != cargoLockFile {
+		// CLI flag mapping: `--file=<path>/Cargo.toml` targets the manifest
+		// with Cargo.lock resolved alongside. We accept either filename: if
+		// the user points at Cargo.toml, normalise to the sibling Cargo.lock.
+		// Anything else is not ours to handle.
+		targetFile := *options.Global.TargetFile
+		base := filepath.Base(targetFile)
+		switch base {
+		case cargoLockFile:
+			// As-is.
+		case cargoTomlFile:
+			targetFile = filepath.Join(filepath.Dir(targetFile), cargoLockFile)
+		default:
 			return nil, nil
 		}
 
-		files, err := discovery.FindFiles(ctx, dir, discovery.WithTargetFile(*options.Global.TargetFile))
+		files, err := discovery.FindFiles(ctx, dir, discovery.WithTargetFile(targetFile))
 		if err != nil {
 			return nil, fmt.Errorf("discovering Cargo.lock files: %w", err)
 		}

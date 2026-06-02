@@ -22,13 +22,16 @@ import (
 // error) so plugin-level tests can exercise the discover → metadata → tree
 // → parse → build pipeline without a real cargo binary.
 //
-// treeByPkg keys on the package name passed to RunTree; the empty key serves
-// the unscoped case. metadataOutput is returned verbatim from RunMetadata.
+// treeByPkg keys on the package name passed in cargoTreeOpts; the empty key
+// serves the unscoped case. metadataOutput is returned verbatim from
+// RunMetadata. capturedTreeOpts records every options struct RunTree saw so
+// tests can assert the plugin forwarded CLI flags correctly.
 type fakeExecutor struct {
-	metadataOutput string
-	metadataErr    error
-	treeByPkg      map[string]string
-	treeErrByPkg   map[string]error
+	metadataOutput   string
+	metadataErr      error
+	treeByPkg        map[string]string
+	treeErrByPkg     map[string]error
+	capturedTreeOpts []cargoTreeOpts
 }
 
 func (f *fakeExecutor) RunMetadata(_ context.Context, _ string) (io.ReadCloser, error) {
@@ -38,13 +41,15 @@ func (f *fakeExecutor) RunMetadata(_ context.Context, _ string) (io.ReadCloser, 
 	return io.NopCloser(strings.NewReader(f.metadataOutput)), nil
 }
 
-func (f *fakeExecutor) RunTree(_ context.Context, _ string, pkg string) (io.ReadCloser, error) {
-	if err, ok := f.treeErrByPkg[pkg]; ok {
+func (f *fakeExecutor) RunTree(_ context.Context, _ string, opts cargoTreeOpts) (io.ReadCloser, error) {
+	f.capturedTreeOpts = append(f.capturedTreeOpts, opts)
+
+	if err, ok := f.treeErrByPkg[opts.Pkg]; ok {
 		return nil, err
 	}
-	out, ok := f.treeByPkg[pkg]
+	out, ok := f.treeByPkg[opts.Pkg]
 	if !ok {
-		return nil, fmt.Errorf("fakeExecutor: no canned tree output for pkg %q", pkg)
+		return nil, fmt.Errorf("fakeExecutor: no canned tree output for pkg %q", opts.Pkg)
 	}
 	return io.NopCloser(strings.NewReader(out)), nil
 }
@@ -78,7 +83,7 @@ func TestBuildDepGraphsFromDir_HappyPath_SingleCrate(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, cargoLockFile), []byte(""), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, cargoTomlFile), []byte(""), 0o600))
 
-	output := `0my-app v0.1.0
+	treeOut := `0my-app v0.1.0
 1serde v1.0.193
 2serde_derive v1.0.193 (proc-macro)
 1tokio v1.35.0
@@ -86,7 +91,7 @@ func TestBuildDepGraphsFromDir_HappyPath_SingleCrate(t *testing.T) {
 
 	plugin := Plugin{executor: &fakeExecutor{
 		metadataOutput: singleCrateMetadata(dir),
-		treeByPkg:      map[string]string{"my-app": output},
+		treeByPkg:      map[string]string{"my-app": treeOut},
 	}}
 
 	result, err := plugin.BuildDepGraphsFromDir(context.Background(), nil, dir, &ecosystems.SCAPluginOptions{})
@@ -203,6 +208,74 @@ func TestBuildDepGraphsFromDir_Workspace_TwoMembers(t *testing.T) {
 	// TargetFile paths use the member's manifest path relative to dir.
 	assert.Equal(t, filepath.Join("crates", "a", cargoTomlFile), byRoot["a"].ProjectDescriptor.GetTargetFile())
 	assert.Equal(t, filepath.Join("crates", "b", cargoTomlFile), byRoot["b"].ProjectDescriptor.GetTargetFile())
+}
+
+func TestBuildDepGraphsFromDir_TargetFile_CargoTomlNormalisedToCargoLock(t *testing.T) {
+	// CLI flag mapping: --file=Cargo.toml should resolve Cargo.lock
+	// alongside it. Pointing target-file at Cargo.toml should still find and
+	// scan the project.
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, cargoLockFile), []byte(""), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, cargoTomlFile), []byte(""), 0o600))
+
+	fake := &fakeExecutor{
+		metadataOutput: singleCrateMetadata(dir),
+		treeByPkg:      map[string]string{"my-app": "0my-app v0.1.0\n"},
+	}
+	plugin := Plugin{executor: fake}
+
+	tf := filepath.Join(dir, cargoTomlFile)
+	result, err := plugin.BuildDepGraphsFromDir(context.Background(), nil, dir,
+		(&ecosystems.SCAPluginOptions{}).WithTargetFile(tf))
+	require.NoError(t, err)
+	require.Len(t, result.Results, 1)
+	require.NoError(t, result.Results[0].Error)
+}
+
+func TestBuildDepGraphsFromDir_FlagsPropagatedToExecutor(t *testing.T) {
+	// IncludeDev and AllowOutOfSync must flow from SCAPluginOptions through to
+	// cargoTreeOpts so the executor builds the right cargo command.
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, cargoLockFile), []byte(""), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, cargoTomlFile), []byte(""), 0o600))
+
+	fake := &fakeExecutor{
+		metadataOutput: singleCrateMetadata(dir),
+		treeByPkg:      map[string]string{"my-app": "0my-app v0.1.0\n"},
+	}
+	plugin := Plugin{executor: fake}
+
+	opts := (&ecosystems.SCAPluginOptions{}).
+		WithIncludeDev(true).
+		WithAllowOutOfSync(true)
+
+	_, err := plugin.BuildDepGraphsFromDir(context.Background(), nil, dir, opts)
+	require.NoError(t, err)
+
+	require.Len(t, fake.capturedTreeOpts, 1)
+	assert.True(t, fake.capturedTreeOpts[0].IncludeDev, "IncludeDev should propagate")
+	assert.True(t, fake.capturedTreeOpts[0].AllowOutOfSync, "AllowOutOfSync should propagate")
+	assert.Equal(t, "my-app", fake.capturedTreeOpts[0].Pkg)
+}
+
+func TestBuildDepGraphsFromDir_DefaultFlagsAreStrict(t *testing.T) {
+	// Defaults: dev excluded, --locked enforced (AllowOutOfSync false).
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, cargoLockFile), []byte(""), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, cargoTomlFile), []byte(""), 0o600))
+
+	fake := &fakeExecutor{
+		metadataOutput: singleCrateMetadata(dir),
+		treeByPkg:      map[string]string{"my-app": "0my-app v0.1.0\n"},
+	}
+	plugin := Plugin{executor: fake}
+
+	_, err := plugin.BuildDepGraphsFromDir(context.Background(), nil, dir, &ecosystems.SCAPluginOptions{})
+	require.NoError(t, err)
+
+	require.Len(t, fake.capturedTreeOpts, 1)
+	assert.False(t, fake.capturedTreeOpts[0].IncludeDev, "dev deps off by default")
+	assert.False(t, fake.capturedTreeOpts[0].AllowOutOfSync, "strict-out-of-sync on by default")
 }
 
 func TestBuildDepGraphsFromDir_Workspace_OneMemberFailsOthersStillSucceed(t *testing.T) {
