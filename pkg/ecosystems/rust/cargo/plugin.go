@@ -229,7 +229,10 @@ func (p Plugin) buildMemberResult(
 
 	out, err := parseTree(ctx, log, output)
 	if err != nil {
-		return memberErrResult(fmt.Errorf("parsing cargo tree output for member %s: %w", member.Name, err))
+		// cargo failures surface here when the subprocess exited non-zero
+		// before producing parseable output; classify the chain to surface
+		// actionable messages (e.g. lockfile-out-of-sync).
+		return memberErrResult(classifyCargoError(fmt.Errorf("parsing cargo tree output for member %s: %w", member.Name, err)))
 	}
 
 	memberID := member.Name + "@" + member.Version
@@ -263,6 +266,13 @@ func (p Plugin) buildMemberResult(
 }
 
 // wrapRunError converts errors from the cargo runner into user-facing messages.
+// It handles the two error paths into the plugin separately:
+//
+//   - Direct returns from cargoRunner methods (cargo failed to start, binary
+//     missing) — checked here via errors.Is on the sentinels.
+//   - Errors surfaced through the streaming pipe after cargo exits non-zero
+//     (lockfile out of sync, malformed manifest) — those arrive embedded in
+//     the parse error chain; classifyCargoError walks that chain.
 func (p Plugin) wrapRunError(err error) error {
 	if errors.Is(err, errCargoNotFound) {
 		return fmt.Errorf(
@@ -271,7 +281,7 @@ func (p Plugin) wrapRunError(err error) error {
 		)
 	}
 
-	return fmt.Errorf("running cargo: %w", err)
+	return classifyCargoError(fmt.Errorf("running cargo: %w", err))
 }
 
 func (p Plugin) discoverLockFiles(

@@ -12,6 +12,13 @@ import (
 // errCargoNotFound is returned when the cargo binary is not in PATH.
 var errCargoNotFound = errors.New("cargo binary not found in PATH")
 
+// errLockfileOutOfSync is returned (via the error chain) when `cargo tree
+// --locked` rejects a Cargo.lock that no longer matches Cargo.toml. The
+// sentinel lets callers detect this specific case to surface a CLI hint
+// (`--strict-out-of-sync=false` to allow regeneration) without parsing
+// error message text.
+var errLockfileOutOfSync = errors.New("cargo lockfile is out of sync with the manifest")
+
 // cargoTreeOpts configures a single `cargo tree` invocation.
 //
 // Pkg scopes the run to a single workspace member via `-p <Pkg>`; empty
