@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "cargo"
+  },
+  "pkgs": [
+    {
+      "id": "snyk-cargo-workspaces-root@0.1.0",
+      "info": {
+        "name": "snyk-cargo-workspaces-root",
+        "version": "0.1.0"
+      }
+    },
+    {
+      "id": "lazy_static@1.5.0",
+      "info": {
+        "name": "lazy_static",
+        "version": "1.5.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "snyk-cargo-workspaces-root@0.1.0",
+        "deps": [
+          {
+            "nodeId": "lazy_static@1.5.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "lazy_static@1.5.0",
+        "pkgId": "lazy_static@1.5.0",
+        "deps": []
+      }
+    ]
+  }
+}
