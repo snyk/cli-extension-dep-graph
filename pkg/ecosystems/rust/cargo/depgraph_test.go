@@ -84,7 +84,7 @@ func TestBuildDepGraph(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dg, err := buildDepGraph(tt.out)
+			dg, err := buildDepGraph(tt.out, nil)
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.wantRoot, dg.GetRootPkg().Info.Name)
@@ -100,4 +100,34 @@ func TestBuildDepGraph(t *testing.T) {
 			assert.Equal(t, tt.wantPkgs, gotPkgs)
 		})
 	}
+}
+
+func TestBuildDepGraph_StopAtWorkspaceMembers(t *testing.T) {
+	// Workspace with two members "a" and "b". "a" depends on "b" (which has
+	// its own deps). When we build a's dep graph with b in stopAt, b appears
+	// as a leaf — its subtree should NOT be expanded inside a's graph.
+	out := &treeOutput{
+		RootID: "a@0.1.0",
+		Graph: forwardGraph{
+			"a@0.1.0":     {"b@0.1.0": {}, "serde@1.0.0": {}},
+			"b@0.1.0":     {"tokio@1.0.0": {}},
+			"serde@1.0.0": {},
+			"tokio@1.0.0": {},
+		},
+	}
+
+	stopAt := map[string]struct{}{"b@0.1.0": {}}
+
+	dg, err := buildDepGraph(out, stopAt)
+	require.NoError(t, err)
+
+	gotPkgs := make([]string, 0, len(dg.Pkgs))
+	for _, p := range dg.Pkgs {
+		gotPkgs = append(gotPkgs, p.ID)
+	}
+	sort.Strings(gotPkgs)
+
+	// tokio (b's transitive dep) MUST NOT appear in a's graph — it belongs to
+	// b's graph only.
+	assert.Equal(t, []string{"a@0.1.0", "b@0.1.0", "serde@1.0.0"}, gotPkgs)
 }

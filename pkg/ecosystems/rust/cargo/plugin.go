@@ -20,15 +20,17 @@ const (
 	cargoLockFile = "Cargo.lock"
 
 	logFieldLockFile = "lockFile"
+	logFieldMember   = "member"
 )
 
 // Plugin implements ecosystems.SCAPlugin for Cargo (Rust) projects.
-// It runs `cargo tree --locked` to resolve the full dependency graph without
-// bespoke Cargo.lock parsing, in line with the unified-scanners principle of
-// preferring native package-manager tooling. The same command runs in CLI and
-// SCM surfaces with no per-environment branching.
+// It runs `cargo metadata` to enumerate workspace members and `cargo tree
+// --locked` to resolve each member's dep graph, in line with the
+// unified-scanners principle of preferring native package-manager tooling.
+// The same commands run in CLI and SCM surfaces with no per-environment
+// branching.
 type Plugin struct {
-	executor cargoTreeRunner
+	executor cargoRunner
 }
 
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
@@ -37,9 +39,9 @@ func (p Plugin) GetName() string {
 	return PluginName
 }
 
-// BuildDepGraphsFromDir discovers Cargo.lock files under dir and produces a
-// dep graph for each. Workspace expansion (one graph per member crate) lands
-// in a later commit; today the plugin emits a single SCAResult per Cargo.lock.
+// BuildDepGraphsFromDir discovers Cargo.lock files under dir and produces one
+// dep graph per workspace member for each lockfile. A non-workspace single
+// crate yields one result; an N-member workspace yields N results.
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context,
 	log logger.Logger,
@@ -98,9 +100,11 @@ func (p Plugin) buildResults(
 	ctx context.Context,
 	log logger.Logger,
 	lockFileRelPath, lockFileAbsDir string,
-	exec cargoTreeRunner,
+	exec cargoRunner,
 ) []ecosystems.SCAResult {
-	// TargetFile for error results: the Cargo.toml alongside Cargo.lock.
+	// TargetFile for error results: the Cargo.toml alongside Cargo.lock. For
+	// virtual workspaces this still exists (it's the workspace manifest); for
+	// non-workspace single crates it's the package's Cargo.toml.
 	lockFileDir := filepath.Dir(lockFileRelPath)
 	rootTargetFile := filepath.Join(lockFileDir, cargoTomlFile)
 
@@ -120,36 +124,128 @@ func (p Plugin) buildResults(
 		}}
 	}
 
-	log.Info(ctx, "Building cargo dependency graph", logger.Attr(logFieldLockFile, lockFileRelPath))
+	log.Info(ctx, "Building cargo dependency graphs", logger.Attr(logFieldLockFile, lockFileRelPath))
 
-	output, err := exec.Run(ctx, lockFileAbsDir)
+	// Step 1: discover workspace members via cargo metadata.
+	members, err := p.discoverMembers(ctx, lockFileAbsDir, exec)
 	if err != nil {
-		return errResult(p.wrapRunError(err))
+		return errResult(err)
+	}
+	if len(members) == 0 {
+		return errResult(fmt.Errorf("cargo metadata returned no workspace members"))
+	}
+
+	// Build the "other members" set once — for each member's graph we'll pass
+	// the complement so the member's own ID is not stop-at-leaf-ed.
+	allMemberIDs := make(map[string]struct{}, len(members))
+	for _, m := range members {
+		allMemberIDs[m.Name+"@"+m.Version] = struct{}{}
+	}
+
+	// Step 2: for each member, run cargo tree scoped to it and build a graph
+	// with the other members stopped-at-leaf.
+	var results []ecosystems.SCAResult
+
+	for _, member := range members {
+		memberResult := p.buildMemberResult(ctx, log, lockFileRelPath, lockFileAbsDir, lockFileDir, member, allMemberIDs, exec)
+		results = append(results, memberResult)
+	}
+
+	log.Info(ctx, "Successfully built cargo dependency graphs",
+		logger.Attr(logFieldLockFile, lockFileRelPath),
+		logger.Attr("graphs", len(results)),
+	)
+
+	return results
+}
+
+// discoverMembers runs cargo metadata in lockFileAbsDir and parses the
+// workspace member list. Non-workspace single-crate projects return a single
+// member (themselves), so the caller doesn't need a special-case path.
+func (p Plugin) discoverMembers(
+	ctx context.Context,
+	lockFileAbsDir string,
+	exec cargoRunner,
+) ([]workspaceMember, error) {
+	output, err := exec.RunMetadata(ctx, lockFileAbsDir)
+	if err != nil {
+		return nil, p.wrapRunError(err)
+	}
+	defer output.Close()
+
+	meta, err := parseMetadata(output)
+	if err != nil {
+		return nil, fmt.Errorf("parsing cargo metadata: %w", err)
+	}
+
+	return meta.members(), nil
+}
+
+// buildMemberResult runs cargo tree scoped to a single workspace member and
+// builds an SCAResult containing that member's dep graph. Errors are
+// captured per-member so a failure in one member doesn't abort the others.
+func (p Plugin) buildMemberResult(
+	ctx context.Context,
+	log logger.Logger,
+	lockFileRelPath, lockFileAbsDir, lockFileDir string,
+	member workspaceMember,
+	allMemberIDs map[string]struct{},
+	exec cargoRunner,
+) ecosystems.SCAResult {
+	// TargetFile = member's Cargo.toml, relative to the original dir.
+	relManifest, err := filepath.Rel(lockFileAbsDir, member.ManifestPath)
+	if err != nil {
+		relManifest = cargoTomlFile
+	}
+	tf := filepath.Join(lockFileDir, relManifest)
+
+	memberErrResult := func(err error) ecosystems.SCAResult {
+		return ecosystems.SCAResult{
+			ProjectDescriptor: identity.ProjectDescriptor{
+				Identity: identity.ProjectIdentity{
+					ProjectType: pkgManager,
+					TargetFile:  &tf,
+				},
+			},
+			ResolverMetadata: &ecosystems.ResolverMetadata{
+				PluginName:           PluginName,
+				NormalisedTargetFile: tf,
+			},
+			Error: err,
+		}
+	}
+
+	log.Debug(ctx, "Building dependency graph for workspace member",
+		logger.Attr(logFieldLockFile, lockFileRelPath),
+		logger.Attr(logFieldMember, member.Name),
+	)
+
+	output, err := exec.RunTree(ctx, lockFileAbsDir, member.Name)
+	if err != nil {
+		return memberErrResult(p.wrapRunError(err))
 	}
 	defer output.Close()
 
 	out, err := parseTree(ctx, log, output)
 	if err != nil {
-		return errResult(fmt.Errorf("parsing cargo tree output: %w", err))
+		return memberErrResult(fmt.Errorf("parsing cargo tree output for member %s: %w", member.Name, err))
 	}
 
-	log.Debug(ctx, "Parsed cargo tree output",
-		logger.Attr(logFieldLockFile, lockFileRelPath),
-		logger.Attr("packages", len(out.Graph)),
-	)
+	// Build the stop-at set: every other member (not this one).
+	memberID := member.Name + "@" + member.Version
+	otherMembers := make(map[string]struct{}, len(allMemberIDs)-1)
+	for id := range allMemberIDs {
+		if id != memberID {
+			otherMembers[id] = struct{}{}
+		}
+	}
 
-	dg, err := buildDepGraph(out)
+	dg, err := buildDepGraph(out, otherMembers)
 	if err != nil {
-		return errResult(fmt.Errorf("building dep graph: %w", err))
+		return memberErrResult(fmt.Errorf("building dep graph for member %s: %w", member.Name, err))
 	}
 
-	log.Info(ctx, "Successfully built cargo dependency graph",
-		logger.Attr(logFieldLockFile, lockFileRelPath),
-	)
-
-	tf := filepath.Join(lockFileDir, cargoTomlFile)
-
-	return []ecosystems.SCAResult{{
+	return ecosystems.SCAResult{
 		DepGraph: dg,
 		ProjectDescriptor: identity.ProjectDescriptor{
 			Identity: identity.ProjectIdentity{
@@ -163,10 +259,10 @@ func (p Plugin) buildResults(
 			VersionBuildInfo:     map[string]string{},
 			NormalisedTargetFile: tf,
 		},
-	}}
+	}
 }
 
-// wrapRunError converts errors from cargoTreeRunner.Run into user-facing messages.
+// wrapRunError converts errors from the cargo runner into user-facing messages.
 func (p Plugin) wrapRunError(err error) error {
 	if errors.Is(err, errCargoNotFound) {
 		return fmt.Errorf(
@@ -175,7 +271,7 @@ func (p Plugin) wrapRunError(err error) error {
 		)
 	}
 
-	return fmt.Errorf("running cargo tree: %w", err)
+	return fmt.Errorf("running cargo: %w", err)
 }
 
 func (p Plugin) discoverLockFiles(
@@ -238,7 +334,7 @@ func fileExists(path string) bool {
 
 // getExecutor returns the configured executor or the production cargoCmdExecutor.
 // Plugin{} zero-value is valid and uses the production executor by default.
-func (p Plugin) getExecutor() cargoTreeRunner {
+func (p Plugin) getExecutor() cargoRunner {
 	if p.executor != nil {
 		return p.executor
 	}
