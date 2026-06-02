@@ -25,11 +25,17 @@ var FlagBunResolver = flag{
 	Value: "internal-bun-resolver",
 }
 
+var FlagCargoResolver = flag{
+	Key:   "internal-cargo-resolver",
+	Value: "internal-cargo-resolver",
+}
+
 var allFlags = []flag{
 	FlagUnifiedTestAPIOsCLI,
 	FlagNewGradleResolver,
 	FlagBazelResolver,
 	FlagBunResolver,
+	FlagCargoResolver,
 }
 
 // GetAllFlags returns all feature flags as a map of key to flag name.

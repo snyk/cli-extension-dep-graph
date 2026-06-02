@@ -112,12 +112,13 @@ func TestPluginRegistry_DefaultRegistryOrder_WithFeatureFlags(t *testing.T) {
 		cfg.Set(FlagBazelResolver.Key, true)
 		cfg.Set(FlagBunResolver.Key, true)
 		cfg.Set(FlagNewGradleResolver.Key, true)
+		cfg.Set(FlagCargoResolver.Key, true)
 	})
 	r, err := NewDefaultPluginRegistry(ictx)
 	require.NoError(t, err)
 
-	require.Len(t, r.plugins, 3)
-	expectedOrder := []string{"bazel", "bun", "gradle"}
+	require.Len(t, r.plugins, 4)
+	expectedOrder := []string{"bazel", "bun", "gradle", "cargo"}
 	for i, plugin := range r.plugins {
 		assert.Equal(t, expectedOrder[i], plugin.GetName())
 	}
@@ -138,12 +139,13 @@ func TestPluginRegistry_DefaultRegistryHasNoCircularDependencies_WithFeatureFlag
 		cfg.Set(FlagBazelResolver.Key, true)
 		cfg.Set(FlagBunResolver.Key, true)
 		cfg.Set(FlagNewGradleResolver.Key, true)
+		cfg.Set(FlagCargoResolver.Key, true)
 	})
 	r, err := NewDefaultPluginRegistry(ictx)
 	require.NoError(t, err, "NewDefaultPluginRegistry should not return error for valid dependency graph")
 	assert.NotNil(t, r)
 	assert.NotNil(t, r.plugins, "plugins should be successfully sorted without circular dependencies")
-	assert.Len(t, r.plugins, 3, "all 3 plugins should be registered")
+	assert.Len(t, r.plugins, 4, "all 4 plugins should be registered")
 }
 
 func TestPluginRegistry_CircularDependencyReturnsError(t *testing.T) {
