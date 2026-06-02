@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "cargo"
+  },
+  "pkgs": [
+    {
+      "id": "snyk-cargo-build-deps@0.1.0",
+      "info": {
+        "name": "snyk-cargo-build-deps",
+        "version": "0.1.0"
+      }
+    },
+    {
+      "id": "lazy_static@1.5.0",
+      "info": {
+        "name": "lazy_static",
+        "version": "1.5.0"
+      }
+    },
+    {
+      "id": "cc@1.2.63",
+      "info": {
+        "name": "cc",
+        "version": "1.2.63"
+      }
+    },
+    {
+      "id": "find-msvc-tools@0.1.9",
+      "info": {
+        "name": "find-msvc-tools",
+        "version": "0.1.9"
+      }
+    },
+    {
+      "id": "shlex@2.0.1",
+      "info": {
+        "name": "shlex",
+        "version": "2.0.1"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "snyk-cargo-build-deps@0.1.0",
+        "deps": [
+          {
+            "nodeId": "lazy_static@1.5.0"
+          },
+          {
+            "nodeId": "cc@1.2.63"
+          }
+        ]
+      },
+      {
+        "nodeId": "lazy_static@1.5.0",
+        "pkgId": "lazy_static@1.5.0",
+        "deps": []
+      },
+      {
+        "nodeId": "cc@1.2.63",
+        "pkgId": "cc@1.2.63",
+        "deps": [
+          {
+            "nodeId": "find-msvc-tools@0.1.9"
+          },
+          {
+            "nodeId": "shlex@2.0.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "find-msvc-tools@0.1.9",
+        "pkgId": "find-msvc-tools@0.1.9",
+        "deps": []
+      },
+      {
+        "nodeId": "shlex@2.0.1",
+        "pkgId": "shlex@2.0.1",
+        "deps": []
+      }
+    ]
+  }
+}

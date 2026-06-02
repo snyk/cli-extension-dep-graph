@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "cargo"
+  },
+  "pkgs": [
+    {
+      "id": "snyk-cargo-multiple-versions@0.1.0",
+      "info": {
+        "name": "snyk-cargo-multiple-versions",
+        "version": "0.1.0"
+      }
+    },
+    {
+      "id": "rand_core@0.5.1",
+      "info": {
+        "name": "rand_core",
+        "version": "0.5.1"
+      }
+    },
+    {
+      "id": "rand_core@0.6.4",
+      "info": {
+        "name": "rand_core",
+        "version": "0.6.4"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "snyk-cargo-multiple-versions@0.1.0",
+        "deps": [
+          {
+            "nodeId": "rand_core@0.5.1"
+          },
+          {
+            "nodeId": "rand_core@0.6.4"
+          }
+        ]
+      },
+      {
+        "nodeId": "rand_core@0.5.1",
+        "pkgId": "rand_core@0.5.1",
+        "deps": []
+      },
+      {
+        "nodeId": "rand_core@0.6.4",
+        "pkgId": "rand_core@0.6.4",
+        "deps": []
+      }
+    ]
+  }
+}

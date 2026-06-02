@@ -1,0 +1,148 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "cargo"
+  },
+  "pkgs": [
+    {
+      "id": "snyk-cargo-target-deps@0.1.0",
+      "info": {
+        "name": "snyk-cargo-target-deps",
+        "version": "0.1.0"
+      }
+    },
+    {
+      "id": "nix@0.27.1",
+      "info": {
+        "name": "nix",
+        "version": "0.27.1"
+      }
+    },
+    {
+      "id": "libc@0.2.186",
+      "info": {
+        "name": "libc",
+        "version": "0.2.186"
+      }
+    },
+    {
+      "id": "bitflags@2.12.1",
+      "info": {
+        "name": "bitflags",
+        "version": "2.12.1"
+      }
+    },
+    {
+      "id": "cfg-if@1.0.4",
+      "info": {
+        "name": "cfg-if",
+        "version": "1.0.4"
+      }
+    },
+    {
+      "id": "winapi@0.3.9",
+      "info": {
+        "name": "winapi",
+        "version": "0.3.9"
+      }
+    },
+    {
+      "id": "winapi-i686-pc-windows-gnu@0.4.0",
+      "info": {
+        "name": "winapi-i686-pc-windows-gnu",
+        "version": "0.4.0"
+      }
+    },
+    {
+      "id": "winapi-x86_64-pc-windows-gnu@0.4.0",
+      "info": {
+        "name": "winapi-x86_64-pc-windows-gnu",
+        "version": "0.4.0"
+      }
+    },
+    {
+      "id": "lazy_static@1.5.0",
+      "info": {
+        "name": "lazy_static",
+        "version": "1.5.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "snyk-cargo-target-deps@0.1.0",
+        "deps": [
+          {
+            "nodeId": "nix@0.27.1"
+          },
+          {
+            "nodeId": "winapi@0.3.9"
+          },
+          {
+            "nodeId": "lazy_static@1.5.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "nix@0.27.1",
+        "pkgId": "nix@0.27.1",
+        "deps": [
+          {
+            "nodeId": "libc@0.2.186"
+          },
+          {
+            "nodeId": "bitflags@2.12.1"
+          },
+          {
+            "nodeId": "cfg-if@1.0.4"
+          }
+        ]
+      },
+      {
+        "nodeId": "libc@0.2.186",
+        "pkgId": "libc@0.2.186",
+        "deps": []
+      },
+      {
+        "nodeId": "bitflags@2.12.1",
+        "pkgId": "bitflags@2.12.1",
+        "deps": []
+      },
+      {
+        "nodeId": "cfg-if@1.0.4",
+        "pkgId": "cfg-if@1.0.4",
+        "deps": []
+      },
+      {
+        "nodeId": "winapi@0.3.9",
+        "pkgId": "winapi@0.3.9",
+        "deps": [
+          {
+            "nodeId": "winapi-i686-pc-windows-gnu@0.4.0"
+          },
+          {
+            "nodeId": "winapi-x86_64-pc-windows-gnu@0.4.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "winapi-i686-pc-windows-gnu@0.4.0",
+        "pkgId": "winapi-i686-pc-windows-gnu@0.4.0",
+        "deps": []
+      },
+      {
+        "nodeId": "winapi-x86_64-pc-windows-gnu@0.4.0",
+        "pkgId": "winapi-x86_64-pc-windows-gnu@0.4.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lazy_static@1.5.0",
+        "pkgId": "lazy_static@1.5.0",
+        "deps": []
+      }
+    ]
+  }
+}

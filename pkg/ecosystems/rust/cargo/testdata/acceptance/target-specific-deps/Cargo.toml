@@ -1,0 +1,13 @@
+[package]
+name = "snyk-cargo-target-deps"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lazy_static = "1.4"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winapi = "0.3"
+
+[target.'cfg(unix)'.dependencies]
+nix = "0.27"
