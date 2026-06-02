@@ -18,9 +18,8 @@ import (
 )
 
 type mockPlugin struct {
-	name           string
-	processedFiles []string
-	results        []ecosystems.SCAResult
+	name    string
+	results []ecosystems.SCAResult
 
 	// capturedExclude / capturedExcludePaths snapshot opts.Global.{Exclude,ExcludePaths}
 	// at the moment BuildDepGraphsFromDir is called, so tests can assert on what each
@@ -34,15 +33,23 @@ func (m *mockPlugin) GetName() string {
 	return m.name
 }
 
-func (m *mockPlugin) BuildDepGraphsFromDir(_ context.Context, _ logger.Logger, _ string, opts *ecosystems.SCAPluginOptions) (*ecosystems.PluginResult, error) {
+func (m *mockPlugin) BuildDepGraphsFromDir(
+	_ context.Context,
+	_ logger.Logger,
+	_ string,
+	opts *ecosystems.SCAPluginOptions,
+	onGraph ecosystems.OnGraphFunc,
+) error {
 	if opts != nil {
 		m.capturedExclude = append([]string(nil), opts.Global.Exclude...)
 		m.capturedExcludePaths = append([]string(nil), opts.Global.ExcludePaths...)
 	}
-	return &ecosystems.PluginResult{
-		ProcessedFiles: m.processedFiles,
-		Results:        m.results,
-	}, nil
+	for _, r := range m.results {
+		if err := onGraph(r); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func TestPluginRegistry_OrderPreservedWithoutDependencies(t *testing.T) {
@@ -226,14 +233,18 @@ func TestPluginRegistry_ResolveDepgraphs_AllProjectsMode(t *testing.T) {
 	}
 
 	require.NoError(t, r.register(&mockPlugin{
-		name:           "plugin-a",
-		processedFiles: []string{"file-a.txt"},
-		results:        []ecosystems.SCAResult{{ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-a"}}}},
+		name: "plugin-a",
+		results: []ecosystems.SCAResult{{
+			ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-a"}},
+			ProcessedFiles:    []string{"file-a.txt"},
+		}},
 	}))
 	require.NoError(t, r.register(&mockPlugin{
-		name:           "plugin-b",
-		processedFiles: []string{"file-b.txt"},
-		results:        []ecosystems.SCAResult{{ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-b"}}}},
+		name: "plugin-b",
+		results: []ecosystems.SCAResult{{
+			ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-b"}},
+			ProcessedFiles:    []string{"file-b.txt"},
+		}},
 	}))
 
 	opts := ecosystems.NewPluginOptions()
@@ -254,14 +265,18 @@ func TestPluginRegistry_ResolveDepgraphs_StopsAfterFirstResult(t *testing.T) {
 	}
 
 	require.NoError(t, r.register(&mockPlugin{
-		name:           "plugin-a",
-		processedFiles: []string{"file-a.txt"},
-		results:        []ecosystems.SCAResult{{ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-a"}}}},
+		name: "plugin-a",
+		results: []ecosystems.SCAResult{{
+			ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-a"}},
+			ProcessedFiles:    []string{"file-a.txt"},
+		}},
 	}))
 	require.NoError(t, r.register(&mockPlugin{
-		name:           "plugin-b",
-		processedFiles: []string{"file-b.txt"},
-		results:        []ecosystems.SCAResult{{ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-b"}}}},
+		name: "plugin-b",
+		results: []ecosystems.SCAResult{{
+			ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-b"}},
+			ProcessedFiles:    []string{"file-b.txt"},
+		}},
 	}))
 
 	opts := ecosystems.NewPluginOptions()
@@ -283,14 +298,15 @@ func TestPluginRegistry_ResolveDepgraphs_ContinuesWhenNoResults(t *testing.T) {
 	}
 
 	require.NoError(t, r.register(&mockPlugin{
-		name:           "plugin-a",
-		processedFiles: []string{},
-		results:        []ecosystems.SCAResult{},
+		name: "plugin-a",
+		// No results — plugin emits nothing through the callback.
 	}))
 	require.NoError(t, r.register(&mockPlugin{
-		name:           "plugin-b",
-		processedFiles: []string{"file-b.txt"},
-		results:        []ecosystems.SCAResult{{ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-b"}}}},
+		name: "plugin-b",
+		results: []ecosystems.SCAResult{{
+			ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-b"}},
+			ProcessedFiles:    []string{"file-b.txt"},
+		}},
 	}))
 
 	opts := ecosystems.NewPluginOptions()
@@ -317,14 +333,18 @@ func TestPluginRegistry_ResolveDepgraphs_PropagatesProcessedFilesAsExcludePaths(
 	}
 
 	pluginA := &mockPlugin{
-		name:           "plugin-a",
-		processedFiles: []string{"a/lock.json", "a/sub/lock.json"},
-		results:        []ecosystems.SCAResult{{ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-a"}}}},
+		name: "plugin-a",
+		results: []ecosystems.SCAResult{{
+			ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-a"}},
+			ProcessedFiles:    []string{"a/lock.json", "a/sub/lock.json"},
+		}},
 	}
 	pluginB := &mockPlugin{
-		name:           "plugin-b",
-		processedFiles: []string{"b/lock.json"},
-		results:        []ecosystems.SCAResult{{ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-b"}}}},
+		name: "plugin-b",
+		results: []ecosystems.SCAResult{{
+			ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-b"}},
+			ProcessedFiles:    []string{"b/lock.json"},
+		}},
 	}
 	require.NoError(t, r.register(pluginA))
 	require.NoError(t, r.register(pluginB))

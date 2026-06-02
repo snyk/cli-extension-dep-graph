@@ -40,10 +40,14 @@ func (p Plugin) GetName() string {
 	return PluginName
 }
 
-// BuildDepGraphsFromDir discovers and builds dependency graphs for Pipenv projects.
+// BuildDepGraphsFromDir discovers and builds dependency graphs for
+// Pipenv projects. Build work runs concurrently (bounded by
+// maxConcurrentInstalls); onGraph invocations are serialized under a
+// mutex to satisfy the SCAPlugin contract.
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context, log logger.Logger, dir string, options *ecosystems.SCAPluginOptions,
-) (*ecosystems.PluginResult, error) {
+	onGraph ecosystems.OnGraphFunc,
+) error {
 	if log == nil {
 		log = logger.Nop()
 	}
@@ -51,23 +55,21 @@ func (p Plugin) BuildDepGraphsFromDir(
 	// Discover Pipfile files
 	files, err := p.discoverPipfiles(ctx, dir, options)
 	if err != nil {
-		return nil, fmt.Errorf("failed to discover Pipfiles: %w", err)
+		return fmt.Errorf("failed to discover Pipfiles: %w", err)
 	}
 
 	if len(files) == 0 {
 		log.Info(ctx, "No Pipfile files found", logger.Attr("dir", dir))
-		return &ecosystems.PluginResult{}, nil
+		return nil
 	}
 
 	// Get Python runtime version
 	pythonVersion, err := pip.GetPythonVersion()
 	if err != nil {
-		return nil, fmt.Errorf("failed to detect Python version: %w", err)
+		return fmt.Errorf("failed to detect Python version: %w", err)
 	}
 
-	// Build dependency graphs concurrently for each Pipfile
-	var mu sync.Mutex
-	results := make([]ecosystems.SCAResult, 0, len(files))
+	var emitMu sync.Mutex
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(maxConcurrentInstalls)
@@ -100,27 +102,20 @@ func (p Plugin) BuildDepGraphsFromDir(
 					Error: err,
 				}
 			}
+			if tf := result.ProjectDescriptor.GetTargetFile(); tf != "" {
+				result.ProcessedFiles = []string{tf}
+			}
 
-			mu.Lock()
-			results = append(results, result)
-			mu.Unlock()
-			return nil
+			emitMu.Lock()
+			defer emitMu.Unlock()
+			return onGraph(result)
 		})
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, fmt.Errorf("error building dependency graphs: %w", err)
+		return fmt.Errorf("error building dependency graphs: %w", err)
 	}
-
-	processedFiles := make([]string, 0, len(results))
-	for _, result := range results {
-		processedFiles = append(processedFiles, result.ProjectDescriptor.GetTargetFile())
-	}
-
-	return &ecosystems.PluginResult{
-		Results:        results,
-		ProcessedFiles: processedFiles,
-	}, nil
+	return nil
 }
 
 // discoverPipfiles finds Pipfile files based on the provided options.

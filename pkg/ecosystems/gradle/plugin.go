@@ -64,37 +64,46 @@ func NewGradlePluginWithNormalizeDepsHook(normalizeDepsPostHook NormalizeDepsPos
 //     yields one SCAResult.  Use --gradle-sub-project to filter to a single one.
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context, log logger.Logger, dir string, options *ecosystems.SCAPluginOptions,
-) (*ecosystems.PluginResult, error) {
+	onGraph ecosystems.OnGraphFunc,
+) error {
 	if log == nil {
 		log = logger.Nop()
 	}
 
 	if err := ValidateOptions(dir, options); err != nil {
-		return nil, fmt.Errorf("gradle: invalid options: %w", err)
+		return fmt.Errorf("gradle: invalid options: %w", err)
 	}
 
 	files, err := p.discoverGradleFiles(ctx, dir, options)
 	if err != nil {
-		return nil, fmt.Errorf("gradle: failed to discover files: %w", err)
+		return fmt.Errorf("gradle: failed to discover files: %w", err)
 	}
 	if len(files) == 0 {
 		log.Debug(ctx, "No Gradle files found, skipping", logger.Attr("dir", dir))
-		return &ecosystems.PluginResult{}, nil
+		return nil
 	}
 
-	allResults, allProcessedFiles, err := p.processGradleFiles(ctx, log, files, dir, options)
-	if err != nil {
-		return nil, err
-	}
-
+	// The normalize-deps post-hook rewrites results as a batch (the
+	// hook resolves canonical Maven coordinates across results), so
+	// when it's configured we collect first, hook, then emit. The
+	// no-hook path streams straight through.
 	if options.Gradle.NormalizeDeps && p.normalizeDepsPostHook != nil {
-		allResults = p.normalizeDepsPostHook(ctx, log, allResults, options)
+		var collected []ecosystems.SCAResult
+		if err := p.processGradleFiles(ctx, log, files, dir, options, func(r ecosystems.SCAResult) error {
+			collected = append(collected, r)
+			return nil
+		}); err != nil {
+			return err
+		}
+		for _, r := range p.normalizeDepsPostHook(ctx, log, collected, options) {
+			if err := onGraph(r); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
-	return &ecosystems.PluginResult{
-		Results:        allResults,
-		ProcessedFiles: allProcessedFiles,
-	}, nil
+	return p.processGradleFiles(ctx, log, files, dir, options, onGraph)
 }
 
 // discoverGradleFiles discovers Gradle build files based on the provided options.
@@ -147,7 +156,8 @@ func (p Plugin) processGradleFiles(
 	files []discovery.FindResult,
 	dir string,
 	options *ecosystems.SCAPluginOptions,
-) ([]ecosystems.SCAResult, []string, error) {
+	onGraph ecosystems.OnGraphFunc,
+) error {
 	// Create a copy to avoid mutating the original slice, then sort by path depth to process parent directories first
 	filesCopy := make([]discovery.FindResult, len(files))
 	copy(filesCopy, files)
@@ -157,13 +167,11 @@ func (p Plugin) processGradleFiles(
 		return depthI < depthJ
 	})
 
-	var allResults []ecosystems.SCAResult
-	var allProcessedFiles []string
 	processedDirs := make(map[string]bool)
 
 	initScriptPath, cleanup, err := resolveInitScript()
 	if err != nil {
-		return nil, nil, fmt.Errorf("gradle: failed to prepare init script: %w", err)
+		return fmt.Errorf("gradle: failed to prepare init script: %w", err)
 	}
 	defer cleanup()
 
@@ -181,13 +189,10 @@ func (p Plugin) processGradleFiles(
 			continue
 		}
 
-		results, processedFiles, err := p.processGradleFile(ctx, log, discoveredFile, dir, initScriptPath, extraArgs, options)
+		processedFiles, err := p.processGradleFile(ctx, log, discoveredFile, dir, initScriptPath, extraArgs, options, onGraph)
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
-
-		allResults = append(allResults, results...)
-		allProcessedFiles = append(allProcessedFiles, processedFiles...)
 
 		// Mark all directories that were processed by this Gradle run
 		for _, processedFile := range processedFiles {
@@ -199,12 +204,14 @@ func (p Plugin) processGradleFiles(
 		processedDirs[relativeProjectDir] = true
 	}
 
-	return allResults, allProcessedFiles, nil
+	return nil
 }
 
-// processGradleFile processes a single discovered Gradle file.
-// Returns the SCA results, processed file paths, and any fatal error.
-// Soft errors (binary resolution, gradle execution) are returned as SCAResult with Error field.
+// processGradleFile processes a single discovered Gradle file. Soft
+// errors (binary resolution, gradle execution) are emitted as
+// SCAResult with Error field via onGraph; fatal errors are returned.
+// Returns the list of processed file paths so the caller can dedup
+// future Gradle runs against directories we've already covered.
 func (p Plugin) processGradleFile(
 	ctx context.Context,
 	log logger.Logger,
@@ -212,7 +219,8 @@ func (p Plugin) processGradleFile(
 	dir, initScriptPath string,
 	extraArgs []string,
 	options *ecosystems.SCAPluginOptions,
-) ([]ecosystems.SCAResult, []string, error) {
+	onGraph ecosystems.OnGraphFunc,
+) ([]string, error) {
 	projectDir := filepath.Dir(discoveredFile.Path)
 
 	// Try to resolve Gradle binary first - if it fails, add error result
@@ -221,9 +229,8 @@ func (p Plugin) processGradleFile(
 		log.Error(ctx, "Gradle binary resolution failed",
 			logger.Attr(logAttrProjectDir, projectDir),
 			logger.Err(err))
-		// Return error result - not a fatal error
-		errResult := gradleErrorResult(dir, discoveredFile.Path, fmt.Errorf("binary resolution failed: %w", err))
-		return []ecosystems.SCAResult{errResult}, nil, nil
+		// Soft error — emit as a result with Error set.
+		return nil, onGraph(gradleErrorResult(dir, discoveredFile.Path, fmt.Errorf("binary resolution failed: %w", err)))
 	}
 
 	// Check if we discovered a settings file (project root) vs build file (scan target)
@@ -240,15 +247,14 @@ func (p Plugin) processGradleFile(
 		log.Error(ctx, "Gradle execution failed",
 			logger.Attr(logAttrProjectDir, projectDir),
 			logger.Err(err))
-		// Return error result - not a fatal error
-		errResult := gradleErrorResult(dir, discoveredFile.Path, err)
-		return []ecosystems.SCAResult{errResult}, nil, nil
+		// Soft error — emit as a result with Error set.
+		return nil, onGraph(gradleErrorResult(dir, discoveredFile.Path, err))
 	}
 	defer reader.Close()
 
 	parsed, err := parseDependencyGraphJSON(reader)
 	if err != nil {
-		return nil, nil, fmt.Errorf("gradle: failed to parse init script output: %w", err)
+		return nil, fmt.Errorf("gradle: failed to parse init script output: %w", err)
 	}
 
 	// For settings files, don't pass them as build file fallback since they're not scan targets
@@ -257,8 +263,7 @@ func (p Plugin) processGradleFile(
 		buildFileForFallback = "" // Let Gradle init script determine actual build files
 	}
 
-	results, processedFiles := p.convertProjects(ctx, log, parsed, dir, buildFileForFallback, options)
-	return results, processedFiles, nil
+	return p.convertProjects(ctx, log, parsed, dir, buildFileForFallback, options, onGraph)
 }
 
 // discoverAllGradleProjects finds all Gradle files recursively for --all-projects.
@@ -287,8 +292,10 @@ func (p Plugin) discoverAllGradleProjects(ctx context.Context, dir string, optio
 	return files, nil
 }
 
-// convertProjects maps every gradleProject from the parsed JSON into an
-// SCAResult, optionally filtering by --gradle-sub-project.
+// convertProjects maps every gradleProject from the parsed JSON to an
+// SCAResult (optionally filtering by --gradle-sub-project), emitting
+// each via onGraph. Returns the list of relative file paths actually
+// emitted so the caller's directory-dedup map stays accurate.
 //
 // dir is the original scan root used to compute relative target file paths,
 // matching the behavior of the legacy snyk-gradle-plugin in --all-sub-projects
@@ -300,7 +307,8 @@ func (p Plugin) convertProjects(
 	dir string,
 	discoveredBuildFile string,
 	options *ecosystems.SCAPluginOptions,
-) (results []ecosystems.SCAResult, processedFiles []string) {
+	onGraph ecosystems.OnGraphFunc,
+) ([]string, error) {
 	subProject := options.Gradle.SubProject
 
 	// Convert target file to absolute path for comparison when filtering
@@ -312,6 +320,8 @@ func (p Plugin) convertProjects(
 			targetFileAbs = filepath.Join(dir, *options.Global.TargetFile)
 		}
 	}
+
+	var processedFiles []string
 
 	// Iterate projects in Gradle evaluation order (preserved by the array format).
 	// The init script outputs projects via root.allprojects.each, which visits
@@ -359,7 +369,7 @@ func (p Plugin) convertProjects(
 			log.Error(ctx, "Failed to build dep graph for Gradle project",
 				logger.Attr("project_path", proj.Path),
 				logger.Err(err))
-			results = append(results, ecosystems.SCAResult{
+			if emitErr := onGraph(ecosystems.SCAResult{
 				ProjectDescriptor: identity.ProjectDescriptor{
 					Identity: identity.ProjectIdentity{
 						ProjectType: "gradle",
@@ -368,8 +378,9 @@ func (p Plugin) convertProjects(
 				},
 				Error:            err,
 				ResolverMetadata: &resolverMetadata,
-			})
-
+			}); emitErr != nil {
+				return processedFiles, emitErr
+			}
 			continue
 		}
 
@@ -381,7 +392,7 @@ func (p Plugin) convertProjects(
 			rootName = rootPkg.Info.Name
 		}
 
-		results = append(results, ecosystems.SCAResult{
+		if emitErr := onGraph(ecosystems.SCAResult{
 			DepGraph: depGraph,
 			ProjectDescriptor: identity.ProjectDescriptor{
 				Identity: identity.ProjectIdentity{
@@ -391,11 +402,14 @@ func (p Plugin) convertProjects(
 				},
 			},
 			ResolverMetadata: &resolverMetadata,
-		})
+			ProcessedFiles:   []string{relFile},
+		}); emitErr != nil {
+			return processedFiles, emitErr
+		}
 		processedFiles = append(processedFiles, relFile)
 	}
 
-	return results, processedFiles
+	return processedFiles, nil
 }
 
 // relativeTargetFile returns absFile as a path relative to dir.

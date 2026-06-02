@@ -43,7 +43,8 @@ func (p Plugin) BuildDepGraphsFromDir(
 	log logger.Logger,
 	inputDir string,
 	options *scaecosystems.SCAPluginOptions,
-) (*scaecosystems.PluginResult, error) {
+	onGraph scaecosystems.OnGraphFunc,
+) error {
 	var targetFile string
 	if options.Global.TargetFile != nil {
 		targetFile = *options.Global.TargetFile
@@ -51,18 +52,17 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	if targetFile != "" && filepath.Base(targetFile) != LockFileName {
 		log.Info(ctx, "Skipping processing uv plugin", logger.Attr("targetFile", targetFile), logger.Attr("reason", "not a 'uv.lock' file"))
-		return &scaecosystems.PluginResult{}, nil
+		return nil
 	}
 
 	files, err := p.discoverLockFiles(ctx, inputDir, targetFile, options)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if len(files) == 0 {
-		return &scaecosystems.PluginResult{}, nil
+		return nil
 	}
 
-	combined := &scaecosystems.PluginResult{}
 	for _, file := range files {
 		lockFilePath := file.RelPath // e.g., "uv.lock" or "project1/uv.lock"
 		lockFileDir := filepath.Dir(lockFilePath)
@@ -73,7 +73,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 			log.Error(ctx, "Failed to build dependency graph", logger.Attr("lockFile", lockFilePath), logger.Err(err))
 			wrappedErr := fmt.Errorf("failed to build dependency graph for %s: %w", lockFilePath, err)
 
-			errorResult := scaecosystems.SCAResult{
+			if emitErr := onGraph(scaecosystems.SCAResult{
 				ProjectDescriptor: identity.ProjectDescriptor{
 					Identity: identity.ProjectIdentity{
 						ProjectType: "uv",
@@ -85,26 +85,28 @@ func (p Plugin) BuildDepGraphsFromDir(
 					NormalisedTargetFile: lockFilePath,
 				},
 				Error: wrappedErr,
+			}); emitErr != nil {
+				return emitErr
 			}
-			combined.Results = append(combined.Results, errorResult)
 			continue
 		}
-		pluginResult, err := p.buildResults(ctx, sbom, lockFilePath, lockFileDir, options, log)
+		emitted, err := p.buildResults(ctx, sbom, lockFilePath, lockFileDir, options, log, onGraph)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		combined.Results = append(combined.Results, pluginResult.Results...)
-		combined.ProcessedFiles = append(combined.ProcessedFiles, pluginResult.ProcessedFiles...)
 
-		if !options.Global.AllProjects {
+		if !options.Global.AllProjects && emitted > 0 {
 			// We don't want more than one project
 			break
 		}
 	}
 
-	return combined, nil
+	return nil
 }
 
+// buildResults parses + converts the SBOM and emits one result per
+// dep-graph via onGraph. Returns the number emitted so the caller can
+// decide whether to break out of the !AllProjects single-project loop.
 func (p Plugin) buildResults(
 	ctx context.Context,
 	sbom Sbom,
@@ -112,10 +114,11 @@ func (p Plugin) buildResults(
 	lockFileDir string,
 	options *scaecosystems.SCAPluginOptions,
 	log logger.Logger,
-) (*scaecosystems.PluginResult, error) {
+	onGraph scaecosystems.OnGraphFunc,
+) (int, error) {
 	parsedSbom, err := parseAndValidateSBOM(sbom)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse and validate sbom for %s: %w", lockFilePath, err)
+		return 0, fmt.Errorf("failed to parse and validate sbom for %s: %w", lockFilePath, err)
 	}
 
 	if !options.Global.AllProjects && !options.Global.ForceIncludeWorkspacePackages && !hasProjectRoot(parsedSbom) {
@@ -123,21 +126,19 @@ func (p Plugin) buildResults(
 		noRootErr := ecosystems.NewUvNoProjectRootError(
 			"Found uv workspace with no root project. To scan all workspace members use the --all-projects flag.",
 		)
-		return &scaecosystems.PluginResult{
-			Results: []scaecosystems.SCAResult{{
-				ProjectDescriptor: identity.ProjectDescriptor{
-					Identity: identity.ProjectIdentity{
-						ProjectType: "uv",
-						TargetFile:  &lockFilePath,
-					},
+		return 1, onGraph(scaecosystems.SCAResult{
+			ProjectDescriptor: identity.ProjectDescriptor{
+				Identity: identity.ProjectIdentity{
+					ProjectType: "uv",
+					TargetFile:  &lockFilePath,
 				},
-				ResolverMetadata: &scaecosystems.ResolverMetadata{
-					PluginName:           PluginName,
-					NormalisedTargetFile: lockFilePath,
-				},
-				Error: noRootErr,
-			}},
-		}, nil
+			},
+			ResolverMetadata: &scaecosystems.ResolverMetadata{
+				PluginName:           PluginName,
+				NormalisedTargetFile: lockFilePath,
+			},
+			Error: noRootErr,
+		})
 	}
 
 	metadata := extractMetadata(parsedSbom)
@@ -145,11 +146,10 @@ func (p Plugin) buildResults(
 
 	depGraphs, err := p.convertWithFallback(ctx, sbom, metadata, options.Global.ForceSingleGraph, log)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert sbom to dep-graphs for %s: %w", lockFilePath, err)
+		return 0, fmt.Errorf("failed to convert sbom to dep-graphs for %s: %w", lockFilePath, err)
 	}
 
-	result := &scaecosystems.PluginResult{}
-
+	emitted := 0
 	for _, depGraph := range depGraphs {
 		workspacePackage := findWorkspacePackage(depGraph, workspacePackages)
 
@@ -167,8 +167,9 @@ func (p Plugin) buildResults(
 		if workspacePackage != nil {
 			packagePath = filepath.Join(packagePath, workspacePackage.Path)
 		}
+		processedFiles := make([]string, 0, 3)
 		for _, name := range []string{LockFileName, PyprojectTomlFileName, RequirementsTxtFileName} {
-			result.ProcessedFiles = append(result.ProcessedFiles, filepath.Join(packagePath, name))
+			processedFiles = append(processedFiles, filepath.Join(packagePath, name))
 		}
 
 		var rootName string
@@ -176,7 +177,7 @@ func (p Plugin) buildResults(
 			rootName = rootPkg.Info.Name
 		}
 
-		res := scaecosystems.SCAResult{
+		if emitErr := onGraph(scaecosystems.SCAResult{
 			DepGraph: depGraph,
 			ProjectDescriptor: identity.ProjectDescriptor{
 				Identity: identity.ProjectIdentity{
@@ -190,11 +191,14 @@ func (p Plugin) buildResults(
 				NormalisedTargetFile: manifestFile,
 				VersionBuildInfo:     map[string]string{},
 			},
+			ProcessedFiles: processedFiles,
+		}); emitErr != nil {
+			return emitted, emitErr
 		}
-		result.Results = append(result.Results, res)
+		emitted++
 	}
 
-	return result, nil
+	return emitted, nil
 }
 
 // sbomMetadata is the minimal metadata needed to construct an empty dep-graph

@@ -36,18 +36,20 @@ func (l *Resolver) GetName() string {
 
 var _ ecosystems.SCAPlugin = (*Resolver)(nil)
 
-// BuildDepGraphsFromDir invokes the legacy CLI workflow and returns its dep graphs as SCAResults.
-// Empty results from the legacy CLI (exit code 3, or successful invocation producing no graphs)
-// are returned as an empty PluginResult with no error; callers decide what to do based on the
-// totals across all plugins.
+// BuildDepGraphsFromDir invokes the legacy CLI workflow and emits one
+// SCAResult per dep-graph via onGraph. Empty results from the legacy
+// CLI (exit code 3, or successful invocation producing no graphs)
+// return nil with no callback invocations; callers decide what to do
+// based on totals across all plugins.
 func (l *Resolver) BuildDepGraphsFromDir(
 	ctx context.Context,
 	log logger.Logger,
 	_ string,
 	opts *ecosystems.SCAPluginOptions,
-) (*ecosystems.PluginResult, error) {
+	onGraph ecosystems.OnGraphFunc,
+) error {
 	if opts == nil {
-		return nil, fmt.Errorf("cannot resolve dependencies without options")
+		return fmt.Errorf("cannot resolve dependencies without options")
 	}
 
 	legacyConfig := buildLegacyConfig(l.ictx.GetConfiguration(), opts)
@@ -56,23 +58,22 @@ func (l *Resolver) BuildDepGraphsFromDir(
 	if err != nil {
 		if errors.Is(err, legacycli.ErrNoDepGraphsFound) || legacycli.IsNoProjectFoundError(err) {
 			log.Debug(ctx, "No projects found in legacy CLI call")
-			return nil, nil //nolint:nilnil // no dep-graphs found, no error
+			return nil
 		}
-		return nil, fmt.Errorf("error handling legacy workflow: %w", err)
+		return fmt.Errorf("error handling legacy workflow: %w", err)
 	}
 
-	results := make([]ecosystems.SCAResult, 0, len(depGraphs))
-	processedFiles := make([]string, 0, len(depGraphs))
 	for i := range depGraphs {
 		result := depGraphOutputToSCAResult(ctx, log, &depGraphs[i])
-		results = append(results, result)
-		processedFiles = append(processedFiles, result.ResolverMetadata.NormalisedTargetFile)
+		if result.ResolverMetadata != nil && result.ResolverMetadata.NormalisedTargetFile != "" {
+			result.ProcessedFiles = []string{result.ResolverMetadata.NormalisedTargetFile}
+		}
+		if err := onGraph(result); err != nil {
+			return err
+		}
 	}
 
-	return &ecosystems.PluginResult{
-		Results:        results,
-		ProcessedFiles: processedFiles,
-	}, nil
+	return nil
 }
 
 // buildLegacyConfig clones the live config and applies legacy-CLI-specific transformations.

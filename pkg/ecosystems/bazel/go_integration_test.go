@@ -13,6 +13,7 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/scatest"
 )
 
 func assertGoProcessedFiles(t *testing.T, files []string) {
@@ -47,15 +48,24 @@ func runGoIntegrationSnapshot(t *testing.T, fixtures []string) {
 
 			opts := ecosystems.NewPluginOptions().WithBazelGo(true)
 			plugin := Plugin{}
-			result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), root, opts)
+			results, err := scatest.Run(ctx, plugin, logger.Nop(), root, opts)
 			require.NoError(t, err)
 
-			// Paths differ by machine; assert filenames only, snapshot dep-graphs only.
-			assertGoProcessedFiles(t, result.ProcessedFiles)
+			// Paths differ by machine; assert filenames only, snapshot
+			// dep-graphs only. Bazel attaches the resolver-scope file list
+			// (WORKSPACE, MODULE.bazel, etc.) to every emitted result —
+			// any one of them carries the full list.
+			require.NotEmpty(t, results)
+			assertGoProcessedFiles(t, results[0].ProcessedFiles)
 
+			// ProcessedFiles is asserted above; null it out so the
+			// JSON snapshot doesn't capture host-specific paths.
+			for i := range results {
+				results[i].ProcessedFiles = nil
+			}
 			snaps.WithConfig(snaps.Dir(root)).MatchJSON(t, struct {
 				Results []ecosystems.SCAResult `json:"results"`
-			}{Results: result.Results})
+			}{Results: results})
 		})
 	}
 }

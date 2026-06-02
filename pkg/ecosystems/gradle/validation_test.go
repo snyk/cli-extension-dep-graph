@@ -10,6 +10,7 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/scatest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -233,9 +234,9 @@ func TestValidateOptions_Integration_BuildDepGraphsFromDir(t *testing.T) {
 		plugin := NewGradlePlugin()
 
 		// This should fail fast during validation, before any file discovery or Gradle execution
-		result, err := plugin.BuildDepGraphsFromDir(ctx, log, dir, options)
+		results, err := scatest.Run(ctx, plugin, log, dir, options)
 		require.Error(t, err)
-		assert.Nil(t, result)
+		assert.Empty(t, results)
 		assert.Contains(t, err.Error(), "gradle: invalid options:")
 		assert.Contains(t, err.Error(), "invalid --configuration-matching regex pattern")
 		assert.Contains(t, err.Error(), "[invalid-regex")
@@ -254,9 +255,9 @@ func TestValidateOptions_Integration_BuildDepGraphsFromDir(t *testing.T) {
 		plugin := NewGradlePlugin()
 
 		// This should fail fast during validation, before any file discovery
-		result, err := plugin.BuildDepGraphsFromDir(ctx, log, dir, options)
+		results, err := scatest.Run(ctx, plugin, log, dir, options)
 		require.Error(t, err)
-		assert.Nil(t, result)
+		assert.Empty(t, results)
 		assert.Contains(t, err.Error(), "gradle: invalid options:")
 		assert.Contains(t, err.Error(), "user init script not found")
 	})
@@ -274,9 +275,9 @@ func TestValidateOptions_Integration_BuildDepGraphsFromDir(t *testing.T) {
 		plugin := NewGradlePlugin()
 
 		// This should fail fast during validation, before any file discovery or Gradle execution
-		result, err := plugin.BuildDepGraphsFromDir(ctx, log, dir, options)
+		results, err := scatest.Run(ctx, plugin, log, dir, options)
 		require.Error(t, err)
-		assert.Nil(t, result)
+		assert.Empty(t, results)
 		assert.Contains(t, err.Error(), "gradle: invalid options:")
 		assert.Contains(t, err.Error(), "--configuration-attributes")
 		assert.Contains(t, err.Error(), "has empty value")
