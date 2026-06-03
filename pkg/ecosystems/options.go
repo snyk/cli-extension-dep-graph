@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/argparser"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/argparser"
 )
 
 // SCAPluginOptions contains configuration options for SCA plugins,

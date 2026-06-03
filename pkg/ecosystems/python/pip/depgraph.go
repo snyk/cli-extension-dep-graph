@@ -9,7 +9,7 @@ import (
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 )
 
 // depStringPattern extracts the package name from a dependency string.

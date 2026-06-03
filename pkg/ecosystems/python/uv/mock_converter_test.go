@@ -6,7 +6,7 @@ import (
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/conversion"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/conversion"
 )
 
 // MockSBOMConverter is a test double for conversion.SBOMConverter. It records

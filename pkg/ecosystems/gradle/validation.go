@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 )
 
 // ValidateOptions validates the provided options and returns an error if any are invalid.

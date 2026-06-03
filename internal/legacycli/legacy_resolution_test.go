@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
-	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/workflow"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/depgraph/parsers"
 )
 
 //go:embed testdata/legacy_cli_output

@@ -1,7 +1,7 @@
 package uv
 
 import (
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 )
 
 type MockClient struct {

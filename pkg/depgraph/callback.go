@@ -3,8 +3,8 @@ package depgraph
 import (
 	gafworkflow "github.com/snyk/go-application-framework/pkg/workflow"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/legacycli"
-	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/legacycli"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/workflow"
 )
 
 func callback(ctx gafworkflow.InvocationContext, _ []gafworkflow.Data) ([]gafworkflow.Data, error) {

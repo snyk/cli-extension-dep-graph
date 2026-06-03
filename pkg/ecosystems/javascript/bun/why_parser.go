@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 )
 
 var (
