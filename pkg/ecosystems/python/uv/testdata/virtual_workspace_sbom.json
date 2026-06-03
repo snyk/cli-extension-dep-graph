@@ -1,0 +1,314 @@
+{
+	"bomFormat": "CycloneDX",
+	"specVersion": "1.5",
+	"version": 1,
+	"serialNumber": "urn:uuid:b154b949-3612-48f1-8e37-a400123fb925",
+	"metadata": {
+	  "timestamp": "2026-06-03T13:27:49.688958000Z",
+	  "tools": [
+		{
+		  "vendor": "Astral Software Inc.",
+		  "name": "uv",
+		  "version": "0.10.9"
+		}
+	  ],
+	  "component": {
+		"type": "library",
+		"bom-ref": "uv-workspace-21",
+		"name": "uv-workspace",
+		"properties": [
+		  {
+			"name": "uv:package:is_synthetic_root",
+			"value": "true"
+		  }
+		]
+	  }
+	},
+	"components": [
+	  {
+		"type": "library",
+		"bom-ref": "albatross-1@0.1.0",
+		"name": "albatross",
+		"version": "0.1.0",
+		"properties": [
+		  {
+			"name": "uv:workspace:path",
+			"value": "packages/albatross"
+		  }
+		]
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "anyio-2@4.12.1",
+		"name": "anyio",
+		"version": "4.12.1",
+		"purl": "pkg:pypi/anyio@4.12.1"
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "asgiref-3@3.2.10",
+		"name": "asgiref",
+		"version": "3.2.10",
+		"purl": "pkg:pypi/asgiref@3.2.10"
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "bird-feeder-4@1.0.0",
+		"name": "bird-feeder",
+		"version": "1.0.0",
+		"properties": [
+		  {
+			"name": "uv:workspace:path",
+			"value": "packages/bird-feeder"
+		  }
+		]
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "cffi-5@2.0.0",
+		"name": "cffi",
+		"version": "2.0.0",
+		"purl": "pkg:pypi/cffi@2.0.0"
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "cryptography-6@3.3",
+		"name": "cryptography",
+		"version": "3.3",
+		"purl": "pkg:pypi/cryptography@3.3"
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "django-7@3.1",
+		"name": "django",
+		"version": "3.1",
+		"purl": "pkg:pypi/django@3.1"
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "idna-8@3.6",
+		"name": "idna",
+		"version": "3.6",
+		"purl": "pkg:pypi/idna@3.6"
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "iniconfig-9@2.3.0",
+		"name": "iniconfig",
+		"version": "2.3.0",
+		"purl": "pkg:pypi/iniconfig@2.3.0"
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "jinja2-10@2.11.2",
+		"name": "jinja2",
+		"version": "2.11.2",
+		"purl": "pkg:pypi/jinja2@2.11.2"
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "markupsafe-11@3.0.3",
+		"name": "markupsafe",
+		"version": "3.0.3",
+		"purl": "pkg:pypi/markupsafe@3.0.3"
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "pillow-12@8.1.0",
+		"name": "pillow",
+		"version": "8.1.0",
+		"purl": "pkg:pypi/pillow@8.1.0"
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "pycparser-13@3.0",
+		"name": "pycparser",
+		"version": "3.0",
+		"purl": "pkg:pypi/pycparser@3.0",
+		"properties": [
+		  {
+			"name": "uv:package:marker",
+			"value": "implementation_name != 'PyPy'"
+		  }
+		]
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "pytz-14@2025.2",
+		"name": "pytz",
+		"version": "2025.2",
+		"purl": "pkg:pypi/pytz@2025.2"
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "pyyaml-15@5.3",
+		"name": "pyyaml",
+		"version": "5.3",
+		"purl": "pkg:pypi/pyyaml@5.3"
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "seeds-16@1.0.0",
+		"name": "seeds",
+		"version": "1.0.0",
+		"properties": [
+		  {
+			"name": "uv:workspace:path",
+			"value": "packages/seeds"
+		  }
+		]
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "six-17@1.17.0",
+		"name": "six",
+		"version": "1.17.0",
+		"purl": "pkg:pypi/six@1.17.0"
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "sqlparse-18@0.5.5",
+		"name": "sqlparse",
+		"version": "0.5.5",
+		"purl": "pkg:pypi/sqlparse@0.5.5"
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "typing-extensions-19@4.15.0",
+		"name": "typing-extensions",
+		"version": "4.15.0",
+		"purl": "pkg:pypi/typing-extensions@4.15.0",
+		"properties": [
+		  {
+			"name": "uv:package:marker",
+			"value": "python_full_version < '3.13'"
+		  }
+		]
+	  },
+	  {
+		"type": "library",
+		"bom-ref": "urllib3-20@1.24.3",
+		"name": "urllib3",
+		"version": "1.24.3",
+		"purl": "pkg:pypi/urllib3@1.24.3"
+	  }
+	],
+	"dependencies": [
+	  {
+		"ref": "albatross-1@0.1.0",
+		"dependsOn": [
+		  "bird-feeder-4@1.0.0",
+		  "iniconfig-9@2.3.0",
+		  "jinja2-10@2.11.2",
+		  "urllib3-20@1.24.3"
+		]
+	  },
+	  {
+		"ref": "anyio-2@4.12.1",
+		"dependsOn": [
+		  "idna-8@3.6",
+		  "typing-extensions-19@4.15.0"
+		]
+	  },
+	  {
+		"ref": "asgiref-3@3.2.10",
+		"dependsOn": []
+	  },
+	  {
+		"ref": "bird-feeder-4@1.0.0",
+		"dependsOn": [
+		  "anyio-2@4.12.1",
+		  "pillow-12@8.1.0",
+		  "pyyaml-15@5.3",
+		  "seeds-16@1.0.0"
+		]
+	  },
+	  {
+		"ref": "cffi-5@2.0.0",
+		"dependsOn": [
+		  "pycparser-13@3.0"
+		]
+	  },
+	  {
+		"ref": "cryptography-6@3.3",
+		"dependsOn": [
+		  "cffi-5@2.0.0",
+		  "six-17@1.17.0"
+		]
+	  },
+	  {
+		"ref": "django-7@3.1",
+		"dependsOn": [
+		  "asgiref-3@3.2.10",
+		  "pytz-14@2025.2",
+		  "sqlparse-18@0.5.5"
+		]
+	  },
+	  {
+		"ref": "idna-8@3.6",
+		"dependsOn": []
+	  },
+	  {
+		"ref": "iniconfig-9@2.3.0",
+		"dependsOn": []
+	  },
+	  {
+		"ref": "jinja2-10@2.11.2",
+		"dependsOn": [
+		  "markupsafe-11@3.0.3"
+		]
+	  },
+	  {
+		"ref": "markupsafe-11@3.0.3",
+		"dependsOn": []
+	  },
+	  {
+		"ref": "pillow-12@8.1.0",
+		"dependsOn": []
+	  },
+	  {
+		"ref": "pycparser-13@3.0",
+		"dependsOn": []
+	  },
+	  {
+		"ref": "pytz-14@2025.2",
+		"dependsOn": []
+	  },
+	  {
+		"ref": "pyyaml-15@5.3",
+		"dependsOn": []
+	  },
+	  {
+		"ref": "seeds-16@1.0.0",
+		"dependsOn": [
+		  "cryptography-6@3.3",
+		  "django-7@3.1",
+		  "idna-8@3.6"
+		]
+	  },
+	  {
+		"ref": "six-17@1.17.0",
+		"dependsOn": []
+	  },
+	  {
+		"ref": "sqlparse-18@0.5.5",
+		"dependsOn": []
+	  },
+	  {
+		"ref": "typing-extensions-19@4.15.0",
+		"dependsOn": []
+	  },
+	  {
+		"ref": "urllib3-20@1.24.3",
+		"dependsOn": []
+	  },
+	  {
+		"ref": "uv-workspace-21",
+		"dependsOn": [
+		  "albatross-1@0.1.0",
+		  "bird-feeder-4@1.0.0",
+		  "seeds-16@1.0.0"
+		]
+	  }
+	]
+  }

@@ -2,6 +2,7 @@ package uv
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"os"
 	"path/filepath"
@@ -19,6 +20,12 @@ import (
 )
 
 var testLogger = logger.Nop()
+
+//go:embed testdata/workspace_sbom.json
+var workspaceSBOMJSON []byte
+
+//go:embed testdata/virtual_workspace_sbom.json
+var virtualWorkspaceSBOMJSON []byte
 
 const validSBOMJSON = `{
 	"bomFormat": "CycloneDX",
@@ -715,47 +722,58 @@ func TestBuildFindings_MultipleDepGraphs(t *testing.T) {
 	assert.Equal(t, "package2", findings[1].DepGraph.GetRootPkg().Info.Name)
 }
 
-func TestBuildFindings_WorkspacePackage(t *testing.T) {
-	sbomJSON := `{
-		"bomFormat": "CycloneDX",
-		"specVersion": "1.5",
-		"version": 1,
-		"metadata": {
-			"tools": [{"vendor": "Astral Software Inc.", "name": "uv", "version": "0.10.9"}],
-			"component": {
-				"type": "library",
-				"bom-ref": "workspace-root-1@1.0.0",
-				"name": "workspace-root",
-				"version": "1.0.0",
-				"properties": [
-					{"name": "uv:package:is_project_root", "value": "true"}
-				]
-			}
-		},
-		"components": [
-			{
-				"type": "library",
-				"bom-ref": "workspace-package-2@3.1.0",
-				"name": "workspace-package",
-				"version": "3.1.0",
-				"properties": [
-					{
-						"name": "uv:workspace:path",
-						"value": "packages/my-package"
-					}
-				]
-			}
-		]
-	}`
-	sbom := Sbom(sbomJSON)
-	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("workspace-package", "3.1.0")), "")
+func TestBuildFindings_WorkspacePackage_FiltersToMember(t *testing.T) {
+	sbom := Sbom(workspaceSBOMJSON)
+	plugin := NewPlugin(&MockClient{}, mockConverter(
+		createTestDepGraph("package-a", "0.1.0"),
+		createTestDepGraph("package-b", "0.1.0"),
+		createTestDepGraph("package-c", "0.1.0"),
+	), "")
 
-	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
+	opts := ecosystems.NewPluginOptions().WithWorkspacePackage("package-b")
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", opts, testLogger)
 
-	findings := results
 	require.NoError(t, err)
-	require.Len(t, findings, 1)
-	assert.Equal(t, filepath.Join("packages", "my-package", "pyproject.toml"), findings[0].ResolverMetadata.NormalisedTargetFile)
+	require.Len(t, results, 1)
+	res := results[0]
+	require.NoError(t, res.Error)
+	assert.Equal(t, "package-b", res.DepGraph.GetRootPkg().Info.Name)
+
+	expected := filepath.Join("packages", "package_b", "pyproject.toml")
+	assert.Equal(t, expected, res.ResolverMetadata.NormalisedTargetFile)
+	require.NotNil(t, res.ProjectDescriptor.Identity.TargetFile)
+	assert.Equal(t, expected, *res.ProjectDescriptor.Identity.TargetFile)
+}
+
+func TestBuildFindings_WorkspacePackage_NotFound(t *testing.T) {
+	sbom := Sbom(workspaceSBOMJSON)
+	plugin := NewPlugin(&MockClient{}, mockConverter(
+		createTestDepGraph("package-a", "0.1.0"),
+		createTestDepGraph("package-c", "0.1.0"),
+	), "")
+
+	opts := ecosystems.NewPluginOptions().WithWorkspacePackage("nope")
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", opts, testLogger)
+
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	var snykErr snyk_errors.Error
+	require.ErrorAs(t, results[0].Error, &snykErr)
+	assert.Equal(t, "Workspace package 'nope' not found.", snykErr.Detail)
+}
+
+func TestBuildFindings_WorkspacePackage_BypassesNoRootGuard(t *testing.T) {
+	sbom := Sbom(virtualWorkspaceSBOMJSON)
+	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("albatross", "0.1.0")), "")
+
+	opts := ecosystems.NewPluginOptions().WithWorkspacePackage("albatross")
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", opts, testLogger)
+
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.NoError(t, results[0].Error)
+	assert.Equal(t, "albatross", results[0].DepGraph.GetRootPkg().Info.Name)
 }
 
 func TestBuildFindings_PathConstruction_RootDir(t *testing.T) {
