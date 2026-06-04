@@ -151,11 +151,11 @@ formatters:
     - goimports
   settings:
     gofumpt:
-      module-path: github.com/snyk/cli-extension-dep-graph
+      module-path: github.com/snyk/cli-extension-dep-graph/v2
       extra-rules: true
     goimports:
       local-prefixes:
-        - github.com/snyk/cli-extension-dep-graph
+        - github.com/snyk/cli-extension-dep-graph/v2
   exclusions:
     generated: lax
     paths:

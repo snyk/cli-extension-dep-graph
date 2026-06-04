@@ -9,8 +9,8 @@ import (
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	gafworkflow "github.com/snyk/go-application-framework/pkg/workflow"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
-	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/workflow"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/depgraph/parsers"
 )
 
 const (

@@ -9,7 +9,7 @@ import (
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/depgraph/parsers"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/depgraph/parsers"
 )
 
 var ErrNoDepGraphsFound = errors.New("no depgraphs found")

@@ -20,10 +20,10 @@ import (
 
 	snykerrors "github.com/snyk/error-catalog-golang-public/snyk_errors"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/metadata"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/scatest"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/metadata"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/scatest"
 )
 
 // PluginTestCase defines a test case for the plugin

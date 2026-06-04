@@ -176,7 +176,7 @@ type ResolverMetadata struct {
 **Standard keys** are available in the `metadata` package:
 
 ```go
-import "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/metadata"
+import "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/metadata"
 
 // Available keys:
 const (
@@ -195,7 +195,7 @@ const (
 **Example usage:**
 
 ```go
-import "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/metadata"
+import "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/metadata"
 
 resolverMetadata := ResolverMetadata{
     PluginName: "gradle",
@@ -219,8 +219,8 @@ Plugins return `PluginResult`, where:
 import (
     "context"
     "fmt"
-    "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-    "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/pip"
+    "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+    "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/python/pip"
 )
 
 func main() {
@@ -290,8 +290,8 @@ To add support for a new ecosystem:
    
    import (
        "context"
-       "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-       "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+       "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+       "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
    )
    
    type Plugin struct {

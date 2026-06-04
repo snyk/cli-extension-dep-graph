@@ -8,7 +8,7 @@ import (
 	"github.com/package-url/packageurl-go"
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 )
 
 const pkgManagerName = "gradle"

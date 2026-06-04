@@ -1,7 +1,7 @@
 package bazel
 
 import (
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 )
 
 // snapshotResults wraps results in the shape JSON snapshot tests

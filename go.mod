@@ -1,4 +1,4 @@
-module github.com/snyk/cli-extension-dep-graph
+module github.com/snyk/cli-extension-dep-graph/v2
 
 go 1.26.3
 

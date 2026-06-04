@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
-	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
-	"github.com/snyk/cli-extension-dep-graph/pkg/conversion"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/mocks"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/conversion"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 )
 
 const singleDepGraphResponse = `{

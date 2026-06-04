@@ -9,11 +9,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/metadata"
-	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/discovery"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/metadata"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/identity"
 )
 
 //go:embed init/snyk-deps-init.gradle

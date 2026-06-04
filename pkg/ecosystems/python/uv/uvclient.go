@@ -10,7 +10,7 @@ import (
 	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 
-	scaecosystems "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	scaecosystems "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 )
 
 const (

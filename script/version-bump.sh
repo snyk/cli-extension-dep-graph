@@ -12,14 +12,15 @@ IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
 PR_TITLE=$(git log -1 --pretty=%s)
 echo "PR title: $PR_TITLE"
 
-# Determine version bump based on PR title
-if [[ "$PR_TITLE" =~ ^[a-z]+(\(.*\))?!: ]]; then
-    # Breaking change indicator with ! (e.g., fix!:, feat(api)!:)
-    BUMP_TYPE="major"
-    MAJOR=$((MAJOR + 1))
-    MINOR=0
-    PATCH=0
-elif [[ "$PR_TITLE" =~ ^feat(\(.*\))?:|^feature: ]]; then
+# Determine version bump based on PR title.
+#
+# Note: major version bumps are intentionally not supported. This module is
+# committed to staying on its current major version; new majors would require
+# a Go module path change (e.g. /v3) and a coordinated consumer migration,
+# which we are not planning to do. Conventional Commits "!" titles (e.g.
+# `feat!:`, `refactor(api)!:`) are therefore treated as a minor bump.
+if [[ "$PR_TITLE" =~ ^[a-z]+(\(.*\))?!: ]] || \
+   [[ "$PR_TITLE" =~ ^feat(\(.*\))?:|^feature: ]]; then
     BUMP_TYPE="minor"
     MINOR=$((MINOR + 1))
     PATCH=0
