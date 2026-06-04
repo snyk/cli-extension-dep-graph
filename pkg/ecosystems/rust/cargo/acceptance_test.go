@@ -164,6 +164,13 @@ func updateGoldenFiles(t *testing.T, dir string, byRoot map[string]*depgraph.Dep
 	for rootName, dg := range byRoot {
 		path := goldenFilenameForRoot(dir, rootName, len(byRoot))
 
+		// Sort before serializing so committed goldens are stable across
+		// regenerations. cargo tree's sibling-emit order isn't fully
+		// deterministic (depends on internal hashmap iteration), and Go's
+		// map iteration is randomized on top — without sorting, every
+		// `go test -update` would produce noisy reorder-only diffs.
+		sortDepGraph(dg)
+
 		data, err := json.MarshalIndent(dg, "", "  ")
 		require.NoError(t, err, "marshaling dep graph for %s", rootName)
 
@@ -188,9 +195,11 @@ func compareAgainstGolden(t *testing.T, dir string, byRoot map[string]*depgraph.
 	}
 }
 
-// normalizedJSON marshals a dep graph to JSON with all arrays sorted so
-// comparisons are order-independent. Same pattern as bun's acceptance suite.
-func normalizedJSON(dg *depgraph.DepGraph) string {
+// sortDepGraph mutates dg in place to put all arrays into a deterministic
+// order: Pkgs by ID, Graph.Nodes by NodeID, each node's Deps by NodeID. Used
+// by both the comparison path (normalizedJSON) and the write path
+// (updateGoldenFiles) so the same ordering is enforced everywhere.
+func sortDepGraph(dg *depgraph.DepGraph) {
 	sort.Slice(dg.Pkgs, func(i, j int) bool { return dg.Pkgs[i].ID < dg.Pkgs[j].ID })
 	sort.Slice(dg.Graph.Nodes, func(i, j int) bool { return dg.Graph.Nodes[i].NodeID < dg.Graph.Nodes[j].NodeID })
 
@@ -199,6 +208,12 @@ func normalizedJSON(dg *depgraph.DepGraph) string {
 			return dg.Graph.Nodes[i].Deps[a].NodeID < dg.Graph.Nodes[i].Deps[b].NodeID
 		})
 	}
+}
+
+// normalizedJSON marshals a dep graph to JSON with all arrays sorted so
+// comparisons are order-independent. Same pattern as bun's acceptance suite.
+func normalizedJSON(dg *depgraph.DepGraph) string {
+	sortDepGraph(dg)
 
 	data, err := json.MarshalIndent(dg, "", "  ")
 	if err != nil {

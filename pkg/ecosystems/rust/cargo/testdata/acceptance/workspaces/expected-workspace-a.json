@@ -5,23 +5,28 @@
   },
   "pkgs": [
     {
-      "id": "workspace-a@0.1.0",
-      "info": {
-        "name": "workspace-a",
-        "version": "0.1.0"
-      }
-    },
-    {
       "id": "lazy_static@1.5.0",
       "info": {
         "name": "lazy_static",
         "version": "1.5.0"
+      }
+    },
+    {
+      "id": "workspace-a@0.1.0",
+      "info": {
+        "name": "workspace-a",
+        "version": "0.1.0"
       }
     }
   ],
   "graph": {
     "rootNodeId": "root-node",
     "nodes": [
+      {
+        "nodeId": "lazy_static@1.5.0",
+        "pkgId": "lazy_static@1.5.0",
+        "deps": []
+      },
       {
         "nodeId": "root-node",
         "pkgId": "workspace-a@0.1.0",
@@ -30,11 +35,6 @@
             "nodeId": "lazy_static@1.5.0"
           }
         ]
-      },
-      {
-        "nodeId": "lazy_static@1.5.0",
-        "pkgId": "lazy_static@1.5.0",
-        "deps": []
       }
     ]
   }

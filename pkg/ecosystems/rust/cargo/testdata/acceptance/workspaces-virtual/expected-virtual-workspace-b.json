@@ -5,10 +5,17 @@
   },
   "pkgs": [
     {
-      "id": "virtual-workspace-b@0.1.0",
+      "id": "proc-macro2@1.0.106",
       "info": {
-        "name": "virtual-workspace-b",
-        "version": "0.1.0"
+        "name": "proc-macro2",
+        "version": "1.0.106"
+      }
+    },
+    {
+      "id": "quote@1.0.45",
+      "info": {
+        "name": "quote",
+        "version": "1.0.45"
       }
     },
     {
@@ -40,13 +47,6 @@
       }
     },
     {
-      "id": "proc-macro2@1.0.106",
-      "info": {
-        "name": "proc-macro2",
-        "version": "1.0.106"
-      }
-    },
-    {
       "id": "unicode-ident@1.0.24",
       "info": {
         "name": "unicode-ident",
@@ -54,16 +54,34 @@
       }
     },
     {
-      "id": "quote@1.0.45",
+      "id": "virtual-workspace-b@0.1.0",
       "info": {
-        "name": "quote",
-        "version": "1.0.45"
+        "name": "virtual-workspace-b",
+        "version": "0.1.0"
       }
     }
   ],
   "graph": {
     "rootNodeId": "root-node",
     "nodes": [
+      {
+        "nodeId": "proc-macro2@1.0.106",
+        "pkgId": "proc-macro2@1.0.106",
+        "deps": [
+          {
+            "nodeId": "unicode-ident@1.0.24"
+          }
+        ]
+      },
+      {
+        "nodeId": "quote@1.0.45",
+        "pkgId": "quote@1.0.45",
+        "deps": [
+          {
+            "nodeId": "proc-macro2@1.0.106"
+          }
+        ]
+      },
       {
         "nodeId": "root-node",
         "pkgId": "virtual-workspace-b@0.1.0",
@@ -96,13 +114,13 @@
         "pkgId": "serde_derive@1.0.228",
         "deps": [
           {
-            "nodeId": "syn@2.0.117"
-          },
-          {
             "nodeId": "proc-macro2@1.0.106"
           },
           {
             "nodeId": "quote@1.0.45"
+          },
+          {
+            "nodeId": "syn@2.0.117"
           }
         ]
       },
@@ -122,27 +140,9 @@
         ]
       },
       {
-        "nodeId": "proc-macro2@1.0.106",
-        "pkgId": "proc-macro2@1.0.106",
-        "deps": [
-          {
-            "nodeId": "unicode-ident@1.0.24"
-          }
-        ]
-      },
-      {
         "nodeId": "unicode-ident@1.0.24",
         "pkgId": "unicode-ident@1.0.24",
         "deps": []
-      },
-      {
-        "nodeId": "quote@1.0.45",
-        "pkgId": "quote@1.0.45",
-        "deps": [
-          {
-            "nodeId": "proc-macro2@1.0.106"
-          }
-        ]
       }
     ]
   }

@@ -12,6 +12,20 @@
       }
     },
     {
+      "id": "proc-macro2@1.0.106",
+      "info": {
+        "name": "proc-macro2",
+        "version": "1.0.106"
+      }
+    },
+    {
+      "id": "quote@1.0.45",
+      "info": {
+        "name": "quote",
+        "version": "1.0.45"
+      }
+    },
+    {
       "id": "serde@1.0.228",
       "info": {
         "name": "serde",
@@ -33,10 +47,10 @@
       }
     },
     {
-      "id": "proc-macro2@1.0.106",
+      "id": "syn@2.0.117",
       "info": {
-        "name": "proc-macro2",
-        "version": "1.0.106"
+        "name": "syn",
+        "version": "2.0.117"
       }
     },
     {
@@ -45,25 +59,29 @@
         "name": "unicode-ident",
         "version": "1.0.24"
       }
-    },
-    {
-      "id": "quote@1.0.45",
-      "info": {
-        "name": "quote",
-        "version": "1.0.45"
-      }
-    },
-    {
-      "id": "syn@2.0.117",
-      "info": {
-        "name": "syn",
-        "version": "2.0.117"
-      }
     }
   ],
   "graph": {
     "rootNodeId": "root-node",
     "nodes": [
+      {
+        "nodeId": "proc-macro2@1.0.106",
+        "pkgId": "proc-macro2@1.0.106",
+        "deps": [
+          {
+            "nodeId": "unicode-ident@1.0.24"
+          }
+        ]
+      },
+      {
+        "nodeId": "quote@1.0.45",
+        "pkgId": "quote@1.0.45",
+        "deps": [
+          {
+            "nodeId": "proc-macro2@1.0.106"
+          }
+        ]
+      },
       {
         "nodeId": "root-node",
         "pkgId": "cross-dep-b@0.1.0",
@@ -107,9 +125,15 @@
         ]
       },
       {
-        "nodeId": "proc-macro2@1.0.106",
-        "pkgId": "proc-macro2@1.0.106",
+        "nodeId": "syn@2.0.117",
+        "pkgId": "syn@2.0.117",
         "deps": [
+          {
+            "nodeId": "proc-macro2@1.0.106"
+          },
+          {
+            "nodeId": "quote@1.0.45"
+          },
           {
             "nodeId": "unicode-ident@1.0.24"
           }
@@ -119,30 +143,6 @@
         "nodeId": "unicode-ident@1.0.24",
         "pkgId": "unicode-ident@1.0.24",
         "deps": []
-      },
-      {
-        "nodeId": "quote@1.0.45",
-        "pkgId": "quote@1.0.45",
-        "deps": [
-          {
-            "nodeId": "proc-macro2@1.0.106"
-          }
-        ]
-      },
-      {
-        "nodeId": "syn@2.0.117",
-        "pkgId": "syn@2.0.117",
-        "deps": [
-          {
-            "nodeId": "unicode-ident@1.0.24"
-          },
-          {
-            "nodeId": "proc-macro2@1.0.106"
-          },
-          {
-            "nodeId": "quote@1.0.45"
-          }
-        ]
       }
     ]
   }

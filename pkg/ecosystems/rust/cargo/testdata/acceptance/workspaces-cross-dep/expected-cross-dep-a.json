@@ -30,6 +30,16 @@
     "rootNodeId": "root-node",
     "nodes": [
       {
+        "nodeId": "cross-dep-b@0.1.0",
+        "pkgId": "cross-dep-b@0.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lazy_static@1.5.0",
+        "pkgId": "lazy_static@1.5.0",
+        "deps": []
+      },
+      {
         "nodeId": "root-node",
         "pkgId": "cross-dep-a@0.1.0",
         "deps": [
@@ -40,16 +50,6 @@
             "nodeId": "lazy_static@1.5.0"
           }
         ]
-      },
-      {
-        "nodeId": "cross-dep-b@0.1.0",
-        "pkgId": "cross-dep-b@0.1.0",
-        "deps": []
-      },
-      {
-        "nodeId": "lazy_static@1.5.0",
-        "pkgId": "lazy_static@1.5.0",
-        "deps": []
       }
     ]
   }
