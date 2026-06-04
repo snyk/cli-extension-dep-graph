@@ -1,0 +1,19 @@
+[package]
+name = "snyk-cargo-optional-target-deps"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lazy_static = "1.4"
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.27", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", optional = true }
+
+[features]
+default = []
+unix-support = ["dep:nix"]
+windows-support = ["dep:winapi"]
+all-platforms = ["unix-support", "windows-support"]
