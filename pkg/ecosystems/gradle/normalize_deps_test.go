@@ -610,6 +610,56 @@ func TestPostHook_HandlesLongestPrefixMatching(t *testing.T) {
 	assert.Equal(t, "canon-extended:lib@2", pkgIDsByNode["short@1-extended:suffix"], "should match 'short@1-extended' and reference canonical package")
 }
 
+func TestPostHook_DoesNotMatchPartialVersions(t *testing.T) {
+	// Test that version prefixes don't incorrectly match longer versions.
+	// E.g., if lib@1.2 is normalized but lib@1.2.3 exists, lib@1.2.3 should NOT be rewritten.
+	graph := makeDepGraph(t, []depgraph.Pkg{
+		{ID: "root@1", Info: depgraph.PkgInfo{Name: "root", Version: "1"}},
+		{ID: "lib@1.2", Info: depgraph.PkgInfo{
+			Name:       "lib",
+			Version:    "1.2",
+			PackageURL: "pkg:maven/com/lib@1.2?checksum=sha1:H1",
+		}},
+		{ID: "lib@1.2.3", Info: depgraph.PkgInfo{
+			Name:       "lib",
+			Version:    "1.2.3",
+			PackageURL: "pkg:maven/com/lib@1.2.3?checksum=sha1:H2",
+		}},
+	}, [][2]string{{"root@1", "lib@1.2"}, {"root@1", "lib@1.2.3"}})
+
+	fake := newFakeLookuper()
+	// Only lib@1.2 has a canonical mapping, lib@1.2.3 should be left unchanged
+	fake.responses["H1"] = "pkg:maven/canonical/lib@2.0"
+	// H2 (lib@1.2.3) intentionally has no mapping
+
+	hook := newNormalizeDepsPostHookWithClient(fake, "org-1")
+	results := hook(context.Background(), logger.Nop(),
+		[]ecosystems.SCAResult{{DepGraph: graph}},
+		&ecosystems.SCAPluginOptions{Global: ecosystems.GlobalOptions{IncludeProvenance: true}},
+	)
+
+	out := results[0].DepGraph
+	require.NotNil(t, out)
+
+	// lib@1.2 should be rewritten to canonical
+	canonicalPkg := pkgByID(t, out, "canonical:lib@2.0")
+	assert.Equal(t, "canonical:lib", canonicalPkg.Info.Name)
+	assert.Equal(t, "2.0", canonicalPkg.Info.Version)
+
+	// lib@1.2.3 should remain unchanged (not rewritten due to prefix match)
+	originalPkg := pkgByID(t, out, "lib@1.2.3")
+	assert.Equal(t, "lib", originalPkg.Info.Name)
+	assert.Equal(t, "1.2.3", originalPkg.Info.Version)
+
+	// Verify node mappings are correct
+	pkgIDsByNode := make(map[string]string)
+	for _, node := range out.Graph.Nodes {
+		pkgIDsByNode[node.NodeID] = node.PkgID
+	}
+	assert.Equal(t, "canonical:lib@2.0", pkgIDsByNode["lib@1.2"], "lib@1.2 node should reference canonical package")
+	assert.Equal(t, "lib@1.2.3", pkgIDsByNode["lib@1.2.3"], "lib@1.2.3 node should reference original package (not affected by prefix match)")
+}
+
 func TestPostHook_HandlesSuffixedNodesWithMerging(t *testing.T) {
 	// Test that suffix-aware node rewriting works correctly when multiple
 	// original packages get merged into a single canonical package, and some

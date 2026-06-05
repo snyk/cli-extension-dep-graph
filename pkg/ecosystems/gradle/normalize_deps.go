@@ -317,7 +317,9 @@ func rewriteDepGraph(
 		var bestReplacement string
 
 		for oldPkgID, newPkgID := range oldToNewPkgID {
-			if strings.HasPrefix(node.PkgID, oldPkgID) && len(oldPkgID) > len(bestMatch) {
+			// Match must be exact or followed by ':' to avoid partial version matches
+			// e.g., lib@1.2 should match lib@1.2 and lib@1.2:constraint, but not lib@1.2.3
+			if (node.PkgID == oldPkgID || strings.HasPrefix(node.PkgID, oldPkgID+":")) && len(oldPkgID) > len(bestMatch) {
 				bestMatch = oldPkgID
 				bestReplacement = newPkgID
 			}
