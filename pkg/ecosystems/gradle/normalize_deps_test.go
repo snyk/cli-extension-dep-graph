@@ -439,3 +439,251 @@ func TestPostHook_PreservesNilDepGraphResults(t *testing.T) {
 	assert.Nil(t, results[1].DepGraph)
 	assert.Equal(t, int64(0), fake.totalCalls.Load())
 }
+
+func TestPostHook_HandlesSuffixedNodeIDs(t *testing.T) {
+	// Test that nodes with suffixed PkgIDs (like constraint and pruned nodes)
+	// are correctly rewritten to reference the canonical packages while
+	// preserving their suffixes.
+	graph := &depgraph.DepGraph{
+		SchemaVersion: "1.3.0",
+		PkgManager:    depgraph.PkgManager{Name: pkgManagerName},
+		Pkgs: []depgraph.Pkg{
+			{ID: "root@1", Info: depgraph.PkgInfo{Name: "root", Version: "1"}},
+			{ID: "orig:lib@OLD", Info: depgraph.PkgInfo{
+				Name:       "orig:lib",
+				Version:    "OLD",
+				PackageURL: "pkg:maven/orig/lib@OLD?checksum=sha1:H1",
+			}},
+		},
+		Graph: depgraph.Graph{
+			RootNodeID: "root@1",
+			Nodes: []depgraph.Node{
+				{NodeID: "root@1", PkgID: "root@1", Deps: []depgraph.Dependency{
+					{NodeID: "orig:lib@OLD"},
+					{NodeID: "orig:lib@OLD:constraint"},
+					{NodeID: "orig:lib@OLD:pruned"},
+				}},
+				{NodeID: "orig:lib@OLD", PkgID: "orig:lib@OLD", Deps: []depgraph.Dependency{}},
+				// Constraint node with suffixed PkgID
+				{NodeID: "orig:lib@OLD:constraint", PkgID: "orig:lib@OLD:constraint", Deps: []depgraph.Dependency{}},
+				// Pruned node with suffixed PkgID
+				{NodeID: "orig:lib@OLD:pruned", PkgID: "orig:lib@OLD:pruned", Deps: []depgraph.Dependency{}},
+			},
+		},
+	}
+
+	fake := newFakeLookuper()
+	fake.responses["H1"] = "pkg:maven/canon/lib@NEW"
+
+	hook := newNormalizeDepsPostHookWithClient(fake, "org-1")
+	results := hook(context.Background(), logger.Nop(),
+		[]ecosystems.SCAResult{{DepGraph: graph}},
+		&ecosystems.SCAPluginOptions{Global: ecosystems.GlobalOptions{IncludeProvenance: true}},
+	)
+
+	out := results[0].DepGraph
+	require.NotNil(t, out)
+
+	// The canonical package should exist
+	canonicalPkg := pkgByID(t, out, "canon:lib@NEW")
+	assert.Equal(t, "canon:lib", canonicalPkg.Info.Name)
+	assert.Equal(t, "NEW", canonicalPkg.Info.Version)
+
+	// Build a map of NodeID -> PkgID for easy verification
+	pkgIDsByNode := make(map[string]string)
+	for _, node := range out.Graph.Nodes {
+		pkgIDsByNode[node.NodeID] = node.PkgID
+	}
+
+	// Verify that all nodes now reference the canonical package ID,
+	// with suffixes preserved
+	assert.Equal(t, "canon:lib@NEW", pkgIDsByNode["orig:lib@OLD"], "base node should reference canonical package")
+	assert.Equal(t, "canon:lib@NEW:constraint", pkgIDsByNode["orig:lib@OLD:constraint"], "constraint node should reference canonical package with :constraint suffix")
+	assert.Equal(t, "canon:lib@NEW:pruned", pkgIDsByNode["orig:lib@OLD:pruned"], "pruned node should reference canonical package with :pruned suffix")
+}
+
+func TestPostHook_HandlesCustomSuffixes(t *testing.T) {
+	// Test that the suffix-aware logic works for any suffix pattern, not just
+	// the hardcoded :constraint and :pruned ones.
+	graph := &depgraph.DepGraph{
+		SchemaVersion: "1.3.0",
+		PkgManager:    depgraph.PkgManager{Name: pkgManagerName},
+		Pkgs: []depgraph.Pkg{
+			{ID: "root@1", Info: depgraph.PkgInfo{Name: "root", Version: "1"}},
+			{ID: "orig:lib@OLD", Info: depgraph.PkgInfo{
+				Name:       "orig:lib",
+				Version:    "OLD",
+				PackageURL: "pkg:maven/orig/lib@OLD?checksum=sha1:H1",
+			}},
+		},
+		Graph: depgraph.Graph{
+			RootNodeID: "root@1",
+			Nodes: []depgraph.Node{
+				{NodeID: "root@1", PkgID: "root@1", Deps: []depgraph.Dependency{
+					{NodeID: "orig:lib@OLD:custom-suffix"},
+					{NodeID: "orig:lib@OLD:another:complex:suffix"},
+				}},
+				// Custom suffix patterns
+				{NodeID: "orig:lib@OLD:custom-suffix", PkgID: "orig:lib@OLD:custom-suffix", Deps: []depgraph.Dependency{}},
+				{NodeID: "orig:lib@OLD:another:complex:suffix", PkgID: "orig:lib@OLD:another:complex:suffix", Deps: []depgraph.Dependency{}},
+			},
+		},
+	}
+
+	fake := newFakeLookuper()
+	fake.responses["H1"] = "pkg:maven/canon/lib@NEW"
+
+	hook := newNormalizeDepsPostHookWithClient(fake, "org-1")
+	results := hook(context.Background(), logger.Nop(),
+		[]ecosystems.SCAResult{{DepGraph: graph}},
+		&ecosystems.SCAPluginOptions{Global: ecosystems.GlobalOptions{IncludeProvenance: true}},
+	)
+
+	out := results[0].DepGraph
+	require.NotNil(t, out)
+
+	// Build a map of NodeID -> PkgID for easy verification
+	pkgIDsByNode := make(map[string]string)
+	for _, node := range out.Graph.Nodes {
+		pkgIDsByNode[node.NodeID] = node.PkgID
+	}
+
+	// Verify that custom suffixes are preserved
+	assert.Equal(t, "canon:lib@NEW:custom-suffix", pkgIDsByNode["orig:lib@OLD:custom-suffix"], "custom suffix should be preserved")
+	assert.Equal(t, "canon:lib@NEW:another:complex:suffix", pkgIDsByNode["orig:lib@OLD:another:complex:suffix"], "complex suffix should be preserved")
+}
+
+func TestPostHook_HandlesLongestPrefixMatching(t *testing.T) {
+	// Test that the longest-prefix matching works correctly when one package ID
+	// is a prefix of another (edge case prevention).
+	graph := &depgraph.DepGraph{
+		SchemaVersion: "1.3.0",
+		PkgManager:    depgraph.PkgManager{Name: pkgManagerName},
+		Pkgs: []depgraph.Pkg{
+			{ID: "root@1", Info: depgraph.PkgInfo{Name: "root", Version: "1"}},
+			{ID: "short@1", Info: depgraph.PkgInfo{
+				Name:       "short",
+				Version:    "1",
+				PackageURL: "pkg:maven/short/lib@1?checksum=sha1:H1",
+			}},
+			{ID: "short@1-extended", Info: depgraph.PkgInfo{
+				Name:       "short-extended",
+				Version:    "1",
+				PackageURL: "pkg:maven/short/extended@1?checksum=sha1:H2",
+			}},
+		},
+		Graph: depgraph.Graph{
+			RootNodeID: "root@1",
+			Nodes: []depgraph.Node{
+				{NodeID: "root@1", PkgID: "root@1", Deps: []depgraph.Dependency{
+					{NodeID: "short@1:suffix"},
+					{NodeID: "short@1-extended:suffix"},
+				}},
+				// Node with suffix that could match multiple prefixes
+				{NodeID: "short@1:suffix", PkgID: "short@1:suffix", Deps: []depgraph.Dependency{}},
+				{NodeID: "short@1-extended:suffix", PkgID: "short@1-extended:suffix", Deps: []depgraph.Dependency{}},
+			},
+		},
+	}
+
+	fake := newFakeLookuper()
+	fake.responses["H1"] = "pkg:maven/canon-short/lib@2"
+	fake.responses["H2"] = "pkg:maven/canon-extended/lib@2"
+
+	hook := newNormalizeDepsPostHookWithClient(fake, "org-1")
+	results := hook(context.Background(), logger.Nop(),
+		[]ecosystems.SCAResult{{DepGraph: graph}},
+		&ecosystems.SCAPluginOptions{Global: ecosystems.GlobalOptions{IncludeProvenance: true}},
+	)
+
+	out := results[0].DepGraph
+	require.NotNil(t, out)
+
+	// Build a map of NodeID -> PkgID for easy verification
+	pkgIDsByNode := make(map[string]string)
+	for _, node := range out.Graph.Nodes {
+		pkgIDsByNode[node.NodeID] = node.PkgID
+	}
+
+	// Verify that longest prefix matching worked correctly
+	assert.Equal(t, "canon-short:lib@2:suffix", pkgIDsByNode["short@1:suffix"], "should match 'short@1' not a substring")
+	assert.Equal(t, "canon-extended:lib@2:suffix", pkgIDsByNode["short@1-extended:suffix"], "should match full 'short@1-extended' prefix")
+}
+
+func TestPostHook_HandlesSuffixedNodesWithMerging(t *testing.T) {
+	// Test that suffix-aware node rewriting works correctly when multiple
+	// original packages get merged into a single canonical package, and some
+	// of those have suffixed nodes (constraint/pruned).
+	graph := &depgraph.DepGraph{
+		SchemaVersion: "1.3.0",
+		PkgManager:    depgraph.PkgManager{Name: pkgManagerName},
+		Pkgs: []depgraph.Pkg{
+			{ID: "root@1", Info: depgraph.PkgInfo{Name: "root", Version: "1"}},
+			// Two different original packages that will map to the same canonical
+			{ID: "a:lib@OLD1", Info: depgraph.PkgInfo{
+				Name:       "a:lib",
+				Version:    "OLD1",
+				PackageURL: "pkg:maven/a/lib@OLD1?checksum=sha1:H1",
+			}},
+			{ID: "b:lib@OLD2", Info: depgraph.PkgInfo{
+				Name:       "b:lib",
+				Version:    "OLD2",
+				PackageURL: "pkg:maven/b/lib@OLD2?checksum=sha1:H2",
+			}},
+		},
+		Graph: depgraph.Graph{
+			RootNodeID: "root@1",
+			Nodes: []depgraph.Node{
+				{NodeID: "root@1", PkgID: "root@1", Deps: []depgraph.Dependency{
+					{NodeID: "a:lib@OLD1"},
+					{NodeID: "a:lib@OLD1:constraint"},
+					{NodeID: "b:lib@OLD2"},
+					{NodeID: "b:lib@OLD2:pruned"},
+				}},
+				// Regular nodes
+				{NodeID: "a:lib@OLD1", PkgID: "a:lib@OLD1", Deps: []depgraph.Dependency{}},
+				{NodeID: "b:lib@OLD2", PkgID: "b:lib@OLD2", Deps: []depgraph.Dependency{}},
+				// Suffixed nodes from different originals
+				{NodeID: "a:lib@OLD1:constraint", PkgID: "a:lib@OLD1:constraint", Deps: []depgraph.Dependency{}},
+				{NodeID: "b:lib@OLD2:pruned", PkgID: "b:lib@OLD2:pruned", Deps: []depgraph.Dependency{}},
+			},
+		},
+	}
+
+	fake := newFakeLookuper()
+	// Both different originals map to the same canonical package
+	fake.responses["H1"] = "pkg:maven/canon/lib@NEW"
+	fake.responses["H2"] = "pkg:maven/canon/lib@NEW"
+
+	hook := newNormalizeDepsPostHookWithClient(fake, "org-1")
+	results := hook(context.Background(), logger.Nop(),
+		[]ecosystems.SCAResult{{DepGraph: graph}},
+		&ecosystems.SCAPluginOptions{Global: ecosystems.GlobalOptions{IncludeProvenance: true}},
+	)
+
+	out := results[0].DepGraph
+	require.NotNil(t, out)
+
+	// Verify merging: only one canonical package should exist
+	canonicalCount := 0
+	for _, pkg := range out.Pkgs {
+		if pkg.ID == "canon:lib@NEW" {
+			canonicalCount++
+		}
+	}
+	assert.Equal(t, 1, canonicalCount, "expected merged packages to result in single canonical pkg")
+	assert.Len(t, out.Pkgs, 2, "expected exactly root + 1 canonical pkg")
+
+	// Build a map of NodeID -> PkgID for verification
+	pkgIDsByNode := make(map[string]string)
+	for _, node := range out.Graph.Nodes {
+		pkgIDsByNode[node.NodeID] = node.PkgID
+	}
+
+	// All nodes should now reference the canonical package,
+	// with suffixes properly preserved
+	assert.Equal(t, "canon:lib@NEW", pkgIDsByNode["a:lib@OLD1"], "regular node from package A should reference canonical")
+	assert.Equal(t, "canon:lib@NEW", pkgIDsByNode["b:lib@OLD2"], "regular node from package B should reference canonical")
+	assert.Equal(t, "canon:lib@NEW:constraint", pkgIDsByNode["a:lib@OLD1:constraint"], "constraint node from package A should reference canonical with suffix")
+	assert.Equal(t, "canon:lib@NEW:pruned", pkgIDsByNode["b:lib@OLD2:pruned"], "pruned node from package B should reference canonical with suffix")
+}

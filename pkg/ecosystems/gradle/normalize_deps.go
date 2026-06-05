@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -307,8 +308,22 @@ func rewriteDepGraph(
 	newNodes := make([]depgraph.Node, len(dg.Graph.Nodes))
 	for i, node := range dg.Graph.Nodes {
 		newNodes[i] = node
-		if redirected, ok := oldToNewPkgID[node.PkgID]; ok {
-			newNodes[i].PkgID = redirected
+
+		// Find the longest matching base package ID that this node starts with
+		var bestMatch string
+		var bestReplacement string
+
+		for oldPkgID, newPkgID := range oldToNewPkgID {
+			if strings.HasPrefix(node.PkgID, oldPkgID) && len(oldPkgID) > len(bestMatch) {
+				bestMatch = oldPkgID
+				bestReplacement = newPkgID
+			}
+		}
+
+		if bestMatch != "" {
+			// Replace the matching prefix with the canonical ID, preserving any suffix
+			suffix := node.PkgID[len(bestMatch):]
+			newNodes[i].PkgID = bestReplacement + suffix
 		}
 	}
 

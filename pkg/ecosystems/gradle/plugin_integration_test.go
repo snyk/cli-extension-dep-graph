@@ -240,13 +240,23 @@ func normalizeDepsTestCases() map[string]PluginTestCase {
 	return map[string]PluginTestCase{
 		"simple_with_normalize_deps": {
 			Fixture:      "simple",
-			Options:      ecosystems.NewPluginOptions().WithGradleNormalizeDeps(true).WithIncludeProvenance(true),
+			Options:      ecosystems.NewPluginOptions().WithGradleNormalizeDeps(true),
 			ExpectedFile: "expected_plugin_with_normalize_deps.json",
+		},
+		"simple_with_normalize_deps_and_provenance": {
+			Fixture:      "simple",
+			Options:      ecosystems.NewPluginOptions().WithGradleNormalizeDeps(true).WithIncludeProvenance(true),
+			ExpectedFile: "expected_plugin_with_normalize_deps_and_provenance.json",
 		},
 		"platform_bom_with_normalize_deps": {
 			Fixture:      "platform-bom",
-			Options:      ecosystems.NewPluginOptions().WithGradleNormalizeDeps(true).WithIncludeProvenance(true),
+			Options:      ecosystems.NewPluginOptions().WithGradleNormalizeDeps(true),
 			ExpectedFile: "expected_plugin_bom_with_normalize_deps.json",
+		},
+		"platform_bom_with_normalize_deps_and_provenance": {
+			Fixture:      "platform-bom",
+			Options:      ecosystems.NewPluginOptions().WithGradleNormalizeDeps(true).WithIncludeProvenance(true),
+			ExpectedFile: "expected_plugin_bom_with_normalize_deps_and_provenance.json",
 		},
 	}
 }
