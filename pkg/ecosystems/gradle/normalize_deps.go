@@ -89,12 +89,7 @@ func newNormalizeDepsPostHookWithClient(client packageLookuper, orgID string) No
 		var canonicalBySha1 map[string]mavenCoords
 		if len(lookups) > 0 {
 			var failures int
-			var err error
-			canonicalBySha1, failures, err = resolveCanonicalCoords(ctx, log, client, lookups)
-			if err != nil {
-				log.Debug(ctx, "gradle: normalisation canceled", logger.Err(err))
-				return results
-			}
+			canonicalBySha1, failures = resolveCanonicalCoords(ctx, log, client, lookups)
 			if failures > 0 {
 				// Info, not Error: per-SHA1 failures are non-fatal — nodes
 				// without a canonical mapping are kept as-is, matching the
@@ -110,7 +105,13 @@ func newNormalizeDepsPostHookWithClient(client packageLookuper, orgID string) No
 			if results[i].DepGraph == nil {
 				continue
 			}
-			results[i].DepGraph = rewriteDepGraph(results[i].DepGraph, canonicalBySha1, includeProvenance)
+			rewritten, err := rewriteDepGraph(results[i].DepGraph, canonicalBySha1, includeProvenance)
+			if err != nil {
+				log.Info(ctx, "gradle: dep-graph rewrite produced an invalid graph; leaving result unchanged",
+					logger.Err(err))
+				continue
+			}
+			results[i].DepGraph = rewritten
 		}
 
 		return results
@@ -174,19 +175,19 @@ func parseMavenPurl(purlString string) (sha1 string, coords mavenCoords, ok bool
 // resolveCanonicalCoords issues one lookup per unique SHA1, returning a map
 // from SHA1 to the canonical Maven coordinates reported by the Packages API.
 //
-// Per-SHA1 failures are tolerated: unmapped entries are simply absent from the
-// returned map, which causes the rewrite pass to leave the corresponding nodes
-// untouched. The failure count is returned alongside the map so callers can
-// surface a summary warning.
-//
-// Context cancellation is treated as a fatal error and propagated to the caller.
+// All per-SHA1 failures are treated as soft failures — including context
+// cancellation, which causes in-flight lookups to return errors that are
+// counted the same as any other API failure. Unmapped entries are simply absent
+// from the returned map, which causes the rewrite pass to leave the
+// corresponding nodes untouched. The failure count is returned alongside the
+// map so callers can surface a summary warning.
 func resolveCanonicalCoords(
 	ctx context.Context,
 	log logger.Logger,
 	client packageLookuper,
 	lookups map[string]mavenCoords,
-) (canonical map[string]mavenCoords, failureCount int, err error) {
-	canonical = make(map[string]mavenCoords, len(lookups))
+) (map[string]mavenCoords, int) {
+	canonical := make(map[string]mavenCoords, len(lookups))
 	var (
 		mu       sync.Mutex
 		failures atomic.Int64
@@ -208,11 +209,9 @@ func resolveCanonicalCoords(
 			return nil
 		})
 	}
-	if err = group.Wait(); err != nil {
-		return nil, 0, fmt.Errorf("dependency normalisation canceled: %w", err)
-	}
+	_ = group.Wait()
 
-	return canonical, int(failures.Load()), nil
+	return canonical, int(failures.Load())
 }
 
 // resolveOne performs a single SHA1 lookup and parses the returned purl.
@@ -273,13 +272,17 @@ func resolveOne(
 //  3. When --include-provenance was not requested, every purl is stripped from
 //     the final output. This matches the behavior of a non-provenance build
 //     and avoids leaking the purls we synthesized solely to power this hook.
+//
+// BuildGraph is called on the result, which validates that every node PkgID
+// still references a known pkg. An error from BuildGraph indicates a bug in
+// the rewrite logic; callers should fall back to the original graph.
 func rewriteDepGraph(
 	dg *depgraph.DepGraph,
 	canonicalBySha1 map[string]mavenCoords,
 	includeProvenance bool,
-) *depgraph.DepGraph {
+) (*depgraph.DepGraph, error) {
 	if dg == nil {
-		return nil
+		return nil, nil
 	}
 
 	oldToNewPkgID := make(map[string]string, len(dg.Pkgs))
@@ -327,7 +330,7 @@ func rewriteDepGraph(
 		}
 	}
 
-	return &depgraph.DepGraph{
+	out := &depgraph.DepGraph{
 		SchemaVersion: dg.SchemaVersion,
 		PkgManager:    dg.PkgManager,
 		Pkgs:          newPkgs,
@@ -336,6 +339,10 @@ func rewriteDepGraph(
 			Nodes:      newNodes,
 		},
 	}
+	if err := out.BuildGraph(); err != nil {
+		return nil, fmt.Errorf("rewritten dep-graph failed validation: %w", err)
+	}
+	return out, nil
 }
 
 // rewritePkg returns a copy of pkg with canonical Maven coordinates applied
