@@ -309,18 +309,27 @@ func rewriteDepGraph(
 		newPkgs = append(newPkgs, newPkg)
 	}
 
+	// Rewrite node PkgIDs to reference canonical packages
+	// Performance optimization: use fast O(1) lookup for exact matches,
+	// fall back to O(M) prefix search only for suffixed nodes
 	newNodes := make([]depgraph.Node, len(dg.Graph.Nodes))
 	for i, node := range dg.Graph.Nodes {
 		newNodes[i] = node
 
-		// Find the longest matching base package ID that this node starts with
+		// Fast path: check for exact match first (O(1))
+		if newPkgID, exists := oldToNewPkgID[node.PkgID]; exists {
+			newNodes[i].PkgID = newPkgID
+			continue
+		}
+
+		// Slow path: check for suffixed nodes (only when needed)
+		// Find the longest matching base package ID for suffixed nodes
 		var bestMatch string
 		var bestReplacement string
 
 		for oldPkgID, newPkgID := range oldToNewPkgID {
-			// Match must be exact or followed by ':' to avoid partial version matches
-			// e.g., lib@1.2 should match lib@1.2 and lib@1.2:constraint, but not lib@1.2.3
-			if (node.PkgID == oldPkgID || strings.HasPrefix(node.PkgID, oldPkgID+":")) && len(oldPkgID) > len(bestMatch) {
+			// Check if this is a suffixed node (node.PkgID starts with oldPkgID followed by ':')
+			if strings.HasPrefix(node.PkgID, oldPkgID+":") && len(oldPkgID) > len(bestMatch) {
 				bestMatch = oldPkgID
 				bestReplacement = newPkgID
 			}
@@ -328,7 +337,6 @@ func rewriteDepGraph(
 
 		if bestMatch != "" {
 			// Replace with the canonical package ID (no suffix)
-			// The NodeID keeps its original identity, but PkgID must reference a real package
 			newNodes[i].PkgID = bestReplacement
 		}
 	}
