@@ -11,7 +11,7 @@ var FlagUnifiedTestAPIOsCLI = flag{
 }
 
 var FlagNewGradleResolver = flag{
-	Key:   "internal_new_gradle_resolver",
+	Key:   "internal-new-gradle-resolver",
 	Value: "internal-new-gradle-resolver",
 }
 
