@@ -38,12 +38,12 @@ func newFakeLookuper() *fakeLookuper {
 func (f *fakeLookuper) LookupMavenPackage(_ context.Context, q snykclient.MavenPackageQuery) (string, error) {
 	f.totalCalls.Add(1)
 	f.mu.Lock()
-	f.calls[q.Sha1]++
-	f.mu.Unlock()
-	if err, ok := f.errors[q.Sha1]; ok {
+	defer f.mu.Unlock()
+	f.calls[q.SHA1]++
+	if err, ok := f.errors[q.SHA1]; ok {
 		return "", err
 	}
-	return f.responses[q.Sha1], nil
+	return f.responses[q.SHA1], nil
 }
 
 //nolint:unused // only used in tests

@@ -32,7 +32,7 @@ func Test_LookupMavenPackage_Success(t *testing.T) {
 
 	client := snykclient.NewSnykClient(server.Client(), server.URL, "org1")
 	purl, err := client.LookupMavenPackage(context.Background(), snykclient.MavenPackageQuery{
-		Sha1:     "ABCDEF",
+		SHA1:     "ABCDEF",
 		GroupID:  "com.example",
 		Artifact: "foo",
 		Version:  "1.2.3",
@@ -48,7 +48,7 @@ func Test_LookupMavenPackage_404ReturnsEmpty(t *testing.T) {
 	server := mocks.NewMockSBOMService(response)
 
 	client := snykclient.NewSnykClient(server.Client(), server.URL, "org1")
-	purl, err := client.LookupMavenPackage(context.Background(), snykclient.MavenPackageQuery{Sha1: "X"})
+	purl, err := client.LookupMavenPackage(context.Background(), snykclient.MavenPackageQuery{SHA1: "X"})
 	require.NoError(t, err)
 	assert.Empty(t, purl)
 }
@@ -62,7 +62,7 @@ func Test_LookupMavenPackage_EmptyData(t *testing.T) {
 	server := mocks.NewMockSBOMService(response)
 
 	client := snykclient.NewSnykClient(server.Client(), server.URL, "org1")
-	purl, err := client.LookupMavenPackage(context.Background(), snykclient.MavenPackageQuery{Sha1: "X"})
+	purl, err := client.LookupMavenPackage(context.Background(), snykclient.MavenPackageQuery{SHA1: "X"})
 	require.NoError(t, err)
 	assert.Empty(t, purl)
 }
@@ -82,7 +82,7 @@ func Test_LookupMavenPackage_Non404ErrorStatusReturnsError(t *testing.T) {
 			server := mocks.NewMockSBOMService(response)
 
 			client := snykclient.NewSnykClient(server.Client(), server.URL, "org1")
-			_, err := client.LookupMavenPackage(context.Background(), snykclient.MavenPackageQuery{Sha1: "X"})
+			_, err := client.LookupMavenPackage(context.Background(), snykclient.MavenPackageQuery{SHA1: "X"})
 			assert.Errorf(t, err, "expected error for HTTP %d", status)
 		})
 	}

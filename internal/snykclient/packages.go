@@ -13,7 +13,7 @@ const packagesAPIVersion = "2024-10-15"
 // MavenPackageQuery describes the input to the Snyk Packages endpoint when
 // looking up the canonical Maven coordinates for an artifact identified by SHA1.
 type MavenPackageQuery struct {
-	Sha1     string
+	SHA1     string
 	GroupID  string
 	Artifact string
 	Version  string
@@ -93,8 +93,8 @@ func buildPackagesAPIURL(apiBaseURL string, q MavenPackageQuery) (*url.URL, erro
 		"version":      []string{packagesAPIVersion},
 		"package_type": []string{"maven"},
 	}
-	if q.Sha1 != "" {
-		query.Set("package_sha1", q.Sha1)
+	if q.SHA1 != "" {
+		query.Set("package_sha1", q.SHA1)
 	}
 	if q.GroupID != "" {
 		query.Set("package_namespace", q.GroupID)

@@ -227,7 +227,7 @@ func resolveOne(
 	original mavenCoords,
 ) (mavenCoords, bool) {
 	purlString, err := client.LookupMavenPackage(ctx, snykclient.MavenPackageQuery{
-		Sha1:     sha1,
+		SHA1:     sha1,
 		GroupID:  original.groupID,
 		Artifact: original.artifact,
 		Version:  original.version,
