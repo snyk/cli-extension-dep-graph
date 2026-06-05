@@ -55,12 +55,8 @@ func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry,
 func (r *PluginRegistry) ResolveDepgraphs(dir string, opts *ecosystems.SCAPluginOptions) <-chan ecosystems.SCAResult {
 	resultsChan := make(chan ecosystems.SCAResult)
 
-	// Clone opts so WithExcludePaths mutations during the loop don't reach into the
-	// caller's opts. Other Global fields are shallow-copied; only ExcludePaths is mutated
-	// here, so its backing slice is the only one we need to clone.
-	localOpts := *opts
-	localOpts.Global.ExcludePaths = append(ecosystems.CommaSeparatedString(nil), opts.Global.ExcludePaths...)
-	opts = &localOpts
+	// Clone so per-iteration WithExcludePaths mutations don't leak back to the caller.
+	opts = opts.Clone()
 
 	go func() {
 		defer close(resultsChan)

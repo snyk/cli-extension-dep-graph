@@ -371,3 +371,52 @@ func TestWithIncludeProvenance(t *testing.T) {
 	options = NewPluginOptions().WithIncludeProvenance(false)
 	assert.False(t, options.Global.IncludeProvenance)
 }
+
+func TestSCAPluginOptions_Clone_NilReceiverReturnsNil(t *testing.T) {
+	var o *SCAPluginOptions
+	assert.Nil(t, o.Clone())
+}
+
+func TestSCAPluginOptions_Clone_IsolatesSliceMutations(t *testing.T) {
+	target := "requirements.txt"
+	original := &SCAPluginOptions{
+		Global: GlobalOptions{
+			TargetFile:   &target,
+			Exclude:      CommaSeparatedString{"a"},
+			ExcludePaths: CommaSeparatedString{"x"},
+			RawFlags:     []string{"--foo"},
+		},
+	}
+
+	clone := original.Clone()
+	clone.WithExclude([]string{"b"})
+	clone.WithExcludePaths([]string{"y"})
+	clone.WithRawFlags("--bar")
+
+	assert.Equal(t, CommaSeparatedString{"a"}, original.Global.Exclude)
+	assert.Equal(t, CommaSeparatedString{"x"}, original.Global.ExcludePaths)
+	assert.Equal(t, []string{"--foo"}, original.Global.RawFlags)
+
+	assert.Equal(t, CommaSeparatedString{"a", "b"}, clone.Global.Exclude)
+	assert.Equal(t, CommaSeparatedString{"x", "y"}, clone.Global.ExcludePaths)
+	assert.Equal(t, []string{"--foo", "--bar"}, clone.Global.RawFlags)
+}
+
+func TestSCAPluginOptions_WithFunctionsDoNotMutateHeldSlices(t *testing.T) {
+	o := NewPluginOptions()
+	o.Global.ExcludePaths = CommaSeparatedString{"x"}
+	o.Global.Exclude = CommaSeparatedString{"a"}
+	o.Global.RawFlags = []string{"--foo"}
+
+	heldExcludePaths := o.Global.ExcludePaths
+	heldExclude := o.Global.Exclude
+	heldRawFlags := o.Global.RawFlags
+
+	o.WithExcludePaths([]string{"y"})
+	o.WithExclude([]string{"b"})
+	o.WithRawFlags("--bar")
+
+	assert.Equal(t, CommaSeparatedString{"x"}, heldExcludePaths)
+	assert.Equal(t, CommaSeparatedString{"a"}, heldExclude)
+	assert.Equal(t, []string{"--foo"}, heldRawFlags)
+}

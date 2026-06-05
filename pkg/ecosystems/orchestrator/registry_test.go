@@ -364,6 +364,37 @@ func TestPluginRegistry_ResolveDepgraphs_PropagatesProcessedFilesAsExcludePaths(
 		"processed files must NOT leak onto opts.Global.Exclude — that channel is for basename patterns only")
 }
 
+func TestPluginRegistry_ResolveDepgraphs_DoesNotMutateCallerOpts(t *testing.T) {
+	r := &PluginRegistry{
+		ictx:    setupMockInvocationContext(t),
+		entries: make([]pluginEntry, 0),
+		plugins: make([]ecosystems.SCAPlugin, 0),
+	}
+
+	require.NoError(t, r.register(&mockPlugin{
+		name:           "plugin-a",
+		processedFiles: []string{"a/lock.json"},
+		results:        []ecosystems.SCAResult{{ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-a"}}}},
+	}))
+	require.NoError(t, r.register(&mockPlugin{
+		name:           "plugin-b",
+		processedFiles: []string{"b/lock.json"},
+		results:        []ecosystems.SCAResult{{ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{ProjectType: "type-b"}}}},
+	}))
+
+	opts := ecosystems.NewPluginOptions()
+	opts.Global.AllProjects = true
+	opts.Global.ExcludePaths = ecosystems.CommaSeparatedString{"user-supplied"}
+	heldExcludePaths := opts.Global.ExcludePaths
+
+	collectResults(r.ResolveDepgraphs("/test/dir", opts))
+
+	assert.Equal(t, ecosystems.CommaSeparatedString{"user-supplied"}, opts.Global.ExcludePaths,
+		"caller's opts.Global.ExcludePaths must be unchanged after ResolveDepgraphs")
+	assert.Equal(t, ecosystems.CommaSeparatedString{"user-supplied"}, heldExcludePaths,
+		"caller's slice held before the call must not have its backing array mutated")
+}
+
 func TestPluginRegistry_Register_WithFeatureFlag(t *testing.T) {
 	r := &PluginRegistry{
 		ictx:    setupMockInvocationContext(t),
