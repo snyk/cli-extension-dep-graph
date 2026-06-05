@@ -9,7 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/snykclient"
 )
 
 // fakeLookuper is a programmable packageLookuper used to drive the normalize-deps

@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
-	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/mocks"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/snykclient"
 )
 
 func Test_LookupMavenPackage_Success(t *testing.T) {

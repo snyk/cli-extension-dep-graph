@@ -12,7 +12,7 @@ import (
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 )

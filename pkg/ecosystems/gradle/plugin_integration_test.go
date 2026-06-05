@@ -484,12 +484,12 @@ func TestPlugin_NormalizeDepsIntegration(t *testing.T) {
 			normalizeDepsHook := newNormalizeDepsPostHookWithClient(fake, "test-org-id")
 
 			plugin := NewGradlePluginWithNormalizeDepsHook(normalizeDepsHook)
-			result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absFixture, testCase.Options)
+			result, err := scatest.Run(ctx, plugin, logger.Nop(), absFixture, testCase.Options)
 			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 			require.NotNil(t, result, "plugin result should not be nil")
 
 			if updateFixtures {
-				writeExpectedSnapshot(t, filepath.Join(fixturePath, testCase.ExpectedFile), result.Results)
+				writeExpectedSnapshot(t, filepath.Join(fixturePath, testCase.ExpectedFile), result)
 				return
 			}
 
@@ -497,7 +497,7 @@ func TestPlugin_NormalizeDepsIntegration(t *testing.T) {
 			require.NoErrorf(t, err, "no expected snapshot for fixture %q; run with %s=1 to generate", testCase.Fixture, updateFixturesEnvVar)
 
 			expected := loadExpectedResults(t, expectedPath)
-			assertResultsMatchExpected(t, result.Results, expected, testCase.Fixture)
+			assertResultsMatchExpected(t, result, expected, testCase.Fixture)
 		})
 	}
 }
