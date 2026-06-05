@@ -464,10 +464,10 @@ func TestPostHook_HandlesSuffixedNodeIDs(t *testing.T) {
 					{NodeID: "orig:lib@OLD:pruned"},
 				}},
 				{NodeID: "orig:lib@OLD", PkgID: "orig:lib@OLD", Deps: []depgraph.Dependency{}},
-				// Constraint node with suffixed PkgID
-				{NodeID: "orig:lib@OLD:constraint", PkgID: "orig:lib@OLD:constraint", Deps: []depgraph.Dependency{}},
-				// Pruned node with suffixed PkgID
-				{NodeID: "orig:lib@OLD:pruned", PkgID: "orig:lib@OLD:pruned", Deps: []depgraph.Dependency{}},
+				// Constraint node - NodeID has suffix, PkgID references actual package
+				{NodeID: "orig:lib@OLD:constraint", PkgID: "orig:lib@OLD", Deps: []depgraph.Dependency{}},
+				// Pruned node - NodeID has suffix, PkgID references actual package  
+				{NodeID: "orig:lib@OLD:pruned", PkgID: "orig:lib@OLD", Deps: []depgraph.Dependency{}},
 			},
 		},
 	}
@@ -495,11 +495,11 @@ func TestPostHook_HandlesSuffixedNodeIDs(t *testing.T) {
 		pkgIDsByNode[node.NodeID] = node.PkgID
 	}
 
-	// Verify that all nodes now reference the canonical package ID,
-	// with suffixes preserved
+	// Verify that all nodes now reference the canonical package ID
+	// NodeIDs keep their original identity, PkgIDs reference the canonical package
 	assert.Equal(t, "canon:lib@NEW", pkgIDsByNode["orig:lib@OLD"], "base node should reference canonical package")
-	assert.Equal(t, "canon:lib@NEW:constraint", pkgIDsByNode["orig:lib@OLD:constraint"], "constraint node should reference canonical package with :constraint suffix")
-	assert.Equal(t, "canon:lib@NEW:pruned", pkgIDsByNode["orig:lib@OLD:pruned"], "pruned node should reference canonical package with :pruned suffix")
+	assert.Equal(t, "canon:lib@NEW", pkgIDsByNode["orig:lib@OLD:constraint"], "constraint node should reference canonical package")
+	assert.Equal(t, "canon:lib@NEW", pkgIDsByNode["orig:lib@OLD:pruned"], "pruned node should reference canonical package")
 }
 
 func TestPostHook_HandlesCustomSuffixes(t *testing.T) {
@@ -523,9 +523,9 @@ func TestPostHook_HandlesCustomSuffixes(t *testing.T) {
 					{NodeID: "orig:lib@OLD:custom-suffix"},
 					{NodeID: "orig:lib@OLD:another:complex:suffix"},
 				}},
-				// Custom suffix patterns
-				{NodeID: "orig:lib@OLD:custom-suffix", PkgID: "orig:lib@OLD:custom-suffix", Deps: []depgraph.Dependency{}},
-				{NodeID: "orig:lib@OLD:another:complex:suffix", PkgID: "orig:lib@OLD:another:complex:suffix", Deps: []depgraph.Dependency{}},
+				// Custom suffix patterns - NodeID has suffix, PkgID references actual package
+				{NodeID: "orig:lib@OLD:custom-suffix", PkgID: "orig:lib@OLD", Deps: []depgraph.Dependency{}},
+				{NodeID: "orig:lib@OLD:another:complex:suffix", PkgID: "orig:lib@OLD", Deps: []depgraph.Dependency{}},
 			},
 		},
 	}
@@ -548,9 +548,9 @@ func TestPostHook_HandlesCustomSuffixes(t *testing.T) {
 		pkgIDsByNode[node.NodeID] = node.PkgID
 	}
 
-	// Verify that custom suffixes are preserved
-	assert.Equal(t, "canon:lib@NEW:custom-suffix", pkgIDsByNode["orig:lib@OLD:custom-suffix"], "custom suffix should be preserved")
-	assert.Equal(t, "canon:lib@NEW:another:complex:suffix", pkgIDsByNode["orig:lib@OLD:another:complex:suffix"], "complex suffix should be preserved")
+	// Verify that nodes reference the canonical package
+	assert.Equal(t, "canon:lib@NEW", pkgIDsByNode["orig:lib@OLD:custom-suffix"], "custom suffixed node should reference canonical package")
+	assert.Equal(t, "canon:lib@NEW", pkgIDsByNode["orig:lib@OLD:another:complex:suffix"], "complex suffixed node should reference canonical package")
 }
 
 func TestPostHook_HandlesLongestPrefixMatching(t *testing.T) {
@@ -579,9 +579,9 @@ func TestPostHook_HandlesLongestPrefixMatching(t *testing.T) {
 					{NodeID: "short@1:suffix"},
 					{NodeID: "short@1-extended:suffix"},
 				}},
-				// Node with suffix that could match multiple prefixes
-				{NodeID: "short@1:suffix", PkgID: "short@1:suffix", Deps: []depgraph.Dependency{}},
-				{NodeID: "short@1-extended:suffix", PkgID: "short@1-extended:suffix", Deps: []depgraph.Dependency{}},
+				// Node with suffix that could match multiple prefixes - PkgID references actual packages
+				{NodeID: "short@1:suffix", PkgID: "short@1", Deps: []depgraph.Dependency{}},
+				{NodeID: "short@1-extended:suffix", PkgID: "short@1-extended", Deps: []depgraph.Dependency{}},
 			},
 		},
 	}
@@ -606,8 +606,8 @@ func TestPostHook_HandlesLongestPrefixMatching(t *testing.T) {
 	}
 
 	// Verify that longest prefix matching worked correctly
-	assert.Equal(t, "canon-short:lib@2:suffix", pkgIDsByNode["short@1:suffix"], "should match 'short@1' not a substring")
-	assert.Equal(t, "canon-extended:lib@2:suffix", pkgIDsByNode["short@1-extended:suffix"], "should match full 'short@1-extended' prefix")
+	assert.Equal(t, "canon-short:lib@2", pkgIDsByNode["short@1:suffix"], "should match 'short@1' and reference canonical package")
+	assert.Equal(t, "canon-extended:lib@2", pkgIDsByNode["short@1-extended:suffix"], "should match 'short@1-extended' and reference canonical package")
 }
 
 func TestPostHook_HandlesSuffixedNodesWithMerging(t *testing.T) {
@@ -643,9 +643,9 @@ func TestPostHook_HandlesSuffixedNodesWithMerging(t *testing.T) {
 				// Regular nodes
 				{NodeID: "a:lib@OLD1", PkgID: "a:lib@OLD1", Deps: []depgraph.Dependency{}},
 				{NodeID: "b:lib@OLD2", PkgID: "b:lib@OLD2", Deps: []depgraph.Dependency{}},
-				// Suffixed nodes from different originals
-				{NodeID: "a:lib@OLD1:constraint", PkgID: "a:lib@OLD1:constraint", Deps: []depgraph.Dependency{}},
-				{NodeID: "b:lib@OLD2:pruned", PkgID: "b:lib@OLD2:pruned", Deps: []depgraph.Dependency{}},
+				// Suffixed nodes from different originals - PkgID references actual packages
+				{NodeID: "a:lib@OLD1:constraint", PkgID: "a:lib@OLD1", Deps: []depgraph.Dependency{}},
+				{NodeID: "b:lib@OLD2:pruned", PkgID: "b:lib@OLD2", Deps: []depgraph.Dependency{}},
 			},
 		},
 	}
@@ -680,10 +680,9 @@ func TestPostHook_HandlesSuffixedNodesWithMerging(t *testing.T) {
 		pkgIDsByNode[node.NodeID] = node.PkgID
 	}
 
-	// All nodes should now reference the canonical package,
-	// with suffixes properly preserved
+	// All nodes should now reference the canonical package
 	assert.Equal(t, "canon:lib@NEW", pkgIDsByNode["a:lib@OLD1"], "regular node from package A should reference canonical")
 	assert.Equal(t, "canon:lib@NEW", pkgIDsByNode["b:lib@OLD2"], "regular node from package B should reference canonical")
-	assert.Equal(t, "canon:lib@NEW:constraint", pkgIDsByNode["a:lib@OLD1:constraint"], "constraint node from package A should reference canonical with suffix")
-	assert.Equal(t, "canon:lib@NEW:pruned", pkgIDsByNode["b:lib@OLD2:pruned"], "pruned node from package B should reference canonical with suffix")
+	assert.Equal(t, "canon:lib@NEW", pkgIDsByNode["a:lib@OLD1:constraint"], "constraint node from package A should reference canonical")
+	assert.Equal(t, "canon:lib@NEW", pkgIDsByNode["b:lib@OLD2:pruned"], "pruned node from package B should reference canonical")
 }

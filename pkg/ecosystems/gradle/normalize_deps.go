@@ -324,9 +324,9 @@ func rewriteDepGraph(
 		}
 
 		if bestMatch != "" {
-			// Replace the matching prefix with the canonical ID, preserving any suffix
-			suffix := node.PkgID[len(bestMatch):]
-			newNodes[i].PkgID = bestReplacement + suffix
+			// Replace with the canonical package ID (no suffix)
+			// The NodeID keeps its original identity, but PkgID must reference a real package
+			newNodes[i].PkgID = bestReplacement
 		}
 	}
 
@@ -339,6 +339,7 @@ func rewriteDepGraph(
 			Nodes:      newNodes,
 		},
 	}
+	// Use standard BuildGraph validation - if this fails, our rewrite is wrong
 	if err := out.BuildGraph(); err != nil {
 		return nil, fmt.Errorf("rewritten dep-graph failed validation: %w", err)
 	}
