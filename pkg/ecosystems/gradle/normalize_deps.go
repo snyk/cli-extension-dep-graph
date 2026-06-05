@@ -186,8 +186,8 @@ func resolveCanonicalCoords(
 	log logger.Logger,
 	client packageLookuper,
 	lookups map[string]mavenCoords,
-) (map[string]mavenCoords, int) {
-	canonical := make(map[string]mavenCoords, len(lookups))
+) (canonical map[string]mavenCoords, failureCount int) {
+	canonical = make(map[string]mavenCoords, len(lookups))
 	var (
 		mu       sync.Mutex
 		failures atomic.Int64
@@ -204,12 +204,13 @@ func resolveCanonicalCoords(
 				return nil
 			}
 			mu.Lock()
+			defer mu.Unlock()
 			canonical[sha1] = canonicalCoords
-			mu.Unlock()
 			return nil
 		})
 	}
-	_ = group.Wait()
+	//nolint:errcheck // goroutines always return nil; Wait is called for synchronization only
+	group.Wait()
 
 	return canonical, int(failures.Load())
 }
@@ -282,7 +283,7 @@ func rewriteDepGraph(
 	includeProvenance bool,
 ) (*depgraph.DepGraph, error) {
 	if dg == nil {
-		return nil, nil
+		return nil, nil //nolint:nilnil // nil graph in, nil graph out — no error to report
 	}
 
 	oldToNewPkgID := make(map[string]string, len(dg.Pkgs))

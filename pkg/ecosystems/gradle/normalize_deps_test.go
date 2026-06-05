@@ -466,7 +466,7 @@ func TestPostHook_HandlesSuffixedNodeIDs(t *testing.T) {
 				{NodeID: "orig:lib@OLD", PkgID: "orig:lib@OLD", Deps: []depgraph.Dependency{}},
 				// Constraint node - NodeID has suffix, PkgID references actual package
 				{NodeID: "orig:lib@OLD:constraint", PkgID: "orig:lib@OLD", Deps: []depgraph.Dependency{}},
-				// Pruned node - NodeID has suffix, PkgID references actual package  
+				// Pruned node - NodeID has suffix, PkgID references actual package
 				{NodeID: "orig:lib@OLD:pruned", PkgID: "orig:lib@OLD", Deps: []depgraph.Dependency{}},
 			},
 		},
