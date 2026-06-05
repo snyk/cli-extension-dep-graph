@@ -233,6 +233,34 @@ func pluginTestCases() map[string]PluginTestCase {
 	}
 }
 
+// normalizeDepsTestCases defines integration test cases specifically for the
+// normalize-deps functionality. These require special handling with mocked
+// Snyk client responses and are not part of the main pluginTestCases.
+func normalizeDepsTestCases() map[string]PluginTestCase {
+	return map[string]PluginTestCase{
+		"simple_with_normalize_deps": {
+			Fixture:      "simple",
+			Options:      ecosystems.NewPluginOptions().WithGradleNormalizeDeps(true),
+			ExpectedFile: "expected_plugin_with_normalize_deps.json",
+		},
+		"simple_with_normalize_deps_and_provenance": {
+			Fixture:      "simple",
+			Options:      ecosystems.NewPluginOptions().WithGradleNormalizeDeps(true).WithIncludeProvenance(true),
+			ExpectedFile: "expected_plugin_with_normalize_deps_and_provenance.json",
+		},
+		"platform_bom_with_normalize_deps": {
+			Fixture:      "platform-bom",
+			Options:      ecosystems.NewPluginOptions().WithGradleNormalizeDeps(true),
+			ExpectedFile: "expected_plugin_bom_with_normalize_deps.json",
+		},
+		"platform_bom_with_normalize_deps_and_provenance": {
+			Fixture:      "platform-bom",
+			Options:      ecosystems.NewPluginOptions().WithGradleNormalizeDeps(true).WithIncludeProvenance(true),
+			ExpectedFile: "expected_plugin_bom_with_normalize_deps_and_provenance.json",
+		},
+	}
+}
+
 // TestGradleWrapper_BinaryResolution validates that the plugin correctly chooses
 // between wrapper and system gradle binaries based on options and fixture setup.
 // These tests focus on execution path and metadata, not graph content (which is
@@ -418,6 +446,90 @@ func TestPlugin_NormalizeDepsPostHook_WiringIntegration(t *testing.T) {
 
 		assert.False(t, hookInvoked, "post-hook should not be invoked when --gradle-normalize-deps is unset")
 	})
+}
+
+// TestPlugin_NormalizeDepsIntegration exercises the full normalize-deps functionality
+// by running the Gradle plugin against real fixtures with mocked Snyk client responses.
+// This test verifies that dependency coordinates are properly transformed and the
+// dependency graph structure is preserved.
+func TestPlugin_NormalizeDepsIntegration(t *testing.T) {
+	updateFixtures := os.Getenv(updateFixturesEnvVar) != ""
+
+	gradleVersion, err := gradleRuntime()
+	require.NoErrorf(t, err, "could not detect gradle runtime version")
+	jdkVersion, err := jdkRuntime()
+	require.NoErrorf(t, err, "could not detect jdk runtime version")
+	t.Logf("gradle %s / jdk %s", gradleVersion, jdkVersion)
+
+	for name, testCase := range normalizeDepsTestCases() {
+		t.Run(name, func(t *testing.T) {
+			fixturePath := filepath.Join(fixturesRoot, testCase.Fixture)
+			absFixture, err := filepath.Abs(fixturePath)
+			require.NoError(t, err, "failed to resolve fixture path")
+
+			meta, err := loadFixtureMetadata(absFixture)
+			require.NoErrorf(t, err, "failed to load metadata for fixture %q", testCase.Fixture)
+
+			if reason, err := meta.skipReason(gradleVersion, jdkVersion); err != nil {
+				t.Fatalf("invalid metadata for fixture %q: %v", testCase.Fixture, err)
+			} else if reason != "" {
+				t.Skipf("fixture %q not applicable: %s", testCase.Fixture, reason)
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel()
+
+			// Create a fake lookuper with predefined transformations
+			fake := createNormalizeDepsFakeLookuper()
+			normalizeDepsHook := newNormalizeDepsPostHookWithClient(fake, "test-org-id")
+
+			plugin := NewGradlePluginWithNormalizeDepsHook(normalizeDepsHook)
+			result, err := scatest.Run(ctx, plugin, logger.Nop(), absFixture, testCase.Options)
+			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
+			require.NotNil(t, result, "plugin result should not be nil")
+
+			if updateFixtures {
+				writeExpectedSnapshot(t, filepath.Join(fixturePath, testCase.ExpectedFile), result)
+				return
+			}
+
+			expectedPath, err := resolveExpectedSnapshotPath(fixturePath, testCase, gradleVersion)
+			require.NoErrorf(t, err, "no expected snapshot for fixture %q; run with %s=1 to generate", testCase.Fixture, updateFixturesEnvVar)
+
+			expected := loadExpectedResults(t, expectedPath)
+			assertResultsMatchExpected(t, result, expected, testCase.Fixture)
+		})
+	}
+}
+
+// createNormalizeDepsFakeLookuper creates a fake lookuper with predefined
+// coordinate transformations for testing normalize-deps functionality.
+func createNormalizeDepsFakeLookuper() *fakeLookuper {
+	fake := newFakeLookuper()
+
+	// Define transformations: SHA1 -> canonical purl
+	// These SHA1s correspond to packages in the simple and platform-bom fixtures
+
+	// Simple fixture packages
+	fake.responses["87e0fd1df874ea3cbe577702fe6f17068b790fd8"] = "pkg:maven/io.snyk.guava/snyk-guava@30.1.1-jre"
+	fake.responses["25ea2e8b0c338a877313bd4672d3fe056ea78f0d"] = "pkg:maven/io.snyk.findbugs/snyk-jsr305@3.0.2"
+	fake.responses["1dcf1de382a0bf95a3d8b0849546c88bac1292c9"] = "pkg:maven/io.snyk.guava/snyk-failureaccess@1.0.1"
+	fake.responses["6b83e4a33220272c3a08991498ba9dc09519f190"] = "pkg:maven/io.snyk.checker/snyk-checker-qual@3.8.0"
+	fake.responses["562d366678b89ce5d6b6b82c1a073880341e3fba"] = "pkg:maven/io.snyk.errorprone/snyk-error-prone-annotations@2.5.1"
+	fake.responses["ba035118bc8bac37d7eff77700720999acd9986d"] = "pkg:maven/io.snyk.j2objc/snyk-j2objc-annotations@1.3"
+	fake.responses["1ed471194b02f2c6cb734a0cd6f6f107c673afae"] = "pkg:maven/io.snyk.commons/snyk-commons-lang3@3.14.0"
+
+	// Platform-bom fixture packages
+	fake.responses["3edcfe49d2c6053a70a2a47e4e1c2f94998a49cf"] = "pkg:maven/io.snyk.gson/snyk-gson@2.8.2"
+	fake.responses["5d3ccc056b6f056dbf0dddfdf43894b9065a8f94"] = "pkg:maven/io.snyk.dom4j/snyk-dom4j@1.6.1"
+	fake.responses["3789d9fada2d3d458c4ba2de349d48780f381ee3"] = "pkg:maven/io.snyk.xmlapis/snyk-xml-apis@1.4.01"
+
+	// Leave some packages unmapped to test fallback behavior
+	// The listenablefuture package will remain unmapped to verify
+	// that unmapped packages are left unchanged
+	// fake.responses["b421526c5f297295adef1c886e5246c39d4ac629"] = "" // intentionally unmapped
+
+	return fake
 }
 
 // defaultExpectedFileName returns the snapshot filename used when writing

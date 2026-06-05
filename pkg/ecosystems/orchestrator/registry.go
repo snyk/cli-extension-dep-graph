@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
@@ -43,7 +44,12 @@ func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry,
 		return nil, fmt.Errorf("failed to register bun plugin: %w", err)
 	}
 	// gradle (opt-in via feature flag)
-	normalizeDepsPostHook := gradle.NewNormalizeDepsPostHook()
+	cfg := ictx.GetConfiguration()
+	normalizeDepsPostHook := gradle.NewNormalizeDepsPostHook(
+		ictx.GetNetworkAccess().GetHttpClient(),
+		cfg.GetString(configuration.API_URL),
+		cfg.GetString(configuration.ORGANIZATION),
+	)
 	gradlePlugin := gradle.NewGradlePluginWithNormalizeDepsHook(normalizeDepsPostHook)
 	if err := r.register(gradlePlugin, withFeatureFlagCheck(FlagNewGradleResolver), withPluginDependencies("bazel")); err != nil {
 		return nil, fmt.Errorf("failed to register gradle plugin: %w", err)
