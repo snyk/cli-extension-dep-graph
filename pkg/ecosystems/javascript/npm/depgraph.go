@@ -101,26 +101,40 @@ func collectAdjacency(root *listResponse, workspacePaths map[string]string) (
 	workspaces = make(map[string]string)
 	rootDeps = make(map[string]struct{})
 
-	visited := make(map[string]bool)
+	onPath := make(map[string]bool)
 
 	for name, dep := range root.Dependencies {
 		id := pkgID(name, dep, workspacePaths)
 		rootDeps[id] = struct{}{}
-		walkDep(id, name, dep, forward, workspaces, workspacePaths, visited)
+		walkDep(id, name, dep, forward, workspaces, workspacePaths, onPath)
 	}
 
 	return forward, workspaces, rootDeps
 }
 
-// walkDep recursively descends a listResponseDep, populating forward edges and
-// the workspace registry. Cycles are bounded by visited (keyed on pkgID).
+// walkDep recursively descends a listResponseDep, accumulating edges into
+// forward[id] from every appearance of the pkg in the npm ls tree.
+//
+// We deliberately walk EVERY appearance — not just the first — because npm ls
+// reports the same pkg at multiple positions in its tree with INCONSISTENT
+// child sets: one canonical listing shows the full subtree, while the rest are
+// stubs with `dependencies: {}` (since npm collapses duplicates to avoid bloat
+// in the JSON output). A first-appearance-wins visited check loses the full
+// subtree whenever a stub is encountered first, dropping packages that should
+// be in the graph. Seen in practice with deep transitive trees (e.g. lodash 2.x
+// internal helpers).
+//
+// `onPath` is the set of ids currently on the recursion stack — used purely
+// for cycle protection against pathological inputs. Real npm ls JSON is
+// acyclic by construction (cycles are flattened to leaf references), but the
+// guard keeps us safe against unit-test fixtures and any future quirk.
 func walkDep(
 	id, name string,
 	dep *listResponseDep,
 	forward map[string]map[string]struct{},
 	workspaces map[string]string,
 	workspacePaths map[string]string,
-	visited map[string]bool,
+	onPath map[string]bool,
 ) {
 	if wsDir, ok := workspacePaths[name]; ok && strings.HasPrefix(dep.Resolved, "file:") {
 		workspaces[id] = wsDir
@@ -130,15 +144,16 @@ func walkDep(
 		forward[id] = make(map[string]struct{})
 	}
 
-	if visited[id] {
+	if onPath[id] {
 		return
 	}
-	visited[id] = true
+	onPath[id] = true
+	defer delete(onPath, id)
 
 	for childName, childDep := range dep.Dependencies {
 		childID := pkgID(childName, childDep, workspacePaths)
 		forward[id][childID] = struct{}{}
-		walkDep(childID, childName, childDep, forward, workspaces, workspacePaths, visited)
+		walkDep(childID, childName, childDep, forward, workspaces, workspacePaths, onPath)
 	}
 }
 
