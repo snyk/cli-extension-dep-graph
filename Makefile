@@ -46,7 +46,10 @@ test-python-integration:
 test-gradle-integration:
 	$(GOTEST) -v -tags="integration,gradle" -timeout=15m ./pkg/ecosystems/gradle/ -coverprofile cp.out
 
+test-npm-integration:
+	$(GOTEST) -v -tags="integration,npm" -timeout=10m ./pkg/ecosystems/javascript/npm/ -coverprofile cp.out
+
 update-gradle-fixtures:
 	UPDATE_FIXTURES=1 $(GOTEST) -v -tags="integration,gradle" -timeout=15m ./pkg/ecosystems/gradle/
 
-.PHONY: install-req fmt test test-bazel-jvm-integration test-bazel-go-integration test-python-integration test-gradle-integration update-gradle-fixtures lint tidy imports install-golangci-lint
+.PHONY: install-req fmt test test-bazel-jvm-integration test-bazel-go-integration test-python-integration test-gradle-integration test-npm-integration update-gradle-fixtures lint tidy imports install-golangci-lint
