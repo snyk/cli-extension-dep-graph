@@ -168,16 +168,18 @@ func walkDep(
 // workspacePaths from the lockfile and (b) its Resolved field begins with
 // "file:" in npm ls output — the AND guards against the unlikely case of a
 // registry package sharing a name with a workspace.
+//
+// When npm ls reports a dep with no version field (typical for invalid
+// alias setups or broken lockfile entries), we propagate the empty version
+// rather than substituting a sentinel — matching snyk-nodejs-lockfile-parser's
+// representation ("name@" with no version) and preserving the signal that
+// the version is genuinely unknown.
 func pkgID(name string, dep *listResponseDep, workspacePaths map[string]string) string {
 	if wsDir, ok := workspacePaths[name]; ok && strings.HasPrefix(dep.Resolved, "file:") {
 		return name + "@file:" + wsDir
 	}
 
-	version := dep.Version
-	if version == "" {
-		version = defaultVersion
-	}
-	return name + "@" + version
+	return name + "@" + dep.Version
 }
 
 // buildSingleDepGraph constructs one dep graph rooted at rootName/rootVersion.
