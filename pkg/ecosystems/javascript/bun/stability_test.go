@@ -22,8 +22,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/javascript/bun"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/javascript/bun"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/scatest"
 )
 
 // TestBunWhyOutputStability runs the plugin against every fixture directory
@@ -60,11 +61,11 @@ func TestBunWhyOutputStability(t *testing.T) {
 
 		t.Run(entry.Name(), func(t *testing.T) {
 			log := &recordingLogger{}
-			result, err := plugin.BuildDepGraphsFromDir(t.Context(), log, dir, opts)
+			results, err := scatest.Run(t.Context(), plugin, log, dir, opts)
 			require.NoError(t, err, "BuildDepGraphsFromDir returned an unexpected error")
-			require.NotEmpty(t, result.Results, "plugin produced no results for %s", entry.Name())
+			require.NotEmpty(t, results, "plugin produced no results for %s", entry.Name())
 
-			for i, r := range result.Results {
+			for i, r := range results {
 				assert.NoError(t, r.Error, "result[%d] for %s contains an error", i, entry.Name())
 			}
 
@@ -72,7 +73,7 @@ func TestBunWhyOutputStability(t *testing.T) {
 
 			// Verify every package in bun.lock is present in some dep graph.
 			// A non-empty missing list is the primary signal of a parser regression.
-			missing := lockfilePackagesMissingFromGraph(t, dir, allResultPkgs(result.Results))
+			missing := lockfilePackagesMissingFromGraph(t, dir, allResultPkgs(results))
 			for _, id := range missing {
 				t.Errorf("bun.lock package %q missing from dep graph — possible bun why format regression", id)
 			}

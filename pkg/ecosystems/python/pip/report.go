@@ -14,7 +14,7 @@ import (
 	"github.com/snyk/error-catalog-golang-public/snyk"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 )
 
 // Report represents the minimal JSON output from pip install --report

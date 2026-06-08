@@ -24,14 +24,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/legacycli"
-	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
-	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/legacy"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/uv"
-	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/legacycli"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/mocks"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/workflow"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/legacy"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/python/uv"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/identity"
 )
 
 //go:embed testdata/uv-sbom-convert-expected-dep-graph.json
@@ -40,9 +40,13 @@ var uvSBOMConvertExpectedDepGraph string
 //go:embed testdata/uv-sbom-convert-response.json
 var uvSBOMConvertResponse string
 
+// mockScaPlugin emits a configured set of SCAResults through the
+// SCAPlugin callback contract. Each result carries its own
+// ProcessedFiles list (the per-graph attribution downstream consumers
+// rely on).
 type mockScaPlugin struct {
 	name    string
-	result  *ecosystems.PluginResult
+	results []ecosystems.SCAResult
 	err     error
 	options *ecosystems.SCAPluginOptions
 }
@@ -56,15 +60,26 @@ func (m *mockScaPlugin) BuildDepGraphsFromDir(
 	_ logger.Logger,
 	_ string,
 	options *ecosystems.SCAPluginOptions,
-) (*ecosystems.PluginResult, error) {
+	onGraph ecosystems.OnGraphFunc,
+) error {
 	m.options = options
 	if m.err != nil {
-		return nil, m.err
+		return m.err
 	}
-	if m.result == nil {
-		return &ecosystems.PluginResult{}, nil
+	for _, r := range m.results {
+		if err := onGraph(r); err != nil {
+			return err
+		}
 	}
-	return m.result, nil
+	return nil
+}
+
+// withProcessedFiles returns r with ProcessedFiles set, for use in
+// fixture literals where attaching the file list to a SCAResult
+// inline keeps the test data dense.
+func withProcessedFiles(r ecosystems.SCAResult, files ...string) ecosystems.SCAResult {
+	r.ProcessedFiles = files
+	return r
 }
 
 // LegacyHarness wraps a real `legacy.Plugin` whose underlying `legacycli` workflow is
@@ -297,18 +312,16 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		expectedDepGraph := builder.Build()
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: expectedDepGraph,
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("pyproject.toml"),
-							},
+			results: []ecosystems.SCAResult{
+				{
+					DepGraph: expectedDepGraph,
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("pyproject.toml"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "pyproject.toml",
-						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "pyproject.toml",
 					},
 				},
 			},
@@ -380,29 +393,27 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(workflow.FlagAllProjects, true)
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("pyproject.toml"),
-							},
-						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "pyproject.toml",
+			results: []ecosystems.SCAResult{
+				{
+					DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("pyproject.toml"),
 						},
 					},
-					{
-						Error: fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("uv.lock"),
-							},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "pyproject.toml",
+					},
+				},
+				{
+					Error: fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("uv.lock"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "uv.lock",
-						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "uv.lock",
 					},
 				},
 			},
@@ -430,29 +441,27 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		// Create mock plugin that returns multiple findings, all with conversion errors
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						Error: fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("project1/uv.lock"),
-							},
-						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "project1/uv.lock",
+			results: []ecosystems.SCAResult{
+				{
+					Error: fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("project1/uv.lock"),
 						},
 					},
-					{
-						Error: fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("project2/uv.lock"),
-							},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "project1/uv.lock",
+					},
+				},
+				{
+					Error: fmt.Errorf("failed to convert SBOM: analysis of SBOM document failed due to error: 500"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("project2/uv.lock"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "project2/uv.lock",
-						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "project2/uv.lock",
 					},
 				},
 			},
@@ -488,18 +497,16 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("pyproject.toml"),
-							},
+			results: []ecosystems.SCAResult{
+				{
+					DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("pyproject.toml"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "pyproject.toml",
-						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "pyproject.toml",
 					},
 				},
 			},
@@ -582,11 +589,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				initialExclude: "",
 				plugins: []ecosystems.SCAPlugin{
 					&mockScaPlugin{
-						result: &ecosystems.PluginResult{
-							Results: []ecosystems.SCAResult{
-								finding1,
-								finding2,
-							},
+						results: []ecosystems.SCAResult{
+							finding1,
+							finding2,
 						},
 					},
 				},
@@ -601,9 +606,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				initialExclude: "",
 				plugins: []ecosystems.SCAPlugin{
 					&mockScaPlugin{
-						result: &ecosystems.PluginResult{
-							Results:        []ecosystems.SCAResult{finding1, finding2},
-							ProcessedFiles: []string{"uv.lock", "pyproject.toml", "requirements.txt", "setup.py"},
+						results: []ecosystems.SCAResult{
+							withProcessedFiles(finding1, "uv.lock", "pyproject.toml", "requirements.txt", "setup.py"),
+							finding2,
 						},
 					},
 				},
@@ -620,9 +625,7 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				plugins: []ecosystems.SCAPlugin{
 					&mockScaPlugin{},
 					&mockScaPlugin{
-						result: &ecosystems.PluginResult{
-							Results: []ecosystems.SCAResult{finding1},
-						},
+						results: []ecosystems.SCAResult{finding1},
 					},
 				},
 				expectedWorkflowDataLen:          1,
@@ -636,14 +639,10 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				initialExclude: "",
 				plugins: []ecosystems.SCAPlugin{
 					&mockScaPlugin{
-						result: &ecosystems.PluginResult{
-							Results: []ecosystems.SCAResult{finding1, finding2},
-						},
+						results: []ecosystems.SCAResult{finding1, finding2},
 					},
 					&mockScaPlugin{
-						result: &ecosystems.PluginResult{
-							Results: []ecosystems.SCAResult{finding3, finding4},
-						},
+						results: []ecosystems.SCAResult{finding3, finding4},
 					},
 				},
 				expectedWorkflowDataLen:          2,
@@ -658,15 +657,15 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				initialExclude: "",
 				plugins: []ecosystems.SCAPlugin{
 					&mockScaPlugin{
-						result: &ecosystems.PluginResult{
-							Results:        []ecosystems.SCAResult{finding1, finding2},
-							ProcessedFiles: []string{"uv.lock", "pyproject.toml", "requirements.txt", "setup.py"},
+						results: []ecosystems.SCAResult{
+							withProcessedFiles(finding1, "uv.lock", "pyproject.toml", "requirements.txt", "setup.py"),
+							finding2,
 						},
 					},
 					&mockScaPlugin{
-						result: &ecosystems.PluginResult{
-							Results:        []ecosystems.SCAResult{finding3, finding4},
-							ProcessedFiles: []string{"package.json", "go.mod"},
+						results: []ecosystems.SCAResult{
+							withProcessedFiles(finding3, "package.json", "go.mod"),
+							finding4,
 						},
 					},
 				},
@@ -695,9 +694,9 @@ func Test_callback_SBOMResolution(t *testing.T) {
 				initialExclude: "existing-file.txt,another-file.py",
 				plugins: []ecosystems.SCAPlugin{
 					&mockScaPlugin{
-						result: &ecosystems.PluginResult{
-							Results:        []ecosystems.SCAResult{finding1, finding2},
-							ProcessedFiles: []string{"uv.lock", "pyproject.toml", "requirements.txt", "setup.py"},
+						results: []ecosystems.SCAResult{
+							withProcessedFiles(finding1, "uv.lock", "pyproject.toml", "requirements.txt", "setup.py"),
+							finding2,
 						},
 					},
 				},
@@ -772,21 +771,18 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		// Create mock plugin that returns a finding
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("pyproject.toml"),
-							},
-						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "pyproject.toml",
+			results: []ecosystems.SCAResult{
+				withProcessedFiles(ecosystems.SCAResult{
+					DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("pyproject.toml"),
 						},
 					},
-				},
-				ProcessedFiles: []string{"uv.lock"},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "pyproject.toml",
+					},
+				}, "uv.lock"),
 			},
 		}
 
@@ -852,21 +848,18 @@ func Test_callback_SBOMResolution(t *testing.T) {
 
 		// Create mock plugin that returns a finding
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("pyproject.toml"),
-							},
-						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "pyproject.toml",
+			results: []ecosystems.SCAResult{
+				withProcessedFiles(ecosystems.SCAResult{
+					DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("pyproject.toml"),
 						},
 					},
-				},
-				ProcessedFiles: []string{"uv.lock"},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "pyproject.toml",
+					},
+				}, "uv.lock"),
 			},
 		}
 
@@ -901,33 +894,30 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		legacyMock := NewLegacyHarness(ctx)
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("project1/pyproject.toml"),
-							},
+			results: []ecosystems.SCAResult{
+				withProcessedFiles(ecosystems.SCAResult{
+					DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("project1/pyproject.toml"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "project1/pyproject.toml",
-						},
-						Error: nil,
 					},
-					{
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("project2/uv.lock"),
-							},
-						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "project2/uv.lock",
-						},
-						Error: fmt.Errorf("failed to generate SBOM"),
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "project1/pyproject.toml",
 					},
+					Error: nil,
+				}, "project1/uv.lock", "project2/uv.lock"),
+				{
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("project2/uv.lock"),
+						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "project2/uv.lock",
+					},
+					Error: fmt.Errorf("failed to generate SBOM"),
 				},
-				ProcessedFiles: []string{"project1/uv.lock", "project2/uv.lock"},
 			},
 		}
 
@@ -957,21 +947,18 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		}
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("uv.lock"),
-							},
+			results: []ecosystems.SCAResult{
+				withProcessedFiles(ecosystems.SCAResult{
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("uv.lock"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "uv.lock",
-						},
-						Error: snykErr,
 					},
-				},
-				ProcessedFiles: []string{"uv.lock"},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "uv.lock",
+					},
+					Error: snykErr,
+				}, "uv.lock"),
 			},
 		}
 
@@ -1008,18 +995,16 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("pyproject.toml"),
-							},
+			results: []ecosystems.SCAResult{
+				{
+					DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("pyproject.toml"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "pyproject.toml",
-						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "pyproject.toml",
 					},
 				},
 			},
@@ -1045,18 +1030,16 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("pyproject.toml"),
-							},
+			results: []ecosystems.SCAResult{
+				{
+					DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("pyproject.toml"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "pyproject.toml",
-						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "pyproject.toml",
 					},
 				},
 			},
@@ -1080,18 +1063,16 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(workflow.FlagStrictOutOfSync, "invalid")
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("pyproject.toml"),
-							},
+			results: []ecosystems.SCAResult{
+				{
+					DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("pyproject.toml"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "pyproject.toml",
-						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "pyproject.toml",
 					},
 				},
 			},
@@ -1122,18 +1103,16 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("pyproject.toml"),
-							},
+			results: []ecosystems.SCAResult{
+				{
+					DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("pyproject.toml"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "pyproject.toml",
-						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "pyproject.toml",
 					},
 				},
 			},
@@ -1162,18 +1141,16 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("pyproject.toml"),
-							},
+			results: []ecosystems.SCAResult{
+				{
+					DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("pyproject.toml"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "pyproject.toml",
-						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "pyproject.toml",
 					},
 				},
 			},
@@ -1202,18 +1179,16 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(configuration.API_URL, mockSBOMService.URL)
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("pyproject.toml"),
-							},
+			results: []ecosystems.SCAResult{
+				{
+					DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("pyproject.toml"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "pyproject.toml",
-						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "pyproject.toml",
 					},
 				},
 			},
@@ -1290,21 +1265,18 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		}
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("uv.lock"),
-							},
+			results: []ecosystems.SCAResult{
+				withProcessedFiles(ecosystems.SCAResult{
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("uv.lock"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "uv.lock",
-						},
-						Error: snykErr,
 					},
-				},
-				ProcessedFiles: []string{"uv.lock"},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "uv.lock",
+					},
+					Error: snykErr,
+				}, "uv.lock"),
 			},
 		}
 
@@ -1340,44 +1312,41 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		}
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("valid-project/pyproject.toml"),
-							},
+			results: []ecosystems.SCAResult{
+				withProcessedFiles(ecosystems.SCAResult{
+					DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("valid-project/pyproject.toml"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "valid-project/pyproject.toml",
-						},
-						Error: nil,
 					},
-					{
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("project1/uv.lock"),
-							},
-						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "project1/uv.lock",
-						},
-						Error: snykErr,
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "valid-project/pyproject.toml",
 					},
-					{
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("project2/uv.lock"),
-							},
+					Error: nil,
+				}, "project1/uv.lock", "project2/uv.lock"),
+				{
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("project1/uv.lock"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "project2/uv.lock",
-						},
-						Error: fmt.Errorf("This should not be processed"),
 					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "project1/uv.lock",
+					},
+					Error: snykErr,
 				},
-				ProcessedFiles: []string{"project1/uv.lock", "project2/uv.lock"},
+				{
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("project2/uv.lock"),
+						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "project2/uv.lock",
+					},
+					Error: fmt.Errorf("This should not be processed"),
+				},
 			},
 		}
 
@@ -1411,21 +1380,18 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		}
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("project1/uv.lock"),
-							},
+			results: []ecosystems.SCAResult{
+				withProcessedFiles(ecosystems.SCAResult{
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("project1/uv.lock"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "project1/uv.lock",
-						},
-						Error: snykErr,
 					},
-				},
-				ProcessedFiles: []string{"project1/uv.lock"},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "project1/uv.lock",
+					},
+					Error: snykErr,
+				}, "project1/uv.lock"),
 			},
 		}
 
@@ -1459,33 +1425,30 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		}
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("valid-project/pyproject.toml"),
-							},
+			results: []ecosystems.SCAResult{
+				withProcessedFiles(ecosystems.SCAResult{
+					DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("valid-project/pyproject.toml"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "valid-project/pyproject.toml",
-						},
-						Error: nil,
 					},
-					{
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("project1/uv.lock"),
-							},
-						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "project1/uv.lock",
-						},
-						Error: snykErr,
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "valid-project/pyproject.toml",
 					},
+					Error: nil,
+				}, "project1/uv.lock"),
+				{
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("project1/uv.lock"),
+						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "project1/uv.lock",
+					},
+					Error: snykErr,
 				},
-				ProcessedFiles: []string{"project1/uv.lock"},
 			},
 		}
 
@@ -1525,21 +1488,18 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		}
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("uv.lock"),
-							},
+			results: []ecosystems.SCAResult{
+				withProcessedFiles(ecosystems.SCAResult{
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("uv.lock"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "uv.lock",
-						},
-						Error: snykErr,
 					},
-				},
-				ProcessedFiles: []string{"uv.lock"},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "uv.lock",
+					},
+					Error: snykErr,
+				}, "uv.lock"),
 			},
 		}
 
@@ -1566,18 +1526,16 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		ctx.config.Set(workflow.FlagFailFast, true)
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("pyproject.toml"),
-							},
+			results: []ecosystems.SCAResult{
+				{
+					DepGraph: createTestDepGraph(t, "pip", "test-project", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("pyproject.toml"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "pyproject.toml",
-						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "pyproject.toml",
 					},
 				},
 			},
@@ -1612,44 +1570,41 @@ func Test_callback_SBOMResolution(t *testing.T) {
 		regularErr := fmt.Errorf("Failure message should not be shown to the user")
 
 		mockPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("valid-project/pyproject.toml"),
-							},
+			results: []ecosystems.SCAResult{
+				withProcessedFiles(ecosystems.SCAResult{
+					DepGraph: createTestDepGraph(t, "pip", "test-project-1", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("valid-project/pyproject.toml"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "valid-project/pyproject.toml",
-						},
-						Error: nil,
 					},
-					{
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("project1/uv.lock"),
-							},
-						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "project1/uv.lock",
-						},
-						Error: snykErr,
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "valid-project/pyproject.toml",
 					},
-					{
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{
-								TargetFile: stringPtr("project2/uv.lock"),
-							},
+					Error: nil,
+				}, "project1/uv.lock", "project2/uv.lock"),
+				{
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("project1/uv.lock"),
 						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "project2/uv.lock",
-						},
-						Error: regularErr,
 					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "project1/uv.lock",
+					},
+					Error: snykErr,
 				},
-				ProcessedFiles: []string{"project1/uv.lock", "project2/uv.lock"},
+				{
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{
+							TargetFile: stringPtr("project2/uv.lock"),
+						},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "project2/uv.lock",
+					},
+					Error: regularErr,
+				},
 			},
 		}
 
@@ -1744,18 +1699,16 @@ func Test_parseExcludeFlag(t *testing.T) {
 func Test_processedFilesFlowFromPluginsToExcludeConfig(t *testing.T) {
 	pluginWithProcessedFiles := func(targetFile, name string, processedFiles []string) *mockScaPlugin {
 		return &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{{
-					DepGraph: createTestDepGraph(t, "pip", name, "1.0.0"),
-					ProjectDescriptor: identity.ProjectDescriptor{
-						Identity: identity.ProjectIdentity{TargetFile: stringPtr(targetFile)},
-					},
-					ResolverMetadata: &ecosystems.ResolverMetadata{
-						NormalisedTargetFile: targetFile,
-					},
-				}},
+			results: []ecosystems.SCAResult{{
+				DepGraph: createTestDepGraph(t, "pip", name, "1.0.0"),
+				ProjectDescriptor: identity.ProjectDescriptor{
+					Identity: identity.ProjectIdentity{TargetFile: stringPtr(targetFile)},
+				},
+				ResolverMetadata: &ecosystems.ResolverMetadata{
+					NormalisedTargetFile: targetFile,
+				},
 				ProcessedFiles: processedFiles,
-			},
+			}},
 		}
 	}
 
@@ -1789,7 +1742,7 @@ func Test_processedFilesFlowFromPluginsToExcludeConfig(t *testing.T) {
 			name:             "user --exclude-paths value alone when no plugin produced ProcessedFiles",
 			userExcludePaths: "user-supplied.txt",
 			plugins: func() []ecosystems.SCAPlugin {
-				return []ecosystems.SCAPlugin{&mockScaPlugin{result: &ecosystems.PluginResult{}}}
+				return []ecosystems.SCAPlugin{&mockScaPlugin{results: nil}}
 			},
 			expectedExcludePaths: "user-supplied.txt",
 		},
@@ -1829,18 +1782,16 @@ func Test_uvWorkspacePackages_passesOptionToPlugin(t *testing.T) {
 	ctx.config.Set(workflow.FlagFile, "uv.lock")
 
 	mockPlugin := &mockScaPlugin{
-		result: &ecosystems.PluginResult{
-			Results: []ecosystems.SCAResult{
-				{
-					DepGraph: createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
-					ProjectDescriptor: identity.ProjectDescriptor{
-						Identity: identity.ProjectIdentity{
-							TargetFile: stringPtr("pyproject.toml"),
-						},
+		results: []ecosystems.SCAResult{
+			{
+				DepGraph: createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
+				ProjectDescriptor: identity.ProjectDescriptor{
+					Identity: identity.ProjectIdentity{
+						TargetFile: stringPtr("pyproject.toml"),
 					},
-					ResolverMetadata: &ecosystems.ResolverMetadata{
-						NormalisedTargetFile: "pyproject.toml",
-					},
+				},
+				ResolverMetadata: &ecosystems.ResolverMetadata{
+					NormalisedTargetFile: "pyproject.toml",
 				},
 			},
 		},
@@ -1870,29 +1821,27 @@ func Test_uvWorkspacePackages_combinesMultipleDepGraphsAsJSONL(t *testing.T) {
 
 	mockPlugin := &mockScaPlugin{
 		name: uv.PluginName,
-		result: &ecosystems.PluginResult{
-			Results: []ecosystems.SCAResult{
-				{
-					DepGraph: createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
-					ProjectDescriptor: identity.ProjectDescriptor{
-						Identity: identity.ProjectIdentity{
-							TargetFile: stringPtr("pyproject.toml"),
-						},
-					},
-					ResolverMetadata: &ecosystems.ResolverMetadata{
-						NormalisedTargetFile: "pyproject.toml",
+		results: []ecosystems.SCAResult{
+			{
+				DepGraph: createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
+				ProjectDescriptor: identity.ProjectDescriptor{
+					Identity: identity.ProjectIdentity{
+						TargetFile: stringPtr("pyproject.toml"),
 					},
 				},
-				{
-					DepGraph: createTestDepGraph(t, "uv", "pkg-b", "2.0.0"),
-					ProjectDescriptor: identity.ProjectDescriptor{
-						Identity: identity.ProjectIdentity{
-							TargetFile: stringPtr("packages/pkg-b/pyproject.toml"),
-						},
+				ResolverMetadata: &ecosystems.ResolverMetadata{
+					NormalisedTargetFile: "pyproject.toml",
+				},
+			},
+			{
+				DepGraph: createTestDepGraph(t, "uv", "pkg-b", "2.0.0"),
+				ProjectDescriptor: identity.ProjectDescriptor{
+					Identity: identity.ProjectIdentity{
+						TargetFile: stringPtr("packages/pkg-b/pyproject.toml"),
 					},
-					ResolverMetadata: &ecosystems.ResolverMetadata{
-						NormalisedTargetFile: "packages/pkg-b/pyproject.toml",
-					},
+				},
+				ResolverMetadata: &ecosystems.ResolverMetadata{
+					NormalisedTargetFile: "packages/pkg-b/pyproject.toml",
 				},
 			},
 		},
@@ -1960,19 +1909,17 @@ func Test_uvWorkspacePackages_returnsErrorWhenFindingHasError(t *testing.T) {
 
 	mockPlugin := &mockScaPlugin{
 		name: uv.PluginName,
-		result: &ecosystems.PluginResult{
-			Results: []ecosystems.SCAResult{
-				{
-					ProjectDescriptor: identity.ProjectDescriptor{
-						Identity: identity.ProjectIdentity{
-							TargetFile: stringPtr("uv.lock"),
-						},
+		results: []ecosystems.SCAResult{
+			{
+				ProjectDescriptor: identity.ProjectDescriptor{
+					Identity: identity.ProjectIdentity{
+						TargetFile: stringPtr("uv.lock"),
 					},
-					ResolverMetadata: &ecosystems.ResolverMetadata{
-						NormalisedTargetFile: "uv.lock",
-					},
-					Error: snykErr,
 				},
+				ResolverMetadata: &ecosystems.ResolverMetadata{
+					NormalisedTargetFile: "uv.lock",
+				},
+				Error: snykErr,
 			},
 		},
 	}
@@ -2003,29 +1950,27 @@ func Test_uvWorkspacePackages_legacyResultsAppendedIndividually(t *testing.T) {
 
 	mockPlugin := &mockScaPlugin{
 		name: uv.PluginName,
-		result: &ecosystems.PluginResult{
-			Results: []ecosystems.SCAResult{
-				{
-					DepGraph: createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
-					ProjectDescriptor: identity.ProjectDescriptor{
-						Identity: identity.ProjectIdentity{
-							TargetFile: stringPtr("pyproject.toml"),
-						},
-					},
-					ResolverMetadata: &ecosystems.ResolverMetadata{
-						NormalisedTargetFile: "pyproject.toml",
+		results: []ecosystems.SCAResult{
+			{
+				DepGraph: createTestDepGraph(t, "uv", "pkg-a", "1.0.0"),
+				ProjectDescriptor: identity.ProjectDescriptor{
+					Identity: identity.ProjectIdentity{
+						TargetFile: stringPtr("pyproject.toml"),
 					},
 				},
-				{
-					DepGraph: createTestDepGraph(t, "uv", "pkg-b", "2.0.0"),
-					ProjectDescriptor: identity.ProjectDescriptor{
-						Identity: identity.ProjectIdentity{
-							TargetFile: stringPtr("packages/pkg-b/pyproject.toml"),
-						},
+				ResolverMetadata: &ecosystems.ResolverMetadata{
+					NormalisedTargetFile: "pyproject.toml",
+				},
+			},
+			{
+				DepGraph: createTestDepGraph(t, "uv", "pkg-b", "2.0.0"),
+				ProjectDescriptor: identity.ProjectDescriptor{
+					Identity: identity.ProjectIdentity{
+						TargetFile: stringPtr("packages/pkg-b/pyproject.toml"),
 					},
-					ResolverMetadata: &ecosystems.ResolverMetadata{
-						NormalisedTargetFile: "packages/pkg-b/pyproject.toml",
-					},
+				},
+				ResolverMetadata: &ecosystems.ResolverMetadata{
+					NormalisedTargetFile: "packages/pkg-b/pyproject.toml",
 				},
 			},
 		},
@@ -2079,26 +2024,24 @@ func Test_uvWorkspacePackages_legacyResultsAppendedIndividually(t *testing.T) {
 func Test_handleSBOMResolutionDI_perResultErrorMatrix(t *testing.T) {
 	pluginErroredResult := func() *mockScaPlugin {
 		return &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						DepGraph: createTestDepGraph(t, "pip", "good", "1.0.0"),
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{TargetFile: stringPtr("good/requirements.txt")},
-						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "good/requirements.txt",
-						},
+			results: []ecosystems.SCAResult{
+				{
+					DepGraph: createTestDepGraph(t, "pip", "good", "1.0.0"),
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{TargetFile: stringPtr("good/requirements.txt")},
 					},
-					{
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{TargetFile: stringPtr("broken/requirements.txt")},
-						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "broken/requirements.txt",
-						},
-						Error: snyk_errors.Error{Title: "Resolution failed", Detail: "missing dep"},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "good/requirements.txt",
 					},
+				},
+				{
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{TargetFile: stringPtr("broken/requirements.txt")},
+					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "broken/requirements.txt",
+					},
+					Error: snyk_errors.Error{Title: "Resolution failed", Detail: "missing dep"},
 				},
 			},
 		}
@@ -2156,8 +2099,8 @@ func Test_handleSBOMResolutionDI_perResultErrorMatrix(t *testing.T) {
 func Test_handleSBOMResolutionDI_noSupportedProjectsDetectedWhenAllPluginsReturnZero(t *testing.T) {
 	t.Run("two plugins both empty", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		emptyPlugin1 := &mockScaPlugin{result: &ecosystems.PluginResult{}}
-		emptyPlugin2 := &mockScaPlugin{result: &ecosystems.PluginResult{}}
+		emptyPlugin1 := &mockScaPlugin{results: nil}
+		emptyPlugin2 := &mockScaPlugin{results: nil}
 
 		workflowData, err := handleSBOMResolutionDI(
 			ctx.invocationContext,
@@ -2176,7 +2119,7 @@ func Test_handleSBOMResolutionDI_noSupportedProjectsDetectedWhenAllPluginsReturn
 
 	t.Run("single empty plugin", func(t *testing.T) {
 		ctx := setupTestContext(t, true)
-		emptyPlugin := &mockScaPlugin{result: &ecosystems.PluginResult{}}
+		emptyPlugin := &mockScaPlugin{results: nil}
 
 		workflowData, err := handleSBOMResolutionDI(
 			ctx.invocationContext,
@@ -2197,21 +2140,19 @@ func Test_handleSBOMResolutionDI_noSupportedProjectsDetectedWhenAllPluginsReturn
 		ctx := setupTestContext(t, true)
 		ctx.config.Set(workflow.FlagAllProjects, true)
 		erroredPlugin := &mockScaPlugin{
-			result: &ecosystems.PluginResult{
-				Results: []ecosystems.SCAResult{
-					{
-						ProjectDescriptor: identity.ProjectDescriptor{
-							Identity: identity.ProjectIdentity{TargetFile: stringPtr("broken/pom.xml")},
-						},
-						ResolverMetadata: &ecosystems.ResolverMetadata{
-							NormalisedTargetFile: "broken/pom.xml",
-						},
-						Error: fmt.Errorf("module failed to resolve"),
+			results: []ecosystems.SCAResult{
+				{
+					ProjectDescriptor: identity.ProjectDescriptor{
+						Identity: identity.ProjectIdentity{TargetFile: stringPtr("broken/pom.xml")},
 					},
+					ResolverMetadata: &ecosystems.ResolverMetadata{
+						NormalisedTargetFile: "broken/pom.xml",
+					},
+					Error: fmt.Errorf("module failed to resolve"),
 				},
 			},
 		}
-		emptyPlugin := &mockScaPlugin{result: &ecosystems.PluginResult{}}
+		emptyPlugin := &mockScaPlugin{results: nil}
 
 		workflowData, err := handleSBOMResolutionDI(
 			ctx.invocationContext,

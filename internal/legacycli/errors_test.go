@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/workflow"
 )
 
 const (

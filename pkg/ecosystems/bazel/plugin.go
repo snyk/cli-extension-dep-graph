@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/identity"
 )
 
 const (
@@ -32,7 +32,8 @@ func (p Plugin) BuildDepGraphsFromDir(
 	log logger.Logger,
 	dir string,
 	options *ecosystems.SCAPluginOptions,
-) (*ecosystems.PluginResult, error) {
+	onGraph ecosystems.OnGraphFunc,
+) error {
 	if log == nil {
 		log = logger.Nop()
 	}
@@ -41,23 +42,28 @@ func (p Plugin) BuildDepGraphsFromDir(
 	if err != nil {
 		if errors.Is(err, errNoBazelOptionFound) {
 			log.Debug(ctx, "no bazel option found, skipping bazel dependency graph resolution")
-			return &ecosystems.PluginResult{}, nil
+			return nil
 		}
-		return nil, fmt.Errorf("failed to initialize bazel resolver: %w", err)
+		return fmt.Errorf("failed to initialize bazel resolver: %w", err)
 	}
 	log.Debug(ctx, "using bazel resolver", logger.Attr("type", resolver.packageManagerName()))
 
 	targets, err := resolver.findTargets(ctx, options)
 	if err != nil {
-		return nil, fmt.Errorf(errQueryBazelTargetsFmt, err)
+		return fmt.Errorf(errQueryBazelTargetsFmt, err)
 	}
 	log.Debug(ctx, "found bazel targets", logger.Attr("targets", targets))
 
 	if err := checkTargetLimit(len(targets), options); err != nil {
-		return nil, err
+		return err
 	}
 
-	var results []ecosystems.SCAResult
+	// processedFiles for the bazel resolver is computed at the resolver
+	// scope (WORKSPACE, MODULE.bazel, etc.), not per target. Attach to
+	// every emitted result; downstream consumers dedup.
+	processed := resolver.processedFiles()
+
+	emitted := 0
 	for _, target := range targets {
 		graph, err := resolver.buildDepGraph(ctx, target)
 		if err != nil {
@@ -66,7 +72,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 		}
 		log.Debug(ctx, "resolved dep-graph for bazel target", logger.Attr("target", target))
 
-		results = append(results, ecosystems.SCAResult{
+		if err := onGraph(ecosystems.SCAResult{
 			DepGraph: graph,
 			ProjectDescriptor: identity.ProjectDescriptor{
 				Identity: identity.ProjectIdentity{
@@ -78,18 +84,18 @@ func (p Plugin) BuildDepGraphsFromDir(
 				PluginName:           pluginName,
 				NormalisedTargetFile: target,
 			},
-			Error: err,
-		})
+			ProcessedFiles: processed,
+		}); err != nil {
+			return err
+		}
+		emitted++
 	}
 
-	if len(results) == 0 {
+	if emitted == 0 {
 		log.Debug(ctx, "no bazel dependency graphs resolved")
 	}
 
-	return &ecosystems.PluginResult{
-		Results:        results,
-		ProcessedFiles: resolver.processedFiles(),
-	}, nil
+	return nil
 }
 
 // checkTargetLimit returns an error when the number of discovered targets

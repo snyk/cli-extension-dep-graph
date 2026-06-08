@@ -10,7 +10,7 @@ import (
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 )
 
 // label is an identifier for a Bazel target.

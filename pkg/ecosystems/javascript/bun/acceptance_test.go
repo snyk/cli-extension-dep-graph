@@ -28,9 +28,10 @@ import (
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/javascript/bun"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/javascript/bun"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/scatest"
 )
 
 type acceptanceFixture struct {
@@ -91,13 +92,13 @@ func runAcceptanceSuite(t *testing.T, fixtureDir string, opts *ecosystems.SCAPlu
 		}
 
 		t.Run(fx.name, func(t *testing.T) {
-			result, err := plugin.BuildDepGraphsFromDir(t.Context(), nil, fx.dir, opts)
+			results, err := scatest.Run(t.Context(), plugin, nil, fx.dir, opts)
 			require.NoError(t, err)
-			require.Len(t, result.Results, 1)
-			require.NoError(t, result.Results[0].Error)
+			require.Len(t, results, 1)
+			require.NoError(t, results[0].Error)
 
 			if *updateGolden {
-				data, writeErr := json.MarshalIndent(result.Results[0].DepGraph, "", "  ")
+				data, writeErr := json.MarshalIndent(results[0].DepGraph, "", "  ")
 				require.NoError(t, writeErr, "marshaling dep graph")
 				writeErr = os.WriteFile(filepath.Join(fx.dir, "expected.json"), append(data, '\n'), 0o600)
 				require.NoError(t, writeErr, "writing expected.json")
@@ -111,11 +112,11 @@ func runAcceptanceSuite(t *testing.T, fixtureDir string, opts *ecosystems.SCAPlu
 			expected, err := depgraph.UnmarshalJSON(raw)
 			require.NoError(t, err, "parsing expected.json")
 
-			assert.Equal(t, normalizedJSON(expected), normalizedJSON(result.Results[0].DepGraph))
+			assert.Equal(t, normalizedJSON(expected), normalizedJSON(results[0].DepGraph))
 
 			// Every package in bun.lock must appear across all dep graphs.
 			// Workspace packages appear in their own dep graph, not the root's.
-			allPkgs := allResultPkgs(result.Results)
+			allPkgs := allResultPkgs(results)
 			assertLockfileCompleteness(t, fx.dir, allPkgs)
 		})
 	}
@@ -192,18 +193,18 @@ func TestAcceptance_Workspaces(t *testing.T) {
 		t.Run(tt.fixture, func(t *testing.T) {
 			dir := filepath.Join("testdata", "acceptance", tt.fixture)
 
-			result, err := plugin.BuildDepGraphsFromDir(t.Context(), nil, dir, &ecosystems.SCAPluginOptions{})
+			results, err := scatest.Run(t.Context(), plugin, nil, dir, &ecosystems.SCAPluginOptions{})
 			require.NoError(t, err)
-			require.Greater(t, len(result.Results), 1)
-			require.Len(t, result.Results, len(tt.graphs))
+			require.Greater(t, len(results), 1)
+			require.Len(t, results, len(tt.graphs))
 
-			for _, r := range result.Results {
+			for _, r := range results {
 				require.NoError(t, r.Error)
 			}
 
 			// Index results by root package name for golden-file lookup.
-			byRoot := make(map[string]*depgraph.DepGraph, len(result.Results))
-			for _, r := range result.Results {
+			byRoot := make(map[string]*depgraph.DepGraph, len(results))
+			for _, r := range results {
 				byRoot[r.DepGraph.GetRootPkg().Info.Name] = r.DepGraph
 			}
 
@@ -219,7 +220,7 @@ func TestAcceptance_Workspaces(t *testing.T) {
 					t.Logf("updated %s/%s", tt.fixture, gc.golden)
 				}
 
-				assertLockfileCompleteness(t, dir, allResultPkgs(result.Results))
+				assertLockfileCompleteness(t, dir, allResultPkgs(results))
 				return
 			}
 
@@ -236,7 +237,7 @@ func TestAcceptance_Workspaces(t *testing.T) {
 				assert.Equal(t, normalizedJSON(expected), normalizedJSON(dg), "mismatch in %s", gc.golden)
 			}
 
-			assertLockfileCompleteness(t, dir, allResultPkgs(result.Results))
+			assertLockfileCompleteness(t, dir, allResultPkgs(results))
 		})
 	}
 }
@@ -251,9 +252,9 @@ func TestInvalidPackageJSON(t *testing.T) {
 
 	dir := filepath.Join("testdata", "acceptance", "invalid-pkg-json")
 
-	result, err := plugin.BuildDepGraphsFromDir(t.Context(), nil, dir, opts)
+	results, err := scatest.Run(t.Context(), plugin, nil, dir, opts)
 	require.NoError(t, err)
-	assert.Empty(t, result.Results)
+	assert.Empty(t, results)
 }
 
 // assertLockfileCompleteness verifies that every package resolved in bun.lock
@@ -331,12 +332,12 @@ func TestBundledDepsVisibleInBunWhy(t *testing.T) {
 	plugin := bun.Plugin{}
 	dir := filepath.Join("testdata", "bundled-deps")
 
-	result, err := plugin.BuildDepGraphsFromDir(t.Context(), nil, dir, &ecosystems.SCAPluginOptions{})
+	results, err := scatest.Run(t.Context(), plugin, nil, dir, &ecosystems.SCAPluginOptions{})
 	require.NoError(t, err)
-	require.Len(t, result.Results, 1)
-	require.NoError(t, result.Results[0].Error)
+	require.Len(t, results, 1)
+	require.NoError(t, results[0].Error)
 
-	missing := lockfilePackagesMissingFromGraph(t, dir, allResultPkgs(result.Results))
+	missing := lockfilePackagesMissingFromGraph(t, dir, allResultPkgs(results))
 	if len(missing) == 0 {
 		// bun has fixed the bug — remove the t.Skipf below and close the issue.
 		return
@@ -409,7 +410,7 @@ func TestAcceptanceNoUnrecognizedLines(t *testing.T) {
 	for _, fx := range discoverFixtures(t, filepath.Join("testdata", "acceptance")) {
 		t.Run(fx.name, func(t *testing.T) {
 			log := &recordingLogger{}
-			_, err := plugin.BuildDepGraphsFromDir(t.Context(), log, fx.dir, &ecosystems.SCAPluginOptions{})
+			_, err := scatest.Run(t.Context(), plugin, log, fx.dir, &ecosystems.SCAPluginOptions{})
 			require.NoError(t, err)
 			log.assertNoUnrecognizedLines(t)
 		})

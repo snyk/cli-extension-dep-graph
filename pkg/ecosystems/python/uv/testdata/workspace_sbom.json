@@ -1,0 +1,314 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "serialNumber": "urn:uuid:6cbf1267-2415-4e61-a384-cfd8b29098bb",
+  "metadata": {
+    "timestamp": "2026-06-03T06:38:46.328785000Z",
+    "tools": [
+      {
+        "vendor": "Astral Software Inc.",
+        "name": "uv",
+        "version": "0.10.9"
+      }
+    ],
+    "component": {
+      "type": "library",
+      "bom-ref": "workspace-project-21",
+      "name": "workspace-project",
+      "properties": [
+        {
+          "name": "uv:package:is_synthetic_root",
+          "value": "true"
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "asgiref-2@3.2.10",
+      "name": "asgiref",
+      "version": "3.2.10",
+      "purl": "pkg:pypi/asgiref@3.2.10"
+    },
+    {
+      "type": "library",
+      "bom-ref": "cffi-3@2.0.0",
+      "name": "cffi",
+      "version": "2.0.0",
+      "purl": "pkg:pypi/cffi@2.0.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "cryptography-4@3.3",
+      "name": "cryptography",
+      "version": "3.3",
+      "purl": "pkg:pypi/cryptography@3.3"
+    },
+    {
+      "type": "library",
+      "bom-ref": "django-5@3.1",
+      "name": "django",
+      "version": "3.1",
+      "purl": "pkg:pypi/django@3.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "jinja2-6@2.11.2",
+      "name": "jinja2",
+      "version": "2.11.2",
+      "purl": "pkg:pypi/jinja2@2.11.2"
+    },
+    {
+      "type": "library",
+      "bom-ref": "json5-7@0.13.0",
+      "name": "json5",
+      "version": "0.13.0",
+      "purl": "pkg:pypi/json5@0.13.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "markupsafe-8@3.0.3",
+      "name": "markupsafe",
+      "version": "3.0.3",
+      "purl": "pkg:pypi/markupsafe@3.0.3"
+    },
+    {
+      "type": "library",
+      "bom-ref": "package-a-9@0.1.0",
+      "name": "package-a",
+      "version": "0.1.0",
+      "properties": [
+        {
+          "name": "uv:workspace:path",
+          "value": "packages/package_a"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "package-b-10@0.1.0",
+      "name": "package-b",
+      "version": "0.1.0",
+      "properties": [
+        {
+          "name": "uv:workspace:path",
+          "value": "packages/package_b"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "package-c-11@0.1.0",
+      "name": "package-c",
+      "version": "0.1.0",
+      "properties": [
+        {
+          "name": "uv:workspace:path",
+          "value": "packages/package_c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pillow-12@8.1.0",
+      "name": "pillow",
+      "version": "8.1.0",
+      "purl": "pkg:pypi/pillow@8.1.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pycparser-13@3.0",
+      "name": "pycparser",
+      "version": "3.0",
+      "purl": "pkg:pypi/pycparser@3.0",
+      "properties": [
+        {
+          "name": "uv:package:marker",
+          "value": "implementation_name != 'PyPy'"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "python-dotenv-14@1.2.1",
+      "name": "python-dotenv",
+      "version": "1.2.1",
+      "purl": "pkg:pypi/python-dotenv@1.2.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pytz-15@2025.2",
+      "name": "pytz",
+      "version": "2025.2",
+      "purl": "pkg:pypi/pytz@2025.2"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pyyaml-16@5.3",
+      "name": "pyyaml",
+      "version": "5.3",
+      "purl": "pkg:pypi/pyyaml@5.3"
+    },
+    {
+      "type": "library",
+      "bom-ref": "ruff-17@0.14.14",
+      "name": "ruff",
+      "version": "0.14.14",
+      "purl": "pkg:pypi/ruff@0.14.14"
+    },
+    {
+      "type": "library",
+      "bom-ref": "six-18@1.17.0",
+      "name": "six",
+      "version": "1.17.0",
+      "purl": "pkg:pypi/six@1.17.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "sqlparse-19@0.5.5",
+      "name": "sqlparse",
+      "version": "0.5.5",
+      "purl": "pkg:pypi/sqlparse@0.5.5"
+    },
+    {
+      "type": "library",
+      "bom-ref": "urllib3-20@1.24.3",
+      "name": "urllib3",
+      "version": "1.24.3",
+      "purl": "pkg:pypi/urllib3@1.24.3"
+    },
+    {
+      "type": "library",
+      "bom-ref": "workspace-project-1@0.1.0",
+      "name": "workspace-project",
+      "version": "0.1.0",
+      "properties": [
+        {
+          "name": "uv:package:is_project_root",
+          "value": "true"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "asgiref-2@3.2.10",
+      "dependsOn": []
+    },
+    {
+      "ref": "cffi-3@2.0.0",
+      "dependsOn": [
+        "pycparser-13@3.0"
+      ]
+    },
+    {
+      "ref": "cryptography-4@3.3",
+      "dependsOn": [
+        "cffi-3@2.0.0",
+        "six-18@1.17.0"
+      ]
+    },
+    {
+      "ref": "django-5@3.1",
+      "dependsOn": [
+        "asgiref-2@3.2.10",
+        "pytz-15@2025.2",
+        "sqlparse-19@0.5.5"
+      ]
+    },
+    {
+      "ref": "jinja2-6@2.11.2",
+      "dependsOn": [
+        "markupsafe-8@3.0.3"
+      ]
+    },
+    {
+      "ref": "json5-7@0.13.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "markupsafe-8@3.0.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "package-a-9@0.1.0",
+      "dependsOn": [
+        "package-b-10@0.1.0",
+        "urllib3-20@1.24.3"
+      ]
+    },
+    {
+      "ref": "package-b-10@0.1.0",
+      "dependsOn": [
+        "json5-7@0.13.0",
+        "pillow-12@8.1.0",
+        "pyyaml-16@5.3"
+      ]
+    },
+    {
+      "ref": "package-c-11@0.1.0",
+      "dependsOn": [
+        "cryptography-4@3.3",
+        "django-5@3.1",
+        "python-dotenv-14@1.2.1"
+      ]
+    },
+    {
+      "ref": "pillow-12@8.1.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pycparser-13@3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "python-dotenv-14@1.2.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pytz-15@2025.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pyyaml-16@5.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "ruff-17@0.14.14",
+      "dependsOn": []
+    },
+    {
+      "ref": "six-18@1.17.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "sqlparse-19@0.5.5",
+      "dependsOn": []
+    },
+    {
+      "ref": "urllib3-20@1.24.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "workspace-project-1@0.1.0",
+      "dependsOn": [
+        "jinja2-6@2.11.2",
+        "json5-7@0.13.0",
+        "package-a-9@0.1.0",
+        "package-b-10@0.1.0",
+        "ruff-17@0.14.14"
+      ]
+    },
+    {
+      "ref": "workspace-project-21",
+      "dependsOn": [
+        "package-a-9@0.1.0",
+        "package-b-10@0.1.0",
+        "package-c-11@0.1.0",
+        "workspace-project-1@0.1.0"
+      ]
+    }
+  ]
+}

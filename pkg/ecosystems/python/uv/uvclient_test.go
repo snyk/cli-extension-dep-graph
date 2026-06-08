@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 )
 
 type mockCmdExecutor struct {
@@ -118,6 +118,43 @@ func TestUVClient_ExportSBOM_UvWorkspacePackages(t *testing.T) {
 
 	client := NewClientWithExecutor("/path/to/uv", mockExecutor)
 	result, err := client.ExportSBOM("/test/dir", ecosystems.NewPluginOptions().WithForceIncludeWorkspacePackages(true))
+
+	assert.NoError(t, err)
+	require.NotNil(t, result)
+	assert.JSONEq(t, validSBOM, string(result))
+	assert.Equal(t, 1, callCount)
+}
+
+func TestUVClient_ExportSBOM_WorkspacePackage(t *testing.T) {
+	validSBOM := `{
+		"bomFormat": "CycloneDX",
+		"specVersion": "1.5",
+		"metadata": {
+			"component": {
+				"type": "library",
+				"bom-ref": "package-b-1@0.1.0",
+				"name": "package-b",
+				"version": "0.1.0",
+				"properties": [
+					{"name": "uv:package:is_project_root", "value": "true"}
+				]
+			}
+		}
+	}`
+
+	callCount := 0
+	mockExecutor := &mockCmdExecutor{
+		executeFunc: func(binary, dir string, args ...string) ([]byte, error) {
+			callCount++
+			assert.Equal(t, "/path/to/uv", binary)
+			assert.Equal(t, "/test/dir", dir)
+			assert.Equal(t, []string{"export", "--format", "cyclonedx1.5", "--preview", "--locked", "--all-packages", "--no-dev"}, args)
+			return []byte(validSBOM), nil
+		},
+	}
+
+	client := NewClientWithExecutor("/path/to/uv", mockExecutor)
+	result, err := client.ExportSBOM("/test/dir", ecosystems.NewPluginOptions().WithWorkspacePackage("package-b"))
 
 	assert.NoError(t, err)
 	require.NotNil(t, result)

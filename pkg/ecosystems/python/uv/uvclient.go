@@ -10,7 +10,7 @@ import (
 	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 
-	scaecosystems "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	scaecosystems "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 )
 
 const (
@@ -64,7 +64,7 @@ func (c client) ExportSBOM(inputDir string, opts *scaecosystems.SCAPluginOptions
 	} else {
 		args = append(args, "--locked")
 	}
-	if opts.Global.AllProjects || opts.Global.ForceIncludeWorkspacePackages {
+	if shouldUseAllPackages(opts) {
 		args = append(args, "--all-packages")
 	}
 	if !opts.Global.IncludeDev {
@@ -83,6 +83,13 @@ func (c client) ExportSBOM(inputDir string, opts *scaecosystems.SCAPluginOptions
 	}
 
 	return output, nil
+}
+
+// shouldUseAllPackages determines whether the uv plugin should use the --all-packages flag.
+func shouldUseAllPackages(opts *scaecosystems.SCAPluginOptions) bool {
+	return opts.Global.AllProjects ||
+		opts.Global.ForceIncludeWorkspacePackages ||
+		(opts.Global.WorkspacePackage != nil && *opts.Global.WorkspacePackage != "")
 }
 
 // Minimal representation of a CycloneDX SBOM.

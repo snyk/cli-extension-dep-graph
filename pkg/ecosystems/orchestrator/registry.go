@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 
 	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
@@ -49,7 +50,12 @@ func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry,
 		return nil, fmt.Errorf("failed to register bun plugin: %w", err)
 	}
 	// gradle (opt-in via feature flag)
-	normalizeDepsPostHook := gradle.NewNormalizeDepsPostHook()
+	cfg := ictx.GetConfiguration()
+	normalizeDepsPostHook := gradle.NewNormalizeDepsPostHook(
+		ictx.GetNetworkAccess().GetHttpClient(),
+		cfg.GetString(configuration.API_URL),
+		cfg.GetString(configuration.ORGANIZATION),
+	)
 	gradlePlugin := gradle.NewGradlePluginWithNormalizeDepsHook(normalizeDepsPostHook)
 	if err := r.register(gradlePlugin, withFeatureFlagCheck(FlagNewGradleResolver), withPluginDependencies(bazelPluginName)); err != nil {
 		return nil, fmt.Errorf("failed to register gradle plugin: %w", err)
@@ -186,23 +192,33 @@ func executePluginWithResults(
 	resultsChan chan ecosystems.SCAResult,
 ) []string {
 	enhancedLogger.Info().Msg(fmt.Sprintf("Executing %s plugin", plugin.GetName()))
-	results, err := plugin.BuildDepGraphsFromDir(ctx, logger.NewFromZerolog(enhancedLogger), dir, opts)
+
+	// processedFiles is the deduped union across every emitted result.
+	// Plugins attach per-result file lists on SCAResult.ProcessedFiles;
+	// the orchestrator unions them here so callers see one flat list
+	// per plugin run.
+	seen := make(map[string]struct{})
+	var processedFiles []string
+
+	err := plugin.BuildDepGraphsFromDir(ctx, logger.NewFromZerolog(enhancedLogger), dir, opts, func(result ecosystems.SCAResult) error {
+		for _, p := range result.ProcessedFiles {
+			if _, ok := seen[p]; ok {
+				continue
+			}
+			seen[p] = struct{}{}
+			processedFiles = append(processedFiles, p)
+		}
+		select {
+		case resultsChan <- result:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	})
 	if err != nil {
 		enhancedLogger.Warn().Err(err).Msg(fmt.Sprintf("%s plugin failed", plugin.GetName()))
-		return nil
+		return processedFiles
 	}
 
-	if results != nil {
-		for _, result := range results.Results {
-			select {
-			case resultsChan <- result:
-			case <-ctx.Done():
-				return nil
-			}
-		}
-
-		return results.ProcessedFiles
-	}
-
-	return nil
+	return processedFiles
 }

@@ -7,9 +7,9 @@ import (
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
-	"github.com/snyk/cli-extension-dep-graph/pkg/conversion"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/conversion"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 )
 
 // RemoteSBOMConverter implements SBOMConverter by calling the remote conversion endpoint.

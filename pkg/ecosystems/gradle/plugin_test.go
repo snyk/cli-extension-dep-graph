@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/metadata"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/metadata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -478,7 +478,7 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 			Global: ecosystems.GlobalOptions{},
 		}
 
-		allResults, allFiles := p.convertProjects(ctx, log, parsed, "/project", "", optsAll)
+		allResults, allFiles := collectConvert(ctx, p, log, parsed, "/project", "", optsAll)
 		assert.Len(t, allResults, 3, "Without target file, should return all projects")
 		assert.Len(t, allFiles, 3)
 
@@ -507,7 +507,7 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 			Global: ecosystems.GlobalOptions{TargetFile: &targetFile},
 		}
 
-		targetedResults, targetedFiles := p.convertProjects(ctx, log, parsed, "/project", "", optsTargeted)
+		targetedResults, targetedFiles := collectConvert(ctx, p, log, parsed, "/project", "", optsTargeted)
 		assert.Len(t, targetedResults, 1, "With target file, should return only matching project")
 		assert.Len(t, targetedFiles, 1)
 
@@ -554,7 +554,7 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 			Global: ecosystems.GlobalOptions{TargetFile: &targetFile},
 		}
 
-		results, files := p.convertProjects(ctx, log, parsed, "/project", "", opts)
+		results, files := collectConvert(ctx, p, log, parsed, "/project", "", opts)
 		assert.Len(t, results, 1, "Should return only the lib project")
 		assert.Len(t, files, 1)
 
@@ -601,7 +601,7 @@ func TestTargetFileFiltering_MockedOutput(t *testing.T) {
 			Global: ecosystems.GlobalOptions{TargetFile: &targetFile},
 		}
 
-		results, files := p.convertProjects(ctx, log, parsed, "/project", "", opts)
+		results, files := collectConvert(ctx, p, log, parsed, "/project", "", opts)
 		assert.Len(t, results, 0, "Should return no results when no project matches")
 		assert.Len(t, files, 0)
 	})

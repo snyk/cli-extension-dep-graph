@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/argparser"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/argparser"
 )
 
 // SCAPluginOptions contains configuration options for SCA plugins,
@@ -30,6 +30,7 @@ type GlobalOptions struct {
 	ForceIncludeWorkspacePackages bool                 `arg:"--internal-uv-workspace-packages"`
 	ProjectName                   *string              `arg:"--project-name"`
 	IncludeProvenance             bool                 `arg:"--include-provenance"`
+	WorkspacePackage              *string              `arg:"--workspace-package"`
 	RawFlags                      []string
 }
 
@@ -169,6 +170,11 @@ func (o *SCAPluginOptions) WithForceIncludeWorkspacePackages(forceIncludeWorkspa
 
 func (o *SCAPluginOptions) WithProjectName(projectName string) *SCAPluginOptions {
 	o.Global.ProjectName = &projectName
+	return o
+}
+
+func (o *SCAPluginOptions) WithWorkspacePackage(pkg string) *SCAPluginOptions {
+	o.Global.WorkspacePackage = &pkg
 	return o
 }
 

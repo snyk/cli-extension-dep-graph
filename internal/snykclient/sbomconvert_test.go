@@ -10,9 +10,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/mocks"
-	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
-	pkglogger "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/mocks"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/snykclient"
+	pkglogger "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 )
 
 var logger = pkglogger.Nop()

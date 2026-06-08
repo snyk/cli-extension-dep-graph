@@ -3,7 +3,7 @@ package depgraph
 import (
 	"github.com/spf13/pflag"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/workflow"
 )
 
 const (

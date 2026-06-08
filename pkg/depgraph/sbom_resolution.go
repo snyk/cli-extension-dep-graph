@@ -15,14 +15,14 @@ import (
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	gafworkflow "github.com/snyk/go-application-framework/pkg/workflow"
 
-	"github.com/snyk/cli-extension-dep-graph/internal/legacycli"
-	"github.com/snyk/cli-extension-dep-graph/internal/remoteconv"
-	"github.com/snyk/cli-extension-dep-graph/internal/snykclient"
-	"github.com/snyk/cli-extension-dep-graph/internal/workflow"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/legacy"
-	ecosystemslogger "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/python/uv"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/legacycli"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/remoteconv"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/snykclient"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/workflow"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/legacy"
+	ecosystemslogger "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/python/uv"
 )
 
 func handleSBOMResolution(
@@ -87,25 +87,48 @@ func handleSBOMResolutionDI(
 	totalResults := 0
 
 	for _, sp := range scaPlugins {
-		pluginResult, err := sp.BuildDepGraphsFromDir(
+		// The sbom_resolution flow runs batch-mode logic (failFast,
+		// JSONL bridge, ExcludePaths propagation) over the entire
+		// plugin output. Collect via the streaming callback into a
+		// local slice; per-plugin peak memory is unchanged from the
+		// previous PluginResult shape — the streaming wins land in
+		// consumers that pipe each SCAResult straight to disk or
+		// network rather than accumulating them.
+		var (
+			results        []ecosystems.SCAResult
+			processedFiles []string
+			seen           = make(map[string]struct{})
+		)
+		err := sp.BuildDepGraphsFromDir(
 			ctx.Context(),
 			pluginLogger,
 			inputDir,
 			pluginOptions,
+			func(r ecosystems.SCAResult) error {
+				results = append(results, r)
+				for _, p := range r.ProcessedFiles {
+					if _, ok := seen[p]; ok {
+						continue
+					}
+					seen[p] = struct{}{}
+					processedFiles = append(processedFiles, p)
+				}
+				return nil
+			},
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error building results: %w", err)
 		}
-		if pluginResult == nil {
+		if len(results) == 0 {
 			continue
 		}
 
-		if ffErr := checkFailFast(logger, failFast, allProjects, pluginResult.Results); ffErr != nil {
+		if ffErr := checkFailFast(logger, failFast, allProjects, results); ffErr != nil {
 			return nil, ffErr
 		}
 
 		pluginData, pluginProblems, err := convertPluginResults(
-			logger, sp, pluginResult.Results, allProjects, forceIncludeWorkspacePackages, targetFile,
+			logger, sp, results, allProjects, forceIncludeWorkspacePackages, targetFile,
 		)
 		if err != nil {
 			return nil, err
@@ -113,11 +136,11 @@ func handleSBOMResolutionDI(
 
 		workflowData = append(workflowData, pluginData...)
 		problemResults = append(problemResults, pluginProblems...)
-		totalResults += len(pluginResult.Results)
+		totalResults += len(results)
 
-		pluginOptions.WithExcludePaths(pluginResult.ProcessedFiles)
+		pluginOptions.WithExcludePaths(processedFiles)
 
-		if !allProjects && len(pluginResult.Results) > 0 {
+		if !allProjects {
 			break
 		}
 	}

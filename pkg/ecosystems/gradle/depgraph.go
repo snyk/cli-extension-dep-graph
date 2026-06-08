@@ -8,7 +8,7 @@ import (
 	"github.com/package-url/packageurl-go"
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 )
 
 const pkgManagerName = "gradle"
@@ -243,14 +243,18 @@ func filterConfigurationsByPattern(configurations []gradleConfig, pattern string
 }
 
 // buildProvenanceMap creates a map from dependency ID to provenance information
-// for quick lookups during graph building. When --include-provenance is enabled,
-// this allows us to attach checksum and type information to dependencies.
+// for quick lookups during graph building. This is built when either
+// --include-provenance or --gradle-normalize-deps is enabled, as both features
+// require checksum and type information to be available for dependencies.
 //
 // Note: If multiple configurations resolve the same dependency ID to different
 // artifacts (different checksums), this takes the first one encountered.
 // This could potentially be improved to handle per-configuration artifacts.
 func buildProvenanceMap(configurations []gradleConfig, options *ecosystems.SCAPluginOptions) map[string]*allDepEntry {
-	if options == nil || !options.Global.IncludeProvenance {
+	if options == nil {
+		return nil
+	}
+	if !options.Global.IncludeProvenance && !options.Gradle.NormalizeDeps {
 		return nil
 	}
 

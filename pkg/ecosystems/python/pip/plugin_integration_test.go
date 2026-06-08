@@ -20,9 +20,10 @@ import (
 
 	snykerrors "github.com/snyk/error-catalog-golang-public/snyk_errors"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/metadata"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/metadata"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/scatest"
 )
 
 // PluginTestCase defines a test case for the plugin
@@ -66,7 +67,7 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 
 			// Run plugin
 			plugin := Plugin{}
-			result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, tc.Options)
+			results, err := scatest.Run(ctx, plugin, logger.Nop(), absPath, tc.Options)
 			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 
 			// Load and compare expected output
@@ -76,7 +77,7 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 			expected, err := loadExpectedResults(expectedPath)
 			require.NoError(t, err, "failed to load expected output from %s", expectedPath)
 
-			assertResultsMatchExpected(t, result.Results, expected, tc.Fixture)
+			assertResultsMatchExpected(t, results, expected, tc.Fixture)
 		})
 	}
 }
@@ -108,9 +109,9 @@ func TestPlugin_Concurrency(t *testing.T) {
 
 	// Run multiple times to test race conditions
 	for i := 0; i < 5; i++ {
-		result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, options)
+		results, err := scatest.Run(ctx, plugin, logger.Nop(), absPath, options)
 		require.NoError(t, err, "iteration %d failed", i)
-		assertResultsMatchExpected(t, result.Results, expected, "multi-requirements")
+		assertResultsMatchExpected(t, results, expected, "multi-requirements")
 	}
 }
 
@@ -151,11 +152,11 @@ func TestPlugin_BuildDepGraphsFromDir_PipErrors(t *testing.T) {
 			require.NoError(t, err, "failed to get absolute path for fixture")
 
 			plugin := Plugin{}
-			result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, ecosystems.NewPluginOptions())
+			results, err := scatest.Run(ctx, plugin, logger.Nop(), absPath, ecosystems.NewPluginOptions())
 			require.NoError(t, err, "BuildDepGraphsFromDir should not return error")
 
-			require.Len(t, result.Results, 1, "expected a single result for fixture %s", tc.fixture)
-			pipResult := result.Results[0]
+			require.Len(t, results, 1, "expected a single result for fixture %s", tc.fixture)
+			pipResult := results[0]
 
 			// Basic metadata expectations
 			if pythonVersion != "" && pipResult.ProjectDescriptor.Identity.TargetRuntime != nil {
@@ -183,7 +184,7 @@ func TestPlugin_ContextCancellation(t *testing.T) {
 	require.NoError(t, err)
 
 	plugin := Plugin{}
-	result, err := plugin.BuildDepGraphsFromDir(ctx, logger.Nop(), absPath, ecosystems.NewPluginOptions())
+	results, err := scatest.Run(ctx, plugin, logger.Nop(), absPath, ecosystems.NewPluginOptions())
 
 	// Should handle cancellation gracefully
 	if err != nil {
@@ -191,10 +192,10 @@ func TestPlugin_ContextCancellation(t *testing.T) {
 		assert.ErrorIs(t, err, context.Canceled)
 	} else {
 		// If results returned, they should contain error
-		assert.Len(t, result.Results, 1)
-		if result.Results[0].Error != nil {
+		assert.Len(t, results, 1)
+		if results[0].Error != nil {
 			// Error might be wrapped
-			assert.Contains(t, result.Results[0].Error.Error(), "context canceled")
+			assert.Contains(t, results[0].Error.Error(), "context canceled")
 		}
 	}
 }
@@ -254,8 +255,9 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 			assert.NotEmpty(t, pythonVersion, "[%s] pythonVersion should not be empty if present", fixtureName)
 		}
 
-		// Null out ResolverMetadata for comparison (not part of golden files)
+		// Null out fields that aren't part of golden files.
 		sortActual[i].ResolverMetadata = nil
+		sortActual[i].ProcessedFiles = nil
 	}
 
 	// Sync fields that vary between pip and pipenv or by environment (allows sharing fixtures)

@@ -9,13 +9,14 @@ import (
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
+	clierrors "github.com/snyk/error-catalog-golang-public/cli"
 	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/conversion"
-	scaecosystems "github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/conversion"
+	scaecosystems "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/discovery"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/identity"
 )
 
 const PluginName = "uv"
@@ -43,7 +44,8 @@ func (p Plugin) BuildDepGraphsFromDir(
 	log logger.Logger,
 	inputDir string,
 	options *scaecosystems.SCAPluginOptions,
-) (*scaecosystems.PluginResult, error) {
+	onGraph scaecosystems.OnGraphFunc,
+) error {
 	var targetFile string
 	if options.Global.TargetFile != nil {
 		targetFile = *options.Global.TargetFile
@@ -51,18 +53,17 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	if targetFile != "" && filepath.Base(targetFile) != LockFileName {
 		log.Info(ctx, "Skipping processing uv plugin", logger.Attr("targetFile", targetFile), logger.Attr("reason", "not a 'uv.lock' file"))
-		return &scaecosystems.PluginResult{}, nil
+		return nil
 	}
 
 	files, err := p.discoverLockFiles(ctx, inputDir, targetFile, options)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if len(files) == 0 {
-		return &scaecosystems.PluginResult{}, nil
+		return nil
 	}
 
-	combined := &scaecosystems.PluginResult{}
 	for _, file := range files {
 		lockFilePath := file.RelPath // e.g., "uv.lock" or "project1/uv.lock"
 		lockFileDir := filepath.Dir(lockFilePath)
@@ -73,7 +74,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 			log.Error(ctx, "Failed to build dependency graph", logger.Attr("lockFile", lockFilePath), logger.Err(err))
 			wrappedErr := fmt.Errorf("failed to build dependency graph for %s: %w", lockFilePath, err)
 
-			errorResult := scaecosystems.SCAResult{
+			if emitErr := onGraph(scaecosystems.SCAResult{
 				ProjectDescriptor: identity.ProjectDescriptor{
 					Identity: identity.ProjectIdentity{
 						ProjectType: "uv",
@@ -85,26 +86,28 @@ func (p Plugin) BuildDepGraphsFromDir(
 					NormalisedTargetFile: lockFilePath,
 				},
 				Error: wrappedErr,
+			}); emitErr != nil {
+				return emitErr
 			}
-			combined.Results = append(combined.Results, errorResult)
 			continue
 		}
-		pluginResult, err := p.buildResults(ctx, sbom, lockFilePath, lockFileDir, options, log)
+		emitted, err := p.buildResults(ctx, sbom, lockFilePath, lockFileDir, options, log, onGraph)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		combined.Results = append(combined.Results, pluginResult.Results...)
-		combined.ProcessedFiles = append(combined.ProcessedFiles, pluginResult.ProcessedFiles...)
 
-		if !options.Global.AllProjects {
-			// We don't want more than one project
+		if (!options.Global.AllProjects || selectedWorkspacePackage(options) != "") && emitted > 0 {
+			// We don't want more than one project (a selected workspace package is a single project too).
 			break
 		}
 	}
 
-	return combined, nil
+	return nil
 }
 
+// buildResults parses + converts the SBOM and emits one result per
+// dep-graph via onGraph. Returns the number emitted so the caller can
+// decide whether to break out of the !AllProjects single-project loop.
 func (p Plugin) buildResults(
 	ctx context.Context,
 	sbom Sbom,
@@ -112,32 +115,34 @@ func (p Plugin) buildResults(
 	lockFileDir string,
 	options *scaecosystems.SCAPluginOptions,
 	log logger.Logger,
-) (*scaecosystems.PluginResult, error) {
+	onGraph scaecosystems.OnGraphFunc,
+) (int, error) {
 	parsedSbom, err := parseAndValidateSBOM(sbom)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse and validate sbom for %s: %w", lockFilePath, err)
+		return 0, fmt.Errorf("failed to parse and validate sbom for %s: %w", lockFilePath, err)
 	}
 
-	if !options.Global.AllProjects && !options.Global.ForceIncludeWorkspacePackages && !hasProjectRoot(parsedSbom) {
+	workspaceMember := selectedWorkspacePackage(options)
+
+	if !options.Global.AllProjects && !options.Global.ForceIncludeWorkspacePackages &&
+		workspaceMember == "" && !hasProjectRoot(parsedSbom) {
 		log.Info(ctx, "No root project found in SBOM", logger.Attr("lockFile", lockFilePath))
 		noRootErr := ecosystems.NewUvNoProjectRootError(
 			"Found uv workspace with no root project. To scan all workspace members use the --all-projects flag.",
 		)
-		return &scaecosystems.PluginResult{
-			Results: []scaecosystems.SCAResult{{
-				ProjectDescriptor: identity.ProjectDescriptor{
-					Identity: identity.ProjectIdentity{
-						ProjectType: "uv",
-						TargetFile:  &lockFilePath,
-					},
+		return 1, onGraph(scaecosystems.SCAResult{
+			ProjectDescriptor: identity.ProjectDescriptor{
+				Identity: identity.ProjectIdentity{
+					ProjectType: "uv",
+					TargetFile:  &lockFilePath,
 				},
-				ResolverMetadata: &scaecosystems.ResolverMetadata{
-					PluginName:           PluginName,
-					NormalisedTargetFile: lockFilePath,
-				},
-				Error: noRootErr,
-			}},
-		}, nil
+			},
+			ResolverMetadata: &scaecosystems.ResolverMetadata{
+				PluginName:           PluginName,
+				NormalisedTargetFile: lockFilePath,
+			},
+			Error: noRootErr,
+		})
 	}
 
 	metadata := extractMetadata(parsedSbom)
@@ -145,56 +150,73 @@ func (p Plugin) buildResults(
 
 	depGraphs, err := p.convertWithFallback(ctx, sbom, metadata, options.Global.ForceSingleGraph, log)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert sbom to dep-graphs for %s: %w", lockFilePath, err)
+		return 0, fmt.Errorf("failed to convert sbom to dep-graphs for %s: %w", lockFilePath, err)
 	}
 
-	result := &scaecosystems.PluginResult{}
+	if workspaceMember != "" {
+		depGraphs = filterDepGraphsByName(depGraphs, workspaceMember)
+		if len(depGraphs) == 0 {
+			log.Info(ctx, "Workspace package not found", logger.Attr("workspacePackage", workspaceMember), logger.Attr("lockFile", lockFilePath))
+			return 1, onGraph(workspacePackageNotFoundResult(workspaceMember, lockFilePath))
+		}
+	}
 
+	emitted := 0
 	for _, depGraph := range depGraphs {
 		workspacePackage := findWorkspacePackage(depGraph, workspacePackages)
-
-		var manifestFile string
-		switch {
-		case workspacePackage != nil:
-			manifestFile = filepath.Join(lockFileDir, workspacePackage.Path, PyprojectTomlFileName)
-		case lockFileDir == ".":
-			manifestFile = PyprojectTomlFileName
-		default:
-			manifestFile = filepath.Join(lockFileDir, PyprojectTomlFileName)
+		result := buildSCAResult(depGraph, lockFileDir, workspacePackage)
+		if emitErr := onGraph(result); emitErr != nil {
+			return emitted, emitErr
 		}
-
-		packagePath := lockFileDir
-		if workspacePackage != nil {
-			packagePath = filepath.Join(packagePath, workspacePackage.Path)
-		}
-		for _, name := range []string{LockFileName, PyprojectTomlFileName, RequirementsTxtFileName} {
-			result.ProcessedFiles = append(result.ProcessedFiles, filepath.Join(packagePath, name))
-		}
-
-		var rootName string
-		if rootPkg := depGraph.GetRootPkg(); rootPkg != nil {
-			rootName = rootPkg.Info.Name
-		}
-
-		res := scaecosystems.SCAResult{
-			DepGraph: depGraph,
-			ProjectDescriptor: identity.ProjectDescriptor{
-				Identity: identity.ProjectIdentity{
-					ProjectType:       "uv",
-					TargetFile:        &manifestFile,
-					RootComponentName: rootName,
-				},
-			},
-			ResolverMetadata: &scaecosystems.ResolverMetadata{
-				PluginName:           PluginName,
-				NormalisedTargetFile: manifestFile,
-				VersionBuildInfo:     map[string]string{},
-			},
-		}
-		result.Results = append(result.Results, res)
+		emitted++
 	}
 
-	return result, nil
+	return emitted, nil
+}
+
+// buildSCAResult constructs the SCAResult for a single dep-graph, deriving the
+// manifest path and processed files from the (optional) workspace package.
+func buildSCAResult(depGraph *depgraph.DepGraph, lockFileDir string, workspacePackage *WorkspacePackage) scaecosystems.SCAResult {
+	var manifestFile string
+	switch {
+	case workspacePackage != nil:
+		manifestFile = filepath.Join(lockFileDir, workspacePackage.Path, PyprojectTomlFileName)
+	case lockFileDir == ".":
+		manifestFile = PyprojectTomlFileName
+	default:
+		manifestFile = filepath.Join(lockFileDir, PyprojectTomlFileName)
+	}
+
+	packagePath := lockFileDir
+	if workspacePackage != nil {
+		packagePath = filepath.Join(packagePath, workspacePackage.Path)
+	}
+	processedFiles := make([]string, 0, 3)
+	for _, name := range []string{LockFileName, PyprojectTomlFileName, RequirementsTxtFileName} {
+		processedFiles = append(processedFiles, filepath.Join(packagePath, name))
+	}
+
+	var rootName string
+	if rootPkg := depGraph.GetRootPkg(); rootPkg != nil {
+		rootName = rootPkg.Info.Name
+	}
+
+	return scaecosystems.SCAResult{
+		DepGraph: depGraph,
+		ProjectDescriptor: identity.ProjectDescriptor{
+			Identity: identity.ProjectIdentity{
+				ProjectType:       "uv",
+				TargetFile:        &manifestFile,
+				RootComponentName: rootName,
+			},
+		},
+		ResolverMetadata: &scaecosystems.ResolverMetadata{
+			PluginName:           PluginName,
+			NormalisedTargetFile: manifestFile,
+			VersionBuildInfo:     map[string]string{},
+		},
+		ProcessedFiles: processedFiles,
+	}
 }
 
 // sbomMetadata is the minimal metadata needed to construct an empty dep-graph
@@ -257,6 +279,43 @@ func buildEmptyDepGraph(metadata *sbomMetadata) (*depgraph.DepGraph, error) {
 	return builder.Build(), nil
 }
 
+// selectedWorkspacePackage returns the requested workspace member name, or "" if none.
+func selectedWorkspacePackage(options *scaecosystems.SCAPluginOptions) string {
+	if options.Global.WorkspacePackage != nil {
+		return *options.Global.WorkspacePackage
+	}
+	return ""
+}
+
+// filterDepGraphsByName keeps only the dep-graphs whose root package matches name.
+func filterDepGraphsByName(depGraphs []*depgraph.DepGraph, name string) []*depgraph.DepGraph {
+	var filtered []*depgraph.DepGraph
+	for _, dg := range depGraphs {
+		if rootPkg := dg.GetRootPkg(); rootPkg != nil && rootPkg.Info.Name == name {
+			filtered = append(filtered, dg)
+		}
+	}
+	return filtered
+}
+
+// workspacePackageNotFoundResult builds a single errored result for a requested
+// workspace member that is not present in the exported workspace.
+func workspacePackageNotFoundResult(pkg, lockFilePath string) scaecosystems.SCAResult {
+	return scaecosystems.SCAResult{
+		ProjectDescriptor: identity.ProjectDescriptor{
+			Identity: identity.ProjectIdentity{
+				ProjectType: "uv",
+				TargetFile:  &lockFilePath,
+			},
+		},
+		ResolverMetadata: &scaecosystems.ResolverMetadata{
+			PluginName:           PluginName,
+			NormalisedTargetFile: lockFilePath,
+		},
+		Error: clierrors.NewGeneralSCAFailureError(fmt.Sprintf("Workspace package '%s' not found.", pkg)),
+	}
+}
+
 // Returns nil if the package was not found.
 func findWorkspacePackage(depGraph *depgraph.DepGraph, workspacePackages []WorkspacePackage) *WorkspacePackage {
 	root := depGraph.GetRootPkg()
@@ -279,7 +338,7 @@ func (p Plugin) discoverLockFiles(
 	var findOpts []discovery.FindOption
 
 	switch {
-	case options.Global.AllProjects:
+	case options.Global.AllProjects && selectedWorkspacePackage(options) == "":
 		findOpts = []discovery.FindOption{
 			discovery.WithInclude(LockFileName),
 			discovery.WithCommonExcludes(),

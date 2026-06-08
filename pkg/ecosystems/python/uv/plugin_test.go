@@ -2,6 +2,7 @@ package uv
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"os"
 	"path/filepath"
@@ -13,11 +14,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/scatest"
 )
 
 var testLogger = logger.Nop()
+
+//go:embed testdata/workspace_sbom.json
+var workspaceSBOMJSON []byte
+
+//go:embed testdata/virtual_workspace_sbom.json
+var virtualWorkspaceSBOMJSON []byte
 
 const validSBOMJSON = `{
 	"bomFormat": "CycloneDX",
@@ -225,7 +233,7 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 				WithAllProjects(tt.allProjects).
 				WithExclude(tt.exclude).
 				WithExcludePaths(tt.excludePaths)
-			pluginResult, err := plugin.BuildDepGraphsFromDir(ctx, testLogger, tmpDir, options)
+			results, err := scatest.Run(ctx, plugin, testLogger, tmpDir, options)
 
 			// Check error
 			if tt.expectedErr != "" {
@@ -234,7 +242,7 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 				return
 			}
 
-			findings := pluginResult.Results
+			findings := results
 
 			// Verify correct directories were processed
 			gotDirs := mockClient.CalledDirs
@@ -270,8 +278,8 @@ func TestPlugin_ShouldNotSkipProcessingWhenNoTargetFileIsSet(t *testing.T) {
 	plugin := NewPlugin(mockClient, mockConverter(), "")
 
 	options := ecosystems.NewPluginOptions()
-	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
-	findings := pluginResult.Results
+	results, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, options)
+	findings := results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 1, "Should return findings")
@@ -285,8 +293,8 @@ func TestPlugin_ShouldNotSkipProcessingWhenUvLockFile(t *testing.T) {
 	plugin := NewPlugin(mockClient, mockConverter(), "")
 
 	options := ecosystems.NewPluginOptions().WithTargetFile("uv.lock")
-	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
-	findings := pluginResult.Results
+	results, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, options)
+	findings := results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 1, "Should return findings")
@@ -300,8 +308,8 @@ func TestPlugin_SkipsProcessingWhenTargetFileIsNotUVFile(t *testing.T) {
 	plugin := NewPlugin(mockClient, mockConverter(), "")
 
 	options := ecosystems.NewPluginOptions().WithTargetFile("package.json")
-	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
-	findings := pluginResult.Results
+	results, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, options)
+	findings := results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 0, "Should return no findings")
@@ -315,8 +323,8 @@ func TestPlugin_SkipsProcessingWhenTargetFileIsAPyProjectTomlFile(t *testing.T) 
 	plugin := NewPlugin(mockClient, mockConverter(), "")
 
 	options := ecosystems.NewPluginOptions().WithTargetFile("pyproject.toml")
-	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
-	findings := pluginResult.Results
+	results, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, options)
+	findings := results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 0, "Should return no findings")
@@ -335,8 +343,8 @@ func TestPlugin_ShouldNotSkipProcessingWhenTargetFileIsRelativeFolderPath(t *tes
 	plugin := NewPlugin(mockClient, mockConverter(), "")
 
 	options := ecosystems.NewPluginOptions().WithTargetFile("my-project/uv.lock")
-	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
-	findings := pluginResult.Results
+	results, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, options)
+	findings := results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 1, "Should return findings for the specific uv.lock file")
@@ -356,8 +364,8 @@ func TestPlugin_ShouldSkipProcessingWhenTargetFileIsNotUvLockInRelativeFolderPat
 	plugin := NewPlugin(mockClient, mockConverter(), "")
 
 	options := ecosystems.NewPluginOptions().WithTargetFile("my-project/package.json")
-	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
-	findings := pluginResult.Results
+	results, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, options)
+	findings := results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 0, "Should return no findings")
@@ -376,12 +384,12 @@ func TestPlugin_ShouldRaiseErrorWhenTargetFileIsUvLockInRelativeFolderButDoesNot
 	plugin := NewPlugin(mockClient, mockConverter(), "")
 
 	options := ecosystems.NewPluginOptions().WithTargetFile("my-project/uv.lock")
-	pluginResult, err := plugin.BuildDepGraphsFromDir(t.Context(), testLogger, tmpDir, options)
+	results, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, options)
 
 	require.Error(t, err)
 	require.ErrorContains(t, err, "failed to find uv lockfile(s)")
 
-	require.Nil(t, pluginResult, "Should return nil result on error")
+	require.Empty(t, results, "Should emit no results on error")
 	require.Empty(t, mockClient.CalledDirs, "Should not call the uv client")
 }
 
@@ -393,8 +401,8 @@ func TestPlugin_BuildDepGraphsFromDir_ErrorHandling(t *testing.T) {
 
 	ctx := context.Background()
 	options := ecosystems.NewPluginOptions()
-	pluginResult, err := plugin.BuildDepGraphsFromDir(ctx, testLogger, tmpDir, options)
-	findings := pluginResult.Results
+	results, err := scatest.Run(ctx, plugin, testLogger, tmpDir, options)
+	findings := results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 1)
@@ -423,8 +431,8 @@ func TestPlugin_BuildDepGraphsFromDir_MixedSuccessAndFailure(t *testing.T) {
 	options := ecosystems.NewPluginOptions().WithAllProjects(true)
 	// project1 fails at ExportSBOM (before conversion), so the converter is only called for "." and "project2".
 	plugin := NewPlugin(mockClient, mockConverter(createTestDepGraph("mock-project", "1.0.0")), "")
-	pluginResult, err := plugin.BuildDepGraphsFromDir(ctx, testLogger, tmpDir, options)
-	findings := pluginResult.Results
+	results, err := scatest.Run(ctx, plugin, testLogger, tmpDir, options)
+	findings := results
 	require.NoError(t, err)
 
 	require.Len(t, findings, 3)
@@ -454,15 +462,15 @@ func TestBuildFindings_Success(t *testing.T) {
 	sbom := Sbom(validSBOMJSON)
 	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("test-package", "1.0.0")), "")
 
-	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
-	findings := buildResult.Results
+	findings := results
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
 	assert.NotNil(t, findings[0].DepGraph)
 	assert.Equal(t, "pyproject.toml", findings[0].ResolverMetadata.NormalisedTargetFile)
 	assert.Nil(t, findings[0].Error)
-	assert.Equal(t, []string{"uv.lock", "pyproject.toml", "requirements.txt"}, buildResult.ProcessedFiles)
+	assert.Equal(t, []string{"uv.lock", "pyproject.toml", "requirements.txt"}, findings[0].ProcessedFiles)
 }
 
 func TestBuildFindings_NoProjectRoot_ReturnsErrorFinding(t *testing.T) {
@@ -505,8 +513,8 @@ func TestBuildFindings_NoProjectRoot_ReturnsErrorFinding(t *testing.T) {
 	sbom := Sbom(sbomJSON)
 	plugin := NewPlugin(&MockClient{}, mockConverter(), "")
 
-	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
-	findings := buildResult.Results
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
+	findings := results
 
 	require.NoError(t, err, "should not return an error, but rather an error finding")
 	require.Len(t, findings, 1)
@@ -553,9 +561,9 @@ func TestBuildFindings_NoProjectRoot_AllProjects_Succeeds(t *testing.T) {
 	sbom := Sbom(sbomJSON)
 	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("albatross", "0.1.0")), "")
 
-	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions().WithAllProjects(true), testLogger)
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", ecosystems.NewPluginOptions().WithAllProjects(true), testLogger)
 
-	findings := buildResult.Results
+	findings := results
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
 	assert.NotNil(t, findings[0].DepGraph)
@@ -593,15 +601,16 @@ func TestBuildFindings_NoProjectRoot_UvWorkspacePackages_Succeeds(t *testing.T) 
 	sbom := Sbom(sbomJSON)
 	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("albatross", "0.1.0")), "")
 
-	buildResult, err := plugin.buildResults(
+	results, err := collectBuildResults(
 		context.Background(),
+		plugin,
 		sbom,
 		"uv.lock",
 		".",
 		ecosystems.NewPluginOptions().WithForceIncludeWorkspacePackages(true),
 		testLogger,
 	)
-	findings := buildResult.Results
+	findings := results
 
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
@@ -614,10 +623,10 @@ func TestBuildFindings_InvalidSBOM(t *testing.T) {
 	sbom := Sbom(`{"invalid": "json"}`)
 	plugin := NewPlugin(&MockClient{}, mockConverter(), "")
 
-	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
 	assert.Error(t, err)
-	assert.Nil(t, buildResult)
+	assert.Empty(t, results)
 	assert.Contains(t, err.Error(), "failed to parse and validate sbom")
 }
 
@@ -629,10 +638,10 @@ func TestBuildFindings_MissingRootComponent(t *testing.T) {
 	sbom := Sbom(sbomJSON)
 	plugin := NewPlugin(&MockClient{}, mockConverter(), "")
 
-	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
 	assert.Error(t, err)
-	assert.Nil(t, buildResult)
+	assert.Empty(t, results)
 	assert.Contains(t, err.Error(), "failed to parse and validate sbom")
 }
 
@@ -640,10 +649,10 @@ func TestBuildFindings_ConversionError(t *testing.T) {
 	sbom := Sbom(validSBOMJSON)
 	plugin := NewPlugin(&MockClient{}, erroringConverter(errors.New("api request failed")), "")
 
-	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
 	assert.Error(t, err)
-	assert.Nil(t, buildResult)
+	assert.Empty(t, results)
 	assert.Contains(t, err.Error(), "failed to convert sbom to dep-graphs")
 }
 
@@ -653,11 +662,11 @@ func TestBuildFindings_EmptyDepGraphFallback_BuildsFromMetadata(t *testing.T) {
 	// The plugin should fall back to building an empty depgraph from the SBOM root metadata.
 	plugin := NewPlugin(&MockClient{}, mockConverter(), "")
 
-	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
 	require.NoError(t, err)
-	require.Len(t, buildResult.Results, 1)
-	finding := buildResult.Results[0]
+	require.Len(t, results, 1)
+	finding := results[0]
 	require.NotNil(t, finding.DepGraph)
 	rootPkg := finding.DepGraph.GetRootPkg()
 	assert.Equal(t, "test-package", rootPkg.Info.Name)
@@ -670,8 +679,9 @@ func TestBuildFindings_ForwardsForceSingleGraphToConverter(t *testing.T) {
 	converter := mockConverter(createTestDepGraph("test-package", "1.0.0"))
 	plugin := NewPlugin(&MockClient{}, converter, "")
 
-	_, err := plugin.buildResults(
+	_, err := collectBuildResults(
 		context.Background(),
+		plugin,
 		sbom,
 		"uv.lock",
 		".",
@@ -689,7 +699,7 @@ func TestBuildFindings_ForwardsRemoteRepoURLToConverter(t *testing.T) {
 	converter := mockConverter(createTestDepGraph("test-package", "1.0.0"))
 	plugin := NewPlugin(&MockClient{}, converter, "https://example.com/repo")
 
-	_, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
+	_, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
 	require.NoError(t, err)
 	require.Len(t, converter.CalledOptions, 1)
@@ -703,65 +713,76 @@ func TestBuildFindings_MultipleDepGraphs(t *testing.T) {
 		createTestDepGraph("package2", "2.0.0"),
 	), "")
 
-	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
-	findings := buildResult.Results
+	findings := results
 	require.NoError(t, err)
 	require.Len(t, findings, 2)
 	assert.Equal(t, "package1", findings[0].DepGraph.GetRootPkg().Info.Name)
 	assert.Equal(t, "package2", findings[1].DepGraph.GetRootPkg().Info.Name)
 }
 
-func TestBuildFindings_WorkspacePackage(t *testing.T) {
-	sbomJSON := `{
-		"bomFormat": "CycloneDX",
-		"specVersion": "1.5",
-		"version": 1,
-		"metadata": {
-			"tools": [{"vendor": "Astral Software Inc.", "name": "uv", "version": "0.10.9"}],
-			"component": {
-				"type": "library",
-				"bom-ref": "workspace-root-1@1.0.0",
-				"name": "workspace-root",
-				"version": "1.0.0",
-				"properties": [
-					{"name": "uv:package:is_project_root", "value": "true"}
-				]
-			}
-		},
-		"components": [
-			{
-				"type": "library",
-				"bom-ref": "workspace-package-2@3.1.0",
-				"name": "workspace-package",
-				"version": "3.1.0",
-				"properties": [
-					{
-						"name": "uv:workspace:path",
-						"value": "packages/my-package"
-					}
-				]
-			}
-		]
-	}`
-	sbom := Sbom(sbomJSON)
-	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("workspace-package", "3.1.0")), "")
+func TestBuildFindings_WorkspacePackage_FiltersToMember(t *testing.T) {
+	sbom := Sbom(workspaceSBOMJSON)
+	plugin := NewPlugin(&MockClient{}, mockConverter(
+		createTestDepGraph("package-a", "0.1.0"),
+		createTestDepGraph("package-b", "0.1.0"),
+		createTestDepGraph("package-c", "0.1.0"),
+	), "")
 
-	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
+	opts := ecosystems.NewPluginOptions().WithWorkspacePackage("package-b")
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", opts, testLogger)
 
-	findings := buildResult.Results
 	require.NoError(t, err)
-	require.Len(t, findings, 1)
-	assert.Equal(t, filepath.Join("packages", "my-package", "pyproject.toml"), findings[0].ResolverMetadata.NormalisedTargetFile)
+	require.Len(t, results, 1)
+	res := results[0]
+	require.NoError(t, res.Error)
+	assert.Equal(t, "package-b", res.DepGraph.GetRootPkg().Info.Name)
+
+	expected := filepath.Join("packages", "package_b", "pyproject.toml")
+	assert.Equal(t, expected, res.ResolverMetadata.NormalisedTargetFile)
+	require.NotNil(t, res.ProjectDescriptor.Identity.TargetFile)
+	assert.Equal(t, expected, *res.ProjectDescriptor.Identity.TargetFile)
+}
+
+func TestBuildFindings_WorkspacePackage_NotFound(t *testing.T) {
+	sbom := Sbom(workspaceSBOMJSON)
+	plugin := NewPlugin(&MockClient{}, mockConverter(
+		createTestDepGraph("package-a", "0.1.0"),
+		createTestDepGraph("package-c", "0.1.0"),
+	), "")
+
+	opts := ecosystems.NewPluginOptions().WithWorkspacePackage("nope")
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", opts, testLogger)
+
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	var snykErr snyk_errors.Error
+	require.ErrorAs(t, results[0].Error, &snykErr)
+	assert.Equal(t, "Workspace package 'nope' not found.", snykErr.Detail)
+}
+
+func TestBuildFindings_WorkspacePackage_BypassesNoRootGuard(t *testing.T) {
+	sbom := Sbom(virtualWorkspaceSBOMJSON)
+	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("albatross", "0.1.0")), "")
+
+	opts := ecosystems.NewPluginOptions().WithWorkspacePackage("albatross")
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", opts, testLogger)
+
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.NoError(t, results[0].Error)
+	assert.Equal(t, "albatross", results[0].DepGraph.GetRootPkg().Info.Name)
 }
 
 func TestBuildFindings_PathConstruction_RootDir(t *testing.T) {
 	sbom := Sbom(validSBOMJSON)
 	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("test-package", "1.0.0")), "")
 
-	buildResult, err := plugin.buildResults(context.Background(), sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "uv.lock", ".", ecosystems.NewPluginOptions(), testLogger)
 
-	findings := buildResult.Results
+	findings := results
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
 	assert.Equal(t, "pyproject.toml", findings[0].ResolverMetadata.NormalisedTargetFile)
@@ -771,9 +792,9 @@ func TestBuildFindings_PathConstruction_NestedDir(t *testing.T) {
 	sbom := Sbom(validSBOMJSON)
 	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("test-package", "1.0.0")), "")
 
-	buildResult, err := plugin.buildResults(context.Background(), sbom, "project1/uv.lock", "project1", ecosystems.NewPluginOptions(), testLogger)
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "project1/uv.lock", "project1", ecosystems.NewPluginOptions(), testLogger)
 
-	findings := buildResult.Results
+	findings := results
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
 	assert.Equal(t, filepath.Join("project1", "pyproject.toml"), findings[0].ResolverMetadata.NormalisedTargetFile)
@@ -814,9 +835,9 @@ func TestBuildFindings_PathConstruction_NestedWorkspacePackage(t *testing.T) {
 	sbom := Sbom(sbomJSON)
 	plugin := NewPlugin(&MockClient{}, mockConverter(createTestDepGraph("workspace-package", "3.1.0")), "")
 
-	buildResult, err := plugin.buildResults(context.Background(), sbom, "workspace/uv.lock", "workspace", ecosystems.NewPluginOptions(), testLogger)
+	results, err := collectBuildResults(context.Background(), plugin, sbom, "workspace/uv.lock", "workspace", ecosystems.NewPluginOptions(), testLogger)
 
-	findings := buildResult.Results
+	findings := results
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
 	assert.Equal(t, filepath.Join("workspace", "packages", "my-package", "pyproject.toml"), findings[0].ResolverMetadata.NormalisedTargetFile)

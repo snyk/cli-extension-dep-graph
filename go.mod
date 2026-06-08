@@ -1,4 +1,4 @@
-module github.com/snyk/cli-extension-dep-graph
+module github.com/snyk/cli-extension-dep-graph/v2
 
 go 1.26.3
 
@@ -9,6 +9,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/gkampitakis/go-snaps v0.5.3
 	github.com/golang/mock v1.6.0
+	github.com/package-url/packageurl-go v0.1.3
 	github.com/rs/zerolog v1.34.0
 	github.com/snyk/dep-graph/go v0.0.0-20260127160647-c836da762c62
 	github.com/snyk/error-catalog-golang-public v0.0.0-20260316131845-f02d7f42046b
@@ -68,7 +69,6 @@ require (
 	github.com/mattn/go-runewidth v0.0.20 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/oapi-codegen/runtime v1.1.1 // indirect
-	github.com/package-url/packageurl-go v0.1.3 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pjbgf/sha1cd v0.6.0 // indirect
@@ -96,11 +96,11 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
-	golang.org/x/crypto v0.50.0 // indirect
-	golang.org/x/net v0.53.0 // indirect
+	golang.org/x/crypto v0.51.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
