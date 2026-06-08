@@ -63,3 +63,19 @@ func TestParseNpmVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestRunOptions_OmitFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		opts RunOptions
+		want []string
+	}{
+		{name: "zero value emits nothing", opts: RunOptions{}, want: nil},
+		{name: "OmitDev", opts: RunOptions{OmitDev: true}, want: []string{"--omit=dev"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.opts.omitFlags())
+		})
+	}
+}

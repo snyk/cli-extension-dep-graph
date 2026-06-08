@@ -33,9 +33,21 @@ const minNpmVersion = "v6.0.0"
 // parsing (e.g. "10.5.0-beta.1").
 var npmVersionRe = regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
 
+// RunOptions configure a single npm ls invocation. Zero value is "include
+// everything that --all would surface" (the npm ls --all default).
+//
+// The only currently-modeled knob is OmitDev: it mirrors the legacy Snyk
+// CLI's user-facing --dev flag, which is the only option the CLI passes to
+// the npm parser today. If more user-facing controls land in the CLI in
+// future (optional/peer toggles, etc.) they would be added here.
+type RunOptions struct {
+	// OmitDev passes --omit=dev to npm ls, suppressing dev dependencies.
+	OmitDev bool
+}
+
 // npmLsRunner runs `npm ls` on behalf of the npm plugin.
 type npmLsRunner interface {
-	Run(ctx context.Context, dir string) (io.ReadCloser, error)
+	Run(ctx context.Context, dir string, opts RunOptions) (io.ReadCloser, error)
 }
 
 // npmCmdExecutor is the production implementation that shells out to npm.
@@ -56,8 +68,13 @@ var _ npmLsRunner = (*npmCmdExecutor)(nil)
 // surface an error if stdout is empty or unparseable. Stderr is folded into
 // the error message in that failure path so the user can see what npm said.
 //
+// opts.OmitDev is translated to npm's `--omit=dev` flag on the npm >= 7
+// path. npm 6 predates `--omit` (it used `--production` / `--only=prod`),
+// so the npm 6 path silently ignores OmitDev — its output always includes
+// dev deps. Degraded behavior on npm 6; documented in README.
+//
 // The caller must close the returned ReadCloser to release the subprocess.
-func (e *npmCmdExecutor) Run(ctx context.Context, dir string) (io.ReadCloser, error) {
+func (e *npmCmdExecutor) Run(ctx context.Context, dir string, opts RunOptions) (io.ReadCloser, error) {
 	resolved, err := exec.LookPath("npm")
 	if err != nil {
 		return nil, errNpmNotFound //nolint:wrapcheck // sentinel error, intentionally returned unwrapped
@@ -74,17 +91,27 @@ func (e *npmCmdExecutor) Run(ctx context.Context, dir string) (io.ReadCloser, er
 
 	major := semver.Major(ver) // "v6", "v7", ...
 	if major == "v6" {
-		return runNpmV6(ctx, resolved, dir)
+		return runNpmV6(ctx, resolved, dir, opts)
 	}
 
-	return runNpmV7Plus(ctx, resolved, dir)
+	return runNpmV7Plus(ctx, resolved, dir, opts)
+}
+
+// omitFlags returns the `--omit=<class>` flags implied by opts.
+func (o RunOptions) omitFlags() []string {
+	var out []string
+	if o.OmitDev {
+		out = append(out, "--omit=dev")
+	}
+	return out
 }
 
 // runNpmV7Plus streams `npm ls --json --all --package-lock-only`. Lockfile-only
 // resolution is supported natively, so any non-zero exit means a real failure
 // and is surfaced via the pipe's CloseWithError.
-func runNpmV7Plus(ctx context.Context, binary, dir string) (io.ReadCloser, error) {
-	cmd := exec.CommandContext(ctx, binary, "ls", "--json", "--all", "--package-lock-only")
+func runNpmV7Plus(ctx context.Context, binary, dir string, opts RunOptions) (io.ReadCloser, error) {
+	args := append([]string{"ls", "--json", "--all", "--package-lock-only"}, opts.omitFlags()...)
+	cmd := exec.CommandContext(ctx, binary, args...)
 	cmd.Dir = dir
 
 	var stderr bytes.Buffer
@@ -115,7 +142,11 @@ func runNpmV7Plus(ctx context.Context, binary, dir string) (io.ReadCloser, error
 // non-zero when node_modules is absent but writes a complete lockfile-derived
 // JSON tree to stdout — we tolerate the exit code, then validate that stdout
 // is non-empty and parseable.
-func runNpmV6(ctx context.Context, binary, dir string) (io.ReadCloser, error) {
+//
+// opts is accepted for interface symmetry but OmitDev is not applied: npm 6
+// doesn't recognize `--omit=<class>` (added in npm 7). Translating to
+// `--production` is out of scope until a user actually asks for it.
+func runNpmV6(ctx context.Context, binary, dir string, _ RunOptions) (io.ReadCloser, error) {
 	cmd := exec.CommandContext(ctx, binary, "list", "--json", "--depth=999")
 	cmd.Dir = dir
 

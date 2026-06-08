@@ -28,8 +28,39 @@ const (
 // bespoke-parser bugs.
 //
 // Requires npm >= 6 in PATH.
+//
+// OmitDev passes --omit=dev to npm ls, suppressing dev dependencies. The
+// zero value (false) keeps dev deps in the graph, matching `npm ls --all`.
+//
+// When BuildDepGraphsFromDir is called with a non-nil SCAPluginOptions, its
+// Global.IncludeDev field overrides OmitDev: IncludeDev=false (the zero
+// value, also the legacy Snyk CLI default) forces OmitDev=true. Plugin-only
+// construction (no SCAPluginOptions) honors the field as set.
+//
+// No knobs for OmitOptional / OmitPeer: the Snyk CLI doesn't expose them
+// either (optional deps are hardcoded on, peer-dep handling is hardcoded
+// inside the legacy parser). If those ever become user-controllable upstream,
+// add them here.
 type Plugin struct {
 	executor npmLsRunner
+	OmitDev  bool
+}
+
+// runOptions translates the Plugin's OmitDev field plus caller-supplied
+// SCAPluginOptions into the executor's RunOptions.
+//
+// The orchestrator-driven path passes a non-nil SCAPluginOptions whose
+// Global.IncludeDev field carries the user's --dev intent. We invert it
+// into OmitDev so the default (IncludeDev=false, the zero value) maps to
+// "exclude dev deps" — matching the legacy Snyk CLI's hardcoded default.
+// Plugin.OmitDev=true forces exclusion regardless of IncludeDev so direct
+// callers can opt in without constructing a full SCAPluginOptions.
+func (p Plugin) runOptions(options *ecosystems.SCAPluginOptions) RunOptions {
+	out := RunOptions{OmitDev: p.OmitDev}
+	if options != nil && !options.Global.IncludeDev {
+		out.OmitDev = true
+	}
+	return out
 }
 
 // Compile-time check that Plugin implements the SCAPlugin interface.
@@ -73,7 +104,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 	for _, file := range files {
 		lockFileAbsDir := filepath.Dir(file.Path)
 
-		fileResults := p.buildResults(ctx, log, file.RelPath, lockFileAbsDir, exec)
+		fileResults := p.buildResults(ctx, log, file.RelPath, lockFileAbsDir, exec, options)
 		for i := range fileResults {
 			r := &fileResults[i]
 			if r.Error != nil {
@@ -100,6 +131,7 @@ func (p Plugin) buildResults(
 	log logger.Logger,
 	lockFileRelPath, lockFileAbsDir string,
 	exec npmLsRunner,
+	options *ecosystems.SCAPluginOptions,
 ) []ecosystems.SCAResult {
 	lockFileDir := filepath.Dir(lockFileRelPath)
 	rootTargetFile := filepath.Join(lockFileDir, packageJSONFile)
@@ -127,7 +159,7 @@ func (p Plugin) buildResults(
 		return errResult(fmt.Errorf("reading package.json: %w", err))
 	}
 
-	output, err := exec.Run(ctx, lockFileAbsDir)
+	output, err := exec.Run(ctx, lockFileAbsDir, p.runOptions(options))
 	if err != nil {
 		return errResult(p.wrapRunError(err))
 	}

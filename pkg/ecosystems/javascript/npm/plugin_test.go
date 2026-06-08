@@ -23,7 +23,7 @@ type fakeExecutor struct {
 	err  error
 }
 
-func (f *fakeExecutor) Run(_ context.Context, _ string) (io.ReadCloser, error) {
+func (f *fakeExecutor) Run(_ context.Context, _ string, _ RunOptions) (io.ReadCloser, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
