@@ -49,10 +49,37 @@ test-gradle-integration:
 test-npm-integration:
 	$(GOTEST) -v -tags="integration,npm" -timeout=10m ./pkg/ecosystems/javascript/npmlocked/ -coverprofile cp.out
 
+# Run the npm integration suite across multiple npm major versions inside
+# official Docker Hub node:<version> images. Mirrors the CircleCI matrix so
+# devs without nvm/fnm can get coverage locally with one command. Requires
+# Docker.
+#
+# Override NPM_MATRIX to add/remove versions:
+#   make test-npm-matrix NPM_MATRIX="14 18 20 22"
+#
+# The node:<v> tag implies the bundled npm version. To pin a *different* npm
+# inside a given image, edit the in-container `npm install -g npm@<x>` line.
+NPM_MATRIX ?= 14 18 20 22
+test-npm-matrix:
+	@command -v docker >/dev/null || { echo "docker not in PATH"; exit 1; }
+	@set -e; for v in $(NPM_MATRIX); do \
+		echo "=== node:$$v ==="; \
+		docker run --rm \
+			-v "$$(pwd)":/src \
+			-v "$${GOPATH:-$$HOME/go}/pkg":/go/pkg \
+			-w /src \
+			node:$$v sh -c "\
+				set -e; \
+				echo \"npm: \$$(npm --version)\"; \
+				wget -qO- https://go.dev/dl/go1.26.3.linux-amd64.tar.gz | tar -C /usr/local -xz; \
+				export PATH=\$$PATH:/usr/local/go/bin; \
+				make test-npm-integration"; \
+	done
+
 update-gradle-fixtures:
 	UPDATE_FIXTURES=1 $(GOTEST) -v -tags="integration,gradle" -timeout=15m ./pkg/ecosystems/gradle/
 
 test-pnpm-integration:
 	$(GOTEST) -v -tags="integration,pnpm" -timeout=10m ./pkg/ecosystems/javascript/pnpm/ -coverprofile cp.out
 
-.PHONY: install-req fmt test test-bazel-jvm-integration test-bazel-go-integration test-python-integration test-gradle-integration test-pnpm-integration test-npm-integration update-gradle-fixtures lint tidy imports install-golangci-lint
+.PHONY: install-req fmt test test-bazel-jvm-integration test-bazel-go-integration test-python-integration test-gradle-integration test-pnpm-integration test-npm-integration test-npm-matrix update-gradle-fixtures lint tidy imports install-golangci-lint
