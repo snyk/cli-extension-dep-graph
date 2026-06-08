@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "composer"
+  },
+  "pkgs": [
+    {
+      "id": "php@>=8.0.0",
+      "info": {
+        "name": "php",
+        "version": ">=8.0.0"
+      }
+    },
+    {
+      "id": "psr/log@3.0.0",
+      "info": {
+        "name": "psr/log",
+        "version": "3.0.0"
+      }
+    },
+    {
+      "id": "snyk-fixtures/composer-simple@0.0.0",
+      "info": {
+        "name": "snyk-fixtures/composer-simple",
+        "version": "0.0.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "php@>=8.0.0",
+        "pkgId": "php@>=8.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "psr/log@3.0.0",
+        "pkgId": "psr/log@3.0.0",
+        "deps": [
+          {
+            "nodeId": "php@>=8.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "root-node",
+        "pkgId": "snyk-fixtures/composer-simple@0.0.0",
+        "deps": [
+          {
+            "nodeId": "psr/log@3.0.0"
+          }
+        ]
+      }
+    ]
+  }
+}
