@@ -10,6 +10,7 @@ package yarn_test
 
 import (
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,6 +21,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	snykdepgraph "github.com/snyk/dep-graph/go/pkg/depgraph"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/javascript/yarn"
@@ -104,6 +107,115 @@ func TestAcceptance_Classic(t *testing.T) {
 	}
 	assert.ElementsMatch(t, []string{"package.json", "yarn.lock"}, names,
 		"yarn plugin must not create node_modules or .yarn dirs in the project")
+}
+
+// TestAcceptance_Classic_Workspaces drives the v1 plugin end-to-end against
+// a real workspaces project (workspace-with-cross-ref: pkg-a depends on
+// express + pkg-b@1.0.0; pkg-b depends on accepts). Asserts the shape
+// invariants that completeness coverage alone won't catch:
+//
+//   - One SCAResult per workspace member, plus one for the root project.
+//   - Each workspace SCAResult's TargetFile is its own package.json
+//     (packages/pkg-a/package.json, packages/pkg-b/package.json).
+//   - In pkg-a's own dep graph, express is fully expanded but pkg-b is a
+//     stop-set leaf (its transitives live only in pkg-b's own graph), so
+//     vuln reports don't double-count accepts across workspaces.
+//
+// We don't compare against goldens because real yarn list output drifts as
+// the registry updates transitives — shape assertions are stable, exact
+// counts are not.
+func TestAcceptance_Classic_Workspaces(t *testing.T) {
+	requireYarn(t, 1)
+
+	srcDir := filepath.Join("testdata", "fixtures", "classic-workspace-with-cross-ref")
+	dir := t.TempDir()
+	copyTreeForAcceptance(t, srcDir, dir)
+
+	plugin := yarn.Plugin{}
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), dir, &ecosystems.SCAPluginOptions{})
+	require.NoError(t, err)
+	require.Len(t, results, 3, "expected root + pkg-a + pkg-b SCAResults")
+
+	root := findResultByRootName(t, results, "yarn-1-workspace-with-cross-ref")
+	pkgA := findResultByRootName(t, results, "pkg-a")
+	pkgB := findResultByRootName(t, results, "pkg-b")
+
+	// TargetFile points at each result's owning package.json.
+	assert.Equal(t, "package.json", root.ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, filepath.Join("packages", "pkg-a", "package.json"), pkgA.ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, filepath.Join("packages", "pkg-b", "package.json"), pkgB.ProjectDescriptor.GetTargetFile())
+
+	// Stop-set semantics: pkg-a's graph fully expands express but treats
+	// pkg-b as a leaf — accepts must NOT appear in pkg-a's graph (it lives
+	// in pkg-b's), while express must appear.
+	pkgAPkgs := pkgIDs(pkgA.DepGraph)
+	assert.True(t, pkgAPkgs["express@4.12.4"], "pkg-a graph must include express")
+	assert.False(t, pkgAPkgs["accepts@1.3.7"],
+		"pkg-a graph must NOT include accepts — it's reachable only via pkg-b, which is a stop-set leaf")
+
+	// pkg-b's own graph contains accepts (its declared dep).
+	pkgBPkgs := pkgIDs(pkgB.DepGraph)
+	assert.True(t, pkgBPkgs["accepts@1.3.7"], "pkg-b graph must include accepts")
+
+	// Install-free contract still holds.
+	for _, name := range []string{"node_modules", ".yarn"} {
+		_, err := os.Stat(filepath.Join(dir, name))
+		assert.True(t, os.IsNotExist(err), "plugin created %s in workspace project", name)
+	}
+}
+
+// findResultByRootName returns the SCAResult whose dep graph's root package
+// name equals rootName. Test setup-only; production code identifies results
+// by TargetFile, not by name.
+func findResultByRootName(t *testing.T, results []ecosystems.SCAResult, rootName string) ecosystems.SCAResult {
+	t.Helper()
+	for _, r := range results {
+		if r.DepGraph != nil && r.DepGraph.GetRootPkg().Info.Name == rootName {
+			return r
+		}
+	}
+	t.Fatalf("no SCAResult with root package %q (got %d results)", rootName, len(results))
+	return ecosystems.SCAResult{}
+}
+
+// pkgIDs returns the set of Pkg.ID values from a dep graph as a lookup map.
+func pkgIDs(dg *snykdepgraph.DepGraph) map[string]bool {
+	ids := make(map[string]bool, len(dg.Pkgs))
+	for _, p := range dg.Pkgs {
+		ids[p.ID] = true
+	}
+	return ids
+}
+
+// copyTreeForAcceptance is a local copy of stability_test.go's copyTree so
+// each test file is self-contained without exporting helpers.
+func copyTreeForAcceptance(t *testing.T, src, dst string) {
+	t.Helper()
+	require.NoError(t, filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		in, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer in.Close()
+		out, err := os.Create(target)
+		if err != nil {
+			return err
+		}
+		defer out.Close()
+		_, err = io.Copy(out, in)
+		return err
+	}))
 }
 
 // TestAcceptance_Berry runs the Berry path end-to-end if a yarn v2+ binary is
