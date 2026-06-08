@@ -115,8 +115,10 @@ func TestAcceptance_Classic(t *testing.T) {
 // invariants that completeness coverage alone won't catch:
 //
 //   - One SCAResult per workspace member, plus one for the root project.
-//   - Each workspace SCAResult's TargetFile is its own package.json
-//     (packages/pkg-a/package.json, packages/pkg-b/package.json).
+//   - Identity.TargetFile is nil on every result (legacy-yarn parity — see
+//     buildResults identity contract). Each result's manifest path lives on
+//     ResolverMetadata.NormalisedTargetFile instead: yarn.lock for the root
+//     SCAResult, packages/<name>/package.json for each workspace.
 //   - In pkg-a's own dep graph, express is fully expanded but pkg-b is a
 //     stop-set leaf (its transitives live only in pkg-b's own graph), so
 //     vuln reports don't double-count accepts across workspaces.
@@ -140,10 +142,19 @@ func TestAcceptance_Classic_Workspaces(t *testing.T) {
 	pkgA := findResultByRootName(t, results, "pkg-a")
 	pkgB := findResultByRootName(t, results, "pkg-b")
 
-	// TargetFile points at each result's owning package.json.
-	assert.Equal(t, "package.json", root.ProjectDescriptor.GetTargetFile())
-	assert.Equal(t, filepath.Join("packages", "pkg-a", "package.json"), pkgA.ProjectDescriptor.GetTargetFile())
-	assert.Equal(t, filepath.Join("packages", "pkg-b", "package.json"), pkgB.ProjectDescriptor.GetTargetFile())
+	// Identity.TargetFile must be nil for every result — legacy yarn parity.
+	for _, r := range []ecosystems.SCAResult{root, pkgA, pkgB} {
+		assert.Nil(t, r.ProjectDescriptor.Identity.TargetFile,
+			"yarn plugin must not set Identity.TargetFile (matches legacy snyk-nodejs-plugin)")
+	}
+
+	// NormalisedTargetFile carries the per-result manifest path.
+	assert.Equal(t, "yarn.lock", root.ResolverMetadata.NormalisedTargetFile,
+		"root SCAResult's NormalisedTargetFile is the lockfile (matches legacy auto-discovery)")
+	assert.Equal(t, filepath.Join("packages", "pkg-a", "package.json"),
+		pkgA.ResolverMetadata.NormalisedTargetFile)
+	assert.Equal(t, filepath.Join("packages", "pkg-b", "package.json"),
+		pkgB.ResolverMetadata.NormalisedTargetFile)
 
 	// Stop-set semantics: pkg-a's graph fully expands express but treats
 	// pkg-b as a leaf — accepts must NOT appear in pkg-a's graph (it lives

@@ -74,8 +74,14 @@ func (p Plugin) BuildDepGraphsFromDir(
 				)
 			}
 			r.ProcessedFiles = append(r.ProcessedFiles, file.RelPath)
-			if tf := r.ProjectDescriptor.GetTargetFile(); tf != "" && tf != file.RelPath {
-				r.ProcessedFiles = append(r.ProcessedFiles, tf)
+			// Identity.TargetFile is intentionally nil for parity with the
+			// legacy yarn path (see buildResults), so derive the
+			// additional ProcessedFiles entry from NormalisedTargetFile —
+			// this is the manifest we actually read.
+			if r.ResolverMetadata != nil {
+				if tf := r.ResolverMetadata.NormalisedTargetFile; tf != "" && tf != file.RelPath {
+					r.ProcessedFiles = append(r.ProcessedFiles, tf)
+				}
 			}
 			if err := onGraph(*r); err != nil {
 				return err
@@ -86,6 +92,27 @@ func (p Plugin) BuildDepGraphsFromDir(
 	return nil
 }
 
+// Identity contract for yarn results — must match the legacy yarn path so
+// existing projects keep their backend identity when this plugin replaces
+// snyk-nodejs-lockfile-parser behind the feature flag:
+//
+//   - Identity.TargetFile: always nil. snyk-nodejs-plugin does not set
+//     plugin.targetFile for npm/yarn, so the legacy go plugin forwards nil;
+//     downstream (pkg/depgraph/sbom_resolution.go) this suppresses
+//     MetaKeyTargetFileFromPlugin, which the backend uses as a
+//     project-uniqueness signal.
+//   - ResolverMetadata.NormalisedTargetFile:
+//     - Root SCAResult     → lockfile path (e.g. "yarn.lock", or
+//       "subdir/yarn.lock" if the lockfile isn't at the scan root). Matches
+//       what CLI auto-discovery would have passed as the target file for a
+//       non-workspace yarn scan.
+//     - Workspace SCAResult → workspace's package.json path relative to the
+//       scan root (e.g. "packages/pkg-a/package.json"). Matches what
+//       snyk-nodejs-plugin's yarn-workspaces-parser emits as
+//       scannedProject.targetFile per workspace.
+//   - Identity.RootComponentName: from depGraph.rootPkg.name (= package.json
+//     `name` field). Matches legacy.
+//   - Identity.ProjectType: "yarn". Matches dg.PkgManager.Name.
 func (p Plugin) buildResults(
 	ctx context.Context,
 	log logger.Logger,
@@ -93,18 +120,17 @@ func (p Plugin) buildResults(
 	exec yarnRunner,
 ) []ecosystems.SCAResult {
 	lockFileDir := filepath.Dir(lockFileRelPath)
-	rootTargetFile := filepath.Join(lockFileDir, packageJSONFile)
 	errResult := func(err error) []ecosystems.SCAResult {
 		return []ecosystems.SCAResult{{
 			ProjectDescriptor: identity.ProjectDescriptor{
 				Identity: identity.ProjectIdentity{
 					ProjectType: pkgManager,
-					TargetFile:  &rootTargetFile,
+					// TargetFile nil — see identity contract above.
 				},
 			},
 			ResolverMetadata: &ecosystems.ResolverMetadata{
 				PluginName:           PluginName,
-				NormalisedTargetFile: rootTargetFile,
+				NormalisedTargetFile: lockFileRelPath,
 			},
 			Error: err,
 		}}
@@ -156,20 +182,29 @@ func (p Plugin) buildResults(
 
 	results := make([]ecosystems.SCAResult, len(graphResults))
 	for i, gr := range graphResults {
-		tf := filepath.Join(lockFileDir, gr.pkgJSONRelPath)
+		// Root SCAResult is built first by buildDepGraphs (i == 0); the rest
+		// are workspace members. The root uses the lockfile path; workspaces
+		// use their own package.json relative path. Identity rationale lives
+		// on buildResults.
+		var normalisedTargetFile string
+		if i == 0 {
+			normalisedTargetFile = lockFileRelPath
+		} else {
+			normalisedTargetFile = filepath.Join(lockFileDir, gr.pkgJSONRelPath)
+		}
 		results[i] = ecosystems.SCAResult{
 			DepGraph: gr.graph,
 			ProjectDescriptor: identity.ProjectDescriptor{
 				Identity: identity.ProjectIdentity{
 					ProjectType:       pkgManager,
-					TargetFile:        &tf,
+					// TargetFile nil — see identity contract above.
 					RootComponentName: gr.graph.GetRootPkg().Info.Name,
 				},
 			},
 			ResolverMetadata: &ecosystems.ResolverMetadata{
 				PluginName:           PluginName,
 				VersionBuildInfo:     map[string]string{"yarn": runResult.Version},
-				NormalisedTargetFile: tf,
+				NormalisedTargetFile: normalisedTargetFile,
 			},
 		}
 	}
