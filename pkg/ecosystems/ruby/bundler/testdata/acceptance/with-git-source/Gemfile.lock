@@ -1,0 +1,29 @@
+GIT
+  remote: https://github.com/rspec/rspec.git
+  revision: bc209d4a2a2dfbf38ac1d470b213753aa9e654db
+  specs:
+    rspec (3.6.0.beta1)
+      rspec-core (= 3.6.0.beta1)
+
+GIT
+  remote: https://github.com/sparklemotion/nokogiri.git
+  revision: 7f8b7b2bf55829e02cd11c2eb25814c3ed458676
+  specs:
+    nokogiri (1.0.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    pdfkit (0.5.2)
+    rspec-core (3.6.0.beta1)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  nokogiri (= 1.0.0)!
+  pdfkit (~> 0.5)
+  rspec!
+
+BUNDLED WITH
+   2.4.10
