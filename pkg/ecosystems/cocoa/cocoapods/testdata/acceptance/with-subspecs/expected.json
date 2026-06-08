@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "cocoapods",
+    "version": "1.10.0"
+  },
+  "pkgs": [
+    {
+      "id": "with-subspecs@0.0.0",
+      "info": {
+        "name": "with-subspecs",
+        "version": "0.0.0"
+      }
+    },
+    {
+      "id": "AFNetworkActivityLogger@2.0.4",
+      "info": {
+        "name": "AFNetworkActivityLogger",
+        "version": "2.0.4"
+      }
+    },
+    {
+      "id": "AFNetworking@2.5.4",
+      "info": {
+        "name": "AFNetworking",
+        "version": "2.5.4"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "with-subspecs@0.0.0",
+        "deps": [
+          {
+            "nodeId": "AFNetworkActivityLogger"
+          },
+          {
+            "nodeId": "AFNetworking"
+          }
+        ]
+      },
+      {
+        "nodeId": "AFNetworkActivityLogger",
+        "pkgId": "AFNetworkActivityLogger@2.0.4",
+        "info": {
+          "labels": {
+            "checksum": "121486b117e7fc6cf68a5dbf3a87a4878babf504"
+          }
+        },
+        "deps": [
+          {
+            "nodeId": "AFNetworking"
+          },
+          {
+            "nodeId": "AFNetworking"
+          }
+        ]
+      },
+      {
+        "nodeId": "AFNetworking",
+        "pkgId": "AFNetworking@2.5.4",
+        "info": {
+          "labels": {
+            "checksum": "49b40179a4f1c66edf16dac24d63785dfdc92587"
+          }
+        },
+        "deps": []
+      }
+    ]
+  }
+}
