@@ -16,6 +16,9 @@ parameters:
   run-gradle-tests:
     type: boolean
     default: false
+  run-npm-tests:
+    type: boolean
+    default: false
 
 metadata:
   resource_class: small
@@ -272,6 +275,32 @@ jobs:
             - /home/gradle/.gradle/caches
             - /home/gradle/.gradle/wrapper
 
+  npm_integration_test:
+    parameters:
+      node_version:
+        type: string
+    resource_class: medium
+    docker:
+      # Official Docker Hub node image — `node:<version>` ships with the npm
+      # version that the corresponding node major historically defaulted to.
+      # If we ever need a *different* npm on a given node base, add an
+      # `npm install -g npm@<x>` step before the test run.
+      - image: node:<< parameters.node_version >>
+    steps:
+      - checkout
+      - run:
+          name: Install Go
+          command: |
+            wget -qO- https://go.dev/dl/go<< pipeline.parameters.go_version >>.linux-amd64.tar.gz | tar -C /usr/local -xz
+            echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
+            source $BASH_ENV
+            go version
+            node --version
+            npm --version
+      - run:
+          name: Run npm integration tests
+          command: make test-npm-integration
+
   security-scans:
     <<: *go_image
     resource_class: small
@@ -430,4 +459,17 @@ workflows:
           name: gradle_9_jdk_25
           gradle_version: "9"
           jdk_version: "25"
+          <<: *filters_pr_only
+
+  # Conditional workflow for npm integration tests (only runs when npm files
+  # changed). Versions are picked to span the lockfile-format transitions:
+  # node 14 → npm 6 (lockfile v1 path), node 18 → npm 9, node 20 → npm 10
+  # (current LTS), node 22 → npm 10/11.
+  npm-integration:
+    when: << pipeline.parameters.run-npm-tests >>
+    jobs:
+      - npm_integration_test:
+          matrix:
+            parameters:
+              node_version: [ "14", "18", "20", "22" ]
           <<: *filters_pr_only
