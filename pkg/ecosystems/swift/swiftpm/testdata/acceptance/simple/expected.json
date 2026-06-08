@@ -1,0 +1,382 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "swift"
+  },
+  "pkgs": [
+    {
+      "id": "basic-swift@unspecified",
+      "info": {
+        "name": "basic-swift",
+        "version": "unspecified"
+      }
+    },
+    {
+      "id": "github.com/grpc/grpc-swift@1.0.0",
+      "info": {
+        "name": "github.com/grpc/grpc-swift",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-nio@2.101.0",
+      "info": {
+        "name": "github.com/apple/swift-nio",
+        "version": "2.101.0"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-atomics@1.3.0",
+      "info": {
+        "name": "github.com/apple/swift-atomics",
+        "version": "1.3.0"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-collections@1.5.1",
+      "info": {
+        "name": "github.com/apple/swift-collections",
+        "version": "1.5.1"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-system@1.6.5",
+      "info": {
+        "name": "github.com/apple/swift-system",
+        "version": "1.6.5"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-nio-http2@1.44.0",
+      "info": {
+        "name": "github.com/apple/swift-nio-http2",
+        "version": "1.44.0"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-nio-ssl@2.37.1",
+      "info": {
+        "name": "github.com/apple/swift-nio-ssl",
+        "version": "2.37.1"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-nio-transport-services@1.28.0",
+      "info": {
+        "name": "github.com/apple/swift-nio-transport-services",
+        "version": "1.28.0"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-nio-extras@1.34.1",
+      "info": {
+        "name": "github.com/apple/swift-nio-extras",
+        "version": "1.34.1"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-http-types@1.6.0",
+      "info": {
+        "name": "github.com/apple/swift-http-types",
+        "version": "1.6.0"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-http-structured-headers@1.7.0",
+      "info": {
+        "name": "github.com/apple/swift-http-structured-headers",
+        "version": "1.7.0"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-algorithms@1.2.1",
+      "info": {
+        "name": "github.com/apple/swift-algorithms",
+        "version": "1.2.1"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-numerics@1.1.1",
+      "info": {
+        "name": "github.com/apple/swift-numerics",
+        "version": "1.1.1"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-certificates@1.19.1",
+      "info": {
+        "name": "github.com/apple/swift-certificates",
+        "version": "1.19.1"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-crypto@4.5.0",
+      "info": {
+        "name": "github.com/apple/swift-crypto",
+        "version": "4.5.0"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-asn1@1.7.1",
+      "info": {
+        "name": "github.com/apple/swift-asn1",
+        "version": "1.7.1"
+      }
+    },
+    {
+      "id": "github.com/swift-server/swift-service-lifecycle@2.11.0",
+      "info": {
+        "name": "github.com/swift-server/swift-service-lifecycle",
+        "version": "2.11.0"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-log@1.13.1",
+      "info": {
+        "name": "github.com/apple/swift-log",
+        "version": "1.13.1"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-async-algorithms@1.1.4",
+      "info": {
+        "name": "github.com/apple/swift-async-algorithms",
+        "version": "1.1.4"
+      }
+    },
+    {
+      "id": "github.com/apple/swift-protobuf@1.38.0",
+      "info": {
+        "name": "github.com/apple/swift-protobuf",
+        "version": "1.38.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "basic-swift@unspecified",
+        "deps": [
+          {
+            "nodeId": "github.com/grpc/grpc-swift@1.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "github.com/grpc/grpc-swift@1.0.0",
+        "pkgId": "github.com/grpc/grpc-swift@1.0.0",
+        "deps": [
+          {
+            "nodeId": "github.com/apple/swift-nio@2.101.0"
+          },
+          {
+            "nodeId": "github.com/apple/swift-nio-http2@1.44.0"
+          },
+          {
+            "nodeId": "github.com/apple/swift-nio-ssl@2.37.1"
+          },
+          {
+            "nodeId": "github.com/apple/swift-nio-transport-services@1.28.0"
+          },
+          {
+            "nodeId": "github.com/apple/swift-nio-extras@1.34.1"
+          },
+          {
+            "nodeId": "github.com/apple/swift-protobuf@1.38.0"
+          },
+          {
+            "nodeId": "github.com/apple/swift-log@1.13.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "github.com/apple/swift-nio@2.101.0",
+        "pkgId": "github.com/apple/swift-nio@2.101.0",
+        "deps": [
+          {
+            "nodeId": "github.com/apple/swift-atomics@1.3.0"
+          },
+          {
+            "nodeId": "github.com/apple/swift-collections@1.5.1"
+          },
+          {
+            "nodeId": "github.com/apple/swift-system@1.6.5"
+          }
+        ]
+      },
+      {
+        "nodeId": "github.com/apple/swift-atomics@1.3.0",
+        "pkgId": "github.com/apple/swift-atomics@1.3.0",
+        "deps": []
+      },
+      {
+        "nodeId": "github.com/apple/swift-collections@1.5.1",
+        "pkgId": "github.com/apple/swift-collections@1.5.1",
+        "deps": []
+      },
+      {
+        "nodeId": "github.com/apple/swift-system@1.6.5",
+        "pkgId": "github.com/apple/swift-system@1.6.5",
+        "deps": []
+      },
+      {
+        "nodeId": "github.com/apple/swift-nio-http2@1.44.0",
+        "pkgId": "github.com/apple/swift-nio-http2@1.44.0",
+        "deps": [
+          {
+            "nodeId": "github.com/apple/swift-nio@2.101.0"
+          },
+          {
+            "nodeId": "github.com/apple/swift-atomics@1.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "github.com/apple/swift-nio-ssl@2.37.1",
+        "pkgId": "github.com/apple/swift-nio-ssl@2.37.1",
+        "deps": [
+          {
+            "nodeId": "github.com/apple/swift-nio@2.101.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "github.com/apple/swift-nio-transport-services@1.28.0",
+        "pkgId": "github.com/apple/swift-nio-transport-services@1.28.0",
+        "deps": [
+          {
+            "nodeId": "github.com/apple/swift-nio@2.101.0"
+          },
+          {
+            "nodeId": "github.com/apple/swift-atomics@1.3.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "github.com/apple/swift-nio-extras@1.34.1",
+        "pkgId": "github.com/apple/swift-nio-extras@1.34.1",
+        "deps": [
+          {
+            "nodeId": "github.com/apple/swift-nio@2.101.0"
+          },
+          {
+            "nodeId": "github.com/apple/swift-nio-http2@1.44.0"
+          },
+          {
+            "nodeId": "github.com/apple/swift-http-types@1.6.0"
+          },
+          {
+            "nodeId": "github.com/apple/swift-http-structured-headers@1.7.0"
+          },
+          {
+            "nodeId": "github.com/apple/swift-atomics@1.3.0"
+          },
+          {
+            "nodeId": "github.com/apple/swift-algorithms@1.2.1"
+          },
+          {
+            "nodeId": "github.com/apple/swift-certificates@1.19.1"
+          },
+          {
+            "nodeId": "github.com/apple/swift-nio-ssl@2.37.1"
+          },
+          {
+            "nodeId": "github.com/apple/swift-asn1@1.7.1"
+          },
+          {
+            "nodeId": "github.com/swift-server/swift-service-lifecycle@2.11.0"
+          },
+          {
+            "nodeId": "github.com/apple/swift-async-algorithms@1.1.4"
+          },
+          {
+            "nodeId": "github.com/apple/swift-log@1.13.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "github.com/apple/swift-http-types@1.6.0",
+        "pkgId": "github.com/apple/swift-http-types@1.6.0",
+        "deps": []
+      },
+      {
+        "nodeId": "github.com/apple/swift-http-structured-headers@1.7.0",
+        "pkgId": "github.com/apple/swift-http-structured-headers@1.7.0",
+        "deps": []
+      },
+      {
+        "nodeId": "github.com/apple/swift-algorithms@1.2.1",
+        "pkgId": "github.com/apple/swift-algorithms@1.2.1",
+        "deps": [
+          {
+            "nodeId": "github.com/apple/swift-numerics@1.1.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "github.com/apple/swift-numerics@1.1.1",
+        "pkgId": "github.com/apple/swift-numerics@1.1.1",
+        "deps": []
+      },
+      {
+        "nodeId": "github.com/apple/swift-certificates@1.19.1",
+        "pkgId": "github.com/apple/swift-certificates@1.19.1",
+        "deps": [
+          {
+            "nodeId": "github.com/apple/swift-crypto@4.5.0"
+          },
+          {
+            "nodeId": "github.com/apple/swift-asn1@1.7.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "github.com/apple/swift-crypto@4.5.0",
+        "pkgId": "github.com/apple/swift-crypto@4.5.0",
+        "deps": [
+          {
+            "nodeId": "github.com/apple/swift-asn1@1.7.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "github.com/apple/swift-asn1@1.7.1",
+        "pkgId": "github.com/apple/swift-asn1@1.7.1",
+        "deps": []
+      },
+      {
+        "nodeId": "github.com/swift-server/swift-service-lifecycle@2.11.0",
+        "pkgId": "github.com/swift-server/swift-service-lifecycle@2.11.0",
+        "deps": [
+          {
+            "nodeId": "github.com/apple/swift-log@1.13.1"
+          },
+          {
+            "nodeId": "github.com/apple/swift-async-algorithms@1.1.4"
+          }
+        ]
+      },
+      {
+        "nodeId": "github.com/apple/swift-log@1.13.1",
+        "pkgId": "github.com/apple/swift-log@1.13.1",
+        "deps": []
+      },
+      {
+        "nodeId": "github.com/apple/swift-async-algorithms@1.1.4",
+        "pkgId": "github.com/apple/swift-async-algorithms@1.1.4",
+        "deps": [
+          {
+            "nodeId": "github.com/apple/swift-collections@1.5.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "github.com/apple/swift-protobuf@1.38.0",
+        "pkgId": "github.com/apple/swift-protobuf@1.38.0",
+        "deps": []
+      }
+    ]
+  }
+}
