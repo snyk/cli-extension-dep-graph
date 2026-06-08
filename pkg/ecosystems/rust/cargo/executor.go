@@ -136,7 +136,7 @@ func (e *cargoCmdExecutor) run(
 	args []string,
 	subcommandLabel string,
 ) (io.ReadCloser, error) {
-	resolved, err := exec.LookPath("cargo")
+	resolved, err := exec.LookPath(PluginName)
 	if err != nil {
 		return nil, errCargoNotFound //nolint:wrapcheck // sentinel error, intentionally returned unwrapped
 	}
