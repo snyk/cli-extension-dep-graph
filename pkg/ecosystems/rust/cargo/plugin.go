@@ -7,10 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/discovery"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/identity"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/discovery"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/identity"
 )
 
 const (
@@ -42,12 +42,16 @@ func (p Plugin) GetName() string {
 // BuildDepGraphsFromDir discovers Cargo.lock files under dir and produces one
 // dep graph per workspace member for each lockfile. A non-workspace single
 // crate yields one result; an N-member workspace yields N results.
+//
+// Each result is emitted via onGraph as soon as it's built — the plugin holds
+// at most one lockfile's worth of results in memory at any time.
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context,
 	log logger.Logger,
 	dir string,
 	options *ecosystems.SCAPluginOptions,
-) (*ecosystems.PluginResult, error) {
+	onGraph ecosystems.OnGraphFunc,
+) error {
 	if log == nil {
 		log = logger.Nop()
 	}
@@ -58,46 +62,44 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	files, err := p.discoverLockFiles(ctx, dir, options)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if len(files) == 0 {
 		log.Debug(ctx, "No Cargo.lock files found", logger.Attr("dir", dir))
-		return &ecosystems.PluginResult{}, nil
+		return nil
 	}
 
 	log.Debug(ctx, "Discovered Cargo.lock files", logger.Attr("count", len(files)))
 
 	exec := p.getExecutor()
 
-	var results []ecosystems.SCAResult
-	var processedFiles []string
-
 	for _, file := range files {
 		lockFileAbsDir := filepath.Dir(file.Path)
 
 		fileResults := p.buildResults(ctx, log, file.RelPath, lockFileAbsDir, exec, options)
-		for _, r := range fileResults {
+		// All results from one lockfile share the lockfile in their
+		// ProcessedFiles list; per-result entries also include their
+		// own target file when known.
+		for i := range fileResults {
+			r := &fileResults[i]
 			if r.Error != nil {
 				log.Error(ctx, "Failed to build cargo dependency graph",
 					logger.Attr(logFieldLockFile, file.RelPath),
 					logger.Err(r.Error),
 				)
 			}
-		}
-		results = append(results, fileResults...)
-		processedFiles = append(processedFiles, file.RelPath)
-		for _, r := range fileResults {
-			if tf := r.ProjectDescriptor.GetTargetFile(); tf != "" {
-				processedFiles = append(processedFiles, tf)
+			r.ProcessedFiles = append(r.ProcessedFiles, file.RelPath)
+			if tf := r.ProjectDescriptor.GetTargetFile(); tf != "" && tf != file.RelPath {
+				r.ProcessedFiles = append(r.ProcessedFiles, tf)
+			}
+			if err := onGraph(*r); err != nil {
+				return err
 			}
 		}
 	}
 
-	return &ecosystems.PluginResult{
-		Results:        results,
-		ProcessedFiles: processedFiles,
-	}, nil
+	return nil
 }
 
 func (p Plugin) buildResults(

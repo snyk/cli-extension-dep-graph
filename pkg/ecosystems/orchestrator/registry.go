@@ -8,13 +8,13 @@ import (
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/bazel"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/gradle"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/javascript/bun"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/legacy"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/logger"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/rust/cargo"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/bazel"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/gradle"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/javascript/bun"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/legacy"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/rust/cargo"
 )
 
 // bazelPluginName is duplicated here because bazel.pluginName is unexported.

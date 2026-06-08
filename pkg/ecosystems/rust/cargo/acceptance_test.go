@@ -28,8 +28,10 @@ import (
 
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems/rust/cargo"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/rust/cargo"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/scatest"
 )
 
 var updateGolden = flag.Bool("update", false, "overwrite expected.json golden files with current plugin output")
@@ -66,19 +68,19 @@ func TestAcceptance(t *testing.T) {
 
 	for _, fx := range fixtures {
 		t.Run(fx.name, func(t *testing.T) {
-			result, err := plugin.BuildDepGraphsFromDir(t.Context(), nil, fx.dir, &ecosystems.SCAPluginOptions{})
+			results, err := scatest.Run(t.Context(), plugin, logger.Nop(), fx.dir, &ecosystems.SCAPluginOptions{})
 			require.NoError(t, err)
-			require.NotEmpty(t, result.Results, "plugin returned no results for fixture %s", fx.name)
+			require.NotEmpty(t, results, "plugin returned no results for fixture %s", fx.name)
 
-			for _, r := range result.Results {
+			for _, r := range results {
 				require.NoError(t, r.Error, "fixture %s produced error result: %v", fx.name, r.Error)
 			}
 
 			// Match each result to its golden file by the root package name.
 			// Single-crate fixtures use expected.json; workspace fixtures use
 			// expected-<rootPkgName>.json so the matching is deterministic.
-			byRoot := make(map[string]*depgraph.DepGraph, len(result.Results))
-			for _, r := range result.Results {
+			byRoot := make(map[string]*depgraph.DepGraph, len(results))
+			for _, r := range results {
 				byRoot[r.DepGraph.GetRootPkg().Info.Name] = r.DepGraph
 			}
 

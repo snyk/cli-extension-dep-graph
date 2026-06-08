@@ -15,7 +15,9 @@ import (
 
 	godepgraph "github.com/snyk/dep-graph/go/pkg/depgraph"
 
-	"github.com/snyk/cli-extension-dep-graph/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/scatest"
 )
 
 // fakeExecutor returns canned cargo tree / metadata output (or a sentinel
@@ -94,29 +96,28 @@ func TestBuildDepGraphsFromDir_HappyPath_SingleCrate(t *testing.T) {
 		treeByPkg:      map[string]string{"my-app": treeOut},
 	}}
 
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), nil, dir, &ecosystems.SCAPluginOptions{})
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), dir, &ecosystems.SCAPluginOptions{})
 	require.NoError(t, err)
-	require.Len(t, result.Results, 1)
-	require.NoError(t, result.Results[0].Error)
+	require.Len(t, results, 1)
+	require.NoError(t, results[0].Error)
 
-	dg := result.Results[0].DepGraph
+	dg := results[0].DepGraph
 	require.NotNil(t, dg)
 	assert.Equal(t, "my-app", dg.GetRootPkg().Info.Name)
 	assert.Equal(t, "0.1.0", dg.GetRootPkg().Info.Version)
 	assert.Equal(t, "cargo", dg.PkgManager.Name)
 	assert.Len(t, dg.Pkgs, 4)
 
-	tf := result.Results[0].ProjectDescriptor.GetTargetFile()
+	tf := results[0].ProjectDescriptor.GetTargetFile()
 	assert.Equal(t, cargoTomlFile, tf)
-	assert.Equal(t, "cargo", result.Results[0].ProjectDescriptor.Identity.ProjectType)
+	assert.Equal(t, "cargo", results[0].ProjectDescriptor.Identity.ProjectType)
 }
 
 func TestBuildDepGraphsFromDir_NoLockfile(t *testing.T) {
 	plugin := Plugin{}
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), nil, t.TempDir(), &ecosystems.SCAPluginOptions{})
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), t.TempDir(), &ecosystems.SCAPluginOptions{})
 	require.NoError(t, err)
-	assert.Empty(t, result.Results)
-	assert.Empty(t, result.ProcessedFiles)
+	assert.Empty(t, results)
 }
 
 func TestBuildDepGraphsFromDir_CargoNotFound(t *testing.T) {
@@ -125,12 +126,12 @@ func TestBuildDepGraphsFromDir_CargoNotFound(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, cargoTomlFile), []byte(""), 0o600))
 
 	plugin := Plugin{executor: &fakeExecutor{metadataErr: errCargoNotFound}}
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), nil, dir, &ecosystems.SCAPluginOptions{})
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), dir, &ecosystems.SCAPluginOptions{})
 	require.NoError(t, err)
-	require.Len(t, result.Results, 1)
-	require.Error(t, result.Results[0].Error)
-	assert.Contains(t, result.Results[0].Error.Error(), "cargo is not installed")
-	assert.True(t, errors.Is(result.Results[0].Error, errCargoNotFound))
+	require.Len(t, results, 1)
+	require.Error(t, results[0].Error)
+	assert.Contains(t, results[0].Error.Error(), "cargo is not installed")
+	assert.True(t, errors.Is(results[0].Error, errCargoNotFound))
 }
 
 func TestBuildDepGraphsFromDir_TargetFileNotCargoLock(t *testing.T) {
@@ -139,10 +140,10 @@ func TestBuildDepGraphsFromDir_TargetFileNotCargoLock(t *testing.T) {
 
 	tf := "some-other-file.txt"
 	plugin := Plugin{}
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), nil, dir,
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), dir,
 		(&ecosystems.SCAPluginOptions{}).WithTargetFile(tf))
 	require.NoError(t, err)
-	assert.Empty(t, result.Results, "non-Cargo.lock target file should produce no results")
+	assert.Empty(t, results, "non-Cargo.lock target file should produce no results")
 }
 
 func TestBuildDepGraphsFromDir_Workspace_TwoMembers(t *testing.T) {
@@ -183,14 +184,14 @@ func TestBuildDepGraphsFromDir_Workspace_TwoMembers(t *testing.T) {
 		treeByPkg:      map[string]string{"a": treeForA, "b": treeForB},
 	}}
 
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), nil, dir, &ecosystems.SCAPluginOptions{})
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), dir, &ecosystems.SCAPluginOptions{})
 	require.NoError(t, err)
-	require.Len(t, result.Results, 2)
+	require.Len(t, results, 2)
 
 	byRoot := make(map[string]*ecosystems.SCAResult, 2)
-	for i := range result.Results {
-		require.NoError(t, result.Results[i].Error)
-		byRoot[result.Results[i].DepGraph.GetRootPkg().Info.Name] = &result.Results[i]
+	for i := range results {
+		require.NoError(t, results[i].Error)
+		byRoot[results[i].DepGraph.GetRootPkg().Info.Name] = &results[i]
 	}
 
 	// a's graph: contains a, b, serde — but NOT tokio (it's b's transitive
@@ -225,11 +226,11 @@ func TestBuildDepGraphsFromDir_TargetFile_CargoTomlNormalisedToCargoLock(t *test
 	plugin := Plugin{executor: fake}
 
 	tf := filepath.Join(dir, cargoTomlFile)
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), nil, dir,
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), dir,
 		(&ecosystems.SCAPluginOptions{}).WithTargetFile(tf))
 	require.NoError(t, err)
-	require.Len(t, result.Results, 1)
-	require.NoError(t, result.Results[0].Error)
+	require.Len(t, results, 1)
+	require.NoError(t, results[0].Error)
 }
 
 func TestBuildDepGraphsFromDir_FlagsPropagatedToExecutor(t *testing.T) {
@@ -249,7 +250,7 @@ func TestBuildDepGraphsFromDir_FlagsPropagatedToExecutor(t *testing.T) {
 		WithIncludeDev(true).
 		WithAllowOutOfSync(true)
 
-	_, err := plugin.BuildDepGraphsFromDir(context.Background(), nil, dir, opts)
+	_, err := scatest.Run(context.Background(), plugin, logger.Nop(), dir, opts)
 	require.NoError(t, err)
 
 	require.Len(t, fake.capturedTreeOpts, 1)
@@ -270,7 +271,7 @@ func TestBuildDepGraphsFromDir_DefaultFlagsAreStrict(t *testing.T) {
 	}
 	plugin := Plugin{executor: fake}
 
-	_, err := plugin.BuildDepGraphsFromDir(context.Background(), nil, dir, &ecosystems.SCAPluginOptions{})
+	_, err := scatest.Run(context.Background(), plugin, logger.Nop(), dir, &ecosystems.SCAPluginOptions{})
 	require.NoError(t, err)
 
 	require.Len(t, fake.capturedTreeOpts, 1)
@@ -302,12 +303,12 @@ func TestBuildDepGraphsFromDir_Workspace_OneMemberFailsOthersStillSucceed(t *tes
 		treeErrByPkg:   map[string]error{"a": fmt.Errorf("simulated cargo tree failure")},
 	}}
 
-	result, err := plugin.BuildDepGraphsFromDir(context.Background(), nil, dir, &ecosystems.SCAPluginOptions{})
+	results, err := scatest.Run(context.Background(), plugin, logger.Nop(), dir, &ecosystems.SCAPluginOptions{})
 	require.NoError(t, err)
-	require.Len(t, result.Results, 2)
+	require.Len(t, results, 2)
 
 	var failedCount, succeededCount int
-	for _, r := range result.Results {
+	for _, r := range results {
 		if r.Error != nil {
 			failedCount++
 			assert.Contains(t, r.Error.Error(), "simulated cargo tree failure")
