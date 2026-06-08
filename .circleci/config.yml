@@ -15,6 +15,8 @@ workflows:
             pkg/ecosystems/testdata/fixtures/python/.* run-python-tests true
             pkg/ecosystems/gradle/.* run-gradle-tests true
             pkg/ecosystems/testdata/fixtures/gradle/.* run-gradle-tests true
+            pkg/ecosystems/javascript/npm/.* run-npm-tests true
             .circleci/.* run-python-tests true
             .circleci/.* run-gradle-tests true
+            .circleci/.* run-npm-tests true
           config-path: .circleci/continue-config.yml
