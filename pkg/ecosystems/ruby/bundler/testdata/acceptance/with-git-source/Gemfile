@@ -1,0 +1,5 @@
+source 'https://rubygems.org'
+
+gem 'rspec', git: 'https://github.com/rspec/rspec.git'
+gem 'nokogiri', '1.0.0', git: 'https://github.com/sparklemotion/nokogiri.git'
+gem 'pdfkit', '~> 0.5'

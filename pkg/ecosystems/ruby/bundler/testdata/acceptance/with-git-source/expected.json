@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "rubygems"
+  },
+  "pkgs": [
+    {
+      "id": "with-git-source@",
+      "info": {
+        "name": "with-git-source"
+      }
+    },
+    {
+      "id": "nokogiri@1.0.0",
+      "info": {
+        "name": "nokogiri",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "pdfkit@0.5.2",
+      "info": {
+        "name": "pdfkit",
+        "version": "0.5.2"
+      }
+    },
+    {
+      "id": "rspec@3.6.0.beta1",
+      "info": {
+        "name": "rspec",
+        "version": "3.6.0.beta1"
+      }
+    },
+    {
+      "id": "rspec-core@3.6.0.beta1",
+      "info": {
+        "name": "rspec-core",
+        "version": "3.6.0.beta1"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "with-git-source@",
+        "deps": [
+          {
+            "nodeId": "nokogiri@1.0.0"
+          },
+          {
+            "nodeId": "pdfkit@0.5.2"
+          },
+          {
+            "nodeId": "rspec@3.6.0.beta1"
+          }
+        ]
+      },
+      {
+        "nodeId": "nokogiri@1.0.0",
+        "pkgId": "nokogiri@1.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "pdfkit@0.5.2",
+        "pkgId": "pdfkit@0.5.2",
+        "deps": []
+      },
+      {
+        "nodeId": "rspec@3.6.0.beta1",
+        "pkgId": "rspec@3.6.0.beta1",
+        "deps": [
+          {
+            "nodeId": "rspec-core@3.6.0.beta1"
+          }
+        ]
+      },
+      {
+        "nodeId": "rspec-core@3.6.0.beta1",
+        "pkgId": "rspec-core@3.6.0.beta1",
+        "deps": []
+      }
+    ]
+  }
+}
