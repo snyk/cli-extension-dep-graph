@@ -1,0 +1,6 @@
+parent 1.0.0 Demo parent
+└── child >=1.0
+    └── parent >=1.0
+child 1.0.0 Demo child
+└── parent >=1.0
+    └── child >=1.0
