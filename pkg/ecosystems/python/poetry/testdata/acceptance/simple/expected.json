@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "poetry"
+  },
+  "pkgs": [
+    {
+      "id": "simple@0.1.0",
+      "info": {
+        "name": "simple",
+        "version": "0.1.0"
+      }
+    },
+    {
+      "id": "six@1.17.0",
+      "info": {
+        "name": "six",
+        "version": "1.17.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "simple@0.1.0",
+        "deps": [
+          {
+            "nodeId": "six@1.17.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "six@1.17.0",
+        "pkgId": "six@1.17.0",
+        "deps": []
+      }
+    ]
+  }
+}
