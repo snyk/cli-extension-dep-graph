@@ -49,4 +49,7 @@ test-gradle-integration:
 update-gradle-fixtures:
 	UPDATE_FIXTURES=1 $(GOTEST) -v -tags="integration,gradle" -timeout=15m ./pkg/ecosystems/gradle/
 
-.PHONY: install-req fmt test test-bazel-jvm-integration test-bazel-go-integration test-python-integration test-gradle-integration update-gradle-fixtures lint tidy imports install-golangci-lint
+test-composer-integration:
+	$(GOTEST) -v -tags="integration,composer" -timeout=10m ./pkg/ecosystems/php/composer/ -coverprofile cp.out
+
+.PHONY: install-req fmt test test-bazel-jvm-integration test-bazel-go-integration test-python-integration test-gradle-integration test-composer-integration update-gradle-fixtures lint tidy imports install-golangci-lint

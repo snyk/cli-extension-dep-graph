@@ -1,0 +1,8 @@
+{
+    "name": "snyk-fixtures/composer-simple",
+    "description": "Smoke fixture for the Snyk composer resolver.",
+    "type": "project",
+    "require": {
+        "psr/log": "3.0.0"
+    }
+}
