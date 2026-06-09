@@ -1,11 +1,15 @@
 package pnpm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
+
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 )
 
 // Rush keeps its shared pnpm lockfile at common/config/rush/pnpm-lock.yaml and
@@ -44,6 +48,48 @@ var (
 	rushBlockCommentRe = regexp.MustCompile(`(?s)/\*.*?\*/`)
 	rushLineCommentRe  = regexp.MustCompile(`(?m)^\s*//.*$`)
 )
+
+// rushTargets is the Rush adapter: detects a pnpm-backed Rush monorepo, stages
+// the common/temp workspace context Rush generates at install time, and returns
+// a single scan target whose cleanup tears the tmp tree down.
+//
+// Out-of-scope Rush repos (npm/yarn-backed, subspaces) return (nil, nil) so the
+// scan ends quietly with a skip log. Unexpected setup failures return one
+// errTarget so they surface as an SCAResult rather than aborting the scan.
+func rushTargets(ctx context.Context, log logger.Logger, rushDir string) ([]scanTarget, error) {
+	log.Info(ctx, "Building Rush + pnpm dependency graphs", logger.Attr(logFieldDir, rushDir))
+
+	folders, err := rushProjectFolders(rushDir)
+	if err != nil {
+		if errors.Is(err, errRushNotPnpm) || errors.Is(err, errRushSubspaces) {
+			log.Info(ctx, "Skipping Rush workspace", logger.Attr("reason", err.Error()))
+			return nil, nil
+		}
+		return []scanTarget{errTarget(rushJSONFile, fmt.Errorf("reading rush.json: %w", err))}, nil
+	}
+
+	runDir, scanRoot, skipped, cleanup, err := stageRushWorkspace(rushDir, folders)
+	if err != nil {
+		return []scanTarget{errTarget(rushJSONFile, err)}, nil
+	}
+
+	if len(skipped) > 0 {
+		// User-visible surfacing of skips is part of the deferred FF+wiring
+		// work; for now log so a stale/renamed project folder doesn't silently
+		// vanish from a scan that otherwise succeeds.
+		log.Info(ctx, "Skipping Rush projects with no readable package.json",
+			logger.Attr("projects", strings.Join(skipped, ", ")))
+	}
+
+	return []scanTarget{{
+		cmdDir:          runDir,
+		manifestBaseDir: scanRoot,
+		excludeDir:      runDir, // the synthetic "rush-common" aggregate lives here
+		processedFiles:  []string{rushJSONFile, filepath.FromSlash(rushLockfilePath)},
+		errTargetFile:   rushJSONFile,
+		cleanup:         cleanup,
+	}}, nil
+}
 
 // stripJSONComments removes JSONC block and full-line comments from rush.json.
 func stripJSONComments(data []byte) []byte {

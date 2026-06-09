@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/discovery"
@@ -25,8 +24,9 @@ const (
 // Plugin implements ecosystems.SCAPlugin for pnpm projects. It shells out to
 // `pnpm list --lockfile-only --json` to resolve the dependency graph from the
 // lockfile without installing node_modules. Rush monorepos (rush.json) are
-// supported by synthesizing the workspace context Rush generates at install
-// time (see rush.go).
+// handled by an adapter in rush.go that synthesizes the workspace context Rush
+// generates at install time; both adapters produce the same scanTarget shape
+// so the runner is uniform.
 type Plugin struct {
 	executor pnpmListRunner
 }
@@ -35,6 +35,22 @@ var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
 func (p Plugin) GetName() string {
 	return PluginName
+}
+
+// scanTarget is a single prepared pnpm-list invocation. Every adapter
+// (bare-pnpm discovery, Rush staging) collapses its asymmetry into this struct
+// so runAndBuild can treat them uniformly.
+type scanTarget struct {
+	cmdDir          string   // where `pnpm list` runs
+	manifestBaseDir string   // base for package.json relative paths
+	excludeDir      string   // importer dir to drop (e.g. Rush "rush-common"); "" = none
+	processedFiles  []string // files this scan was derived from
+	errTargetFile   string   // target file used for an error SCAResult
+	cleanup         func()   // tmp-tree teardown; never nil
+	// setupErr, when set, short-circuits runAndBuild and surfaces as the
+	// target's sole SCAResult — used when an adapter cannot fully stage a
+	// target but wants to surface the failure rather than skip silently.
+	setupErr error
 }
 
 func (p Plugin) BuildDepGraphsFromDir(
@@ -48,110 +64,105 @@ func (p Plugin) BuildDepGraphsFromDir(
 		log = logger.Nop()
 	}
 
-	exec := p.getExecutor()
-
-	// Rush adapter: a rush.json root has no scannable pnpm-lock.yaml at the
-	// root, so handle it before standard discovery.
-	if isRushRoot(dir) {
-		return emit(ctx, log, onGraph, p.buildRushResults(ctx, log, dir, exec))
-	}
-
-	files, err := p.discoverLockFiles(ctx, dir, options)
+	targets, err := collectTargets(ctx, log, dir, options)
 	if err != nil {
 		return err
 	}
-	if len(files) == 0 {
-		log.Debug(ctx, "No pnpm-lock.yaml found", logger.Attr(logFieldDir, dir))
+	defer func() {
+		for _, t := range targets {
+			t.cleanup()
+		}
+	}()
+	if len(targets) == 0 {
 		return nil
 	}
-	log.Debug(ctx, "Discovered pnpm-lock.yaml files", logger.Attr("count", len(files)))
 
-	for _, file := range files {
-		lockDir := filepath.Dir(file.Path)
-		errTarget := filepath.Join(filepath.Dir(file.RelPath), packageJSONFile)
-		results := p.runAndBuild(ctx, log, exec, &runSpec{
-			runDir:        lockDir,
-			scanDir:       lockDir,
-			baseProcessed: []string{file.RelPath},
-			errTargetFile: errTarget,
-		})
+	exec := p.getExecutor()
+	for _, t := range targets {
+		results := runAndBuild(ctx, log, exec, t)
 		if err := emit(ctx, log, onGraph, results); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
-// buildRushResults stages the Rush workspace then resolves it. npm/yarn-backed
-// or subspaces Rush repos are skipped (logged, no results) per the pnpm-only
-// scope; setup failures surface as an error result.
-func (p Plugin) buildRushResults(ctx context.Context, log logger.Logger, rushDir string, exec pnpmListRunner) []ecosystems.SCAResult {
-	log.Info(ctx, "Building Rush + pnpm dependency graphs", logger.Attr(logFieldDir, rushDir))
-
-	folders, err := rushProjectFolders(rushDir)
-	if err != nil {
-		if errors.Is(err, errRushNotPnpm) || errors.Is(err, errRushSubspaces) {
-			log.Info(ctx, "Skipping Rush workspace", logger.Attr("reason", err.Error()))
-			return nil
-		}
-		return errResult(rushJSONFile, fmt.Errorf("reading rush.json: %w", err))
+// collectTargets dispatches to one adapter per scan root. Rush is checked first
+// because a Rush root has no scannable pnpm-lock.yaml at the top.
+func collectTargets(
+	ctx context.Context,
+	log logger.Logger,
+	dir string,
+	options *ecosystems.SCAPluginOptions,
+) ([]scanTarget, error) {
+	if isRushRoot(dir) {
+		return rushTargets(ctx, log, dir)
 	}
-
-	runDir, scanRoot, skipped, cleanup, err := stageRushWorkspace(rushDir, folders)
-	if err != nil {
-		return errResult(rushJSONFile, err)
-	}
-	defer cleanup()
-
-	if len(skipped) > 0 {
-		// User-visible surfacing of skips is part of the deferred FF+wiring work
-		// (#3); for now log so a stale/renamed project folder doesn't silently
-		// vanish from a scan that otherwise succeeds.
-		log.Info(ctx, "Skipping Rush projects with no readable package.json",
-			logger.Attr("projects", strings.Join(skipped, ", ")))
-	}
-
-	return p.runAndBuild(ctx, log, exec, &runSpec{
-		runDir:        runDir,
-		scanDir:       scanRoot,
-		skipDir:       runDir, // the synthetic "rush-common" aggregate lives here
-		baseProcessed: []string{rushJSONFile, filepath.FromSlash(rushLockfilePath)},
-		errTargetFile: rushJSONFile,
-	})
+	return pnpmTargets(ctx, log, dir, options)
 }
 
-// runSpec parameterises a single pnpm-list run.
-type runSpec struct {
-	runDir        string   // where pnpm runs
-	scanDir       string   // base for package.json relative paths
-	skipDir       string   // importer dir to omit (e.g. the rush-common aggregate); "" skips nothing
-	baseProcessed []string // files every result was derived from
-	errTargetFile string   // target file for an error result
+// pnpmTargets discovers pnpm-lock.yaml files per the scan options and produces
+// one scan target per lockfile. Bare pnpm needs no staging — cmdDir and
+// manifestBaseDir both point at the lockfile's directory.
+func pnpmTargets(
+	ctx context.Context,
+	log logger.Logger,
+	dir string,
+	options *ecosystems.SCAPluginOptions,
+) ([]scanTarget, error) {
+	files, err := discoverLockFiles(ctx, dir, options)
+	if err != nil {
+		return nil, err
+	}
+	if len(files) == 0 {
+		log.Debug(ctx, "No pnpm-lock.yaml found", logger.Attr(logFieldDir, dir))
+		return nil, nil
+	}
+	log.Debug(ctx, "Discovered pnpm-lock.yaml files", logger.Attr("count", len(files)))
+
+	targets := make([]scanTarget, 0, len(files))
+	for _, file := range files {
+		lockDir := filepath.Dir(file.Path)
+		errTargetFile := filepath.Join(filepath.Dir(file.RelPath), packageJSONFile)
+		targets = append(targets, scanTarget{
+			cmdDir:          lockDir,
+			manifestBaseDir: lockDir,
+			processedFiles:  []string{file.RelPath},
+			errTargetFile:   errTargetFile,
+			cleanup:         noopCleanup,
+		})
+	}
+	return targets, nil
 }
 
-func (p Plugin) runAndBuild(ctx context.Context, log logger.Logger, exec pnpmListRunner, spec *runSpec) []ecosystems.SCAResult {
-	log.Info(ctx, "Building pnpm dependency graph", logger.Attr(logFieldDir, spec.runDir))
+// runAndBuild executes pnpm list for one target and produces SCAResults. A
+// pre-baked setupErr short-circuits the run and surfaces as the sole result.
+func runAndBuild(ctx context.Context, log logger.Logger, exec pnpmListRunner, t scanTarget) []ecosystems.SCAResult {
+	if t.setupErr != nil {
+		return errResult(t.errTargetFile, t.setupErr)
+	}
 
-	output, err := exec.Run(ctx, spec.runDir)
+	log.Info(ctx, "Building pnpm dependency graph", logger.Attr(logFieldDir, t.cmdDir))
+
+	output, err := exec.Run(ctx, t.cmdDir)
 	if err != nil {
-		return errResult(spec.errTargetFile, p.wrapRunError(err))
+		return errResult(t.errTargetFile, wrapRunError(err))
 	}
 	defer output.Close()
 
 	data, err := io.ReadAll(output)
 	if err != nil {
-		return errResult(spec.errTargetFile, fmt.Errorf("reading pnpm list output: %w", err))
+		return errResult(t.errTargetFile, fmt.Errorf("reading pnpm list output: %w", err))
 	}
 
 	var projects []listProject
 	if err = json.Unmarshal(data, &projects); err != nil {
-		return errResult(spec.errTargetFile, fmt.Errorf("parsing pnpm list output: %w", err))
+		return errResult(t.errTargetFile, fmt.Errorf("parsing pnpm list output: %w", err))
 	}
 
-	graphResults, err := buildDepGraphs(spec.scanDir, projects, spec.skipDir)
+	graphResults, err := buildDepGraphs(t.manifestBaseDir, projects, t.excludeDir)
 	if err != nil {
-		return errResult(spec.errTargetFile, err)
+		return errResult(t.errTargetFile, err)
 	}
 
 	log.Info(ctx, "Successfully built pnpm dependency graphs", logger.Attr("graphs", len(graphResults)))
@@ -159,7 +170,7 @@ func (p Plugin) runAndBuild(ctx context.Context, log logger.Logger, exec pnpmLis
 	results := make([]ecosystems.SCAResult, len(graphResults))
 	for i, gr := range graphResults {
 		tf := gr.pkgJSONRelPath
-		processed := append(append([]string{}, spec.baseProcessed...), tf)
+		processed := append(append([]string{}, t.processedFiles...), tf)
 		results[i] = ecosystems.SCAResult{
 			DepGraph: gr.graph,
 			ProjectDescriptor: identity.ProjectDescriptor{
@@ -198,6 +209,17 @@ func errResult(targetFile string, err error) []ecosystems.SCAResult {
 	}}
 }
 
+// errTarget builds a scanTarget that carries a setup error in place of a real
+// run. runAndBuild short-circuits and turns this into the only SCAResult, so
+// setup failures surface as one error result instead of aborting the scan.
+func errTarget(targetFile string, err error) scanTarget {
+	return scanTarget{
+		errTargetFile: targetFile,
+		setupErr:      err,
+		cleanup:       noopCleanup,
+	}
+}
+
 func emit(ctx context.Context, log logger.Logger, onGraph ecosystems.OnGraphFunc, results []ecosystems.SCAResult) error {
 	for i := range results {
 		r := &results[i]
@@ -214,7 +236,7 @@ func emit(ctx context.Context, log logger.Logger, onGraph ecosystems.OnGraphFunc
 	return nil
 }
 
-func (p Plugin) wrapRunError(err error) error {
+func wrapRunError(err error) error {
 	if errors.Is(err, errPnpmNotFound) {
 		return fmt.Errorf("pnpm is not installed or not in PATH; install pnpm >= %s to scan this project: %w", minPnpmVersion, err)
 	}
@@ -224,7 +246,7 @@ func (p Plugin) wrapRunError(err error) error {
 	return fmt.Errorf("running pnpm list: %w", err)
 }
 
-func (p Plugin) discoverLockFiles(
+func discoverLockFiles(
 	ctx context.Context,
 	dir string,
 	options *ecosystems.SCAPluginOptions,
@@ -274,6 +296,8 @@ func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
 }
+
+func noopCleanup() {}
 
 // getExecutor returns the configured executor or the production pnpmCmdExecutor.
 // The zero-value Plugin{} is valid and uses the production executor.
