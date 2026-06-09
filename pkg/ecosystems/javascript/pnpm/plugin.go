@@ -78,8 +78,8 @@ func (p Plugin) BuildDepGraphsFromDir(
 	}
 
 	exec := p.getExecutor()
-	for _, t := range targets {
-		results := runAndBuild(ctx, log, exec, t)
+	for i := range targets {
+		results := runAndBuild(ctx, log, exec, &targets[i])
 		if err := emit(ctx, log, onGraph, results); err != nil {
 			return err
 		}
@@ -137,7 +137,7 @@ func pnpmTargets(
 
 // runAndBuild executes pnpm list for one target and produces SCAResults. A
 // pre-baked setupErr short-circuits the run and surfaces as the sole result.
-func runAndBuild(ctx context.Context, log logger.Logger, exec pnpmListRunner, t scanTarget) []ecosystems.SCAResult {
+func runAndBuild(ctx context.Context, log logger.Logger, exec pnpmListRunner, t *scanTarget) []ecosystems.SCAResult {
 	if t.setupErr != nil {
 		return errResult(t.errTargetFile, t.setupErr)
 	}

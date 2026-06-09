@@ -127,10 +127,17 @@ func addDep(
 	visited, edgesSeen map[string]bool,
 ) error {
 	version := d.Version
+	// A workspace cross-dependency is identified by pnpm's authoritative `link:`
+	// version prefix — NOT by name. Keying on name alone would mis-flag a real
+	// registry package that happens to share a name with a workspace project,
+	// stop-set'ing it and silently dropping its subtree. Once a link is
+	// confirmed, consult wsVersions only to render the sibling's real version
+	// instead of the bare `link:<path>`.
 	isWorkspace := strings.HasPrefix(version, "link:")
-	if v, ok := wsVersions[name]; ok {
-		isWorkspace = true
-		version = v // render the sibling project's real version, not "link:.."
+	if isWorkspace {
+		if v, ok := wsVersions[name]; ok {
+			version = v
+		}
 	}
 	if version == "" {
 		version = defaultVersion
