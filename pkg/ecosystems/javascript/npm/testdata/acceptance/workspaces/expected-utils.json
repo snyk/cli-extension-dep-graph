@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "npm"
+  },
+  "pkgs": [
+    {
+      "id": "@workspace/utils@file:packages/utils",
+      "info": {
+        "name": "@workspace/utils",
+        "version": "file:packages/utils"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "@workspace/utils@file:packages/utils",
+        "deps": []
+      }
+    ]
+  }
+}
