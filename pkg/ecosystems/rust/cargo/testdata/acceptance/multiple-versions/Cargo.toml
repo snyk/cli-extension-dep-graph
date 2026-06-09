@@ -1,0 +1,8 @@
+[package]
+name = "snyk-cargo-multiple-versions"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+old_rand_core = { package = "rand_core", version = "0.5" }
+new_rand_core = { package = "rand_core", version = "0.6" }

@@ -1,0 +1,8 @@
+[package]
+name = "cross-dep-a"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cross-dep-b = { path = "../b" }
+lazy_static = "1.4"

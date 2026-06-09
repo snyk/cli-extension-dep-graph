@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "cargo"
+  },
+  "pkgs": [
+    {
+      "id": "cross-dep-a@0.1.0",
+      "info": {
+        "name": "cross-dep-a",
+        "version": "0.1.0"
+      }
+    },
+    {
+      "id": "cross-dep-b@0.1.0",
+      "info": {
+        "name": "cross-dep-b",
+        "version": "0.1.0"
+      }
+    },
+    {
+      "id": "lazy_static@1.5.0",
+      "info": {
+        "name": "lazy_static",
+        "version": "1.5.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "cross-dep-b@0.1.0",
+        "pkgId": "cross-dep-b@0.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "lazy_static@1.5.0",
+        "pkgId": "lazy_static@1.5.0",
+        "deps": []
+      },
+      {
+        "nodeId": "root-node",
+        "pkgId": "cross-dep-a@0.1.0",
+        "deps": [
+          {
+            "nodeId": "cross-dep-b@0.1.0"
+          },
+          {
+            "nodeId": "lazy_static@1.5.0"
+          }
+        ]
+      }
+    ]
+  }
+}

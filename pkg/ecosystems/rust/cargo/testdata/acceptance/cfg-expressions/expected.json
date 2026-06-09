@@ -1,0 +1,501 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "cargo"
+  },
+  "pkgs": [
+    {
+      "id": "bitflags@2.12.1",
+      "info": {
+        "name": "bitflags",
+        "version": "2.12.1"
+      }
+    },
+    {
+      "id": "cfg-if@1.0.4",
+      "info": {
+        "name": "cfg-if",
+        "version": "1.0.4"
+      }
+    },
+    {
+      "id": "lazy_static@1.5.0",
+      "info": {
+        "name": "lazy_static",
+        "version": "1.5.0"
+      }
+    },
+    {
+      "id": "libc@0.2.186",
+      "info": {
+        "name": "libc",
+        "version": "0.2.186"
+      }
+    },
+    {
+      "id": "libm@0.2.16",
+      "info": {
+        "name": "libm",
+        "version": "0.2.16"
+      }
+    },
+    {
+      "id": "log@0.4.32",
+      "info": {
+        "name": "log",
+        "version": "0.4.32"
+      }
+    },
+    {
+      "id": "mio@0.8.11",
+      "info": {
+        "name": "mio",
+        "version": "0.8.11"
+      }
+    },
+    {
+      "id": "nix@0.27.1",
+      "info": {
+        "name": "nix",
+        "version": "0.27.1"
+      }
+    },
+    {
+      "id": "snyk-cargo-cfg-expressions@0.1.0",
+      "info": {
+        "name": "snyk-cargo-cfg-expressions",
+        "version": "0.1.0"
+      }
+    },
+    {
+      "id": "wasi@0.11.1+wasi-snapshot-preview1",
+      "info": {
+        "name": "wasi",
+        "version": "0.11.1+wasi-snapshot-preview1"
+      }
+    },
+    {
+      "id": "winapi-i686-pc-windows-gnu@0.4.0",
+      "info": {
+        "name": "winapi-i686-pc-windows-gnu",
+        "version": "0.4.0"
+      }
+    },
+    {
+      "id": "winapi-x86_64-pc-windows-gnu@0.4.0",
+      "info": {
+        "name": "winapi-x86_64-pc-windows-gnu",
+        "version": "0.4.0"
+      }
+    },
+    {
+      "id": "winapi@0.3.9",
+      "info": {
+        "name": "winapi",
+        "version": "0.3.9"
+      }
+    },
+    {
+      "id": "windows-sys@0.48.0",
+      "info": {
+        "name": "windows-sys",
+        "version": "0.48.0"
+      }
+    },
+    {
+      "id": "windows-sys@0.52.0",
+      "info": {
+        "name": "windows-sys",
+        "version": "0.52.0"
+      }
+    },
+    {
+      "id": "windows-targets@0.48.5",
+      "info": {
+        "name": "windows-targets",
+        "version": "0.48.5"
+      }
+    },
+    {
+      "id": "windows-targets@0.52.6",
+      "info": {
+        "name": "windows-targets",
+        "version": "0.52.6"
+      }
+    },
+    {
+      "id": "windows_aarch64_gnullvm@0.48.5",
+      "info": {
+        "name": "windows_aarch64_gnullvm",
+        "version": "0.48.5"
+      }
+    },
+    {
+      "id": "windows_aarch64_gnullvm@0.52.6",
+      "info": {
+        "name": "windows_aarch64_gnullvm",
+        "version": "0.52.6"
+      }
+    },
+    {
+      "id": "windows_aarch64_msvc@0.48.5",
+      "info": {
+        "name": "windows_aarch64_msvc",
+        "version": "0.48.5"
+      }
+    },
+    {
+      "id": "windows_aarch64_msvc@0.52.6",
+      "info": {
+        "name": "windows_aarch64_msvc",
+        "version": "0.52.6"
+      }
+    },
+    {
+      "id": "windows_i686_gnu@0.48.5",
+      "info": {
+        "name": "windows_i686_gnu",
+        "version": "0.48.5"
+      }
+    },
+    {
+      "id": "windows_i686_gnu@0.52.6",
+      "info": {
+        "name": "windows_i686_gnu",
+        "version": "0.52.6"
+      }
+    },
+    {
+      "id": "windows_i686_gnullvm@0.52.6",
+      "info": {
+        "name": "windows_i686_gnullvm",
+        "version": "0.52.6"
+      }
+    },
+    {
+      "id": "windows_i686_msvc@0.48.5",
+      "info": {
+        "name": "windows_i686_msvc",
+        "version": "0.48.5"
+      }
+    },
+    {
+      "id": "windows_i686_msvc@0.52.6",
+      "info": {
+        "name": "windows_i686_msvc",
+        "version": "0.52.6"
+      }
+    },
+    {
+      "id": "windows_x86_64_gnu@0.48.5",
+      "info": {
+        "name": "windows_x86_64_gnu",
+        "version": "0.48.5"
+      }
+    },
+    {
+      "id": "windows_x86_64_gnu@0.52.6",
+      "info": {
+        "name": "windows_x86_64_gnu",
+        "version": "0.52.6"
+      }
+    },
+    {
+      "id": "windows_x86_64_gnullvm@0.48.5",
+      "info": {
+        "name": "windows_x86_64_gnullvm",
+        "version": "0.48.5"
+      }
+    },
+    {
+      "id": "windows_x86_64_gnullvm@0.52.6",
+      "info": {
+        "name": "windows_x86_64_gnullvm",
+        "version": "0.52.6"
+      }
+    },
+    {
+      "id": "windows_x86_64_msvc@0.48.5",
+      "info": {
+        "name": "windows_x86_64_msvc",
+        "version": "0.48.5"
+      }
+    },
+    {
+      "id": "windows_x86_64_msvc@0.52.6",
+      "info": {
+        "name": "windows_x86_64_msvc",
+        "version": "0.52.6"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "bitflags@2.12.1",
+        "pkgId": "bitflags@2.12.1",
+        "deps": []
+      },
+      {
+        "nodeId": "cfg-if@1.0.4",
+        "pkgId": "cfg-if@1.0.4",
+        "deps": []
+      },
+      {
+        "nodeId": "lazy_static@1.5.0",
+        "pkgId": "lazy_static@1.5.0",
+        "deps": []
+      },
+      {
+        "nodeId": "libc@0.2.186",
+        "pkgId": "libc@0.2.186",
+        "deps": []
+      },
+      {
+        "nodeId": "libm@0.2.16",
+        "pkgId": "libm@0.2.16",
+        "deps": []
+      },
+      {
+        "nodeId": "log@0.4.32",
+        "pkgId": "log@0.4.32",
+        "deps": []
+      },
+      {
+        "nodeId": "mio@0.8.11",
+        "pkgId": "mio@0.8.11",
+        "deps": [
+          {
+            "nodeId": "libc@0.2.186"
+          },
+          {
+            "nodeId": "log@0.4.32"
+          },
+          {
+            "nodeId": "wasi@0.11.1+wasi-snapshot-preview1"
+          },
+          {
+            "nodeId": "windows-sys@0.48.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "nix@0.27.1",
+        "pkgId": "nix@0.27.1",
+        "deps": [
+          {
+            "nodeId": "bitflags@2.12.1"
+          },
+          {
+            "nodeId": "cfg-if@1.0.4"
+          },
+          {
+            "nodeId": "libc@0.2.186"
+          }
+        ]
+      },
+      {
+        "nodeId": "root-node",
+        "pkgId": "snyk-cargo-cfg-expressions@0.1.0",
+        "deps": [
+          {
+            "nodeId": "lazy_static@1.5.0"
+          },
+          {
+            "nodeId": "libm@0.2.16"
+          },
+          {
+            "nodeId": "mio@0.8.11"
+          },
+          {
+            "nodeId": "nix@0.27.1"
+          },
+          {
+            "nodeId": "winapi@0.3.9"
+          },
+          {
+            "nodeId": "windows-sys@0.52.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "wasi@0.11.1+wasi-snapshot-preview1",
+        "pkgId": "wasi@0.11.1+wasi-snapshot-preview1",
+        "deps": []
+      },
+      {
+        "nodeId": "winapi-i686-pc-windows-gnu@0.4.0",
+        "pkgId": "winapi-i686-pc-windows-gnu@0.4.0",
+        "deps": []
+      },
+      {
+        "nodeId": "winapi-x86_64-pc-windows-gnu@0.4.0",
+        "pkgId": "winapi-x86_64-pc-windows-gnu@0.4.0",
+        "deps": []
+      },
+      {
+        "nodeId": "winapi@0.3.9",
+        "pkgId": "winapi@0.3.9",
+        "deps": [
+          {
+            "nodeId": "winapi-i686-pc-windows-gnu@0.4.0"
+          },
+          {
+            "nodeId": "winapi-x86_64-pc-windows-gnu@0.4.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "windows-sys@0.48.0",
+        "pkgId": "windows-sys@0.48.0",
+        "deps": [
+          {
+            "nodeId": "windows-targets@0.48.5"
+          }
+        ]
+      },
+      {
+        "nodeId": "windows-sys@0.52.0",
+        "pkgId": "windows-sys@0.52.0",
+        "deps": [
+          {
+            "nodeId": "windows-targets@0.52.6"
+          }
+        ]
+      },
+      {
+        "nodeId": "windows-targets@0.48.5",
+        "pkgId": "windows-targets@0.48.5",
+        "deps": [
+          {
+            "nodeId": "windows_aarch64_gnullvm@0.48.5"
+          },
+          {
+            "nodeId": "windows_aarch64_msvc@0.48.5"
+          },
+          {
+            "nodeId": "windows_i686_gnu@0.48.5"
+          },
+          {
+            "nodeId": "windows_i686_msvc@0.48.5"
+          },
+          {
+            "nodeId": "windows_x86_64_gnu@0.48.5"
+          },
+          {
+            "nodeId": "windows_x86_64_gnullvm@0.48.5"
+          },
+          {
+            "nodeId": "windows_x86_64_msvc@0.48.5"
+          }
+        ]
+      },
+      {
+        "nodeId": "windows-targets@0.52.6",
+        "pkgId": "windows-targets@0.52.6",
+        "deps": [
+          {
+            "nodeId": "windows_aarch64_gnullvm@0.52.6"
+          },
+          {
+            "nodeId": "windows_aarch64_msvc@0.52.6"
+          },
+          {
+            "nodeId": "windows_i686_gnu@0.52.6"
+          },
+          {
+            "nodeId": "windows_i686_gnullvm@0.52.6"
+          },
+          {
+            "nodeId": "windows_i686_msvc@0.52.6"
+          },
+          {
+            "nodeId": "windows_x86_64_gnu@0.52.6"
+          },
+          {
+            "nodeId": "windows_x86_64_gnullvm@0.52.6"
+          },
+          {
+            "nodeId": "windows_x86_64_msvc@0.52.6"
+          }
+        ]
+      },
+      {
+        "nodeId": "windows_aarch64_gnullvm@0.48.5",
+        "pkgId": "windows_aarch64_gnullvm@0.48.5",
+        "deps": []
+      },
+      {
+        "nodeId": "windows_aarch64_gnullvm@0.52.6",
+        "pkgId": "windows_aarch64_gnullvm@0.52.6",
+        "deps": []
+      },
+      {
+        "nodeId": "windows_aarch64_msvc@0.48.5",
+        "pkgId": "windows_aarch64_msvc@0.48.5",
+        "deps": []
+      },
+      {
+        "nodeId": "windows_aarch64_msvc@0.52.6",
+        "pkgId": "windows_aarch64_msvc@0.52.6",
+        "deps": []
+      },
+      {
+        "nodeId": "windows_i686_gnu@0.48.5",
+        "pkgId": "windows_i686_gnu@0.48.5",
+        "deps": []
+      },
+      {
+        "nodeId": "windows_i686_gnu@0.52.6",
+        "pkgId": "windows_i686_gnu@0.52.6",
+        "deps": []
+      },
+      {
+        "nodeId": "windows_i686_gnullvm@0.52.6",
+        "pkgId": "windows_i686_gnullvm@0.52.6",
+        "deps": []
+      },
+      {
+        "nodeId": "windows_i686_msvc@0.48.5",
+        "pkgId": "windows_i686_msvc@0.48.5",
+        "deps": []
+      },
+      {
+        "nodeId": "windows_i686_msvc@0.52.6",
+        "pkgId": "windows_i686_msvc@0.52.6",
+        "deps": []
+      },
+      {
+        "nodeId": "windows_x86_64_gnu@0.48.5",
+        "pkgId": "windows_x86_64_gnu@0.48.5",
+        "deps": []
+      },
+      {
+        "nodeId": "windows_x86_64_gnu@0.52.6",
+        "pkgId": "windows_x86_64_gnu@0.52.6",
+        "deps": []
+      },
+      {
+        "nodeId": "windows_x86_64_gnullvm@0.48.5",
+        "pkgId": "windows_x86_64_gnullvm@0.48.5",
+        "deps": []
+      },
+      {
+        "nodeId": "windows_x86_64_gnullvm@0.52.6",
+        "pkgId": "windows_x86_64_gnullvm@0.52.6",
+        "deps": []
+      },
+      {
+        "nodeId": "windows_x86_64_msvc@0.48.5",
+        "pkgId": "windows_x86_64_msvc@0.48.5",
+        "deps": []
+      },
+      {
+        "nodeId": "windows_x86_64_msvc@0.52.6",
+        "pkgId": "windows_x86_64_msvc@0.52.6",
+        "deps": []
+      }
+    ]
+  }
+}

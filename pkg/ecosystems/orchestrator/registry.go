@@ -14,7 +14,13 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/javascript/bun"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/legacy"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/rust/cargo"
 )
+
+// bazelPluginName is duplicated here because bazel.pluginName is unexported.
+// Used as a dependency declaration for every plugin that should run after
+// bazel. Promote to an exported bazel.PluginName if a third caller appears.
+const bazelPluginName = "bazel"
 
 type pluginEntry struct {
 	plugin       ecosystems.SCAPlugin
@@ -40,7 +46,7 @@ func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry,
 		return nil, fmt.Errorf("failed to register bazel plugin: %w", err)
 	}
 	// javascript
-	if err := r.register(bun.Plugin{}, withFeatureFlagCheck(FlagBunResolver), withPluginDependencies("bazel")); err != nil {
+	if err := r.register(bun.Plugin{}, withFeatureFlagCheck(FlagBunResolver), withPluginDependencies(bazelPluginName)); err != nil {
 		return nil, fmt.Errorf("failed to register bun plugin: %w", err)
 	}
 	// gradle (opt-in via feature flag)
@@ -51,8 +57,12 @@ func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry,
 		cfg.GetString(configuration.ORGANIZATION),
 	)
 	gradlePlugin := gradle.NewGradlePluginWithNormalizeDepsHook(normalizeDepsPostHook)
-	if err := r.register(gradlePlugin, withFeatureFlagCheck(FlagNewGradleResolver), withPluginDependencies("bazel")); err != nil {
+	if err := r.register(gradlePlugin, withFeatureFlagCheck(FlagNewGradleResolver), withPluginDependencies(bazelPluginName)); err != nil {
 		return nil, fmt.Errorf("failed to register gradle plugin: %w", err)
+	}
+	// rust
+	if err := r.register(cargo.Plugin{}, withFeatureFlagCheck(FlagCargoResolver), withPluginDependencies(bazelPluginName)); err != nil {
+		return nil, fmt.Errorf("failed to register cargo plugin: %w", err)
 	}
 
 	return r, nil

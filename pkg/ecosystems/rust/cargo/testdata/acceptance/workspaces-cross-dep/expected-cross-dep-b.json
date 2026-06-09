@@ -1,0 +1,149 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "cargo"
+  },
+  "pkgs": [
+    {
+      "id": "cross-dep-b@0.1.0",
+      "info": {
+        "name": "cross-dep-b",
+        "version": "0.1.0"
+      }
+    },
+    {
+      "id": "proc-macro2@1.0.106",
+      "info": {
+        "name": "proc-macro2",
+        "version": "1.0.106"
+      }
+    },
+    {
+      "id": "quote@1.0.45",
+      "info": {
+        "name": "quote",
+        "version": "1.0.45"
+      }
+    },
+    {
+      "id": "serde@1.0.228",
+      "info": {
+        "name": "serde",
+        "version": "1.0.228"
+      }
+    },
+    {
+      "id": "serde_core@1.0.228",
+      "info": {
+        "name": "serde_core",
+        "version": "1.0.228"
+      }
+    },
+    {
+      "id": "serde_derive@1.0.228",
+      "info": {
+        "name": "serde_derive",
+        "version": "1.0.228"
+      }
+    },
+    {
+      "id": "syn@2.0.117",
+      "info": {
+        "name": "syn",
+        "version": "2.0.117"
+      }
+    },
+    {
+      "id": "unicode-ident@1.0.24",
+      "info": {
+        "name": "unicode-ident",
+        "version": "1.0.24"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "proc-macro2@1.0.106",
+        "pkgId": "proc-macro2@1.0.106",
+        "deps": [
+          {
+            "nodeId": "unicode-ident@1.0.24"
+          }
+        ]
+      },
+      {
+        "nodeId": "quote@1.0.45",
+        "pkgId": "quote@1.0.45",
+        "deps": [
+          {
+            "nodeId": "proc-macro2@1.0.106"
+          }
+        ]
+      },
+      {
+        "nodeId": "root-node",
+        "pkgId": "cross-dep-b@0.1.0",
+        "deps": [
+          {
+            "nodeId": "serde@1.0.228"
+          }
+        ]
+      },
+      {
+        "nodeId": "serde@1.0.228",
+        "pkgId": "serde@1.0.228",
+        "deps": [
+          {
+            "nodeId": "serde_core@1.0.228"
+          }
+        ]
+      },
+      {
+        "nodeId": "serde_core@1.0.228",
+        "pkgId": "serde_core@1.0.228",
+        "deps": [
+          {
+            "nodeId": "serde_derive@1.0.228"
+          }
+        ]
+      },
+      {
+        "nodeId": "serde_derive@1.0.228",
+        "pkgId": "serde_derive@1.0.228",
+        "deps": [
+          {
+            "nodeId": "proc-macro2@1.0.106"
+          },
+          {
+            "nodeId": "quote@1.0.45"
+          },
+          {
+            "nodeId": "syn@2.0.117"
+          }
+        ]
+      },
+      {
+        "nodeId": "syn@2.0.117",
+        "pkgId": "syn@2.0.117",
+        "deps": [
+          {
+            "nodeId": "proc-macro2@1.0.106"
+          },
+          {
+            "nodeId": "quote@1.0.45"
+          },
+          {
+            "nodeId": "unicode-ident@1.0.24"
+          }
+        ]
+      },
+      {
+        "nodeId": "unicode-ident@1.0.24",
+        "pkgId": "unicode-ident@1.0.24",
+        "deps": []
+      }
+    ]
+  }
+}

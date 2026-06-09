@@ -1,0 +1,10 @@
+[package]
+name = "snyk-cargo-dev-deps"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lazy_static = "1.4"
+
+[dev-dependencies]
+mockall = "0.11"
