@@ -1,0 +1,8 @@
+{
+  "name": "standalone-pnpm-fixture",
+  "version": "1.0.0",
+  "description": "Single-package (non-workspace) pnpm project with a vulnerable lodash.",
+  "dependencies": {
+    "lodash": "4.17.4"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "@rush-fix/app-a",
+  "version": "1.0.0",
+  "description": "App that depends on lib-b (workspace) and a vulnerable lodash.",
+  "dependencies": {
+    "lodash": "4.17.4",
+    "@rush-fix/lib-b": "workspace:*"
+  }
+}
