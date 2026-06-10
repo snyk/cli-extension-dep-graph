@@ -30,12 +30,18 @@ var FlagCargoResolver = flag{
 	Value: "internal-cargo-resolver",
 }
 
+var FlagPnpmResolver = flag{
+	Key:   "internal-pnpm-resolver",
+	Value: "internal-pnpm-resolver",
+}
+
 var allFlags = []flag{
 	FlagUnifiedTestAPIOsCLI,
 	FlagNewGradleResolver,
 	FlagBazelResolver,
 	FlagBunResolver,
 	FlagCargoResolver,
+	FlagPnpmResolver,
 }
 
 // GetAllFlags returns all feature flags as a map of key to flag name.

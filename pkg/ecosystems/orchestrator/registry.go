@@ -12,6 +12,7 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/bazel"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/gradle"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/javascript/bun"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/javascript/pnpm"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/legacy"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/rust/cargo"
@@ -48,6 +49,9 @@ func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry,
 	// javascript
 	if err := r.register(bun.Plugin{}, withFeatureFlagCheck(FlagBunResolver), withPluginDependencies(bazelPluginName)); err != nil {
 		return nil, fmt.Errorf("failed to register bun plugin: %w", err)
+	}
+	if err := r.register(pnpm.Plugin{}, withFeatureFlagCheck(FlagPnpmResolver), withPluginDependencies(bazelPluginName)); err != nil {
+		return nil, fmt.Errorf("failed to register pnpm plugin: %w", err)
 	}
 	// gradle (opt-in via feature flag)
 	cfg := ictx.GetConfiguration()
