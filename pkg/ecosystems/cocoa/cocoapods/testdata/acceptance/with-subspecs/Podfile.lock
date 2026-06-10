@@ -1,0 +1,31 @@
+PODS:
+  - AFNetworkActivityLogger (2.0.4):
+    - AFNetworking/NSURLConnection (~> 2.0)
+    - AFNetworking/NSURLSession (~> 2.0)
+  - AFNetworking (2.5.4):
+    - AFNetworking/NSURLConnection (= 2.5.4)
+    - AFNetworking/NSURLSession (= 2.5.4)
+    - AFNetworking/Reachability (= 2.5.4)
+    - AFNetworking/Security (= 2.5.4)
+    - AFNetworking/Serialization (= 2.5.4)
+  - AFNetworking/NSURLConnection (2.5.4):
+    - AFNetworking/Reachability
+    - AFNetworking/Security
+    - AFNetworking/Serialization
+  - AFNetworking/NSURLSession (2.5.4):
+    - AFNetworking/Reachability
+    - AFNetworking/Security
+    - AFNetworking/Serialization
+  - AFNetworking/Reachability (2.5.4)
+  - AFNetworking/Security (2.5.4)
+  - AFNetworking/Serialization (2.5.4)
+
+DEPENDENCIES:
+  - AFNetworkActivityLogger (~> 2.0)
+  - AFNetworking (~> 2.5)
+
+SPEC CHECKSUMS:
+  AFNetworkActivityLogger: 121486b117e7fc6cf68a5dbf3a87a4878babf504
+  AFNetworking: 49b40179a4f1c66edf16dac24d63785dfdc92587
+
+COCOAPODS: 1.10.0
