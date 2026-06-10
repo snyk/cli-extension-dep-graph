@@ -1,0 +1,52 @@
+lockfileVersion: '6.0'
+
+settings:
+  autoInstallPeers: false
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .: {}
+
+  ../../apps/app-a:
+    dependencies:
+      '@rush-fix/lib-b':
+        specifier: workspace:*
+        version: link:../../libs/lib-b
+      lodash:
+        specifier: 4.17.4
+        version: 4.17.4
+
+  ../../libs/lib-b:
+    dependencies:
+      minimatch:
+        specifier: 3.0.0
+        version: 3.0.0
+
+packages:
+
+  /balanced-match@1.0.2:
+    resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
+    dev: false
+
+  /brace-expansion@1.1.15:
+    resolution: {integrity: sha512-EwOCDEex4quD37XhqM3omwtMoJjr//isUZz1JopUNWms+4Z2ViyM/k1YIRePpoVNnQhENnxtFjLaxNHrT7xIUg==}
+    dependencies:
+      balanced-match: 1.0.2
+      concat-map: 0.0.1
+    dev: false
+
+  /concat-map@0.0.1:
+    resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
+    dev: false
+
+  /lodash@4.17.4:
+    resolution: {integrity: sha512-6X37Sq9KCpLSXEh8uM12AKYlviHPNNk4RxiGBn4cmKGJinbXBneWIV7iE/nXkM928O7ytHcHb6+X6Svl0f4hXg==}
+    dev: false
+
+  /minimatch@3.0.0:
+    resolution: {integrity: sha512-ekKdP/98gMbw+JdQaHZlS5/irFw63ktA3FXHaal7TXkvdaUJ9M6BewwNyEujYzRsTirZGmEVDho+Gh8bfcpVxw==}
+    deprecated: Please update to minimatch 3.0.2 or higher to avoid a RegExp DoS issue
+    dependencies:
+      brace-expansion: 1.1.15
+    dev: false

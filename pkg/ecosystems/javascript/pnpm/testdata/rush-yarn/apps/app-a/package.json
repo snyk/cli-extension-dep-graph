@@ -1,0 +1,8 @@
+{
+  "name": "@rush-yarn/app-a",
+  "version": "1.0.0",
+  "description": "Rush + yarn project — out of scope; must be detected and skipped with a clear message.",
+  "dependencies": {
+    "lodash": "4.17.4"
+  }
+}

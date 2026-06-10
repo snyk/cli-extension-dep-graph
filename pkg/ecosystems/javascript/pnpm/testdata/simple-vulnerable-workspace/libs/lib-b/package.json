@@ -1,0 +1,8 @@
+{
+  "name": "@rush-fix/lib-b",
+  "version": "1.0.0",
+  "description": "Library with a vulnerable minimatch, linked into app-a via workspace.",
+  "dependencies": {
+    "minimatch": "3.0.0"
+  }
+}

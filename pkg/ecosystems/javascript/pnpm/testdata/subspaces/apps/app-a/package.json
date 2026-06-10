@@ -1,0 +1,8 @@
+{
+  "name": "@rush-sub/app-a",
+  "version": "1.0.0",
+  "description": "Project in a Rush subspace. Lockfile lives at common/config/subspaces/default/pnpm-lock.yaml.",
+  "dependencies": {
+    "lodash": "4.17.4"
+  }
+}
