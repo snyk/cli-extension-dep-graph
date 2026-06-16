@@ -191,3 +191,32 @@ func TestReadWorkspacePaths_MissingFiles(t *testing.T) {
 	got := readWorkspacePaths(t.TempDir())
 	assert.Equal(t, map[string]string{}, got, "missing files should return empty map, not nil")
 }
+
+func TestReadWorkspaceVersions(t *testing.T) {
+	tmp := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmp, "packages", "api"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmp, "packages", "api", "package.json"),
+		[]byte(`{"name":"@workspace/api","version":"2.3.1"}`), 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmp, "packages", "noversion"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmp, "packages", "noversion", "package.json"),
+		[]byte(`{"name":"@workspace/noversion"}`), 0o600))
+	// Workspace dir with no package.json — silently skipped.
+	require.NoError(t, os.MkdirAll(filepath.Join(tmp, "packages", "missing"), 0o755))
+
+	paths := map[string]string{
+		"@workspace/api":       "packages/api",
+		"@workspace/noversion": "packages/noversion",
+		"@workspace/missing":   "packages/missing",
+	}
+	got := readWorkspaceVersions(tmp, paths)
+
+	assert.Equal(t, "2.3.1", got["@workspace/api"], "real semver read from package.json")
+	// noversion has no "version" field; readPackageJSON falls back to defaultVersion ("0.0.0").
+	assert.Equal(t, defaultVersion, got["@workspace/noversion"], "missing version field falls back")
+	assert.NotContains(t, got, "@workspace/missing", "missing package.json is silently skipped")
+}
+
+func TestReadWorkspaceVersions_EmptyInputReturnsEmptyMap(t *testing.T) {
+	got := readWorkspaceVersions(t.TempDir(), nil)
+	assert.Equal(t, map[string]string{}, got)
+}

@@ -155,6 +155,26 @@ func matchesAnyWorkspacePattern(resolved string, patterns []string) bool {
 const nodeModulesPrefix = "node_modules/"
 
 func hasNodeModulesPrefix(p string) bool {
-	// Use filepath.ToSlash to normalise separators before checking.
-	return len(p) >= len(nodeModulesPrefix) && filepath.ToSlash(p)[:len(nodeModulesPrefix)] == nodeModulesPrefix
+	return strings.HasPrefix(filepath.ToSlash(p), nodeModulesPrefix)
+}
+
+// readWorkspaceVersions returns a map of workspace package name → semver
+// version, by reading each workspace's package.json. Used so per-workspace
+// dep-graph roots show their real version in customer-facing reports rather
+// than the synthetic file:<reldir> identifier we use internally for stop-set
+// keying.
+//
+// Always returns a non-nil map. Skips entries silently when a workspace
+// package.json is missing or unparseable — a missing version is better than
+// failing the whole scan.
+func readWorkspaceVersions(lockfileDir string, paths map[string]string) map[string]string {
+	out := make(map[string]string, len(paths))
+	for name, relDir := range paths {
+		pkgJSON, err := readPackageJSON(filepath.Join(lockfileDir, relDir))
+		if err != nil || pkgJSON.Version == "" {
+			continue
+		}
+		out[name] = pkgJSON.Version
+	}
+	return out
 }

@@ -30,9 +30,15 @@ type depGraphResult struct {
 // (relative to the lockfile dir) as parsed from the lockfile. It overrides
 // the malformed `file:../../...` paths npm ls reports.
 //
+// workspaceVersions maps workspace package name → real semver version read
+// from that workspace's own package.json. Used as the root version of each
+// per-workspace dep graph so customer-facing reports show the package's
+// actual version instead of the synthetic `file:<reldir>` form. Nil-safe:
+// when missing or unset for a given workspace, falls back to defaultVersion.
+//
 // If the project contains no workspace packages, a single-element slice is
 // returned containing the root dep graph.
-func buildDepGraphs(rootName, rootVersion string, root *listResponse, workspacePaths map[string]string) ([]depGraphResult, error) {
+func buildDepGraphs(rootName, rootVersion string, root *listResponse, workspacePaths, workspaceVersions map[string]string) ([]depGraphResult, error) {
 	forward, workspaces, rootDeps := collectAdjacency(root, workspacePaths)
 
 	// Set view of workspace pkg IDs — used as the stop-set when building the
@@ -54,7 +60,16 @@ func buildDepGraphs(rootName, rootVersion string, root *listResponse, workspaceP
 	// One dep graph per workspace package. Each stops at other workspace
 	// packages so their subtrees are not duplicated.
 	for wsID, wsDir := range workspaces {
-		name, version := splitPkgID(wsID)
+		name, _ := splitPkgID(wsID)
+
+		// Prefer real semver from workspace's package.json; fall back to
+		// defaultVersion if unknown. The synthetic file:<reldir> form is kept
+		// only as an internal ID for dedup/stop-set purposes (see pkgID), not
+		// as the customer-visible root version.
+		rootVer := defaultVersion
+		if v, ok := workspaceVersions[name]; ok && v != "" {
+			rootVer = v
+		}
 
 		wsSeeds := make(map[string]struct{}, len(forward[wsID]))
 		for dep := range forward[wsID] {
@@ -69,7 +84,7 @@ func buildDepGraphs(rootName, rootVersion string, root *listResponse, workspaceP
 			}
 		}
 
-		wsGraph, err := buildSingleDepGraph(name, version, wsSeeds, forward, otherWS)
+		wsGraph, err := buildSingleDepGraph(name, rootVer, wsSeeds, forward, otherWS)
 		if err != nil {
 			return nil, fmt.Errorf("building dep graph for %s: %w", wsID, err)
 		}

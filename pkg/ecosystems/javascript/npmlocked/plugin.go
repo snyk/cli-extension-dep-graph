@@ -28,6 +28,16 @@ const (
 // bespoke-parser bugs.
 //
 // Requires npm >= 6 in PATH.
+//
+// Behavior is configured via SCAPluginOptions passed to BuildDepGraphsFromDir:
+// Global.IncludeDev=false (the zero value, also the legacy Snyk CLI default)
+// suppresses dev deps via `--omit=dev`; IncludeDev=true keeps them in the
+// graph.
+//
+// No knobs for optional / peer deps: the Snyk CLI doesn't expose them either
+// (optional deps are hardcoded on, peer-dep handling is hardcoded inside the
+// legacy parser). If those ever become user-controllable upstream, extend
+// RunOptions to match.
 type Plugin struct {
 	executor npmLsRunner
 }
@@ -55,6 +65,9 @@ func (p Plugin) BuildDepGraphsFromDir(
 	if log == nil {
 		log = logger.Nop()
 	}
+	if options == nil {
+		options = ecosystems.NewPluginOptions()
+	}
 
 	files, err := p.discoverLockFiles(ctx, dir, options)
 	if err != nil {
@@ -62,18 +75,18 @@ func (p Plugin) BuildDepGraphsFromDir(
 	}
 
 	if len(files) == 0 {
-		log.Debug(ctx, "No package-lock.json files found", logger.Attr("dir", dir))
+		log.Debug(ctx, "No npm lockfile found", logger.Attr("dir", dir))
 		return nil
 	}
 
-	log.Debug(ctx, "Discovered package-lock.json files", logger.Attr("count", len(files)))
+	log.Debug(ctx, "Discovered npm lockfiles", logger.Attr("count", len(files)))
 
 	exec := p.getExecutor()
 
 	for _, file := range files {
 		lockFileAbsDir := filepath.Dir(file.Path)
 
-		fileResults := p.buildResults(ctx, log, file.RelPath, lockFileAbsDir, exec)
+		fileResults := p.buildResults(ctx, log, file.RelPath, lockFileAbsDir, exec, options)
 		for i := range fileResults {
 			r := &fileResults[i]
 			if r.Error != nil {
@@ -100,6 +113,7 @@ func (p Plugin) buildResults(
 	log logger.Logger,
 	lockFileRelPath, lockFileAbsDir string,
 	exec npmLsRunner,
+	options *ecosystems.SCAPluginOptions,
 ) []ecosystems.SCAResult {
 	lockFileDir := filepath.Dir(lockFileRelPath)
 	rootTargetFile := filepath.Join(lockFileDir, packageJSONFile)
@@ -127,7 +141,7 @@ func (p Plugin) buildResults(
 		return errResult(fmt.Errorf("reading package.json: %w", err))
 	}
 
-	output, err := exec.Run(ctx, lockFileAbsDir)
+	output, err := exec.Run(ctx, lockFileAbsDir, RunOptions{OmitDev: !options.Global.IncludeDev})
 	if err != nil {
 		return errResult(p.wrapRunError(err))
 	}
@@ -158,9 +172,30 @@ func (p Plugin) buildResults(
 		logger.Attr("topLevelDeps", len(parsed.Dependencies)),
 	)
 
-	workspacePaths := readWorkspacePaths(lockFileAbsDir)
+	// npm reports out-of-sync lockfiles, missing deps, etc. via a structured
+	// `problems` array alongside a partial-but-usable tree. Surface them so
+	// customers see the actionable detail ("missing X required by Y") instead
+	// of an opaque scan. Logger interface has no Warn; Info is the closest
+	// level — these are not errors (the scan succeeded) but are user-actionable.
+	for _, problem := range parsed.Problems {
+		log.Info(ctx, "npm reported a lockfile problem",
+			logger.Attr(logFieldLockFile, lockFileRelPath),
+			logger.Attr("problem", problem),
+		)
+	}
 
-	graphResults, err := buildDepGraphs(rootName, rootVersion, parsed, workspacePaths)
+	// Only split into per-workspace graphs when the caller opted into
+	// multi-project scanning. Without --all-projects, the legacy CLI emits one
+	// graph per invocation; emitting N+1 here would silently expand a customer's
+	// Snyk project count. With workspacePaths nil, the root graph walks
+	// transitively through workspace packages instead of stopping at them.
+	var graphWorkspacePaths, graphWorkspaceVersions map[string]string
+	if options.Global.AllProjects {
+		graphWorkspacePaths = readWorkspacePaths(lockFileAbsDir)
+		graphWorkspaceVersions = readWorkspaceVersions(lockFileAbsDir, graphWorkspacePaths)
+	}
+
+	graphResults, err := buildDepGraphs(rootName, rootVersion, parsed, graphWorkspacePaths, graphWorkspaceVersions)
 	if err != nil {
 		return errResult(fmt.Errorf("building dep graphs: %w", err))
 	}
@@ -232,20 +267,20 @@ func (p Plugin) discoverLockFiles(
 
 	switch {
 	case options.Global.TargetFile != nil:
-		if filepath.Base(*options.Global.TargetFile) != packageLockFile {
+		if !isLockfileName(filepath.Base(*options.Global.TargetFile)) {
 			return nil, nil
 		}
 
 		files, err := discovery.FindFiles(ctx, dir, discovery.WithTargetFile(*options.Global.TargetFile))
 		if err != nil {
-			return nil, fmt.Errorf("discovering package-lock.json files: %w", err)
+			return nil, fmt.Errorf("discovering npm lockfile: %w", err)
 		}
 
 		return files, nil
 
 	case options.Global.AllProjects:
 		findOpts := []discovery.FindOption{
-			discovery.WithInclude(packageLockFile),
+			discovery.WithIncludes(lockfileNames...),
 			discovery.WithCommonExcludes(),
 		}
 
@@ -258,19 +293,51 @@ func (p Plugin) discoverLockFiles(
 
 		files, err := discovery.FindFiles(ctx, dir, findOpts...)
 		if err != nil {
-			return nil, fmt.Errorf("discovering package-lock.json files: %w", err)
+			return nil, fmt.Errorf("discovering npm lockfiles: %w", err)
 		}
 
-		return files, nil
+		return dedupeLockfilesPerDir(files), nil
 
 	default:
-		rootLock := filepath.Join(dir, packageLockFile)
-		if !fileExists(rootLock) {
-			return nil, nil
+		// Prefer npm-shrinkwrap.json over package-lock.json (matches npm CLI
+		// behavior). Either is read by `npm ls --package-lock-only` identically.
+		for _, name := range lockfileNames {
+			candidate := filepath.Join(dir, name)
+			if fileExists(candidate) {
+				return []discovery.FindResult{{Path: candidate, RelPath: name}}, nil
+			}
 		}
-
-		return []discovery.FindResult{{Path: rootLock, RelPath: packageLockFile}}, nil
+		return nil, nil
 	}
+}
+
+// dedupeLockfilesPerDir returns a slice where, for each directory containing
+// both npm-shrinkwrap.json and package-lock.json, only the npm-shrinkwrap.json
+// entry is kept. Matches npm CLI precedence so we don't run `npm ls` twice in
+// the same dir and produce duplicate dep graphs.
+func dedupeLockfilesPerDir(files []discovery.FindResult) []discovery.FindResult {
+	byDir := make(map[string]discovery.FindResult, len(files))
+	for _, f := range files {
+		dir := filepath.Dir(f.Path)
+		existing, seen := byDir[dir]
+		if !seen {
+			byDir[dir] = f
+			continue
+		}
+		// Both lockfiles exist here. Keep the shrinkwrap entry.
+		if filepath.Base(f.Path) == shrinkwrapFile {
+			byDir[dir] = f
+		} else if filepath.Base(existing.Path) != shrinkwrapFile {
+			// Defensive: neither is shrinkwrap (shouldn't happen given our
+			// include list, but keeps the map stable on unexpected input).
+			byDir[dir] = existing
+		}
+	}
+	out := make([]discovery.FindResult, 0, len(byDir))
+	for _, f := range byDir {
+		out = append(out, f)
+	}
+	return out
 }
 
 func fileExists(path string) bool {

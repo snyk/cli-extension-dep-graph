@@ -51,7 +51,7 @@ func TestBuildDepGraphs_Simple(t *testing.T) {
 		},
 	}
 
-	results, err := buildDepGraphs("my-app", "1.0.0", root, nil)
+	results, err := buildDepGraphs("my-app", "1.0.0", root, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 1, "non-workspace project produces exactly one dep graph")
 
@@ -79,7 +79,7 @@ func TestBuildDepGraphs_Diamond(t *testing.T) {
 		},
 	}
 
-	results, err := buildDepGraphs("root", "0.0.0", root, nil)
+	results, err := buildDepGraphs("root", "0.0.0", root, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 
@@ -101,7 +101,7 @@ func TestBuildDepGraphs_MultipleVersions(t *testing.T) {
 		},
 	}
 
-	results, err := buildDepGraphs("root", "0.0.0", root, nil)
+	results, err := buildDepGraphs("root", "0.0.0", root, nil, nil)
 	require.NoError(t, err)
 	dg := results[0].graph
 
@@ -133,7 +133,7 @@ func TestBuildDepGraphs_WithWorkspaces(t *testing.T) {
 	workspacePaths := map[string]string{
 		"@workspace/logger": "packages/logger",
 	}
-	results, err := buildDepGraphs("my-workspace", "1.0.0", root, workspacePaths)
+	results, err := buildDepGraphs("my-workspace", "1.0.0", root, workspacePaths, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 2, "root graph + one per workspace package")
 
@@ -156,6 +156,54 @@ func TestBuildDepGraphs_WithWorkspaces(t *testing.T) {
 	assert.Contains(t, nodeDeps(loggerResult.graph, "axios@1.14.0"), "follow-redirects@1.15.9", "axios → follow-redirects")
 }
 
+func TestBuildDepGraphs_WorkspaceRootUsesSemverFromVersionsMap(t *testing.T) {
+	// When workspaceVersions supplies a real semver, the per-workspace dep graph
+	// uses it as the root version instead of the synthetic file:<reldir> form.
+	root := &listResponse{
+		Dependencies: map[string]*listResponseDep{
+			"@workspace/api": wsDep("packages/api", map[string]*listResponseDep{
+				"express": dep("4.18.0"),
+			}),
+		},
+	}
+	workspacePaths := map[string]string{"@workspace/api": "packages/api"}
+	workspaceVersions := map[string]string{"@workspace/api": "2.3.1"}
+
+	results, err := buildDepGraphs("my-workspace", "1.0.0", root, workspacePaths, workspaceVersions)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+
+	apiResult := findResultByRoot(t, results, "@workspace/api")
+	assert.Equal(t, "2.3.1", apiResult.graph.GetRootPkg().Info.Version,
+		"per-workspace graph root uses the supplied semver, not file:<reldir>")
+	assert.Equal(t, "@workspace/api", apiResult.graph.GetRootPkg().Info.Name)
+
+	// Internal IDs still use file: form for stop-set keying — only the graph
+	// root identity changes.
+	rootResult := findResultByRoot(t, results, "my-workspace")
+	assert.Contains(t, nodeDeps(rootResult.graph, "root-node"), "@workspace/api@file:packages/api",
+		"workspace pkg in root graph still uses file: ID")
+}
+
+func TestBuildDepGraphs_WorkspaceFallsBackToDefaultVersionWhenAbsent(t *testing.T) {
+	// When workspaceVersions has no entry for a workspace, fall back to
+	// defaultVersion rather than emitting the synthetic file: form as a version.
+	root := &listResponse{
+		Dependencies: map[string]*listResponseDep{
+			"@workspace/api": wsDep("packages/api"),
+		},
+	}
+	workspacePaths := map[string]string{"@workspace/api": "packages/api"}
+	// workspaceVersions intentionally nil / missing entry
+
+	results, err := buildDepGraphs("my-workspace", "1.0.0", root, workspacePaths, nil)
+	require.NoError(t, err)
+
+	apiResult := findResultByRoot(t, results, "@workspace/api")
+	assert.Equal(t, defaultVersion, apiResult.graph.GetRootPkg().Info.Version,
+		"missing workspace version falls back to default, not file:<reldir>")
+}
+
 func TestBuildDepGraphs_CrossWorkspaceCycleTerminates(t *testing.T) {
 	// wsA depends on wsB which depends on wsA. Must not infinite-loop.
 	root := &listResponse{
@@ -173,7 +221,7 @@ func TestBuildDepGraphs_CrossWorkspaceCycleTerminates(t *testing.T) {
 		"wsA": "packages/a",
 		"wsB": "packages/b",
 	}
-	results, err := buildDepGraphs("root", "0.0.0", root, workspacePaths)
+	results, err := buildDepGraphs("root", "0.0.0", root, workspacePaths, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 3, "root + wsA + wsB")
 
@@ -201,7 +249,7 @@ func TestBuildDepGraphs_HandlesPackageLevelCycle(t *testing.T) {
 		Dependencies: map[string]*listResponseDep{"pkg-a": cyclicA},
 	}
 
-	results, err := buildDepGraphs("root", "0.0.0", root, nil)
+	results, err := buildDepGraphs("root", "0.0.0", root, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 

@@ -13,8 +13,27 @@ import (
 const (
 	packageJSONFile = "package.json"
 	packageLockFile = "package-lock.json"
+	shrinkwrapFile  = "npm-shrinkwrap.json"
 	defaultVersion  = "0.0.0"
 )
+
+// lockfileNames lists the lockfile filenames this plugin recognizes, in
+// preferred order. npm itself prefers npm-shrinkwrap.json over
+// package-lock.json when both are present in the same directory.
+// `npm ls --package-lock-only` reads either format identically (verified
+// empirically against npm 10.x).
+var lockfileNames = []string{shrinkwrapFile, packageLockFile}
+
+// isLockfileName reports whether base is one of our recognized lockfile
+// filenames. base must be a basename, not a path.
+func isLockfileName(base string) bool {
+	for _, n := range lockfileNames {
+		if base == n {
+			return true
+		}
+	}
+	return false
+}
 
 // packageJSON represents the fields we need from a package.json file.
 type packageJSON struct {
