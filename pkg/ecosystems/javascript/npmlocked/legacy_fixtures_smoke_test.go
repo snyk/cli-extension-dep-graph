@@ -1,7 +1,7 @@
 //go:build integration && npm
 // +build integration,npm
 
-package npm_test
+package npmlocked_test
 
 // legacy_fixtures_smoke_test.go runs the plugin against every imported
 // fixture under testdata/legacy-fixtures/ and asserts the smallest
@@ -31,7 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/javascript/npm"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/javascript/npmlocked"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/scatest"
 )
 
@@ -56,7 +56,7 @@ func TestLegacyFixtures_Smoke(t *testing.T) {
 
 	t.Logf("discovered %d fixtures", len(fixtures))
 
-	plugin := npm.Plugin{}
+	plugin := npmlocked.Plugin{}
 
 	for _, fx := range fixtures {
 		t.Run(fx.ID(), func(t *testing.T) {

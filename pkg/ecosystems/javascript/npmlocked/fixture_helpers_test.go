@@ -1,7 +1,7 @@
 //go:build integration && npm
 // +build integration,npm
 
-package npm_test
+package npmlocked_test
 
 // fixture_helpers_test.go holds the helpers shared by the integration test
 // suites that walk testdata/legacy-fixtures/ (smoke + divergence-comparison).

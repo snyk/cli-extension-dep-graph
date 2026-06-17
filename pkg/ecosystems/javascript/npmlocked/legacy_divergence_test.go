@@ -1,7 +1,7 @@
 //go:build integration && npm
 // +build integration,npm
 
-package npm_test
+package npmlocked_test
 
 // legacy_divergence_test.go quantifies how our `npm ls`-based output
 // diverges from the snyk-nodejs-lockfile-parser output for fixtures that
@@ -38,7 +38,7 @@ import (
 	"github.com/snyk/dep-graph/go/pkg/depgraph"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/javascript/npm"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/javascript/npmlocked"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/scatest"
 )
 
@@ -136,7 +136,7 @@ func TestLegacyFixtures_Divergence(t *testing.T) {
 
 	t.Logf("comparing %d fixtures against legacy goldens", len(withGolden))
 
-	plugin := npm.Plugin{}
+	plugin := npmlocked.Plugin{}
 	collector := &divergenceCollector{}
 
 	for _, fx := range withGolden {
