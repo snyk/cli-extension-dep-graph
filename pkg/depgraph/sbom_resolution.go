@@ -20,8 +20,8 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/v2/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/v2/internal/workflow"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/legacy"
 	ecosystemslogger "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/orchestrator"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/python/uv"
 )
 
@@ -51,7 +51,7 @@ func handleSBOMResolution(
 		logger,
 		[]ecosystems.SCAPlugin{
 			uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL),
-			legacy.NewPlugin(ctx),
+			orchestrator.NewPlugin(ctx),
 		},
 	)
 }
