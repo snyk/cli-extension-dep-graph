@@ -13,7 +13,7 @@ package yarn_test
 // (ordering, labels) are normalized out. Fixtures without a legacy golden
 // are skipped silently so the suite is additive.
 //
-// This guards against behavioural drift from the legacy parser as we evolve
+// This guards against behavioral drift from the legacy parser as we evolve
 // the new plugin.
 //
 // Run with: go test -run TestLegacyDivergence ./pkg/ecosystems/javascript/yarn/...

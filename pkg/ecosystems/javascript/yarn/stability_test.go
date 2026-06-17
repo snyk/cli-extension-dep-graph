@@ -97,7 +97,8 @@ func assertNoInstallArtifacts(t *testing.T, dir string) {
 		assert.True(t, os.IsNotExist(err),
 			"plugin created %s in fixture dir (violates install-free contract)", name)
 	}
-	matches, _ := filepath.Glob(filepath.Join(dir, ".pnp.*"))
+	matches, err := filepath.Glob(filepath.Join(dir, ".pnp.*"))
+	require.NoError(t, err)
 	assert.Empty(t, matches, "plugin created .pnp.* artifact in fixture dir")
 }
 
