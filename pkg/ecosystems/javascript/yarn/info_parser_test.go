@@ -31,12 +31,14 @@ func TestParseYarnInfoOutput_Simple(t *testing.T) {
 
 	// Forward edges populated as expected.
 	require.Contains(t, out.Graph, "accepts@npm:1.3.7")
-	assert.ElementsMatch(t,
+	assert.ElementsMatch(
+		t,
 		[]string{"mime-types@npm:2.1.31", "negotiator@npm:0.6.2"},
 		setKeys(out.Graph["accepts@npm:1.3.7"]),
 	)
 	require.Contains(t, out.Graph, "mime-types@npm:2.1.31")
-	assert.ElementsMatch(t,
+	assert.ElementsMatch(
+		t,
 		[]string{"mime-db@npm:1.48.0"},
 		setKeys(out.Graph["mime-types@npm:2.1.31"]),
 	)
@@ -54,6 +56,7 @@ func TestParseYarnInfoOutput_Simple(t *testing.T) {
 // real locator, so multiple virtualisations of the same package become a
 // single graph node.
 func TestParseYarnInfoOutput_DevirtualisesDependencyLocators(t *testing.T) {
+	//nolint:lll // NDJSON test inputs are intentionally single-line.
 	ndjson := strings.Join([]string{
 		`{"value":"root@workspace:.","children":{"Version":"0.0.0-use.local","Dependencies":[{"descriptor":"debug@npm:4.3.1","locator":"debug@virtual:abc123#npm:4.3.1"}]}}`,
 		`{"value":"debug@npm:4.3.1","children":{"Version":"4.3.1","Dependencies":[{"descriptor":"ms@npm:1.0.0","locator":"ms@virtual:def456#npm:1.0.0"}]}}`,
@@ -67,7 +70,8 @@ func TestParseYarnInfoOutput_DevirtualisesDependencyLocators(t *testing.T) {
 	assert.Equal(t, []string{"debug@npm:4.3.1"}, out.ProdDeps)
 
 	// Cross-reference inside debug's deps also de-virtualised.
-	assert.ElementsMatch(t,
+	assert.ElementsMatch(
+		t,
 		[]string{"ms@npm:1.0.0"},
 		setKeys(out.Graph["debug@npm:4.3.1"]),
 	)
@@ -77,6 +81,7 @@ func TestParseYarnInfoOutput_DevirtualisesDependencyLocators(t *testing.T) {
 // populated with the right dir/name/version and added to the Graph so their
 // own dep graphs can be built downstream.
 func TestParseYarnInfoOutput_WorkspaceMembers(t *testing.T) {
+	//nolint:lll // NDJSON test inputs are intentionally single-line.
 	ndjson := strings.Join([]string{
 		`{"value":"my-monorepo@workspace:.","children":{"Version":"1.0.0","Dependencies":[{"descriptor":"@my/logger@workspace:^","locator":"@my/logger@workspace:packages/logger"},{"descriptor":"axios@npm:^1","locator":"axios@npm:1.6.0"}]}}`,
 		`{"value":"@my/logger@workspace:packages/logger","children":{"Version":"0.1.0","Dependencies":[{"descriptor":"chalk@npm:^5","locator":"chalk@npm:5.3.0"}]}}`,
@@ -88,7 +93,8 @@ func TestParseYarnInfoOutput_WorkspaceMembers(t *testing.T) {
 	require.NoError(t, err)
 
 	// Root deps include both the workspace member and a regular package.
-	assert.ElementsMatch(t,
+	assert.ElementsMatch(
+		t,
 		[]string{"@my/logger@workspace:packages/logger", "axios@npm:1.6.0"},
 		out.ProdDeps,
 	)
@@ -102,7 +108,8 @@ func TestParseYarnInfoOutput_WorkspaceMembers(t *testing.T) {
 
 	// Workspace member's deps live in the Graph so its own dep graph can be built.
 	require.Contains(t, out.Graph, "@my/logger@workspace:packages/logger")
-	assert.ElementsMatch(t,
+	assert.ElementsMatch(
+		t,
 		[]string{"chalk@npm:5.3.0"},
 		setKeys(out.Graph["@my/logger@workspace:packages/logger"]),
 	)
@@ -166,9 +173,9 @@ func TestDevirtualise(t *testing.T) {
 
 func TestSplitPkgID(t *testing.T) {
 	cases := []struct {
-		in           string
-		wantName     string
-		wantVersion  string
+		in          string
+		wantName    string
+		wantVersion string
 	}{
 		{"accepts@1.3.7", "accepts", "1.3.7"},
 		{"@types/node@25.5.2", "@types/node", "25.5.2"},

@@ -1,6 +1,6 @@
 package yarn
 
-// identity_test.go pins down the identity contract this plugin must honour
+// identity_test.go pins down the identity contract this plugin must honor
 // to keep migrated yarn projects pointing at the same backend identity they
 // had under snyk-nodejs-lockfile-parser. The contract is documented on
 // buildResults in plugin.go; this file asserts it stays true.
@@ -163,7 +163,7 @@ func TestIdentity_Workspaces_MatchesLegacy(t *testing.T) {
 }
 
 // TestIdentity_ErrorResult_MatchesContract verifies the error path also
-// honours the identity contract — nil TargetFile, lockfile as
+// honors the identity contract — nil TargetFile, lockfile as
 // NormalisedTargetFile. Failed scans must not be identified differently
 // from successful ones, or backend project history breaks on the first error.
 func TestIdentity_ErrorResult_MatchesContract(t *testing.T) {
@@ -202,7 +202,7 @@ func writeIdentityFixture(t *testing.T, dir, pkgJSON, yarnLock string) {
 func writeIdentityFile(t *testing.T, path, content string) {
 	t.Helper()
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
-	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 }
 
 // classicSimpleLockfile is a minimal yarn v1 lockfile pinning accepts@1.3.7.

@@ -7,7 +7,7 @@ package yarn
 // IDs are kept in the form emitted by yarn:
 //   - Classic: "name@resolvedVersion"          e.g. "accepts@1.3.7"
 //   - Berry:   "name@protocol:identifier"      e.g. "debug@npm:4.3.1"
-//                                                   "logger@workspace:packages/logger"
+//     "logger@workspace:packages/logger"
 //
 // splitPkgID in depgraph.go strips protocol prefixes when populating PkgInfo,
 // but graph keys remain raw to preserve uniqueness across protocols.

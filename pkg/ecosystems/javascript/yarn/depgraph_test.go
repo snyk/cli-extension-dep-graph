@@ -107,9 +107,9 @@ func TestBuildDepGraphs_WithWorkspaces(t *testing.T) {
 	out := &parsedOutput{
 		Graph: forwardGraph{
 			"@my/logger@workspace:packages/logger": {"chalk@npm:5.0.0": {}},
-			"debug@npm:4.4.3":                       {"ms@npm:2.1.3": {}},
-			"chalk@npm:5.0.0":                       {},
-			"ms@npm:2.1.3":                          {},
+			"debug@npm:4.4.3":                      {"ms@npm:2.1.3": {}},
+			"chalk@npm:5.0.0":                      {},
+			"ms@npm:2.1.3":                         {},
 		},
 		ProdDeps: []string{"@my/logger@workspace:packages/logger", "debug@npm:4.4.3"},
 		Workspaces: map[string]workspaceInfo{

@@ -68,7 +68,8 @@ func (p Plugin) BuildDepGraphsFromDir(
 		for i := range fileResults {
 			r := &fileResults[i]
 			if r.Error != nil {
-				log.Error(ctx, "Failed to build yarn dependency graph",
+				log.Error(
+					ctx, "Failed to build yarn dependency graph",
 					logger.Attr(logFieldLockFile, file.RelPath),
 					logger.Err(r.Error),
 				)
@@ -102,14 +103,14 @@ func (p Plugin) BuildDepGraphsFromDir(
 //     MetaKeyTargetFileFromPlugin, which the backend uses as a
 //     project-uniqueness signal.
 //   - ResolverMetadata.NormalisedTargetFile:
-//     - Root SCAResult     → lockfile path (e.g. "yarn.lock", or
-//       "subdir/yarn.lock" if the lockfile isn't at the scan root). Matches
-//       what CLI auto-discovery would have passed as the target file for a
-//       non-workspace yarn scan.
-//     - Workspace SCAResult → workspace's package.json path relative to the
-//       scan root (e.g. "packages/pkg-a/package.json"). Matches what
-//       snyk-nodejs-plugin's yarn-workspaces-parser emits as
-//       scannedProject.targetFile per workspace.
+//   - Root SCAResult     → lockfile path (e.g. "yarn.lock", or
+//     "subdir/yarn.lock" if the lockfile isn't at the scan root). Matches
+//     what CLI auto-discovery would have passed as the target file for a
+//     non-workspace yarn scan.
+//   - Workspace SCAResult → workspace's package.json path relative to the
+//     scan root (e.g. "packages/pkg-a/package.json"). Matches what
+//     snyk-nodejs-plugin's yarn-workspaces-parser emits as
+//     scannedProject.targetFile per workspace.
 //   - Identity.RootComponentName: from depGraph.rootPkg.name (= package.json
 //     `name` field). Matches legacy.
 //   - Identity.ProjectType: "yarn". Matches dg.PkgManager.Name.
@@ -165,7 +166,8 @@ func (p Plugin) buildResults(
 		return errResult(fmt.Errorf("parsing yarn output: %w", err))
 	}
 
-	log.Debug(ctx, "Parsed yarn output",
+	log.Debug(
+		ctx, "Parsed yarn output",
 		logger.Attr(logFieldLockFile, lockFileRelPath),
 		logger.Attr("packages", len(parsed.Graph)),
 	)
@@ -175,7 +177,8 @@ func (p Plugin) buildResults(
 		return errResult(fmt.Errorf("building dep graphs: %w", err))
 	}
 
-	log.Info(ctx, "Successfully built yarn dependency graphs",
+	log.Info(
+		ctx, "Successfully built yarn dependency graphs",
 		logger.Attr(logFieldLockFile, lockFileRelPath),
 		logger.Attr("graphs", len(graphResults)),
 	)
@@ -196,7 +199,7 @@ func (p Plugin) buildResults(
 			DepGraph: gr.graph,
 			ProjectDescriptor: identity.ProjectDescriptor{
 				Identity: identity.ProjectIdentity{
-					ProjectType:       pkgManager,
+					ProjectType: pkgManager,
 					// TargetFile nil — see identity contract above.
 					RootComponentName: gr.graph.GetRootPkg().Info.Name,
 				},

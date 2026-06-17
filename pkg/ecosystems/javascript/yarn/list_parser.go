@@ -16,6 +16,8 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 )
 
+const logFieldDir = "dir"
+
 // `yarn list --depth=Infinity --json` emits NDJSON, one envelope per line:
 //
 //	{"type":"warning","data":"package.json: No license field"}
@@ -90,7 +92,7 @@ func parseYarnListOutput(
 	lockResolutions, err := readYarnLockResolutions(lockFileDir)
 	if err != nil {
 		log.Debug(ctx, "yarn.lock pre-pass failed; proceeding without",
-			logger.Attr("err", err.Error()))
+			logger.Err(err))
 		lockResolutions = nil
 	}
 
@@ -127,9 +129,7 @@ func parseYarnListOutput(
 	// just need to flag which of those tree entries are workspaces so depgraph.go
 	// emits a separate dep graph per workspace and treats sibling workspaces as
 	// leaves in non-owner graphs.
-	if err := markWorkspaces(ctx, log, lockFileDir, pkgJSON, out); err != nil {
-		return nil, err
-	}
+	markWorkspaces(ctx, log, lockFileDir, pkgJSON, out)
 
 	// Root-direct dependencies come from the root package.json — yarn list does
 	// not emit a root-tree entry. Dev deps go in DevDeps; everything else in ProdDeps.
@@ -181,7 +181,7 @@ func readClassicTrees(ctx context.Context, log logger.Logger, r io.Reader) ([]cl
 		var env classicListEnvelope
 		if err := json.Unmarshal(raw, &env); err != nil {
 			log.Debug(ctx, "Skipping unparseable yarn list line",
-				logger.Attr("line", lineNum), logger.Attr("err", err.Error()))
+				logger.Attr("line", lineNum), logger.Err(err))
 			continue
 		}
 
@@ -418,16 +418,16 @@ func markWorkspaces(
 	lockFileDir string,
 	pkgJSON *packageJSON,
 	out *parsedOutput,
-) error {
+) {
 	if pkgJSON == nil || len(pkgJSON.Workspaces.Packages) == 0 {
-		return nil
+		return
 	}
 
 	for _, glob := range pkgJSON.Workspaces.Packages {
-		matches, err := filepath.Glob(filepath.Join(lockFileDir, glob))
-		if err != nil {
+		matches, globErr := filepath.Glob(filepath.Join(lockFileDir, glob))
+		if globErr != nil {
 			log.Debug(ctx, "skipping invalid workspaces glob",
-				logger.Attr("glob", glob), logger.Attr("err", err.Error()))
+				logger.Attr("glob", glob), logger.Err(globErr))
 			continue
 		}
 		for _, m := range matches {
@@ -435,20 +435,20 @@ func markWorkspaces(
 			if statErr != nil || !info.IsDir() {
 				continue
 			}
-			wsRel, err := filepath.Rel(lockFileDir, m)
-			if err != nil {
+			wsRel, relErr := filepath.Rel(lockFileDir, m)
+			if relErr != nil {
 				continue
 			}
 
-			wsPJ, err := readPackageJSON(m)
-			if err != nil {
+			wsPJ, readErr := readPackageJSON(m)
+			if readErr != nil {
 				log.Debug(ctx, "skipping workspace with unreadable package.json",
-					logger.Attr("dir", wsRel), logger.Attr("err", err.Error()))
+					logger.Attr(logFieldDir, wsRel), logger.Err(readErr))
 				continue
 			}
 			if wsPJ.Name == "" {
 				log.Debug(ctx, "skipping unnamed workspace package.json",
-					logger.Attr("dir", wsRel))
+					logger.Attr(logFieldDir, wsRel))
 				continue
 			}
 
@@ -475,7 +475,6 @@ func markWorkspaces(
 			}
 		}
 	}
-	return nil
 }
 
 // readRootDeps returns the root project's direct deps as a map from declared

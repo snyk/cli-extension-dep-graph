@@ -24,6 +24,12 @@ var virtualRe = regexp.MustCompile(`@virtual:[^#]+#`)
 // berryEntry mirrors the shape of a single NDJSON line emitted by
 // `yarn info --all --recursive --json`. Many other fields exist
 // (Dependents, Instances, "Exported Binaries"…) — we ignore them.
+//
+// Version / Dependencies are intentionally Pascal-cased because Berry emits
+// the wire format with those exact keys; the camelCase tagliatelle warning
+// doesn't apply to keys we don't control.
+//
+//nolint:tagliatelle // Berry's wire format uses PascalCase keys we don't control
 type berryEntry struct {
 	Value    string `json:"value"`
 	Children struct {
@@ -81,7 +87,7 @@ func parseYarnInfoOutput(
 		var entry berryEntry
 		if err := json.Unmarshal(raw, &entry); err != nil {
 			log.Debug(ctx, "Skipping unparseable yarn info line",
-				logger.Attr("line", lineNum), logger.Attr("err", err.Error()))
+				logger.Attr("line", lineNum), logger.Err(err))
 			continue
 		}
 
@@ -146,7 +152,7 @@ const (
 //	"name@workspace:packages/x"  → workspace, dir="packages/x"
 //	"name@npm:1.2.3"             → package,   dir=""
 //	"name@file:./local"          → package,   dir=""
-func classifyLocator(locator string) (locatorKind, string) {
+func classifyLocator(locator string) (kind locatorKind, wsDir string) {
 	i := strings.LastIndex(locator, "@")
 	if i <= 0 {
 		return locatorPackage, ""

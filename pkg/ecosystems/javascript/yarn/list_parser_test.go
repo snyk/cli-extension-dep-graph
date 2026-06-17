@@ -38,13 +38,15 @@ func TestParseYarnListOutput_Simple(t *testing.T) {
 
 	// Semver disambiguation: "mime-types@~2.1.24" → resolved "mime-types@2.1.31".
 	require.Contains(t, out.Graph, "accepts@1.3.7")
-	assert.ElementsMatch(t,
+	assert.ElementsMatch(
+		t,
 		[]string{"mime-types@2.1.31", "negotiator@0.6.2"},
 		setKeys(out.Graph["accepts@1.3.7"]),
 	)
 
 	require.Contains(t, out.Graph, "mime-types@2.1.31")
-	assert.ElementsMatch(t,
+	assert.ElementsMatch(
+		t,
 		[]string{"mime-db@1.48.0"},
 		setKeys(out.Graph["mime-types@2.1.31"]),
 	)
@@ -91,8 +93,10 @@ func TestResolveSpecifier(t *testing.T) {
 		// Classic semver pitfall: a lexicographic comparison would pick "2.0.9"
 		// over "2.0.10" because '9' > '1'. Parity with the existing TS test in
 		// nodejs-lockfile-parser/test/jest/cli-parsers/cli-parser-utils.test.ts.
-		{"semver picks 2.0.10 over 2.0.9 for ~2.0.0",
-			"lex@~2.0.0", "lex@2.0.10"},
+		{
+			"semver picks 2.0.10 over 2.0.9 for ~2.0.0",
+			"lex@~2.0.0", "lex@2.0.10",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -114,19 +118,27 @@ func TestResolveSpecifier_LockfileLookup(t *testing.T) {
 	}
 
 	cases := []struct {
-		name      string
-		spec      string
-		want      string
+		name string
+		spec string
+		want string
 	}{
-		{"tarball URL resolves via lockfile",
-			"body-parser@https://example.com/body-parser-1.9.0.tar.gz", "body-parser@1.9.0"},
-		{"git+ssh URL resolves via lockfile",
-			"body-parser@git+ssh://git@example.com/x.git#1.9.0", "body-parser@1.9.0"},
-		{"npm: alias resolves via lockfile",
-			"lodash@npm:lodash@^4.17.15", "lodash@4.17.21"},
-		{"spec not in lockfile or universe falls through to raw",
+		{
+			"tarball URL resolves via lockfile",
+			"body-parser@https://example.com/body-parser-1.9.0.tar.gz", "body-parser@1.9.0",
+		},
+		{
+			"git+ssh URL resolves via lockfile",
+			"body-parser@git+ssh://git@example.com/x.git#1.9.0", "body-parser@1.9.0",
+		},
+		{
+			"npm: alias resolves via lockfile",
+			"lodash@npm:lodash@^4.17.15", "lodash@4.17.21",
+		},
+		{
+			"spec not in lockfile or universe falls through to raw",
 			"body-parser@https://other.example/foo.tar.gz",
-			"body-parser@https://other.example/foo.tar.gz"},
+			"body-parser@https://other.example/foo.tar.gz",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -174,6 +186,7 @@ func TestParseYarnListOutput_SkipsWarningEnvelopes(t *testing.T) {
 		"dependencies": {"debug": "^2"}
 	}`)
 
+	//nolint:lll // NDJSON test inputs are intentionally single-line.
 	ndjson := strings.Join([]string{
 		`{"type":"warning","data":"package.json: No license field"}`,
 		`{"type":"warning","data":"no-license@0.0.1: No license field"}`,
@@ -208,8 +221,9 @@ func TestParseYarnListOutput_SurfacesYarnError(t *testing.T) {
 		`{"type":"error","data":"Package \"shared\" refers to a non-existing file './missing'."}`,
 	}, "\n")
 
-	pj, _ := readPackageJSON(dir)
-	_, err := parseYarnListOutput(context.Background(), logger.Nop(), strings.NewReader(ndjson), pj, dir)
+	pj, err := readPackageJSON(dir)
+	require.NoError(t, err)
+	_, err = parseYarnListOutput(context.Background(), logger.Nop(), strings.NewReader(ndjson), pj, dir)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "non-existing file")
 }
@@ -250,6 +264,7 @@ func TestParseYarnListOutput_WorkspaceMembers(t *testing.T) {
 
 	// Real yarn list emits the workspaces as tree entries too — @my/a has both
 	// lodash and @my/b as children. We mock that exact shape here.
+	//nolint:lll // NDJSON test inputs are intentionally single-line.
 	listJSON := `{"type":"tree","data":{"type":"list","trees":[` +
 		`{"name":"@my/a@0.1.0","children":[{"name":"lodash@^4","color":"dim","shadow":true},{"name":"@my/b@0.2.0","color":"dim","shadow":true}],"hint":null,"color":"bold","depth":0},` +
 		`{"name":"@my/b@0.2.0","children":[],"hint":null,"color":null,"depth":0},` +
@@ -279,7 +294,8 @@ func TestParseYarnListOutput_WorkspaceMembers(t *testing.T) {
 	// Workspace A's deps come from the yarn list tree — both lodash (resolved
 	// via semver) and the cross-ref to @my/b (exact match on resolved ID).
 	require.Contains(t, out.Graph, "@my/a@0.1.0")
-	assert.ElementsMatch(t,
+	assert.ElementsMatch(
+		t,
 		[]string{"lodash@4.17.21", "@my/b@0.2.0"},
 		setKeys(out.Graph["@my/a@0.1.0"]),
 	)
@@ -312,5 +328,5 @@ func TestSplitNameAndIdentifier(t *testing.T) {
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
-	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 }

@@ -49,7 +49,7 @@ func requireYarn(t *testing.T, wantMajor int) int {
 	if m == nil {
 		t.Skipf("could not parse yarn version: %q", out)
 	}
-	got, _ := strconv.Atoi(m[1])
+	got, _ := strconv.Atoi(m[1]) //nolint:errcheck // regex group is \d+
 	if got != wantMajor {
 		t.Skipf("yarn major %d in PATH, test needs %d", got, wantMajor)
 	}
@@ -101,7 +101,7 @@ func TestAcceptance_Classic(t *testing.T) {
 	// Install-free contract: the staged dir must contain only the files we put there.
 	entries, err := os.ReadDir(dir)
 	require.NoError(t, err)
-	var names []string
+	names := make([]string, 0, len(entries))
 	for _, e := range entries {
 		names = append(names, e.Name())
 	}
