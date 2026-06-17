@@ -63,15 +63,17 @@ var _ yarnRunner = (*yarnCmdExecutor)(nil)
 //   - Berry (v2+):  `yarn info --all --recursive --json`. Would otherwise write
 //     `.yarn/install-state.gz` and `.yarn/cache/` into the project dir; we
 //     redirect both to a tmp dir via YARN_GLOBAL_FOLDER /
-//     YARN_INSTALL_STATE_PATH so the user's project is untouched.
+//     YARN_INSTALL_STATE_PATH so the user's project is untouched. Network
+//     access is disabled via YARN_ENABLE_NETWORK=false so a scan can't fetch
+//     packages even if the redirected cache is empty.
 //
 // The subprocess runs in a goroutine; non-zero exit surfaces as a read error
 // when the caller exhausts the stream. The caller must close the returned
 // ReadCloser to release the goroutine and any tmp dir created for Berry.
 func (e *yarnCmdExecutor) Run(ctx context.Context, dir string) (*yarnRunResult, error) {
-	resolved, err := exec.LookPath("yarn")
+	resolved, err := exec.LookPath(pkgManager)
 	if err != nil {
-		return nil, errYarnNotFound
+		return nil, fmt.Errorf("%w: %w", errYarnNotFound, err)
 	}
 
 	family, version, err := detectYarnFamily(ctx, resolved, dir)
@@ -80,14 +82,15 @@ func (e *yarnCmdExecutor) Run(ctx context.Context, dir string) (*yarnRunResult, 
 	}
 
 	var (
-		cmd     *exec.Cmd
+		cmd      *exec.Cmd
 		extraEnv = append(os.Environ(), "NO_COLOR=1")
 		tmpDir   string
 	)
 
 	switch family {
 	case familyClassic:
-		cmd = exec.CommandContext(ctx, resolved,
+		cmd = exec.CommandContext(
+			ctx, resolved,
 			"list",
 			"--depth=Infinity",
 			"--json",
@@ -102,16 +105,25 @@ func (e *yarnCmdExecutor) Run(ctx context.Context, dir string) (*yarnRunResult, 
 			return nil, fmt.Errorf("creating yarn temp dir: %w", err)
 		}
 		stateFile := filepath.Join(tmpDir, "install-state.gz")
-		cmd = exec.CommandContext(ctx, resolved,
+		cmd = exec.CommandContext(
+			ctx, resolved,
 			"info",
 			"--all",
 			"--recursive",
 			"--json",
 		)
-		extraEnv = append(extraEnv,
+		// `yarn info --all --recursive --json` walks the lockfile and does
+		// not need package contents — verified empirically against a fresh
+		// (empty) global folder. YARN_ENABLE_NETWORK=false turns that
+		// observation into an enforced contract: if a future Berry version,
+		// an unusual lockfile, or an unusual locator type ever needs to
+		// fetch, we fail loudly instead of silently downloading.
+		extraEnv = append(
+			extraEnv,
 			"YARN_GLOBAL_FOLDER="+tmpDir,
 			"YARN_ENABLE_GLOBAL_CACHE=true",
 			"YARN_INSTALL_STATE_PATH="+stateFile,
+			"YARN_ENABLE_NETWORK=false",
 		)
 
 	default:
@@ -171,7 +183,9 @@ func detectYarnFamily(ctx context.Context, binary, dir string) (yarnFamily, stri
 		return familyUnknown, "", err
 	}
 
-	major, _ := strconv.Atoi(strings.Split(ver, ".")[0])
+	// ver is "MAJOR.MINOR.PATCH" from parseYarnVersion's regex — first
+	// segment is guaranteed to be a numeric literal, so Atoi cannot fail.
+	major, _ := strconv.Atoi(strings.Split(ver, ".")[0]) //nolint:errcheck // regex group is \d+, cannot fail
 	switch {
 	case major == 1:
 		return familyClassic, ver, nil
