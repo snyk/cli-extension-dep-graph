@@ -102,6 +102,24 @@ func TestRushPnpm_NonPnpmAndSubspacesAreSkipped(t *testing.T) {
 	}
 }
 
+// A subspaces.json that exists but has subspacesEnabled:false is NOT a
+// subspaces repo — the monorepo-level lockfile is authoritative, so it must be
+// scanned exactly like the baseline workspace. Regression guard for the
+// file-exists-vs-field-value fix in rushSubspacesEnabled.
+func TestRushPnpm_SubspacesDisabledIsScanned(t *testing.T) {
+	requirePnpm(t)
+	results := run(t, filepath.Join("testdata", "rush-subspaces-disabled"))
+
+	require.Len(t, results, 2)
+	names := map[string]bool{}
+	for _, r := range results {
+		require.NoError(t, r.Error)
+		names[r.ProjectDescriptor.Identity.RootComponentName] = true
+	}
+	assert.True(t, names["@rush-fix/app-a"] && names["@rush-fix/lib-b"],
+		"disabled-subspaces repo should resolve both projects, got %v", names)
+}
+
 func graphJSON(t *testing.T, r ecosystems.SCAResult) string {
 	t.Helper()
 	require.NotNil(t, r.DepGraph)

@@ -2,6 +2,7 @@ package pnpm
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -30,10 +31,12 @@ const (
 // errRushNotPnpm is returned for an npm/yarn-backed Rush repo (pnpm-only scope).
 var errRushNotPnpm = errors.New("not a pnpm-backed Rush monorepo; only Rush + pnpm is supported")
 
-// errRushSubspaces is returned when subspaces are enabled (out of scope): the
+// errRushSubspaces is returned when subspaces are enabled (subspacesEnabled:
+// true in common/config/rush/subspaces.json) — out of scope: the
 // monorepo-level lockfile is forbidden, so scanning it would yield wrong
-// results. Skip rather than scan an incomplete lockfile.
-var errRushSubspaces = errors.New("rush subspaces are not yet supported (common/config/rush/subspaces.json present)")
+// results. Skip rather than scan an incomplete lockfile. A subspaces.json that
+// merely exists with the flag off is not subspaces; see rushSubspacesEnabled.
+var errRushSubspaces = errors.New("rush subspaces are not yet supported (subspacesEnabled: true in common/config/rush/subspaces.json)")
 
 // rush.json is JSONC (comments + trailing commas); test for fields rather than
 // JSON-parsing.
@@ -91,6 +94,23 @@ func rushTargets(ctx context.Context, log logger.Logger, rushDir string) ([]scan
 	}}, nil
 }
 
+// rushSubspacesEnabled reports whether the subspaces.json file at path exists
+// and contains "subspacesEnabled": true. If the file is absent, unreadable, or
+// does not contain the field, it returns false (the Rush default).
+func rushSubspacesEnabled(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var cfg struct {
+		SubspacesEnabled bool `json:"subspacesEnabled"`
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return false
+	}
+	return cfg.SubspacesEnabled
+}
+
 // stripJSONComments removes JSONC block and full-line comments from rush.json.
 func stripJSONComments(data []byte) []byte {
 	data = rushBlockCommentRe.ReplaceAll(data, nil)
@@ -113,7 +133,7 @@ func rushProjectFolders(rushDir string) ([]string, error) {
 	if !rushPnpmVersionRe.Match(data) {
 		return nil, errRushNotPnpm //nolint:wrapcheck // sentinel matched with errors.Is by the caller
 	}
-	if fileExists(filepath.Join(rushDir, filepath.FromSlash(rushSubspacesConfig))) {
+	if rushSubspacesEnabled(filepath.Join(rushDir, filepath.FromSlash(rushSubspacesConfig))) {
 		return nil, errRushSubspaces //nolint:wrapcheck // sentinel matched with errors.Is by the caller
 	}
 
