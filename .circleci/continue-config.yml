@@ -280,6 +280,7 @@ jobs:
       - prodsec/security_scans:
           mode: auto
           iac-scan: disabled
+          open-source-additional-arguments: --exclude=testdata
 
   determine-version:
     <<: *go_image
