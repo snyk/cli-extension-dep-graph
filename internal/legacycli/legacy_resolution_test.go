@@ -199,6 +199,11 @@ func Test_LegacyResolution(t *testing.T) {
 			value:    "net9.3",
 			expected: "--dotnet-target-framework=net9.3",
 		},
+		{
+			key:      workflow.FlagIncludeComponentMetadata,
+			value:    true,
+			expected: "--include-component-metadata",
+		},
 	}
 
 	for _, tc := range options {
