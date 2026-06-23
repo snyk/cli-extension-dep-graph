@@ -274,6 +274,11 @@ func PrepareLegacyFlags(argument string, cfg configuration.Configuration, logger
 		logger.Print("Include provenance: true")
 	}
 
+	if cfg.GetBool(workflow.FlagIncludeComponentMetadata) {
+		cmdArgs = append(cmdArgs, "--include-component-metadata")
+		logger.Print("Include component metadata: true")
+	}
+
 	if cfg.IsSet(workflow.FlagDotnetRuntimeResolution) {
 		dotnetRuntimeResolution := cfg.GetBool(workflow.FlagDotnetRuntimeResolution)
 		cmdArgs = append(cmdArgs, fmt.Sprintf("--dotnet-runtime-resolution=%t", dotnetRuntimeResolution))

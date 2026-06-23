@@ -41,6 +41,7 @@ func getFlagSet() *pflag.FlagSet {
 	flagSet.String(workflow.FlagNugetPkgsFolder, "", "Specify a custom path to the packages folder when using NuGet.")
 	flagSet.Int(workflow.FlagUnmanagedMaxDepth, 0, "Specify the maximum level of archive extraction for unmanaged scanning.")
 	flagSet.Bool(workflow.FlagIncludeProvenance, false, "Include checksums in purl to support package provenance.")
+	flagSet.Bool(workflow.FlagIncludeComponentMetadata, false, "Include component metadata (e.g. hashes, distribution URLs) as node labels.")
 	flagSet.String(workflow.FlagExcludePaths, "", "Comma-separated paths to exclude from scanning.")
 	flagSet.Bool(workflow.FlagUseSBOMResolution, false, "Use SBOM resolution instead of legacy CLI.")
 	flagSet.Bool(workflow.FlagPrintEffectiveGraph, false, "Return the pruned dependency graph.")

@@ -30,6 +30,7 @@ const (
 	FlagNugetPkgsFolder               = "packages-folder"
 	FlagUnmanagedMaxDepth             = "max-depth"
 	FlagIncludeProvenance             = "include-provenance"
+	FlagIncludeComponentMetadata      = "include-component-metadata"
 	FlagUseSBOMResolution             = "use-sbom-resolution"
 	FlagPrintEffectiveGraph           = "effective-graph"
 	FlagPrintEffectiveGraphWithErrors = "effective-graph-with-errors"
