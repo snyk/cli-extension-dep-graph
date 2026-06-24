@@ -156,6 +156,13 @@ func depGraphOutputToSCAResult(ctx context.Context, log logger.Logger, output *p
 		if rootPkg := dg.GetRootPkg(); rootPkg != nil {
 			result.ProjectDescriptor.Identity.RootComponentName = rootPkg.Info.Name
 		}
+
+		// The Python plugin omits targetFileFromPlugin for pip projects; normalisedTargetFile
+		// (e.g. requirements.txt) is the correct manifest to use as the fallback in that case.
+		if dg.PkgManager.Name == "pip" && result.ProjectDescriptor.Identity.TargetFile == nil && output.NormalisedTargetFile != "" {
+			tf := output.NormalisedTargetFile
+			result.ProjectDescriptor.Identity.TargetFile = &tf
+		}
 	}
 
 	return result

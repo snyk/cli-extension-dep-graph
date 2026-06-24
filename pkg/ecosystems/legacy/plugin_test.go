@@ -51,9 +51,10 @@ func TestPlugin_MapsTargetFramework(t *testing.T) {
 
 // TestPlugin_TargetFileForwarding verifies the plugin forwards the legacy CLI's
 // `targetFileFromPlugin` field verbatim onto Identity.TargetFile, and its
-// `normalisedTargetFile` onto ResolverMetadata.NormalisedTargetFile. Downstream
-// emission of MetaKeyTargetFileFromPlugin depends on Identity.TargetFile's nilness
-// exactly matching the CLI's own.
+// `normalisedTargetFile` onto ResolverMetadata.NormalisedTargetFile. For pip projects
+// the Python plugin omits `targetFileFromPlugin`; the plugin falls back to
+// `normalisedTargetFile` (e.g. requirements.txt). For other ecosystems (e.g. npm)
+// `targetFileFromPlugin` is omitted intentionally; Identity.TargetFile stays nil.
 func TestPlugin_TargetFileForwarding(t *testing.T) {
 	cases := map[string]struct {
 		body                 string
@@ -70,15 +71,20 @@ func TestPlugin_TargetFileForwarding(t *testing.T) {
 			wantNormalisedTarget: "build.gradle.kts",
 			wantPluginTargetFile: stringPtr("something-else.kts"),
 		},
-		"CLI omits targetFileFromPlugin → forwarded as nil": {
+		"CLI omits targetFileFromPlugin for npm → forwarded as nil (lockfile, not manifest)": {
 			body:                 `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package-lock.json"}`,
 			wantNormalisedTarget: "package-lock.json",
 			wantPluginTargetFile: nil,
 		},
-		"CLI omits targetFileFromPlugin even when workspace is set": {
+		"CLI omits targetFileFromPlugin for npm even when workspace is set → forwarded as nil": {
 			body:                 `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package-lock.json","workspace":{"type":"npm"}}`,
 			wantNormalisedTarget: "package-lock.json",
 			wantPluginTargetFile: nil,
+		},
+		"CLI omits targetFileFromPlugin for pip → falls back to normalisedTargetFile": {
+			body:                 `{"depGraph":{"pkgManager":{"name":"pip"}},"normalisedTargetFile":"requirements.txt"}`,
+			wantNormalisedTarget: "requirements.txt",
+			wantPluginTargetFile: stringPtr("requirements.txt"),
 		},
 	}
 
