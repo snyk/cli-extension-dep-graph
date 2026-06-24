@@ -84,6 +84,26 @@ func NewPluginOptions() *SCAPluginOptions {
 	}
 }
 
+// Clone returns a deep copy of o. Slice fields are copied so mutations through
+// the returned options (e.g. appending to ExcludePaths) cannot leak into the
+// original. *string fields share storage because strings are immutable.
+func (o *SCAPluginOptions) Clone() *SCAPluginOptions {
+	if o == nil {
+		return nil
+	}
+	clone := *o
+	if o.Global.Exclude != nil {
+		clone.Global.Exclude = append(CommaSeparatedString(nil), o.Global.Exclude...)
+	}
+	if o.Global.ExcludePaths != nil {
+		clone.Global.ExcludePaths = append(CommaSeparatedString(nil), o.Global.ExcludePaths...)
+	}
+	if o.Global.RawFlags != nil {
+		clone.Global.RawFlags = append([]string(nil), o.Global.RawFlags...)
+	}
+	return &clone
+}
+
 func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) {
 	var args struct {
 		GlobalOptions
@@ -134,17 +154,32 @@ func (o *SCAPluginOptions) WithIncludeDev(includeDev bool) *SCAPluginOptions {
 }
 
 func (o *SCAPluginOptions) WithRawFlags(rawflags string) *SCAPluginOptions {
-	o.Global.RawFlags = append(o.Global.RawFlags, rawflags)
+	merged := make([]string, len(o.Global.RawFlags)+1)
+	copy(merged, o.Global.RawFlags)
+	merged[len(o.Global.RawFlags)] = rawflags
+	o.Global.RawFlags = merged
 	return o
 }
 
 func (o *SCAPluginOptions) WithExclude(exclude []string) *SCAPluginOptions {
-	o.Global.Exclude = append(o.Global.Exclude, exclude...)
+	if len(exclude) == 0 {
+		return o
+	}
+	merged := make(CommaSeparatedString, len(o.Global.Exclude)+len(exclude))
+	copy(merged, o.Global.Exclude)
+	copy(merged[len(o.Global.Exclude):], exclude)
+	o.Global.Exclude = merged
 	return o
 }
 
 func (o *SCAPluginOptions) WithExcludePaths(excludePaths []string) *SCAPluginOptions {
-	o.Global.ExcludePaths = append(o.Global.ExcludePaths, excludePaths...)
+	if len(excludePaths) == 0 {
+		return o
+	}
+	merged := make(CommaSeparatedString, len(o.Global.ExcludePaths)+len(excludePaths))
+	copy(merged, o.Global.ExcludePaths)
+	copy(merged[len(o.Global.ExcludePaths):], excludePaths)
+	o.Global.ExcludePaths = merged
 	return o
 }
 
