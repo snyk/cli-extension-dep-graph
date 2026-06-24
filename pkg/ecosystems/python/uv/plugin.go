@@ -67,23 +67,26 @@ func (p Plugin) BuildDepGraphsFromDir(
 	for _, file := range files {
 		lockFilePath := file.RelPath // e.g., "uv.lock" or "project1/uv.lock"
 		lockFileDir := filepath.Dir(lockFilePath)
+		// Run uv from the discovered project directory; identity paths stay root-relative.
+		exportDir := filepath.Dir(file.Path)
 		log.Info(ctx, "Building dependency graph", logger.Attr("lockFile", lockFilePath)) //nolint:goconst // logger key, not worth a constant
 
-		sbom, err := p.client.ExportSBOM(lockFileDir, options)
+		sbom, err := p.client.ExportSBOM(exportDir, options)
 		if err != nil {
 			log.Error(ctx, "Failed to build dependency graph", logger.Attr("lockFile", lockFilePath), logger.Err(err))
 			wrappedErr := fmt.Errorf("failed to build dependency graph for %s: %w", lockFilePath, err)
 
+			manifestFile := manifestPathForRoot(lockFileDir)
 			if emitErr := onGraph(scaecosystems.SCAResult{
 				ProjectDescriptor: identity.ProjectDescriptor{
 					Identity: identity.ProjectIdentity{
 						ProjectType: "uv",
-						TargetFile:  &lockFilePath,
+						TargetFile:  &manifestFile,
 					},
 				},
 				ResolverMetadata: &scaecosystems.ResolverMetadata{
 					PluginName:           PluginName,
-					NormalisedTargetFile: lockFilePath,
+					NormalisedTargetFile: manifestFile,
 				},
 				Error: wrappedErr,
 			}); emitErr != nil {
@@ -130,16 +133,17 @@ func (p Plugin) buildResults(
 		noRootErr := ecosystems.NewUvNoProjectRootError(
 			"Found uv workspace with no root project. To scan all workspace members use the --all-projects flag.",
 		)
+		manifestFile := manifestPathForRoot(lockFileDir)
 		return 1, onGraph(scaecosystems.SCAResult{
 			ProjectDescriptor: identity.ProjectDescriptor{
 				Identity: identity.ProjectIdentity{
 					ProjectType: "uv",
-					TargetFile:  &lockFilePath,
+					TargetFile:  &manifestFile,
 				},
 			},
 			ResolverMetadata: &scaecosystems.ResolverMetadata{
 				PluginName:           PluginName,
-				NormalisedTargetFile: lockFilePath,
+				NormalisedTargetFile: manifestFile,
 			},
 			Error: noRootErr,
 		})
@@ -157,7 +161,7 @@ func (p Plugin) buildResults(
 		depGraphs = filterDepGraphsByName(depGraphs, workspaceMember)
 		if len(depGraphs) == 0 {
 			log.Info(ctx, "Workspace package not found", logger.Attr("workspacePackage", workspaceMember), logger.Attr("lockFile", lockFilePath))
-			return 1, onGraph(workspacePackageNotFoundResult(workspaceMember, lockFilePath))
+			return 1, onGraph(workspacePackageNotFoundResult(workspaceMember, manifestPathForRoot(lockFileDir)))
 		}
 	}
 
@@ -174,6 +178,15 @@ func (p Plugin) buildResults(
 	return emitted, nil
 }
 
+// manifestPathForRoot returns the pyproject.toml path used for uv project identity.
+// lockFileDir is relative to the input directory; "." maps to the bare filename.
+func manifestPathForRoot(lockFileDir string) string {
+	if lockFileDir == "." {
+		return PyprojectTomlFileName
+	}
+	return filepath.Join(lockFileDir, PyprojectTomlFileName)
+}
+
 // buildSCAResult constructs the SCAResult for a single dep-graph, deriving the
 // manifest path and processed files from the (optional) workspace package.
 func buildSCAResult(depGraph *depgraph.DepGraph, lockFileDir string, workspacePackage *WorkspacePackage) scaecosystems.SCAResult {
@@ -181,10 +194,8 @@ func buildSCAResult(depGraph *depgraph.DepGraph, lockFileDir string, workspacePa
 	switch {
 	case workspacePackage != nil:
 		manifestFile = filepath.Join(lockFileDir, workspacePackage.Path, PyprojectTomlFileName)
-	case lockFileDir == ".":
-		manifestFile = PyprojectTomlFileName
 	default:
-		manifestFile = filepath.Join(lockFileDir, PyprojectTomlFileName)
+		manifestFile = manifestPathForRoot(lockFileDir)
 	}
 
 	packagePath := lockFileDir
@@ -298,19 +309,18 @@ func filterDepGraphsByName(depGraphs []*depgraph.DepGraph, name string) []*depgr
 	return filtered
 }
 
-// workspacePackageNotFoundResult builds a single errored result for a requested
-// workspace member that is not present in the exported workspace.
-func workspacePackageNotFoundResult(pkg, lockFilePath string) scaecosystems.SCAResult {
+// workspacePackageNotFoundResult builds an errored result for a missing workspace member.
+func workspacePackageNotFoundResult(pkg, manifestFile string) scaecosystems.SCAResult {
 	return scaecosystems.SCAResult{
 		ProjectDescriptor: identity.ProjectDescriptor{
 			Identity: identity.ProjectIdentity{
 				ProjectType: "uv",
-				TargetFile:  &lockFilePath,
+				TargetFile:  &manifestFile,
 			},
 		},
 		ResolverMetadata: &scaecosystems.ResolverMetadata{
 			PluginName:           PluginName,
-			NormalisedTargetFile: lockFilePath,
+			NormalisedTargetFile: manifestFile,
 		},
 		Error: clierrors.NewGeneralSCAFailureError(fmt.Sprintf("Workspace package '%s' not found.", pkg)),
 	}

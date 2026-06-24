@@ -244,9 +244,15 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 
 			findings := results
 
-			// Verify correct directories were processed
 			gotDirs := mockClient.CalledDirs
-			expectedDirs := append([]string{}, tt.expectedDirs...)
+			expectedDirs := make([]string, 0, len(tt.expectedDirs))
+			for _, d := range tt.expectedDirs {
+				if d == "." {
+					expectedDirs = append(expectedDirs, tmpDir)
+				} else {
+					expectedDirs = append(expectedDirs, filepath.Join(tmpDir, d))
+				}
+			}
 			sort.Strings(gotDirs)
 			sort.Strings(expectedDirs)
 
@@ -349,7 +355,8 @@ func TestPlugin_ShouldNotSkipProcessingWhenTargetFileIsRelativeFolderPath(t *tes
 
 	require.Len(t, findings, 1, "Should return findings for the specific uv.lock file")
 	require.NotEmpty(t, mockClient.CalledDirs, "Should have called the uv client")
-	require.Equal(t, "my-project", mockClient.CalledDirs[0], "Should have called uv client with the correct directory")
+	require.Equal(t, filepath.Join(tmpDir, "my-project"), mockClient.CalledDirs[0],
+		"Should have called uv client with the correct absolute directory")
 }
 
 func TestPlugin_ShouldSkipProcessingWhenTargetFileIsNotUvLockInRelativeFolderPath(t *testing.T) {
@@ -409,27 +416,26 @@ func TestPlugin_BuildDepGraphsFromDir_ErrorHandling(t *testing.T) {
 	require.NotNil(t, findings[0].Error)
 	require.ErrorContains(t, findings[0].Error, "failed to build dependency graph")
 
-	require.Equal(t, "uv.lock", findings[0].ResolverMetadata.NormalisedTargetFile)
+	require.Equal(t, "pyproject.toml", findings[0].ResolverMetadata.NormalisedTargetFile)
+	require.NotNil(t, findings[0].ProjectDescriptor.Identity.TargetFile)
+	require.Equal(t, "pyproject.toml", *findings[0].ProjectDescriptor.Identity.TargetFile)
 	require.Nil(t, findings[0].DepGraph)
 }
 
 func TestPlugin_BuildDepGraphsFromDir_MixedSuccessAndFailure(t *testing.T) {
-	// Create multiple lock files
 	tmpDir := createFiles(t,
 		"uv.lock",
 		"project1/uv.lock",
 		"project2/uv.lock",
 	)
 
-	// Setup mock to fail for project1 but succeed for others
 	mockClient := &MockClient{
 		ErrorDirs: map[string]error{
-			"project1": errors.New("uv export failed"),
+			filepath.Join(tmpDir, "project1"): errors.New("uv export failed"),
 		},
 	}
 	ctx := context.Background()
 	options := ecosystems.NewPluginOptions().WithAllProjects(true)
-	// project1 fails at ExportSBOM (before conversion), so the converter is only called for "." and "project2".
 	plugin := NewPlugin(mockClient, mockConverter(createTestDepGraph("mock-project", "1.0.0")), "")
 	results, err := scatest.Run(ctx, plugin, testLogger, tmpDir, options)
 	findings := results
@@ -437,7 +443,6 @@ func TestPlugin_BuildDepGraphsFromDir_MixedSuccessAndFailure(t *testing.T) {
 
 	require.Len(t, findings, 3)
 
-	// Count successful vs error findings
 	successCount := 0
 	errorCount := 0
 	var errorFinding *ecosystems.SCAResult
@@ -454,7 +459,9 @@ func TestPlugin_BuildDepGraphsFromDir_MixedSuccessAndFailure(t *testing.T) {
 
 	require.NotNil(t, errorFinding)
 	require.ErrorContains(t, errorFinding.Error, "failed to build dependency graph")
-	require.Equal(t, "project1/uv.lock", errorFinding.ResolverMetadata.NormalisedTargetFile)
+	require.Equal(t, filepath.Join("project1", "pyproject.toml"), errorFinding.ResolverMetadata.NormalisedTargetFile)
+	require.NotNil(t, errorFinding.ProjectDescriptor.Identity.TargetFile)
+	require.Equal(t, filepath.Join("project1", "pyproject.toml"), *errorFinding.ProjectDescriptor.Identity.TargetFile)
 	require.Nil(t, errorFinding.DepGraph)
 }
 
@@ -521,7 +528,9 @@ func TestBuildFindings_NoProjectRoot_ReturnsErrorFinding(t *testing.T) {
 	require.NotNil(t, findings[0].Error)
 	assert.Contains(t, findings[0].Error.Error(), "No root project found")
 	assert.Nil(t, findings[0].DepGraph)
-	assert.Equal(t, "uv.lock", findings[0].ResolverMetadata.NormalisedTargetFile)
+	assert.Equal(t, "pyproject.toml", findings[0].ResolverMetadata.NormalisedTargetFile)
+	require.NotNil(t, findings[0].ProjectDescriptor.Identity.TargetFile)
+	assert.Equal(t, "pyproject.toml", *findings[0].ProjectDescriptor.Identity.TargetFile)
 
 	var catalogErr snyk_errors.Error
 	require.True(t, errors.As(findings[0].Error, &catalogErr), "error should be a catalog error")
@@ -1060,6 +1069,136 @@ func TestPlugin_DiscoverLockFiles(t *testing.T) {
 				"Expected files %v, got %v", tt.expectedFiles, relPaths)
 		})
 	}
+}
+
+// Regression coverage for absolute --file project identity.
+func TestPlugin_AbsoluteTargetFile_ProducesSameIdentityAsRelative(t *testing.T) {
+	t.Run("--file is absolute path to uv.lock at project root", func(t *testing.T) {
+		tmpDir := createFiles(t, "uv.lock", "pyproject.toml")
+		absLockFile := filepath.Join(tmpDir, "uv.lock")
+		require.True(t, filepath.IsAbs(absLockFile), "test setup: path must be absolute")
+
+		mockClient := &MockClient{}
+		plugin := NewPlugin(mockClient, mockConverter(createTestDepGraph("smb-api", "1.0.0")), "")
+
+		opts := ecosystems.NewPluginOptions().WithTargetFile(absLockFile)
+		results, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, opts)
+
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		require.NoError(t, results[0].Error)
+
+		require.NotNil(t, results[0].ProjectDescriptor.Identity.TargetFile)
+		assert.Equal(t, "pyproject.toml", *results[0].ProjectDescriptor.Identity.TargetFile)
+		assert.Equal(t, "pyproject.toml", results[0].ResolverMetadata.NormalisedTargetFile)
+	})
+
+	t.Run("--file is absolute path to uv.lock in nested project dir", func(t *testing.T) {
+		tmpDir := createFiles(t, "nested/uv.lock", "nested/pyproject.toml")
+		absLockFile := filepath.Join(tmpDir, "nested", "uv.lock")
+		require.True(t, filepath.IsAbs(absLockFile), "test setup: path must be absolute")
+
+		mockClient := &MockClient{}
+		plugin := NewPlugin(mockClient, mockConverter(createTestDepGraph("smb-api", "1.0.0")), "")
+
+		opts := ecosystems.NewPluginOptions().WithTargetFile(absLockFile)
+		results, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, opts)
+
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		require.NoError(t, results[0].Error)
+
+		expected := filepath.Join("nested", "pyproject.toml")
+		require.NotNil(t, results[0].ProjectDescriptor.Identity.TargetFile)
+		assert.Equal(t, expected, *results[0].ProjectDescriptor.Identity.TargetFile)
+		assert.Equal(t, expected, results[0].ResolverMetadata.NormalisedTargetFile)
+	})
+
+	t.Run("absolute and relative --file produce identical identity", func(t *testing.T) {
+		tmpDir := createFiles(t, "uv.lock", "pyproject.toml")
+
+		mockClient := &MockClient{}
+		plugin := NewPlugin(mockClient, mockConverter(createTestDepGraph("smb-api", "1.0.0")), "")
+
+		relOpts := ecosystems.NewPluginOptions().WithTargetFile("uv.lock")
+		relResults, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, relOpts)
+		require.NoError(t, err)
+		require.Len(t, relResults, 1)
+
+		absOpts := ecosystems.NewPluginOptions().WithTargetFile(filepath.Join(tmpDir, "uv.lock"))
+		absResults, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, absOpts)
+		require.NoError(t, err)
+		require.Len(t, absResults, 1)
+
+		require.NotNil(t, relResults[0].ProjectDescriptor.Identity.TargetFile)
+		require.NotNil(t, absResults[0].ProjectDescriptor.Identity.TargetFile)
+		assert.Equal(t,
+			*relResults[0].ProjectDescriptor.Identity.TargetFile,
+			*absResults[0].ProjectDescriptor.Identity.TargetFile,
+			"absolute and relative --file must emit the same project identity")
+		assert.Equal(t,
+			relResults[0].ResolverMetadata.NormalisedTargetFile,
+			absResults[0].ResolverMetadata.NormalisedTargetFile,
+		)
+	})
+}
+
+// uv must execute from the discovered project directory, not the caller's cwd.
+func TestPlugin_ExportSBOM_ReceivesAbsoluteDir(t *testing.T) {
+	t.Run("relative --file at project root", func(t *testing.T) {
+		tmpDir := createFiles(t, "uv.lock", "pyproject.toml")
+
+		mockClient := &MockClient{}
+		plugin := NewPlugin(mockClient, mockConverter(createTestDepGraph("p", "1.0.0")), "")
+
+		opts := ecosystems.NewPluginOptions().WithTargetFile("uv.lock")
+		_, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, opts)
+		require.NoError(t, err)
+
+		require.Len(t, mockClient.CalledDirs, 1)
+		got := mockClient.CalledDirs[0]
+		assert.True(t, filepath.IsAbs(got),
+			"ExportSBOM must receive an absolute dir, got %q", got)
+		assert.Equal(t, tmpDir, got)
+	})
+
+	t.Run("absolute --file in nested project dir", func(t *testing.T) {
+		tmpDir := createFiles(t, "nested/uv.lock", "nested/pyproject.toml")
+		absLockFile := filepath.Join(tmpDir, "nested", "uv.lock")
+
+		mockClient := &MockClient{}
+		plugin := NewPlugin(mockClient, mockConverter(createTestDepGraph("p", "1.0.0")), "")
+
+		opts := ecosystems.NewPluginOptions().WithTargetFile(absLockFile)
+		_, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, opts)
+		require.NoError(t, err)
+
+		require.Len(t, mockClient.CalledDirs, 1)
+		got := mockClient.CalledDirs[0]
+		assert.True(t, filepath.IsAbs(got))
+		assert.Equal(t, filepath.Join(tmpDir, "nested"), got)
+	})
+
+	t.Run("--all-projects passes absolute dir for every discovered lockfile", func(t *testing.T) {
+		tmpDir := createFiles(t,
+			"uv.lock",
+			"project1/uv.lock",
+			"project2/uv.lock",
+		)
+
+		mockClient := &MockClient{}
+		plugin := NewPlugin(mockClient, mockConverter(createTestDepGraph("p", "1.0.0")), "")
+
+		opts := ecosystems.NewPluginOptions().WithAllProjects(true)
+		_, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, opts)
+		require.NoError(t, err)
+
+		require.Len(t, mockClient.CalledDirs, 3)
+		for _, d := range mockClient.CalledDirs {
+			assert.True(t, filepath.IsAbs(d),
+				"every ExportSBOM call must receive an absolute dir, got %q", d)
+		}
+	})
 }
 
 // Helper to create files.
