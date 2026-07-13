@@ -1,0 +1,12 @@
+module(name = "conditional_deps_select_no_default")
+
+# Minimal rules_go setup. Deliberately no gazelle / go_deps: this fixture has
+# no external Go modules — its purpose is to reproduce the exact bazel error
+# an *unrelated* target's select() (no //conditions:default) produces during
+# target discovery over //..., independent of whether that target is a
+# dependency of anything being resolved. See broken/BUILD.bazel and the
+# README.
+bazel_dep(name = "rules_go", version = "0.60.0")
+
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.download(version = "1.23.4")

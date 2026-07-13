@@ -13,7 +13,7 @@ import (
 type bazelDependencyResolver interface {
 	packageManagerName() string
 	findTargets(ctx context.Context, options *ecosystems.SCAPluginOptions) ([]string, error)
-	buildDepGraph(ctx context.Context, targetName string) (*depgraph.DepGraph, error)
+	buildDepGraph(ctx context.Context, targetName string, options *ecosystems.SCAPluginOptions) (*depgraph.DepGraph, error)
 	processedFiles() []string
 }
 

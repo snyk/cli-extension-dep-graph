@@ -65,7 +65,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	emitted := 0
 	for _, target := range targets {
-		graph, err := resolver.buildDepGraph(ctx, target)
+		graph, err := resolver.buildDepGraph(ctx, target, options)
 		if err != nil {
 			log.Error(ctx, "failed to build graph for bazel target", logger.Attr("target", target), logger.Err(err))
 			continue

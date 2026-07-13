@@ -1,0 +1,51 @@
+# Mirrors rules_distroless' apt dpkg_status target: a select() with no
+# //conditions:default, structurally unrelated to //:app (no dependency edge
+# in either direction, and not even the same rule kind). See the README for
+# why this structure — rather than a select() on //:app's own deps — is the
+# faithful reproduction of the original bug.
+#
+# The real dpkg_status keys its select() on @platforms//os and
+# @platforms//cpu, which is what made the original bug host-dependent: it
+# broke on the client's macOS but would resolve fine on a linux/amd64 or
+# linux/arm64 CI runner (confirmed empirically — verified in this repo's
+# session history that CI's `cimg/go` image is exactly linux/amd64, and a
+# linux_amd64/linux_arm64-keyed select "passes" there even under the pre-fix
+# code, purely because the host's own auto-detected platform happens to
+# satisfy one branch). That would make this fixture non-deterministic across
+# environments and give a false sense of regression coverage in CI.
+#
+# constraint_setting/value below is deliberately custom, not tied to
+# @platforms//os or @platforms//cpu: a host's auto-detected default platform
+# never assigns a value to a constraint_setting it doesn't know about, so
+# neither select() branch can ever match on any host, regardless of OS or
+# architecture — verified locally, including with --platforms explicitly set
+# to a linux/amd64 platform.
+constraint_setting(name = "flavor")
+
+constraint_value(
+    name = "flavor_a",
+    constraint_setting = ":flavor",
+)
+
+constraint_value(
+    name = "flavor_b",
+    constraint_setting = ":flavor",
+)
+
+config_setting(
+    name = "is_flavor_a",
+    constraint_values = [":flavor_a"],
+)
+
+config_setting(
+    name = "is_flavor_b",
+    constraint_values = [":flavor_b"],
+)
+
+filegroup(
+    name = "dpkg_status_like",
+    srcs = select({
+        ":is_flavor_a": ["status.txt"],
+        ":is_flavor_b": ["status.txt"],
+    }),
+)

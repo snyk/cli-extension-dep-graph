@@ -1,0 +1,10 @@
+load("@rules_go//go:def.bzl", "go_binary")
+
+# Plain go_binary with no select() of its own. It has zero dependency
+# relationship to //broken:dpkg_status_like — see that package and the
+# README for why the fixture is structured this way.
+go_binary(
+    name = "app",
+    srcs = ["app.go"],
+    visibility = ["//visibility:public"],
+)

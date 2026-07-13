@@ -42,7 +42,7 @@ func newJVMExternalResolver(dir string) (bazelDependencyResolver, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &jvmExternalResolver{dir, lookup}, nil
+	return &jvmExternalResolver{dir: dir, lookup: lookup}, nil
 }
 
 func createMavenLookup(path string) (mavenLookup, error) {
@@ -138,17 +138,17 @@ func (r *jvmExternalResolver) findTargets(ctx context.Context, options *ecosyste
 		query = options.Bazel.TargetQuery
 	}
 
-	output, err := bazelQuery(ctx, r.dir, query)
+	results, err := bazelStreamedQuery(ctx, r.dir, query)
 	if err != nil {
 		return nil, fmt.Errorf(errQueryBazelTargetsFmt, err)
 	}
 
 	var targets []string
-	for _, result := range output.Results {
-		if result.Target == nil || result.Target.Rule == nil {
+	for _, t := range results {
+		if t.Rule == nil {
 			continue
 		}
-		if n := result.Target.Rule.Name; n != "" {
+		if n := t.Rule.Name; n != "" {
 			targets = append(targets, n)
 		}
 	}
@@ -156,8 +156,8 @@ func (r *jvmExternalResolver) findTargets(ctx context.Context, options *ecosyste
 	return targets, nil
 }
 
-func (r *jvmExternalResolver) buildDepGraph(ctx context.Context, targetName string) (*depgraph.DepGraph, error) {
-	labelDeps, err := r.queryDeps(ctx, targetName)
+func (r *jvmExternalResolver) buildDepGraph(ctx context.Context, targetName string, options *ecosystems.SCAPluginOptions) (*depgraph.DepGraph, error) {
+	labelDeps, err := r.queryDeps(ctx, targetName, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query dependencies: %w", err)
 	}
@@ -209,9 +209,14 @@ func getParentNodeID(builder *depgraph.Builder, rootLabel, label string) string 
 }
 
 // queryDeps performs a bazel deps query and constructs a lookup of label dependencies.
-func (r *jvmExternalResolver) queryDeps(ctx context.Context, targetName string) (map[string][]string, error) {
+func (r *jvmExternalResolver) queryDeps(ctx context.Context, targetName string, options *ecosystems.SCAPluginOptions) (map[string][]string, error) {
+	var platforms string
+	if options != nil {
+		platforms = options.Bazel.Platforms
+	}
+
 	query := "deps(" + targetName + ")"
-	output, err := bazelQuery(ctx, r.dir, query)
+	output, err := bazelCquery(ctx, r.dir, query, platforms)
 	if err != nil {
 		return nil, fmt.Errorf("bazel cquery failed %s: %w", query, err)
 	}
