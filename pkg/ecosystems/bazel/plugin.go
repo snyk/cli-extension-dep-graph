@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
@@ -52,6 +53,10 @@ func (p Plugin) BuildDepGraphsFromDir(
 	if err != nil {
 		return fmt.Errorf(errQueryBazelTargetsFmt, err)
 	}
+	// bazel query's emission order is not guaranteed stable across runs or
+	// bazel versions; sort so target enumeration (and result ordering) is
+	// deterministic regardless.
+	sort.Strings(targets)
 	log.Debug(ctx, "found bazel targets", logger.Attr("targets", targets))
 
 	if err := checkTargetLimit(len(targets), options); err != nil {
