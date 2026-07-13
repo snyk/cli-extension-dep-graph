@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/scatest"
 )
 
@@ -48,7 +47,7 @@ func runGoIntegrationSnapshot(t *testing.T, fixtures []string) {
 
 			opts := ecosystems.NewPluginOptions().WithBazelGo(true)
 			plugin := Plugin{}
-			results, err := scatest.Run(ctx, plugin, logger.Nop(), root, opts)
+			results, err := scatest.Run(ctx, plugin, debugLogger(), root, opts)
 			require.NoError(t, err)
 
 			// Paths differ by machine; assert filenames only, snapshot
@@ -107,12 +106,14 @@ func TestPlugin_BuildDepGraphsFromDir_ConditionalDepsSelect_MatchJSON(t *testing
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			bazelShutdown(t, root)
+
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 			defer cancel()
 
 			opts := ecosystems.NewPluginOptions().WithBazelGo(true).WithBazelPlatforms(tc.platforms)
 			plugin := Plugin{}
-			results, err := scatest.Run(ctx, plugin, logger.Nop(), root, opts)
+			results, err := scatest.Run(ctx, plugin, debugLogger(), root, opts)
 			require.NoError(t, err)
 			require.NotEmpty(t, results)
 
@@ -159,7 +160,7 @@ func TestPlugin_BuildDepGraphsFromDir_ConditionalDepsSelectNoDefault(t *testing.
 
 	opts := ecosystems.NewPluginOptions().WithBazelGo(true)
 	plugin := Plugin{}
-	results, err := scatest.Run(ctx, plugin, logger.Nop(), root, opts)
+	results, err := scatest.Run(ctx, plugin, debugLogger(), root, opts)
 
 	// The regression: this must never error, on any host, with no
 	// --bazel-platforms needed. Before the discovery fix (cquery -> query),
