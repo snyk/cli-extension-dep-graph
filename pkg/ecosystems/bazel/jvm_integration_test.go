@@ -37,6 +37,7 @@ func TestPlugin_BuildDepGraphsFromDir_MatchJSON(t *testing.T) {
 
 			root, err := filepath.Abs(filepath.Join("..", "testdata", "fixtures", "bazel", fixture))
 			require.NoError(t, err)
+			t.Cleanup(func() { bazelShutdown(t, root) })
 
 			opts := ecosystems.NewPluginOptions().WithBazelJvm(true)
 			plugin := Plugin{}
@@ -71,6 +72,7 @@ func TestPlugin_BuildDepGraphsFromDir_AndriodBinary_MatchJSON(t *testing.T) {
 
 	root, err := filepath.Abs(filepath.Join("..", "testdata", "fixtures", "bazel", fixture))
 	require.NoError(t, err)
+	t.Cleanup(func() { bazelShutdown(t, root) })
 
 	opts := ecosystems.NewPluginOptions().
 		WithBazelJvm(true).
@@ -92,6 +94,7 @@ func TestPlugin_BuildDepGraphsFromDir_JavaExport_MatchJSON(t *testing.T) {
 
 	root, err := filepath.Abs(filepath.Join("..", "testdata", "fixtures", "bazel", fixture))
 	require.NoError(t, err)
+	t.Cleanup(func() { bazelShutdown(t, root) })
 
 	opts := ecosystems.NewPluginOptions().
 		WithBazelJvm(true).
@@ -113,6 +116,7 @@ func TestPlugin_BuildDepGraphsFromDir_ScalaBinary_MatchJSON(t *testing.T) {
 
 	root, err := filepath.Abs(filepath.Join("..", "testdata", "fixtures", "bazel", fixture))
 	require.NoError(t, err)
+	t.Cleanup(func() { bazelShutdown(t, root) })
 
 	opts := ecosystems.NewPluginOptions().
 		WithBazelJvm(true).

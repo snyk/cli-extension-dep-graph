@@ -44,6 +44,7 @@ func runGoIntegrationSnapshot(t *testing.T, fixtures []string) {
 
 			root, err := filepath.Abs(filepath.Join("..", "testdata", "fixtures", "bazel", fixture))
 			require.NoError(t, err)
+			t.Cleanup(func() { bazelShutdown(t, root) })
 
 			opts := ecosystems.NewPluginOptions().WithBazelGo(true)
 			plugin := Plugin{}
@@ -106,7 +107,7 @@ func TestPlugin_BuildDepGraphsFromDir_ConditionalDepsSelect_MatchJSON(t *testing
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			bazelShutdown(t, root)
+			t.Cleanup(func() { bazelShutdown(t, root) })
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 			defer cancel()
@@ -157,6 +158,7 @@ func TestPlugin_BuildDepGraphsFromDir_ConditionalDepsSelectNoDefault(t *testing.
 
 	root, err := filepath.Abs(filepath.Join("..", "testdata", "fixtures", "bazel", "rules-go-0.60.0", "conditional-deps-select-no-default"))
 	require.NoError(t, err)
+	t.Cleanup(func() { bazelShutdown(t, root) })
 
 	opts := ecosystems.NewPluginOptions().WithBazelGo(true)
 	plugin := Plugin{}

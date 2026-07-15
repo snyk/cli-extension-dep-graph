@@ -26,16 +26,24 @@ func debugLogger() logger.Logger {
 	return logger.NewFromSlog(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
 }
 
-// bazelShutdown kills the persistent bazel server for dir before switching
-// --bazel-platforms between subtests against the same fixture. Reusing a
-// server across a --platforms change makes bazel discard and rebuild its
-// analysis cache in place, which briefly holds both the old and new
-// analysis state in memory; under a constrained CI runner this has been
-// observed to crash the server outright ("Server terminated abruptly ...
-// Socket closed"), which buildDepGraph then reports as a per-target error
-// (logged and skipped, not fatal — see plugin.go), silently producing an
-// empty result. Starting each platform variant from a clean server avoids
-// the transient double-state memory spike.
+// bazelShutdown kills the persistent bazel server for dir. Call it via
+// t.Cleanup right after root is resolved in every integration test, so each
+// fixture's server is torn down as soon as that (sub)test ends rather than
+// idling (default --max_idle_secs=10800) for the rest of the binary's run.
+//
+// Each fixture directory gets its own server, and different fixtures pin
+// different Bazel versions (see .bazelversion) via bazelisk, so without this
+// cleanup the servers from every fixture that ran earlier in the same `go
+// test` invocation are all still resident by the time a later, heavier
+// fixture starts — under a memory-constrained CI runner this has been
+// observed to push the container to its memory ceiling and crash
+// the newest server outright ("Server terminated abruptly ... Socket
+// closed"), which buildDepGraph then reports as a per-target error (logged
+// and skipped, not fatal — see plugin.go), silently producing an empty
+// result. It also matters within a single fixture: reusing a server across a
+// --bazel-platforms change makes bazel discard and rebuild its analysis
+// cache in place, briefly holding both the old and new analysis state in
+// memory — another reason to start each variant from a clean server.
 func bazelShutdown(t *testing.T, dir string) {
 	t.Helper()
 	// Bounded independently of the test's own context: this must never be
