@@ -792,6 +792,74 @@ func TestFilterConfigurationsByPattern(t *testing.T) {
 	})
 }
 
+// ── Component metadata (hash:* / distribution:url labels) ────────────────────
+
+func TestBuildDepGraph_ComponentMetadata(t *testing.T) {
+	// A single config with one dep whose flat allDependencies entry carries
+	// hashes + distribution URL (as the init script emits under the flag).
+	makeProjWithMetadata := func(entry allDepEntry) gradleProject {
+		cfg := makeConfig("runtimeClasspath", "com.example:my-app:1.0.0", []gradleDep{
+			makeDep("com.google.guava:guava:30.1.1-jre"),
+		})
+		cfg.AllDependencies = []allDepEntry{entry}
+		return makeProject("com.example", "my-app", "1.0.0", []gradleConfig{cfg})
+	}
+
+	fullEntry := allDepEntry{
+		ID: "com.google.guava:guava:30.1.1-jre",
+		Hashes: map[string]string{
+			"sha-1":   "87e0fd1df874ea3cbe577702fe6f17068b790fd8",
+			"sha-256": "44ce229ce26d880bf3afc362bbfcec34d7e6903d195bbb1db9f3b6e0d9834f06",
+		},
+		DistributionURL: "https://repo.maven.apache.org/maven2/com/google/guava/guava/30.1.1-jre/guava-30.1.1-jre.jar",
+	}
+
+	t.Run("attaches hash:* and distribution:url labels when flag enabled", func(t *testing.T) {
+		proj := makeProjWithMetadata(fullEntry)
+		options := &ecosystems.SCAPluginOptions{}
+		options.Global.IncludeComponentMetadata = true
+
+		dg, err := buildDepGraph(&proj, options)
+		require.NoError(t, err)
+
+		node := findNodeByID(t, dg, "com.google.guava:guava@30.1.1-jre")
+		require.NotNil(t, node.Info)
+		assert.Equal(t, "87e0fd1df874ea3cbe577702fe6f17068b790fd8", node.Info.Labels["hash:sha-1"])
+		assert.Equal(t, "44ce229ce26d880bf3afc362bbfcec34d7e6903d195bbb1db9f3b6e0d9834f06", node.Info.Labels["hash:sha-256"])
+		assert.Equal(t, "https://repo.maven.apache.org/maven2/com/google/guava/guava/30.1.1-jre/guava-30.1.1-jre.jar", node.Info.Labels["distribution:url"])
+	})
+
+	t.Run("emits hashes without distribution:url when URL absent (warm cache)", func(t *testing.T) {
+		entry := fullEntry
+		entry.DistributionURL = ""
+		proj := makeProjWithMetadata(entry)
+		options := &ecosystems.SCAPluginOptions{}
+		options.Global.IncludeComponentMetadata = true
+
+		dg, err := buildDepGraph(&proj, options)
+		require.NoError(t, err)
+
+		node := findNodeByID(t, dg, "com.google.guava:guava@30.1.1-jre")
+		require.NotNil(t, node.Info)
+		assert.Equal(t, "87e0fd1df874ea3cbe577702fe6f17068b790fd8", node.Info.Labels["hash:sha-1"])
+		_, hasURL := node.Info.Labels["distribution:url"]
+		assert.False(t, hasURL, "distribution:url should be absent when not observed")
+	})
+
+	t.Run("adds no component-metadata labels when flag disabled", func(t *testing.T) {
+		proj := makeProjWithMetadata(fullEntry)
+
+		dg, err := buildDepGraph(&proj, nil)
+		require.NoError(t, err)
+
+		node := findNodeByID(t, dg, "com.google.guava:guava@30.1.1-jre")
+		if node.Info != nil {
+			assert.Empty(t, node.Info.Labels["hash:sha-1"])
+			assert.Empty(t, node.Info.Labels["distribution:url"])
+		}
+	})
+}
+
 func TestCreatePkgInfo(t *testing.T) {
 	t.Run("creates basic PkgInfo without provenance enabled", func(t *testing.T) {
 		pkgInfo := createPkgInfo("org.example:artifact", "1.0.0", nil, false)

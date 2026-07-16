@@ -484,6 +484,17 @@ func buildExtraArgs(projectDir string, options *ecosystems.SCAPluginOptions) []s
 		args = append(args, "-PsnykConfAttr="+configAttrs)
 	}
 
+	// Opt-in component-metadata labels (hash:<alg>, distribution:url). The init
+	// script only does the extra work when this property is present.
+	if options.Global.IncludeComponentMetadata {
+		args = append(args, "-PsnykIncludeComponentMetadata=true")
+		// Forces network re-validation of metadata so distribution:url can be
+		// captured on a warm cache. Only meaningful alongside the metadata flag.
+		if options.Gradle.RefreshDependencies {
+			args = append(args, "--refresh-dependencies")
+		}
+	}
+
 	return args
 }
 

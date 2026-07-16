@@ -451,6 +451,36 @@ func TestBuildExtraArgs(t *testing.T) {
 		args := buildExtraArgs(dir, opts)
 		assert.Empty(t, args)
 	})
+
+	t.Run("adds snykIncludeComponentMetadata property when the flag is set", func(t *testing.T) {
+		dir := t.TempDir()
+		opts := &ecosystems.SCAPluginOptions{
+			Global: ecosystems.GlobalOptions{IncludeComponentMetadata: true},
+		}
+
+		args := buildExtraArgs(dir, opts)
+		assert.Contains(t, args, "-PsnykIncludeComponentMetadata=true")
+		assert.NotContains(t, args, "--refresh-dependencies")
+	})
+
+	t.Run("adds --refresh-dependencies only with component metadata enabled", func(t *testing.T) {
+		dir := t.TempDir()
+
+		// refresh alone (without component metadata) does nothing
+		optsRefreshOnly := &ecosystems.SCAPluginOptions{
+			Gradle: ecosystems.GradleOptions{RefreshDependencies: true},
+		}
+		assert.Empty(t, buildExtraArgs(dir, optsRefreshOnly))
+
+		// refresh + component metadata forwards both
+		opts := &ecosystems.SCAPluginOptions{
+			Global: ecosystems.GlobalOptions{IncludeComponentMetadata: true},
+			Gradle: ecosystems.GradleOptions{RefreshDependencies: true},
+		}
+		args := buildExtraArgs(dir, opts)
+		assert.Contains(t, args, "-PsnykIncludeComponentMetadata=true")
+		assert.Contains(t, args, "--refresh-dependencies")
+	})
 }
 
 // ── Target file filtering behavior demonstration ──────────────────────────────

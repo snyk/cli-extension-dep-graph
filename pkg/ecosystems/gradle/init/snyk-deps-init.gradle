@@ -26,6 +26,26 @@ gradle.projectsEvaluated { g ->
     // Check if provenance (checksums) should be included
     def includeProvenance = root.findProperty('snykIncludeProvenance')?.toBoolean() ?: false
 
+    // ── Component metadata (opt-in: -PsnykIncludeComponentMetadata) ──────
+    // Shared cross-ecosystem label vocabulary (see snyk-mvn-plugin /
+    // nodejs-lockfile-parser): hash:<alg> lowercase-hex digests, and
+    // distribution:url — the real remote URL Gradle read the artifact from.
+    // distribution:url is TRUE provenance only: Gradle's public API exposes no
+    // per-artifact source repository, so we capture actual resource-read URLs
+    // via an internal build-operation listener. On a warm cache nothing is
+    // re-fetched, so a node simply carries no distribution:url (never a guess).
+    //
+    // The map and the listener are created here, in the same scope threaded to
+    // the per-project tasks, so the listener and the lookups share one instance
+    // (a run()-scope local captured across the build lifecycle does not).
+    // projectsEvaluated runs before task execution, so the listener is active
+    // before any resolution/download happens.
+    def includeComponentMetadata = root.findProperty('snykIncludeComponentMetadata')?.toBoolean() ?: false
+    def urlsByFilename = new java.util.concurrent.ConcurrentHashMap()
+    if (includeComponentMetadata) {
+        registerResourceReadListener(urlsByFilename)
+    }
+
     // Parse configuration-attributes filter once upfront for all projects
     def confAttrSpec = root.hasProperty('snykConfAttr') ? 
         parseConfigurationAttributes(root.snykConfAttr) : null
@@ -49,7 +69,7 @@ gradle.projectsEvaluated { g ->
             }
             doLast {
                 outputFile.parentFile.mkdirs()
-                outputFile.text = groovy.json.JsonOutput.toJson(buildProjectEntry(proj, confAttrSpec, includeProvenance))
+                outputFile.text = groovy.json.JsonOutput.toJson(buildProjectEntry(proj, confAttrSpec, includeProvenance, includeComponentMetadata, urlsByFilename))
             }
         }
     }
@@ -108,7 +128,7 @@ def buildMetadata(rootProject) {
 
 // ── Per-project entry ───────────────────────────────────────────────
 
-def buildProjectEntry(project, confAttrSpec, includeProvenance = false) {
+def buildProjectEntry(project, confAttrSpec, includeProvenance = false, includeComponentMetadata = false, urlsByFilename = null) {
     def resolvableConfigs = project.configurations.matching { config ->
         if (!config.canBeResolved) {
             return false
@@ -140,7 +160,7 @@ def buildProjectEntry(project, confAttrSpec, includeProvenance = false) {
 
     resolvableConfigs.each { config ->
         try {
-            def configEntry = resolveConfiguration(config, includeProvenance)
+            def configEntry = resolveConfiguration(config, includeProvenance, includeComponentMetadata, urlsByFilename)
             if (configEntry != null) {
                 entry.configurations << configEntry
             }
@@ -157,7 +177,7 @@ def buildProjectEntry(project, confAttrSpec, includeProvenance = false) {
 
 // ── Configuration resolution ────────────────────────────────────────
 
-def resolveConfiguration(config, includeProvenance = false) {
+def resolveConfiguration(config, includeProvenance = false, includeComponentMetadata = false, urlsByFilename = null) {
     def resolutionResult = config.incoming.resolutionResult
     def rootComponent = resolutionResult.root
 
@@ -181,9 +201,10 @@ def resolveConfiguration(config, includeProvenance = false) {
     def ancestry = new HashSet<String>()
     def tree = walkDependencies(rootComponent, processed, ancestry, resolvedNames)
 
-    // Build artifact lookup map once per configuration for O(1) lookups
+    // Build artifact lookup map once per configuration for O(1) lookups.
+    // Needed for provenance checksums and/or component-metadata hashes+URL.
     def artifactLookup = null
-    if (includeProvenance) {
+    if (includeProvenance || includeComponentMetadata) {
         artifactLookup = buildArtifactLookup(config)
     }
 
@@ -195,7 +216,7 @@ def resolveConfiguration(config, includeProvenance = false) {
             dependencies: tree,
         ],
         // Flat list of all resolved components for quick lookups
-        allDependencies: collectAllDependencies(resolutionResult, includeProvenance, artifactLookup),
+        allDependencies: collectAllDependencies(resolutionResult, includeProvenance, artifactLookup, includeComponentMetadata, urlsByFilename),
     ]
 }
 
@@ -310,7 +331,7 @@ def buildArtifactLookup(config) {
 
 // ── Flat dependency collection ──────────────────────────────────────
 
-def collectAllDependencies(resolutionResult, includeProvenance, artifactLookup) {
+def collectAllDependencies(resolutionResult, includeProvenance, artifactLookup, includeComponentMetadata = false, urlsByFilename = null) {
     def all = []
 
     resolutionResult.allComponents.each { component ->
@@ -322,6 +343,12 @@ def collectAllDependencies(resolutionResult, includeProvenance, artifactLookup) 
             def provenance = computeProvenance(component, artifactLookup)
             if (provenance != null) {
                 entry.putAll(provenance)
+            }
+        }
+        if (includeComponentMetadata) {
+            def metadata = computeComponentMetadata(component, artifactLookup, urlsByFilename)
+            if (metadata != null) {
+                entry.putAll(metadata)
             }
         }
         all << entry
@@ -542,4 +569,122 @@ def computeSHA1(File file) {
     } catch (Exception e) {
         return null
     }
+}
+
+// ── Component metadata helpers ──────────────────────────────────────
+
+// Computes md5/sha-1/sha-256/sha-512 in a single pass over the file bytes.
+// Keys match the CycloneDX-friendly label suffixes used across ecosystems.
+def computeHashes(File file) {
+    def algos = ['MD5': 'md5', 'SHA-1': 'sha-1', 'SHA-256': 'sha-256', 'SHA-512': 'sha-512']
+    def digests = algos.collectEntries { javaName, _label -> [(javaName): java.security.MessageDigest.getInstance(javaName)] }
+    file.withInputStream { stream ->
+        def buffer = new byte[8192]
+        int bytesRead
+        while ((bytesRead = stream.read(buffer)) != -1) {
+            digests.each { _name, md -> md.update(buffer, 0, bytesRead) }
+        }
+    }
+    def result = [:]
+    digests.each { javaName, md -> result[algos[javaName]] = md.digest().encodeHex().toString() }
+    return result
+}
+
+// Strip any userinfo (basic-auth credentials) from a URL before labelling so
+// private-registry credentials never leak into the dep-graph.
+def stripCredentials(String url) {
+    try {
+        def u = new URI(url)
+        if (u.userInfo != null) {
+            return new URI(u.scheme, null, u.host, u.port, u.path, u.query, u.fragment).toString()
+        }
+    } catch (Exception ignored) { /* not a parseable URI — return as-is */ }
+    return url
+}
+
+// Register an internal build-operation listener recording the URL of every
+// external resource Gradle reads during resolution — the only signal carrying
+// true per-artifact provenance. Internal + unstable across versions, so the
+// whole thing is best-effort: any failure degrades to "no distribution:url".
+def registerResourceReadListener(urlsByFilename) {
+    try {
+        def manager = gradle.services.get(org.gradle.internal.operations.BuildOperationListenerManager)
+        // Map-of-closures coerced to the interface: closures take untyped args,
+        // satisfying the interface's typed abstract methods on every Gradle
+        // version (the method set has changed over time). Absent methods no-op.
+        def listener = [
+            started : { buildOp, startEvent -> },
+            progress: { operationId, progressEvent -> },
+            finished: { buildOp, finishEvent -> recordResourceRead(buildOp, urlsByFilename) },
+        ] as org.gradle.internal.operations.BuildOperationListener
+        manager.addListener(listener)
+    } catch (Exception ignored) {
+        // Internal API unavailable on this Gradle version — distribution:url
+        // simply won't be populated; hashes are unaffected.
+    }
+}
+
+// Record one finished build operation's URL if it is an external-resource read.
+// Duck-typed on getLocation() to avoid importing the internal details type
+// (whose package has moved across Gradle versions).
+def recordResourceRead(buildOp, urlsByFilename) {
+    try {
+        def details = buildOp?.details
+        if (details == null) return
+        if (!details.metaClass.respondsTo(details, 'getLocation')) return
+        def loc = details.getLocation()
+        if (loc == null) return
+        def url = loc.toString()
+        if (!(url.startsWith('http://') || url.startsWith('https://'))) return
+        def clean = url.replaceAll(/[?#].*$/, '')
+        int slash = clean.lastIndexOf('/')
+        if (slash < 0 || slash == clean.length() - 1) return
+        def filename = clean.substring(slash + 1)
+        urlsByFilename
+            .computeIfAbsent(filename) { _ -> java.util.Collections.synchronizedSet(new LinkedHashSet()) }
+            .add(stripCredentials(url))
+    } catch (Exception ignored) { /* one bad op must not break resolution */ }
+}
+
+// Build the per-node component metadata (hashes + distribution:url) for a
+// resolved external component. Returns null when nothing could be derived.
+def computeComponentMetadata(component, artifactLookup, urlsByFilename) {
+    try {
+        def id = component.id
+        if (!id.hasProperty('group') || !id.hasProperty('module') || !id.hasProperty('version')) return null
+        def moduleVersion = component.moduleVersion
+        if (moduleVersion == null) return null
+        def matchingArtifacts = (artifactLookup ? artifactLookup[component.id] : null) ?: []
+        if (matchingArtifacts.empty) return null
+        def file = matchingArtifacts.first().file
+        if (file == null || !file.isFile()) return null
+        def result = [hashes: computeHashes(file)]
+        def url = lookupDistributionUrl(
+            "${moduleVersion.group}:${moduleVersion.name}".toString(),
+            moduleVersion.version?.toString(),
+            file.name,
+            urlsByFilename)
+        if (url) result.distributionUrl = url
+        return result
+    } catch (Exception ignored) {
+        return null
+    }
+}
+
+// Resolve a filename to the URL it was actually read from. When a filename maps
+// to more than one captured URL (shared cache seeing multiple repos), pick the
+// one matching this artifact's Maven layout; if still ambiguous, emit nothing.
+def lookupDistributionUrl(String name, String version, String fileName, urlsByFilename) {
+    if (urlsByFilename == null) return null
+    def candidates = urlsByFilename.get(fileName)
+    if (!candidates || candidates.isEmpty()) return null
+    if (candidates.size() == 1) return candidates.iterator().next()
+    try {
+        def group = name.contains(':') ? name.substring(0, name.indexOf(':')) : name
+        def module = name.contains(':') ? name.substring(name.indexOf(':') + 1) : name
+        def suffix = "/${group.replace('.', '/')}/${module}/${version}/${fileName}".toString()
+        def match = candidates.find { it.replaceAll(/[?#].*$/, '').endsWith(suffix) }
+        if (match) return match
+    } catch (Exception ignored) { /* fall through to no-label */ }
+    return null
 }

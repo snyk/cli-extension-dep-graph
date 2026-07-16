@@ -27,6 +27,7 @@ func getFlagSet() *pflag.FlagSet {
 	flagSet.String(workflow.FlagSubProject, "", "Name of Gradle sub-project to test.")
 	flagSet.String(workflow.FlagGradleSubProject, "", "Name of Gradle sub-project to test.")
 	flagSet.Bool(workflow.FlagGradleNormalizeDeps, false, "Normalize Gradle dependencies.")
+	flagSet.Bool(workflow.FlagGradleRefreshDependencies, false, "Force Gradle to refresh dependencies so distribution URLs can be captured on a warm cache (used with --include-component-metadata; forces network access).")
 	flagSet.Bool(workflow.FlagAllSubProjects, false, "Test all sub-projects in a multi-project build.")
 	flagSet.String(workflow.FlagConfigurationMatching, "", "Resolve dependencies using only configuration(s) that match the specified Java regular expression.")
 	flagSet.String(workflow.FlagConfigurationAttributes, "", "Select certain values of configuration attributes to install and resolve dependencies.")

@@ -382,3 +382,31 @@ func TestWithIncludeProvenance(t *testing.T) {
 	options = NewPluginOptions().WithIncludeProvenance(false)
 	assert.False(t, options.Global.IncludeProvenance)
 }
+
+func TestNewPluginOptionsFromRawFlags_IncludeComponentMetadata(t *testing.T) {
+	got, err := NewPluginOptionsFromRawFlags([]string{"--include-component-metadata"})
+	assert.NoError(t, err)
+	assert.True(t, got.Global.IncludeComponentMetadata)
+}
+
+func TestNewPluginOptionsFromRawFlags_GradleRefreshDependencies(t *testing.T) {
+	got, err := NewPluginOptionsFromRawFlags([]string{"--gradle-refresh-dependencies"})
+	assert.NoError(t, err)
+	assert.True(t, got.Gradle.RefreshDependencies)
+}
+
+func TestWithIncludeComponentMetadata(t *testing.T) {
+	options := NewPluginOptions().WithIncludeComponentMetadata(true)
+	assert.True(t, options.Global.IncludeComponentMetadata)
+
+	options = NewPluginOptions().WithIncludeComponentMetadata(false)
+	assert.False(t, options.Global.IncludeComponentMetadata)
+}
+
+func TestWithGradleRefreshDependencies(t *testing.T) {
+	options := NewPluginOptions().WithGradleRefreshDependencies(true)
+	assert.True(t, options.Gradle.RefreshDependencies)
+
+	options = NewPluginOptions().WithGradleRefreshDependencies(false)
+	assert.False(t, options.Gradle.RefreshDependencies)
+}

@@ -94,6 +94,12 @@ type allDepEntry struct {
 	ID       string `json:"id"`
 	Checksum string `json:"checksum,omitempty"`
 	Type     string `json:"type,omitempty"`
+	// Component-metadata fields, populated by the init script only under
+	// -PsnykIncludeComponentMetadata. Hashes maps algorithm (md5, sha-1,
+	// sha-256, sha-512) to lowercase-hex digest; DistributionURL is the real
+	// remote URL Gradle read the artifact from (present only when observed).
+	Hashes          map[string]string `json:"hashes,omitempty"`
+	DistributionURL string            `json:"distributionUrl,omitempty"`
 }
 
 // parseDependencyGraphJSON deserialises the NDJSON file produced by snyk-deps-init.gradle.
