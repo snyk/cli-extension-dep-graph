@@ -230,6 +230,17 @@ func pluginTestCases() map[string]PluginTestCase {
 			Options:      ecosystems.NewPluginOptions().WithIncludeProvenance(true),
 			ExpectedFile: "expected_plugin_with_provenance.json",
 		},
+		// Component-metadata integration test - exercises
+		// --include-component-metadata to verify hash:<alg> node labels are
+		// attached to resolved external artifacts. distribution:url is stripped
+		// from the snapshot (environment-dependent, see
+		// stripEnvironmentDependentLabels); its format and credential-safety are
+		// asserted separately in TestPlugin_ComponentMetadataIntegration.
+		"simple_with_component_metadata": {
+			Fixture:      "simple",
+			Options:      ecosystems.NewPluginOptions().WithIncludeComponentMetadata(true),
+			ExpectedFile: "expected_plugin_with_component_metadata.json",
+		},
 	}
 }
 
@@ -607,7 +618,12 @@ func writeExpectedSnapshot(t *testing.T, path string, results []ecosystems.SCARe
 		cleaned[i].Error = nil
 		// ResolverMetadata contains runtime-specific info and is not part of the snapshot format.
 		cleaned[i].ResolverMetadata = nil
+		// ProcessedFiles is an implementation detail excluded from comparison
+		// (see assertResultsMatchExpected); strip it here too so a regenerated
+		// snapshot matches what the comparison path expects.
+		cleaned[i].ProcessedFiles = nil
 	}
+	stripEnvironmentDependentLabels(cleaned)
 
 	data, err := json.MarshalIndent(cleaned, "", "  ")
 	require.NoError(t, err, "failed to marshal results for snapshot")
@@ -639,6 +655,11 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 		// is verified separately.
 		sortedActual[i].ProcessedFiles = nil
 	}
+	// distribution:url is only populated when a live download is observed, so
+	// it is environment-dependent (cache warmth / gradle version) and excluded
+	// from snapshots; its format and credential-safety are covered by
+	// TestPlugin_ComponentMetadataIntegration.
+	stripEnvironmentDependentLabels(sortedActual)
 
 	actualJSON, err := json.Marshal(sortedActual)
 	require.NoErrorf(t, err, "[%s] failed to marshal actual results", fixture)
@@ -650,6 +671,28 @@ func assertResultsMatchExpected(t *testing.T, actual, expected []ecosystems.SCAR
 	require.NoErrorf(t, err, "[%s] failed to resolve wildcard versions", fixture)
 
 	assert.JSONEq(t, string(resolvedExpected), string(actualJSON), "[%s] results mismatch", fixture)
+}
+
+// stripEnvironmentDependentLabels removes node labels whose presence depends on
+// the runtime environment rather than the resolved graph. Currently that is
+// distribution:url, which the init script only emits when the resource-read
+// listener observes a live download (cold cache or --refresh-dependencies), so
+// it cannot appear in a deterministic snapshot. The hash:<alg> labels are
+// derived from the artifact files and stay in the snapshot. No-op for fixtures
+// that carry no such labels.
+func stripEnvironmentDependentLabels(results []ecosystems.SCAResult) {
+	for _, r := range results {
+		if r.DepGraph == nil {
+			continue
+		}
+		for i := range r.DepGraph.Graph.Nodes {
+			info := r.DepGraph.Graph.Nodes[i].Info
+			if info == nil || info.Labels == nil {
+				continue
+			}
+			delete(info.Labels, "distribution:url")
+		}
+	}
 }
 
 // sortResults returns a copy of results sorted by target file (with root
