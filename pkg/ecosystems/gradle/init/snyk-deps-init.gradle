@@ -549,23 +549,28 @@ def getGradleChecksum(File file, artifact) {
     return null
 }
 
-// Computes SHA1 hash of a file manually
+// Stream a file once, feeding every requested digest from a single read.
+// `algorithms` maps the JDK algorithm name to its output label; returns
+// {label: lowercase-hex}. Shared by every file-hashing helper below.
+def digestFile(File file, Map<String, String> algorithms) {
+    def digests = algorithms.collectEntries { javaName, _label ->
+        [(javaName): java.security.MessageDigest.getInstance(javaName)]
+    }
+    file.eachByte(1024 * 8) { buffer, len ->
+        digests.each { _name, md -> md.update(buffer, 0, len) }
+    }
+    return digests.collectEntries { javaName, md ->
+        [(algorithms[javaName]): md.digest().encodeHex().toString()]
+    }
+}
+
+// Computes SHA1 hash of a file (used for provenance checksums).
 def computeSHA1(File file) {
     try {
         if (!file.exists()) {
             return null
         }
-
-        def digest = java.security.MessageDigest.getInstance('SHA-1')
-        file.withInputStream { stream ->
-            def buffer = new byte[8192]
-            int bytesRead
-            while ((bytesRead = stream.read(buffer)) != -1) {
-                digest.update(buffer, 0, bytesRead)
-            }
-        }
-        def result = digest.digest().encodeHex().toString()
-        return result
+        return digestFile(file, ['SHA-1': 'sha-1'])['sha-1']
     } catch (Exception e) {
         return null
     }
@@ -576,18 +581,7 @@ def computeSHA1(File file) {
 // Computes md5/sha-1/sha-256/sha-512 in a single pass over the file bytes.
 // Keys match the CycloneDX-friendly label suffixes used across ecosystems.
 def computeHashes(File file) {
-    def algos = ['MD5': 'md5', 'SHA-1': 'sha-1', 'SHA-256': 'sha-256', 'SHA-512': 'sha-512']
-    def digests = algos.collectEntries { javaName, _label -> [(javaName): java.security.MessageDigest.getInstance(javaName)] }
-    file.withInputStream { stream ->
-        def buffer = new byte[8192]
-        int bytesRead
-        while ((bytesRead = stream.read(buffer)) != -1) {
-            digests.each { _name, md -> md.update(buffer, 0, bytesRead) }
-        }
-    }
-    def result = [:]
-    digests.each { javaName, md -> result[algos[javaName]] = md.digest().encodeHex().toString() }
-    return result
+    return digestFile(file, ['MD5': 'md5', 'SHA-1': 'sha-1', 'SHA-256': 'sha-256', 'SHA-512': 'sha-512'])
 }
 
 // Reduce a resource URL to its canonical, credential-free location —
