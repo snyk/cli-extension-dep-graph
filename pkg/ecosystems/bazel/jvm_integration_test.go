@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/scatest"
 )
 
@@ -38,10 +37,11 @@ func TestPlugin_BuildDepGraphsFromDir_MatchJSON(t *testing.T) {
 
 			root, err := filepath.Abs(filepath.Join("..", "testdata", "fixtures", "bazel", fixture))
 			require.NoError(t, err)
+			t.Cleanup(func() { bazelShutdown(t, root) })
 
 			opts := ecosystems.NewPluginOptions().WithBazelJvm(true)
 			plugin := Plugin{}
-			results, err := scatest.Run(ctx, plugin, logger.Nop(), root, opts)
+			results, err := scatest.Run(ctx, plugin, debugLogger(), root, opts)
 			require.NoError(t, err)
 
 			snaps.WithConfig(snaps.Dir(root)).MatchJSON(t, snapshotResults(results))
@@ -57,7 +57,7 @@ func TestPlugin_BuildDepGraphsFromDir_NoOption_EmptyResult(t *testing.T) {
 
 	opts := ecosystems.NewPluginOptions() // no bazel option used
 	plugin := Plugin{}
-	results, err := scatest.Run(ctx, plugin, logger.Nop(), "./", opts)
+	results, err := scatest.Run(ctx, plugin, debugLogger(), "./", opts)
 
 	require.NoError(t, err)
 	require.Empty(t, results)
@@ -72,13 +72,14 @@ func TestPlugin_BuildDepGraphsFromDir_AndriodBinary_MatchJSON(t *testing.T) {
 
 	root, err := filepath.Abs(filepath.Join("..", "testdata", "fixtures", "bazel", fixture))
 	require.NoError(t, err)
+	t.Cleanup(func() { bazelShutdown(t, root) })
 
 	opts := ecosystems.NewPluginOptions().
 		WithBazelJvm(true).
 		WithBazelTargetQuery("kind('android_binary', //...)") // override the default
 
 	plugin := Plugin{}
-	results, err := scatest.Run(ctx, plugin, logger.Nop(), root, opts)
+	results, err := scatest.Run(ctx, plugin, debugLogger(), root, opts)
 	require.NoError(t, err)
 
 	snaps.WithConfig(snaps.Dir(root)).MatchJSON(t, snapshotResults(results))
@@ -93,13 +94,14 @@ func TestPlugin_BuildDepGraphsFromDir_JavaExport_MatchJSON(t *testing.T) {
 
 	root, err := filepath.Abs(filepath.Join("..", "testdata", "fixtures", "bazel", fixture))
 	require.NoError(t, err)
+	t.Cleanup(func() { bazelShutdown(t, root) })
 
 	opts := ecosystems.NewPluginOptions().
 		WithBazelJvm(true).
 		WithBazelTargetQuery("kind('java_library', //...)") // override the default
 
 	plugin := Plugin{}
-	results, err := scatest.Run(ctx, plugin, logger.Nop(), root, opts)
+	results, err := scatest.Run(ctx, plugin, debugLogger(), root, opts)
 	require.NoError(t, err)
 
 	snaps.WithConfig(snaps.Dir(root)).MatchJSON(t, snapshotResults(results))
@@ -114,13 +116,14 @@ func TestPlugin_BuildDepGraphsFromDir_ScalaBinary_MatchJSON(t *testing.T) {
 
 	root, err := filepath.Abs(filepath.Join("..", "testdata", "fixtures", "bazel", fixture))
 	require.NoError(t, err)
+	t.Cleanup(func() { bazelShutdown(t, root) })
 
 	opts := ecosystems.NewPluginOptions().
 		WithBazelJvm(true).
 		WithBazelTargetQuery("kind('scala_binary', //...)") // override the default
 
 	plugin := Plugin{}
-	results, err := scatest.Run(ctx, plugin, logger.Nop(), root, opts)
+	results, err := scatest.Run(ctx, plugin, debugLogger(), root, opts)
 	require.NoError(t, err)
 
 	snaps.WithConfig(snaps.Dir(root)).MatchJSON(t, snapshotResults(results))

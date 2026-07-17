@@ -8,6 +8,7 @@ import (
 
 func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 	targetFile := "requirements.txt"
+	maxTargets := 50
 
 	tests := []struct {
 		name     string
@@ -35,6 +36,10 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 				"--init-script", "custom.gradle",
 				"--gradle-skip-wrapper",
 				"--include-provenance",
+				"--bazel-target-query", "kind('go_binary', //...)",
+				"--bazel-max-targets", "50",
+				"--bazel-go",
+				"--bazel-platforms", "//:linux_x86_64",
 			},
 			expected: &SCAPluginOptions{
 				Global: GlobalOptions{
@@ -59,6 +64,12 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 					AllSubProjects:          true,
 					InitScript:              "custom.gradle",
 					SkipWrapper:             true,
+				},
+				Bazel: BazelOptions{
+					TargetQuery: "kind('go_binary', //...)",
+					MaxTargets:  &maxTargets,
+					Go:          true,
+					Platforms:   "//:linux_x86_64",
 				},
 			},
 			wantErr: false,

@@ -1,0 +1,62 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+# Platform config_settings defined against @platforms//os so the fixture does
+# not depend on rules_go-internal platform label naming.
+config_setting(
+    name = "linux",
+    constraint_values = ["@platforms//os:linux"],
+)
+
+config_setting(
+    name = "darwin",
+    constraint_values = ["@platforms//os:osx"],
+)
+
+# The dependency edge that matters: `deps` is a select(). Under `bazel cquery`
+# only the branch matching the resolved configuration is returned; under plain
+# `bazel query` (with the default --proto:flatten_selects) BOTH //platformlinux
+# and //platformdarwin appear. This is the query-vs-cquery divergence made
+# observable end-to-end through the Go resolver.
+go_library(
+    name = "app_lib",
+    srcs = [
+        "app.go",
+        "app_darwin.go",
+        "app_linux.go",
+    ],
+    importpath = "conditional-deps-select",
+    visibility = ["//visibility:private"],
+    deps = select({
+        ":linux": ["//platformlinux"],
+        ":darwin": ["//platformdarwin"],
+        "//conditions:default": [],
+    }),
+)
+
+go_binary(
+    name = "app",
+    embed = [":app_lib"],
+    visibility = ["//visibility:public"],
+)
+
+# Target platforms for `bazel cquery --platforms=<label>`, used by the
+# --bazel-platform integration test to force each select() branch
+# deterministically regardless of the host running the test. A platform
+# needs a cpu constraint as well as os: cquery resolves toolchains (e.g. the
+# Go SDK) during analysis, and toolchain resolution fails to find a match on
+# an os-only platform.
+platform(
+    name = "linux_x86_64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+platform(
+    name = "darwin_arm64",
+    constraint_values = [
+        "@platforms//os:osx",
+        "@platforms//cpu:arm64",
+    ],
+)

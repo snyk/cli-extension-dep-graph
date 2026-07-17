@@ -74,6 +74,17 @@ type BazelOptions struct {
 	MaxTargets  *int   `arg:"--bazel-max-targets"`
 	Jvm         bool   `arg:"--bazel-jvm"`
 	Go          bool   `arg:"--bazel-go"`
+	// Platforms is forwarded verbatim as `bazel cquery --platforms=<value>`
+	// when resolving a target's dependencies, so that platform-conditional
+	// select()s resolve deterministically regardless of the host running the
+	// scan. Named to match Bazel's own --platforms flag: --platforms is
+	// documented as taking a single build target label, but also accepts a
+	// comma-separated list, of which only the first entry affects analysis
+	// for a single-target cquery — the same behavior applies here since we
+	// forward the value unparsed. Empty means the host's auto-detected
+	// platform is used. Target discovery (`bazel query`) never receives this
+	// flag — it never resolves selects.
+	Platforms string `arg:"--bazel-platforms"`
 }
 
 func NewPluginOptions() *SCAPluginOptions {
@@ -241,5 +252,13 @@ func (o *SCAPluginOptions) WithBazelTargetQuery(query string) *SCAPluginOptions 
 // default in place.
 func (o *SCAPluginOptions) WithBazelMaxTargets(n int) *SCAPluginOptions {
 	o.Bazel.MaxTargets = &n
+	return o
+}
+
+// WithBazelPlatforms sets the target platform(s) passed to `bazel cquery
+// --platforms` when resolving dependencies. Empty (the default) leaves
+// resolution to the host's auto-detected platform.
+func (o *SCAPluginOptions) WithBazelPlatforms(platforms string) *SCAPluginOptions {
+	o.Bazel.Platforms = platforms
 	return o
 }

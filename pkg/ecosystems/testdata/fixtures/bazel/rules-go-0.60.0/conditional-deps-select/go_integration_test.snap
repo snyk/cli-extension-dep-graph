@@ -1,0 +1,146 @@
+
+[TestPlugin_BuildDepGraphsFromDir_ConditionalDepsSelect_MatchJSON/linux_x86_64 - 1]
+{
+ "results": [
+  {
+   "depGraph": {
+    "graph": {
+     "nodes": [
+      {
+       "deps": [
+        {
+         "nodeId": "//:app_lib"
+        }
+       ],
+       "nodeId": "root-node",
+       "pkgId": "//:app@"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "//platformlinux:platformlinux"
+        }
+       ],
+       "nodeId": "//:app_lib",
+       "pkgId": "//:app_lib@"
+      },
+      {
+       "deps": [],
+       "nodeId": "//platformlinux:platformlinux",
+       "pkgId": "//platformlinux:platformlinux@"
+      }
+     ],
+     "rootNodeId": "root-node"
+    },
+    "pkgManager": {
+     "name": "gomodules"
+    },
+    "pkgs": [
+     {
+      "id": "//:app@",
+      "info": {
+       "name": "//:app"
+      }
+     },
+     {
+      "id": "//:app_lib@",
+      "info": {
+       "name": "//:app_lib"
+      }
+     },
+     {
+      "id": "//platformlinux:platformlinux@",
+      "info": {
+       "name": "//platformlinux:platformlinux"
+      }
+     }
+    ],
+    "schemaVersion": "1.3.0"
+   },
+   "meta": {
+    "normalisedTargetFile": "//:app",
+    "pluginName": "bazel"
+   },
+   "projectDescriptor": {
+    "identity": {
+     "targetFile": "//:app",
+     "type": "gomodules"
+    }
+   }
+  }
+ ]
+}
+---
+
+[TestPlugin_BuildDepGraphsFromDir_ConditionalDepsSelect_MatchJSON/darwin_arm64 - 1]
+{
+ "results": [
+  {
+   "depGraph": {
+    "graph": {
+     "nodes": [
+      {
+       "deps": [
+        {
+         "nodeId": "//:app_lib"
+        }
+       ],
+       "nodeId": "root-node",
+       "pkgId": "//:app@"
+      },
+      {
+       "deps": [
+        {
+         "nodeId": "//platformdarwin:platformdarwin"
+        }
+       ],
+       "nodeId": "//:app_lib",
+       "pkgId": "//:app_lib@"
+      },
+      {
+       "deps": [],
+       "nodeId": "//platformdarwin:platformdarwin",
+       "pkgId": "//platformdarwin:platformdarwin@"
+      }
+     ],
+     "rootNodeId": "root-node"
+    },
+    "pkgManager": {
+     "name": "gomodules"
+    },
+    "pkgs": [
+     {
+      "id": "//:app@",
+      "info": {
+       "name": "//:app"
+      }
+     },
+     {
+      "id": "//:app_lib@",
+      "info": {
+       "name": "//:app_lib"
+      }
+     },
+     {
+      "id": "//platformdarwin:platformdarwin@",
+      "info": {
+       "name": "//platformdarwin:platformdarwin"
+      }
+     }
+    ],
+    "schemaVersion": "1.3.0"
+   },
+   "meta": {
+    "normalisedTargetFile": "//:app",
+    "pluginName": "bazel"
+   },
+   "projectDescriptor": {
+    "identity": {
+     "targetFile": "//:app",
+     "type": "gomodules"
+    }
+   }
+  }
+ ]
+}
+---

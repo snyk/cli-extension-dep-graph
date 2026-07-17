@@ -1,0 +1,43 @@
+
+[TestPlugin_BuildDepGraphsFromDir_ConditionalDepsSelectNoDefault - 1]
+{
+ "results": [
+  {
+   "depGraph": {
+    "graph": {
+     "nodes": [
+      {
+       "deps": [],
+       "nodeId": "root-node",
+       "pkgId": "//:app@"
+      }
+     ],
+     "rootNodeId": "root-node"
+    },
+    "pkgManager": {
+     "name": "gomodules"
+    },
+    "pkgs": [
+     {
+      "id": "//:app@",
+      "info": {
+       "name": "//:app"
+      }
+     }
+    ],
+    "schemaVersion": "1.3.0"
+   },
+   "meta": {
+    "normalisedTargetFile": "//:app",
+    "pluginName": "bazel"
+   },
+   "projectDescriptor": {
+    "identity": {
+     "targetFile": "//:app",
+     "type": "gomodules"
+    }
+   }
+  }
+ ]
+}
+---

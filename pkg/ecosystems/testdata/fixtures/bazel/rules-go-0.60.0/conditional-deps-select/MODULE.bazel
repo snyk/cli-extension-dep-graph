@@ -1,0 +1,14 @@
+module(name = "conditional_deps_select")
+
+# Minimal rules_go setup. Deliberately no gazelle / go_deps: this fixture has
+# no external Go modules — its purpose is to exercise a configurable (select())
+# `deps` attribute so that `bazel query` (flattens all select branches) and
+# `bazel cquery` (resolves to the active configuration's branch) diverge.
+bazel_dep(name = "rules_go", version = "0.60.0")
+
+# @platforms is not visible to the main repo under bzlmod unless declared.
+# The config_settings below reference @platforms//os.
+bazel_dep(name = "platforms", version = "0.0.11")
+
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.download(version = "1.23.4")
