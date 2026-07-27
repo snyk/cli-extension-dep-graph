@@ -204,6 +204,11 @@ func Test_LegacyResolution(t *testing.T) {
 			value:    true,
 			expected: "--include-component-metadata",
 		},
+		{
+			key:      workflow.FlagGradleRefreshDependencies,
+			value:    true,
+			expected: "--gradle-refresh-dependencies",
+		},
 	}
 
 	for _, tc := range options {
