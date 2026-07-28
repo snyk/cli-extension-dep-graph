@@ -17,6 +17,7 @@ const (
 	FlagSubProject                    = "sub-project"
 	FlagGradleSubProject              = "gradle-sub-project"
 	FlagGradleNormalizeDeps           = "gradle-normalize-deps"
+	FlagGradleRefreshDependencies     = "gradle-refresh-dependencies"
 	FlagAllSubProjects                = "all-sub-projects"
 	FlagConfigurationMatching         = "configuration-matching"
 	FlagConfigurationAttributes       = "configuration-attributes"

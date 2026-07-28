@@ -206,6 +206,11 @@ func PrepareLegacyFlags(argument string, cfg configuration.Configuration, logger
 		logger.Print("Normalize Gradle dependencies: true")
 	}
 
+	if cfg.GetBool(workflow.FlagGradleRefreshDependencies) {
+		cmdArgs = append(cmdArgs, "--gradle-refresh-dependencies")
+		logger.Print("Gradle refresh dependencies: true")
+	}
+
 	if cfg.GetBool(workflow.FlagAllSubProjects) {
 		cmdArgs = append(cmdArgs, "--all-sub-projects")
 		logger.Print("Test all sub-projects: true")
