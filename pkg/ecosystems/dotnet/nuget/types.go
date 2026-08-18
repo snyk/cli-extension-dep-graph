@@ -28,6 +28,14 @@ const (
 	// getRootName in snyk-nuget-plugin's lib/nuget-parser/index.ts:86-91.
 	objDir = "obj"
 
+	// placeholderTargetRuntime stands in for the project's target framework.
+	// .NET results carry one — the legacy resolver reports values like
+	// "net6.0" — and the platform uses it to tell a project's frameworks
+	// apart. Reading the real value means parsing the project or its restore
+	// output, which this placeholder resolver does not do, so report an
+	// obviously non-framework value rather than inventing a plausible one.
+	placeholderTargetRuntime = "unknown"
+
 	// fallbackRootName names the root package when the target file's directory
 	// cannot name the project (a filesystem or volume root). It matches the
 	// default the dep-graph builder itself uses for an unnamed root package.

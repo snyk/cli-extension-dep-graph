@@ -82,6 +82,11 @@ func TestPlugin_RootDirOnly(t *testing.T) {
 	assert.Equal(t, filepath.Base(dir), result.ProjectDescriptor.Identity.RootComponentName)
 	assert.Equal(t, pkgManager, result.ProjectDescriptor.Identity.ProjectType)
 
+	// .NET results always carry a target framework; until the resolver reads
+	// the real one, it must still be present rather than absent.
+	require.NotNil(t, result.ProjectDescriptor.Identity.TargetRuntime)
+	assert.Equal(t, placeholderTargetRuntime, *result.ProjectDescriptor.Identity.TargetRuntime)
+
 	require.NotNil(t, result.ResolverMetadata)
 	assert.Equal(t, PluginName, result.ResolverMetadata.PluginName)
 	assert.Equal(t, "packages.config", result.ResolverMetadata.NormalisedTargetFile)
@@ -395,7 +400,9 @@ func TestRootComponentName(t *testing.T) {
 			path: filepath.Join(sep, "obj", "project.assets.json"),
 			want: fallbackRootName,
 		},
-		"path with no directory has no project name": {
+		// Defensive only: callers cannot produce a relative path now that every
+		// FindResult.Path is absolute. Kept so the helper stays total.
+		"relative path with no directory falls back": {
 			path: "packages.config",
 			want: fallbackRootName,
 		},
@@ -406,4 +413,17 @@ func TestRootComponentName(t *testing.T) {
 			assert.Equal(t, tt.want, rootComponentName(discovery.FindResult{Path: tt.path}))
 		})
 	}
+}
+
+// Every emitted result must carry a target runtime, including the error path —
+// a project the resolver failed on is still a .NET project.
+func TestNewProjectIdentity_AlwaysSetsTargetRuntime(t *testing.T) {
+	id := newProjectIdentity("src/App/packages.config", placeholderTargetRuntime, "App")
+
+	require.NotNil(t, id.TargetRuntime)
+	assert.Equal(t, placeholderTargetRuntime, *id.TargetRuntime)
+	require.NotNil(t, id.TargetFile)
+	assert.Equal(t, "src/App/packages.config", *id.TargetFile)
+	assert.Equal(t, "App", id.RootComponentName)
+	assert.Equal(t, pkgManager, id.ProjectType)
 }

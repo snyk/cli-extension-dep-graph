@@ -89,18 +89,15 @@ func (p Plugin) buildResult(ctx context.Context, log logger.Logger, file discove
 	)
 
 	targetFile := file.RelPath
+	rootName := rootComponentName(file)
+
 	descriptor := identity.ProjectDescriptor{
-		Identity: identity.ProjectIdentity{
-			ProjectType: pkgManager,
-			TargetFile:  &targetFile,
-		},
+		Identity: newProjectIdentity(targetFile, placeholderTargetRuntime, rootName),
 	}
 	meta := &ecosystems.ResolverMetadata{
 		PluginName:           PluginName,
 		NormalisedTargetFile: targetFile,
 	}
-
-	rootName := rootComponentName(file)
 
 	graph, err := buildEmptyDepGraph(rootName, defaultVersion)
 	if err != nil {
@@ -111,12 +108,26 @@ func (p Plugin) buildResult(ctx context.Context, log logger.Logger, file discove
 		}
 	}
 
-	descriptor.Identity.RootComponentName = rootName
-
 	return ecosystems.SCAResult{
 		DepGraph:          graph,
 		ProjectDescriptor: descriptor,
 		ResolverMetadata:  meta,
+	}
+}
+
+// newProjectIdentity builds the identity for one .NET project.
+//
+// targetRuntime is a required parameter rather than a field left to the
+// caller: every .NET result carries a target framework, so a constructor that
+// cannot be called without one keeps it from being quietly dropped as this
+// package grows. Promoting this to a shared helper in pkg/identity, so the
+// other ecosystems get the same treatment, is worth doing separately.
+func newProjectIdentity(targetFile, targetRuntime, rootComponentName string) identity.ProjectIdentity {
+	return identity.ProjectIdentity{
+		ProjectType:       pkgManager,
+		TargetFile:        &targetFile,
+		TargetRuntime:     &targetRuntime,
+		RootComponentName: rootComponentName,
 	}
 }
 
@@ -135,10 +146,13 @@ func rootComponentName(file discovery.FindResult) string {
 		dir = filepath.Dir(dir)
 	}
 
-	// A directory that is its own parent is a filesystem root — "/", a volume
-	// root such as `C:\`, or "." for a path with no directory at all. None of
-	// those name a project, so report the dep-graph builder's own placeholder
-	// rather than surfacing "/" or "." in the platform.
+	// A directory that is its own parent is a filesystem or volume root, which
+	// names no project. Reaching this needs the scanned tree to *be* the root —
+	// only plausible in a container — so it is defense in depth rather than an
+	// expected path: it exists so a bare "/" can never reach the platform as a
+	// project name. It also covers a relative path with no directory at all
+	// (Dir(".") == "."), which callers cannot produce now that every
+	// FindResult.Path is absolute, but which is cheap to keep honest.
 	if filepath.Dir(dir) == dir {
 		return fallbackRootName
 	}
