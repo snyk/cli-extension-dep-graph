@@ -68,7 +68,7 @@ func TestPlugin_GetName(t *testing.T) {
 }
 
 func TestPlugin_RootDirOnly(t *testing.T) {
-	dir := writeFiles(t, "MyApp.csproj", "nested/Other.csproj")
+	dir := writeFiles(t, "packages.config", "nested/packages.config")
 
 	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
 	require.NoError(t, err)
@@ -77,17 +77,40 @@ func TestPlugin_RootDirOnly(t *testing.T) {
 	result := results[0]
 	require.NoError(t, result.Error)
 	require.NotNil(t, result.DepGraph)
-	assert.Equal(t, "MyApp.csproj", result.ProjectDescriptor.GetTargetFile())
-	assert.Equal(t, "MyApp", result.ProjectDescriptor.Identity.RootComponentName)
+	assert.Equal(t, "packages.config", result.ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, filepath.Base(dir), result.ProjectDescriptor.Identity.RootComponentName)
 	assert.Equal(t, pkgManager, result.ProjectDescriptor.Identity.ProjectType)
 
 	require.NotNil(t, result.ResolverMetadata)
 	assert.Equal(t, PluginName, result.ResolverMetadata.PluginName)
-	assert.Equal(t, "MyApp.csproj", result.ResolverMetadata.NormalisedTargetFile)
+	assert.Equal(t, "packages.config", result.ResolverMetadata.NormalisedTargetFile)
+}
+
+// Restore output lives in obj/, and detect.ts allows that path explicitly, so a
+// default scan of an SDK-style project must still find it.
+func TestPlugin_RootDirOnly_FindsProjectAssetsInObj(t *testing.T) {
+	dir := writeFiles(t, "obj/project.assets.json")
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, filepath.Join("obj", "project.assets.json"), results[0].ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, filepath.Base(dir), results[0].ProjectDescriptor.Identity.RootComponentName)
+}
+
+// Project files are not discoverable target files: snyk-nuget-plugin reads them
+// internally, but the CLI keys discovery on restore output and config files.
+func TestPlugin_ProjectFilesAreNotTargetFiles(t *testing.T) {
+	dir := writeFiles(t, "MyApp.csproj", "MyApp.vbproj", "MyApp.fsproj", "MySolution.sln")
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithAllProjects(true))
+	require.NoError(t, err)
+	assert.Empty(t, results)
 }
 
 func TestPlugin_EmptyDepGraphShape(t *testing.T) {
-	dir := writeFiles(t, "MyApp.csproj")
+	dir := writeFiles(t, "packages.config")
 
 	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
 	require.NoError(t, err)
@@ -96,7 +119,7 @@ func TestPlugin_EmptyDepGraphShape(t *testing.T) {
 	graph := results[0].DepGraph
 	require.NotNil(t, graph)
 	assert.Equal(t, pkgManager, graph.PkgManager.Name)
-	assert.Equal(t, "MyApp", graph.GetRootPkg().Info.Name)
+	assert.Equal(t, filepath.Base(dir), graph.GetRootPkg().Info.Name)
 	assert.Equal(t, defaultVersion, graph.GetRootPkg().Info.Version)
 	assert.Len(t, graph.Pkgs, 1, "the placeholder graph holds the root package only")
 	require.Len(t, graph.Graph.Nodes, 1)
@@ -104,7 +127,7 @@ func TestPlugin_EmptyDepGraphShape(t *testing.T) {
 }
 
 func TestPlugin_DoesNotClaimProcessedFiles(t *testing.T) {
-	dir := writeFiles(t, "MyApp.csproj")
+	dir := writeFiles(t, "packages.config")
 
 	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
 	require.NoError(t, err)
@@ -116,7 +139,7 @@ func TestPlugin_DoesNotClaimProcessedFiles(t *testing.T) {
 }
 
 func TestPlugin_LogsPlaceholderWarningPerTargetFile(t *testing.T) {
-	dir := writeFiles(t, "A.csproj", "B.csproj")
+	dir := writeFiles(t, "packages.config", "project.json")
 	log := &recordingLogger{}
 
 	results, err := scatest.Run(context.Background(), Plugin{}, log, dir, ecosystems.NewPluginOptions())
@@ -141,7 +164,7 @@ func TestPlugin_NoTargetFiles(t *testing.T) {
 }
 
 func TestPlugin_NilLoggerAndNilOptions(t *testing.T) {
-	dir := writeFiles(t, "MyApp.csproj")
+	dir := writeFiles(t, "packages.config")
 
 	results, err := scatest.Run(context.Background(), Plugin{}, nil, dir, nil)
 	require.NoError(t, err)
@@ -150,17 +173,15 @@ func TestPlugin_NilLoggerAndNilOptions(t *testing.T) {
 
 func TestPlugin_AllProjects(t *testing.T) {
 	dir := writeFiles(t,
-		"MySolution.sln",
-		"src/App/App.csproj",
-		"src/Lib/Lib.fsproj",
-		"src/Legacy/Legacy.vbproj",
-		"src/Legacy/packages.config",
-		// Excluded: build output and restore artifacts, vendored trees, and
-		// unrelated files.
-		"src/App/bin/Debug/Ignored.csproj",
 		"src/App/obj/project.assets.json",
-		"node_modules/pkg/Vendored.csproj",
-		"src/App/App.cs",
+		"src/Legacy/packages.config",
+		"src/Old/project.json",
+		// Not target files, or not reachable.
+		"src/App/App.csproj",
+		"MySolution.sln",
+		"paket.dependencies",
+		"node_modules/pkg/packages.config",
+		".build/packages.config",
 	)
 
 	opts := ecosystems.NewPluginOptions().WithAllProjects(true)
@@ -168,47 +189,58 @@ func TestPlugin_AllProjects(t *testing.T) {
 	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, opts)
 	require.NoError(t, err)
 
-	// obj/ and bin/ are skipped, so src/App is reported once — via its
-	// App.csproj — rather than twice via its restore output.
+	// obj/ is deliberately not pruned: the CLI ignores only node_modules and
+	// .build (src/lib/find-files.ts:55), so restore output stays discoverable.
 	assert.ElementsMatch(t, []string{
-		"MySolution.sln",
-		filepath.Join("src", "App", "App.csproj"),
-		filepath.Join("src", "Lib", "Lib.fsproj"),
-		filepath.Join("src", "Legacy", "Legacy.vbproj"),
+		filepath.Join("src", "App", "obj", "project.assets.json"),
 		filepath.Join("src", "Legacy", "packages.config"),
+		filepath.Join("src", "Old", "project.json"),
 	}, relPaths(t, results))
 }
 
+// paket.dependencies is a .NET target file, but detect.ts routes it to a
+// separate paket plugin rather than to nuget.
+func TestPlugin_PaketIsNotOurs(t *testing.T) {
+	dir := writeFiles(t, "paket.dependencies")
+
+	opts := ecosystems.NewPluginOptions().WithTargetFile("paket.dependencies")
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, opts)
+	require.NoError(t, err)
+	assert.Empty(t, results)
+}
+
 func TestPlugin_AllProjects_HonoursExcludes(t *testing.T) {
-	dir := writeFiles(t, "Keep/Keep.csproj", "Skip/Skip.csproj")
+	dir := writeFiles(t, "Keep/packages.config", "Skip/packages.config")
 
 	opts := ecosystems.NewPluginOptions().WithAllProjects(true).WithExclude([]string{"Skip"})
 
 	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, opts)
 	require.NoError(t, err)
-	assert.Equal(t, []string{filepath.Join("Keep", "Keep.csproj")}, relPaths(t, results))
+	assert.Equal(t, []string{filepath.Join("Keep", "packages.config")}, relPaths(t, results))
 }
 
 func TestPlugin_AllProjects_HonoursExcludePaths(t *testing.T) {
-	dir := writeFiles(t, "Keep/Keep.csproj", "Skip/Skip.csproj")
+	dir := writeFiles(t, "Keep/packages.config", "Skip/packages.config")
 
 	opts := ecosystems.NewPluginOptions().WithAllProjects(true).WithExcludePaths([]string{"Skip"})
 
 	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, opts)
 	require.NoError(t, err)
-	assert.Equal(t, []string{filepath.Join("Keep", "Keep.csproj")}, relPaths(t, results))
+	assert.Equal(t, []string{filepath.Join("Keep", "packages.config")}, relPaths(t, results))
 }
 
 func TestPlugin_TargetFile(t *testing.T) {
-	dir := writeFiles(t, "MyApp.csproj", "Other.csproj")
+	dir := writeFiles(t, "a/packages.config", "b/packages.config")
 
-	opts := ecosystems.NewPluginOptions().WithTargetFile("Other.csproj")
+	target := filepath.Join("b", "packages.config")
+	opts := ecosystems.NewPluginOptions().WithTargetFile(target)
 
 	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, opts)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
-	assert.Equal(t, "Other.csproj", results[0].ProjectDescriptor.GetTargetFile())
-	assert.Equal(t, "Other", results[0].ProjectDescriptor.Identity.RootComponentName)
+	assert.Equal(t, target, results[0].ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, "b", results[0].ProjectDescriptor.Identity.RootComponentName)
 }
 
 // A --file pointing straight at restore output must keep working: that is how
@@ -253,7 +285,7 @@ func TestPlugin_TargetFile_PackagesConfigInScannedRoot(t *testing.T) {
 }
 
 func TestPlugin_TargetFile_UnsupportedIsSkipped(t *testing.T) {
-	dir := writeFiles(t, "MyApp.csproj", "package.json")
+	dir := writeFiles(t, "packages.config", "package.json")
 
 	opts := ecosystems.NewPluginOptions().WithTargetFile("package.json")
 
@@ -263,9 +295,9 @@ func TestPlugin_TargetFile_UnsupportedIsSkipped(t *testing.T) {
 }
 
 func TestPlugin_TargetFile_MissingReturnsError(t *testing.T) {
-	dir := writeFiles(t, "MyApp.csproj")
+	dir := writeFiles(t, "packages.config")
 
-	opts := ecosystems.NewPluginOptions().WithTargetFile("Absent.csproj")
+	opts := ecosystems.NewPluginOptions().WithTargetFile("Absent/packages.config")
 
 	_, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, opts)
 	require.Error(t, err, "an explicitly requested target file that does not exist is a setup failure")
@@ -273,7 +305,7 @@ func TestPlugin_TargetFile_MissingReturnsError(t *testing.T) {
 
 // A non-nil onGraph error aborts the run and reaches the caller unchanged.
 func TestPlugin_OnGraphErrorAbortsRun(t *testing.T) {
-	dir := writeFiles(t, "A.csproj", "B.csproj")
+	dir := writeFiles(t, "a/packages.config", "b/packages.config")
 
 	sentinel := errors.New("consumer failed")
 	calls := 0
@@ -295,20 +327,22 @@ func TestPlugin_OnGraphErrorAbortsRun(t *testing.T) {
 
 func TestIsSupportedTargetFile(t *testing.T) {
 	tests := map[string]bool{
-		"MyApp.csproj":            true,
-		"MyApp.vbproj":            true,
-		"MyApp.fsproj":            true,
-		"MySolution.sln":          true,
-		"packages.config":         true,
 		"project.assets.json":     true,
-		"src/App/App.csproj":      true,
+		"packages.config":         true,
+		"project.json":            true,
 		"obj/project.assets.json": true,
-		"package.json":            false,
-		"MyApp.csproj.user":       false,
-		"project.json":            false,
-		"Directory.Build.props":   false,
-		"csproj":                  false,
-		"":                        false,
+		"src/App/packages.config": true,
+		// Project files are read by the resolver, never discovered as targets.
+		"MyApp.csproj":   false,
+		"MyApp.vbproj":   false,
+		"MyApp.fsproj":   false,
+		"MySolution.sln": false,
+		// Belongs to the paket plugin.
+		"paket.dependencies": false,
+		// Other ecosystems.
+		"package.json":          false,
+		"Directory.Build.props": false,
+		"":                      false,
 	}
 
 	for path, want := range tests {

@@ -20,10 +20,6 @@ const (
 	PluginName = "dotnet"
 
 	logFieldTargetFile = "targetFile"
-
-	// objDir is the directory `dotnet restore` writes project.assets.json
-	// into. A target file inside it describes the project one level up.
-	objDir = "obj"
 )
 
 // Plugin implements ecosystems.SCAPlugin for .NET projects.
@@ -126,26 +122,20 @@ func (p Plugin) buildResult(ctx context.Context, log logger.Logger, file discove
 
 // rootComponentName derives a root package name from a target file.
 //
-// Project files and solutions are named after the project, so the file name
-// without its extension is used. packages.config and project.assets.json are
-// fixed names, so the containing directory names the project instead —
-// stepping over obj/ when project.assets.json sits in it.
+// Every recognized target file is a fixed name, so the containing directory
+// names the project — stepping over obj/ when the target file sits in it, as
+// getRootName does in snyk-nuget-plugin (lib/nuget-parser/index.ts:86-91).
+// The comparison is case-insensitive there, so it is here too.
+//
+// Derived from the absolute path so that a target file in the scanned root
+// (where RelPath's directory is ".") still yields a real name.
 func rootComponentName(file discovery.FindResult) string {
-	base := filepath.Base(file.RelPath)
-
-	switch base {
-	case packagesConfigFile, projectAssetsFile:
-		// Derived from the absolute path so that a target file in the scanned
-		// root (where RelPath's directory is ".") still yields a real name.
-		dir := filepath.Dir(file.Path)
-		if filepath.Base(dir) == objDir {
-			dir = filepath.Dir(dir)
-		}
-
-		return filepath.Base(dir)
-	default:
-		return strings.TrimSuffix(base, filepath.Ext(base))
+	dir := filepath.Dir(file.Path)
+	if strings.EqualFold(filepath.Base(dir), objDir) {
+		dir = filepath.Dir(dir)
 	}
+
+	return filepath.Base(dir)
 }
 
 // discoverTargetFiles finds the .NET target files to report on, honoring the
@@ -174,10 +164,13 @@ func (p Plugin) discoverTargetFiles(
 		return files, nil
 
 	case options.Global.AllProjects:
+		// WithCommonExcludes is [".build", "node_modules"], which matches the
+		// CLI's own ignoreFolders (src/lib/find-files.ts:55). Notably it does
+		// not prune obj/ or bin/, so obj/project.assets.json stays
+		// discoverable — as it is today.
 		findOpts := []discovery.FindOption{
-			discovery.WithIncludes(targetFileGlobs...),
+			discovery.WithIncludes(targetFileNames...),
 			discovery.WithCommonExcludes(),
-			discovery.WithExcludes(buildOutputDirs...),
 		}
 
 		if len(options.Global.Exclude) > 0 {
@@ -201,8 +194,13 @@ func (p Plugin) discoverTargetFiles(
 	}
 }
 
-// rootTargetFiles lists the supported target files directly inside dir,
-// without descending into subdirectories.
+// rootTargetFiles lists the supported target files for a single project rooted
+// at dir, without descending into arbitrary subdirectories.
+//
+// obj/ is the one directory it does look into: restore writes
+// project.assets.json there, and detect.ts allows exactly that path
+// (obj/project.assets.json, src/lib/detect.ts:29). Without it a default scan of
+// an SDK-style project would find nothing at all.
 func rootTargetFiles(dir string) ([]discovery.FindResult, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -222,24 +220,32 @@ func rootTargetFiles(dir string) ([]discovery.FindResult, error) {
 		})
 	}
 
+	objAssets := filepath.Join(dir, objDir, projectAssetsFile)
+	if fileExists(objAssets) {
+		files = append(files, discovery.FindResult{
+			Path:    objAssets,
+			RelPath: filepath.Join(objDir, projectAssetsFile),
+		})
+	}
+
 	return files, nil
 }
 
+// fileExists reports whether path exists and is a regular file.
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
 // isSupportedTargetFile reports whether path's file name is one this plugin
-// recognizes. Only the base name is considered, matching how discovery
-// applies its include globs.
+// recognizes. Only the base name is considered, matching how discovery applies
+// its include patterns — so --file=obj/project.assets.json is accepted, which
+// is the form detect.ts allows (src/lib/detect.ts:29).
 func isSupportedTargetFile(path string) bool {
 	base := filepath.Base(path)
 
-	for _, glob := range targetFileGlobs {
-		ok, err := filepath.Match(glob, base)
-		if err != nil {
-			// targetFileGlobs holds compile-time literals, so a malformed
-			// pattern would be a programming error rather than bad input.
-			continue
-		}
-
-		if ok {
+	for _, name := range targetFileNames {
+		if base == name {
 			return true
 		}
 	}

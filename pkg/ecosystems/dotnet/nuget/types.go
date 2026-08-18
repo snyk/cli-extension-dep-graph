@@ -3,40 +3,43 @@ package nuget
 const (
 	// Target files this plugin recognizes as identifying a .NET project.
 	//
-	// The project-file globs and packages.config identify a project whose
-	// dependencies are yet to be resolved; project.assets.json is `dotnet
-	// restore` output and is what the CLI's current static analysis parses.
-	// Kept as a single set so discovery matches the target files the
-	// TypeScript snyk-nuget-plugin accepts today.
-	csprojGlob         = "*.csproj"
-	vbprojGlob         = "*.vbproj"
-	fsprojGlob         = "*.fsproj"
-	solutionGlob       = "*.sln"
-	packagesConfigFile = "packages.config"
+	// Taken from what the CLI discovers today, in snyk/cli's
+	// src/lib/detect.ts: SUPPORTED_TARGET_FILES (the --file allowlist,
+	// lines 29-32) holds obj/project.assets.json, project.assets.json and
+	// packages.config; AUTO_DETECTABLE_FILES (lines 50-53, walked for
+	// --all-projects via src/lib/plugins/get-deps-from-plugin.ts) holds
+	// packages.config, project.json and project.assets.json.
+	//
+	// Note what is deliberately absent. *.csproj / *.vbproj / *.fsproj and
+	// *.sln are not discoverable target files: snyk-nuget-plugin reads project
+	// files internally to resolve target frameworks and the project name, but
+	// discovery keys on restore output and config files only. Matching that
+	// matters — recognizing project files here would make this resolver claim
+	// projects the current resolver never would.
+	//
+	// paket.dependencies is absent for a different reason: detect.ts routes it
+	// to a separate paket plugin (src/lib/plugins/index.ts), not to nuget.
 	projectAssetsFile  = "project.assets.json"
+	packagesConfigFile = "packages.config"
+	projectJSONFile    = "project.json"
+
+	// objDir is where `dotnet restore` writes project.assets.json. A target
+	// file inside it describes the project one directory up, matching
+	// getRootName in snyk-nuget-plugin's lib/nuget-parser/index.ts:86-91.
+	objDir = "obj"
 
 	// defaultVersion is the root package version. No .NET target file carries a
 	// project version that is knowable without resolving the project, and the
-	// CLI's current static analysis reports the same value — see `version:
-	// '0.0.0'` in snyk-nuget-plugin's lib/nuget-parser/index.ts, which roots
-	// every manifest type it supports.
+	// CLI's current static analysis reports the same value — see
+	// `version: '0.0.0'` at lib/nuget-parser/index.ts:423 in
+	// snyk-nuget-plugin, which roots every manifest type it supports.
 	defaultVersion = "0.0.0"
 )
 
-// targetFileGlobs lists every pattern discovery matches when scanning a tree.
-// discovery.FindFiles matches include globs against the basename only, so
-// plain filenames act as exact-basename matches.
-var targetFileGlobs = []string{
-	csprojGlob,
-	vbprojGlob,
-	fsprojGlob,
-	solutionGlob,
-	packagesConfigFile,
+// targetFileNames lists every file name discovery matches. All are exact names
+// rather than globs, so they double as basename matches for include patterns.
+var targetFileNames = []string{
 	projectAssetsFile,
+	packagesConfigFile,
+	projectJSONFile,
 }
-
-// buildOutputDirs are excluded when scanning a tree. .NET writes build output
-// and restore artifacts here; discovery.WithCommonExcludes only covers
-// ".build" and "node_modules". A project.assets.json inside obj/ is still
-// reachable when the user points --file directly at it.
-var buildOutputDirs = []string{"bin", "obj"}
