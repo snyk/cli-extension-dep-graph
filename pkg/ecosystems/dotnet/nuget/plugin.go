@@ -1,0 +1,248 @@
+package nuget
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/discovery"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/identity"
+)
+
+const (
+	// PluginName is "dotnet" rather than "nuget" to match the resolver
+	// ecosystem key used in-cluster, while the dep graphs themselves report
+	// the "nuget" package manager (see pkgManager).
+	PluginName = "dotnet"
+
+	logFieldTargetFile = "targetFile"
+
+	// objDir is the directory `dotnet restore` writes project.assets.json
+	// into. A target file inside it describes the project one level up.
+	objDir = "obj"
+)
+
+// Plugin implements ecosystems.SCAPlugin for .NET projects.
+//
+// It is currently a placeholder: it discovers .NET target files and emits one
+// empty dep graph per target file, logging that no resolution took place.
+// Driving `dotnet restore` and building real graphs comes later; landing the
+// plugin first lets the feature flag, registration, and end-to-end result
+// handling be exercised against a known-empty result.
+//
+// Because no dependencies are resolved, the plugin deliberately does not claim
+// its target files via SCAResult.ProcessedFiles, so the legacy resolver still
+// scans them and reports real results alongside the empty graphs. Note this
+// only holds for an --all-projects scan: consumers that stop at the first
+// resolver to return anything (as the CLI's dep-graph workflow does for a
+// single project) see the empty graph instead of the legacy result.
+type Plugin struct{}
+
+// Compile-time check that Plugin implements the SCAPlugin interface.
+var _ ecosystems.SCAPlugin = (*Plugin)(nil)
+
+func (p Plugin) GetName() string {
+	return PluginName
+}
+
+// BuildDepGraphsFromDir discovers .NET target files under dir and emits one
+// empty dep graph per target file, each via onGraph as soon as it's built.
+//
+// Finding no .NET target files is not an error: the plugin reports nothing and
+// returns nil, which is how a plugin says "not my project".
+func (p Plugin) BuildDepGraphsFromDir(
+	ctx context.Context,
+	log logger.Logger,
+	dir string,
+	options *ecosystems.SCAPluginOptions,
+	onGraph ecosystems.OnGraphFunc,
+) error {
+	if log == nil {
+		log = logger.Nop()
+	}
+
+	files, err := p.discoverTargetFiles(ctx, dir, options)
+	if err != nil {
+		return err
+	}
+
+	if len(files) == 0 {
+		log.Debug(ctx, "No .NET target files found", logger.Attr("dir", dir))
+		return nil
+	}
+
+	log.Debug(ctx, "Discovered .NET target files", logger.Attr("count", len(files)))
+
+	for _, file := range files {
+		if err := onGraph(p.buildResult(ctx, log, file)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// buildResult produces the placeholder SCAResult for a single target file.
+func (p Plugin) buildResult(ctx context.Context, log logger.Logger, file discovery.FindResult) ecosystems.SCAResult {
+	log.Info(ctx, "WARNING: dotnet resolver is not yet implemented; returning an empty dep-graph",
+		logger.Attr(logFieldTargetFile, file.RelPath),
+	)
+
+	targetFile := file.RelPath
+	descriptor := identity.ProjectDescriptor{
+		Identity: identity.ProjectIdentity{
+			ProjectType: pkgManager,
+			TargetFile:  &targetFile,
+		},
+	}
+	meta := &ecosystems.ResolverMetadata{
+		PluginName:           PluginName,
+		NormalisedTargetFile: targetFile,
+	}
+
+	rootName := rootComponentName(file)
+
+	graph, err := buildEmptyDepGraph(rootName, defaultVersion)
+	if err != nil {
+		return ecosystems.SCAResult{
+			ProjectDescriptor: descriptor,
+			ResolverMetadata:  meta,
+			Error:             err,
+		}
+	}
+
+	descriptor.Identity.RootComponentName = rootName
+
+	return ecosystems.SCAResult{
+		DepGraph:          graph,
+		ProjectDescriptor: descriptor,
+		ResolverMetadata:  meta,
+	}
+}
+
+// rootComponentName derives a root package name from a target file.
+//
+// Project files and solutions are named after the project, so the file name
+// without its extension is used. packages.config and project.assets.json are
+// fixed names, so the containing directory names the project instead —
+// stepping over obj/ when project.assets.json sits in it.
+func rootComponentName(file discovery.FindResult) string {
+	base := filepath.Base(file.RelPath)
+
+	switch base {
+	case packagesConfigFile, projectAssetsFile:
+		// Derived from the absolute path so that a target file in the scanned
+		// root (where RelPath's directory is ".") still yields a real name.
+		dir := filepath.Dir(file.Path)
+		if filepath.Base(dir) == objDir {
+			dir = filepath.Dir(dir)
+		}
+
+		return filepath.Base(dir)
+	default:
+		return strings.TrimSuffix(base, filepath.Ext(base))
+	}
+}
+
+// discoverTargetFiles finds the .NET target files to report on, honoring the
+// same three request shapes as the other resolvers: an explicit --file, a
+// full --all-projects scan, or the scanned root directory only.
+func (p Plugin) discoverTargetFiles(
+	ctx context.Context,
+	dir string,
+	options *ecosystems.SCAPluginOptions,
+) ([]discovery.FindResult, error) {
+	if options == nil {
+		options = ecosystems.NewPluginOptions()
+	}
+
+	switch {
+	case options.Global.TargetFile != nil:
+		if !isSupportedTargetFile(*options.Global.TargetFile) {
+			return nil, nil
+		}
+
+		files, err := discovery.FindFiles(ctx, dir, discovery.WithTargetFile(*options.Global.TargetFile))
+		if err != nil {
+			return nil, fmt.Errorf("discovering .NET target files: %w", err)
+		}
+
+		return files, nil
+
+	case options.Global.AllProjects:
+		findOpts := []discovery.FindOption{
+			discovery.WithIncludes(targetFileGlobs...),
+			discovery.WithCommonExcludes(),
+			discovery.WithExcludes(buildOutputDirs...),
+		}
+
+		if len(options.Global.Exclude) > 0 {
+			findOpts = append(findOpts, discovery.WithExcludes(options.Global.Exclude...))
+		}
+		if len(options.Global.ExcludePaths) > 0 {
+			findOpts = append(findOpts, discovery.WithExcludes(options.Global.ExcludePaths...))
+		}
+
+		files, err := discovery.FindFiles(ctx, dir, findOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("discovering .NET target files: %w", err)
+		}
+
+		return files, nil
+
+	default:
+		// Check the root directory only; return empty (not an error) when it
+		// holds no .NET target file.
+		return rootTargetFiles(dir)
+	}
+}
+
+// rootTargetFiles lists the supported target files directly inside dir,
+// without descending into subdirectories.
+func rootTargetFiles(dir string) ([]discovery.FindResult, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("reading directory %s: %w", dir, err)
+	}
+
+	var files []discovery.FindResult
+
+	for _, entry := range entries {
+		if entry.IsDir() || !isSupportedTargetFile(entry.Name()) {
+			continue
+		}
+
+		files = append(files, discovery.FindResult{
+			Path:    filepath.Join(dir, entry.Name()),
+			RelPath: entry.Name(),
+		})
+	}
+
+	return files, nil
+}
+
+// isSupportedTargetFile reports whether path's file name is one this plugin
+// recognizes. Only the base name is considered, matching how discovery
+// applies its include globs.
+func isSupportedTargetFile(path string) bool {
+	base := filepath.Base(path)
+
+	for _, glob := range targetFileGlobs {
+		ok, err := filepath.Match(glob, base)
+		if err != nil {
+			// targetFileGlobs holds compile-time literals, so a malformed
+			// pattern would be a programming error rather than bad input.
+			continue
+		}
+
+		if ok {
+			return true
+		}
+	}
+
+	return false
+}
