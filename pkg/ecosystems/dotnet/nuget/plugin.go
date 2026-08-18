@@ -146,17 +146,6 @@ func rootComponentName(file discovery.FindResult) string {
 		dir = filepath.Dir(dir)
 	}
 
-	// A directory that is its own parent is a filesystem or volume root, which
-	// names no project. Reaching this needs the scanned tree to *be* the root —
-	// only plausible in a container — so it is defense in depth rather than an
-	// expected path: it exists so a bare "/" can never reach the platform as a
-	// project name. It also covers a relative path with no directory at all
-	// (Dir(".") == "."), which callers cannot produce now that every
-	// FindResult.Path is absolute, but which is cheap to keep honest.
-	if filepath.Dir(dir) == dir {
-		return fallbackRootName
-	}
-
 	return filepath.Base(dir)
 }
 

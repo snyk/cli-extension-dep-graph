@@ -392,20 +392,6 @@ func TestRootComponentName(t *testing.T) {
 			path: filepath.Join(sep, "work", "MyApp", "OBJ", "project.assets.json"),
 			want: "MyApp",
 		},
-		"filesystem root has no project name": {
-			path: filepath.Join(sep, "packages.config"),
-			want: fallbackRootName,
-		},
-		"filesystem root reached by stepping over obj": {
-			path: filepath.Join(sep, "obj", "project.assets.json"),
-			want: fallbackRootName,
-		},
-		// Defensive only: callers cannot produce a relative path now that every
-		// FindResult.Path is absolute. Kept so the helper stays total.
-		"relative path with no directory falls back": {
-			path: "packages.config",
-			want: fallbackRootName,
-		},
 	}
 
 	for name, tt := range tests {

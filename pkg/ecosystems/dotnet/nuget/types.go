@@ -36,11 +36,6 @@ const (
 	// obviously non-framework value rather than inventing a plausible one.
 	placeholderTargetRuntime = "unknown"
 
-	// fallbackRootName names the root package when the target file's directory
-	// cannot name the project (a filesystem or volume root). It matches the
-	// default the dep-graph builder itself uses for an unnamed root package.
-	fallbackRootName = "_root"
-
 	// defaultVersion is the root package version. No .NET target file carries a
 	// project version that is knowable without resolving the project, and the
 	// CLI's current static analysis reports the same value — see
