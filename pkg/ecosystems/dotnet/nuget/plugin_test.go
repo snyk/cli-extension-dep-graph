@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/scatest"
 )
@@ -348,6 +349,61 @@ func TestIsSupportedTargetFile(t *testing.T) {
 	for path, want := range tests {
 		t.Run(path, func(t *testing.T) {
 			assert.Equal(t, want, isSupportedTargetFile(path))
+		})
+	}
+}
+
+// The dep-graph workflow passes "." when no input directory is configured,
+// which is the most common CLI invocation. A relative path must still yield a
+// real project name rather than ".".
+func TestPlugin_RootDirOnly_RelativeDirYieldsRealName(t *testing.T) {
+	dir := writeFiles(t, "packages.config")
+	t.Chdir(dir)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), ".", ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	assert.Equal(t, filepath.Base(dir), results[0].ProjectDescriptor.Identity.RootComponentName)
+	assert.Equal(t, "packages.config", results[0].ProjectDescriptor.GetTargetFile())
+}
+
+func TestRootComponentName(t *testing.T) {
+	sep := string(filepath.Separator)
+
+	tests := map[string]struct {
+		path string
+		want string
+	}{
+		"names the containing directory": {
+			path: filepath.Join(sep, "work", "MyApp", "packages.config"),
+			want: "MyApp",
+		},
+		"steps over obj": {
+			path: filepath.Join(sep, "work", "MyApp", "obj", "project.assets.json"),
+			want: "MyApp",
+		},
+		"steps over obj case-insensitively": {
+			path: filepath.Join(sep, "work", "MyApp", "OBJ", "project.assets.json"),
+			want: "MyApp",
+		},
+		"filesystem root has no project name": {
+			path: filepath.Join(sep, "packages.config"),
+			want: fallbackRootName,
+		},
+		"filesystem root reached by stepping over obj": {
+			path: filepath.Join(sep, "obj", "project.assets.json"),
+			want: fallbackRootName,
+		},
+		"path with no directory has no project name": {
+			path: "packages.config",
+			want: fallbackRootName,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.want, rootComponentName(discovery.FindResult{Path: tt.path}))
 		})
 	}
 }

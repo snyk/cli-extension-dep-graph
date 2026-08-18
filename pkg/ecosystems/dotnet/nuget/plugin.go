@@ -135,6 +135,14 @@ func rootComponentName(file discovery.FindResult) string {
 		dir = filepath.Dir(dir)
 	}
 
+	// A directory that is its own parent is a filesystem root — "/", a volume
+	// root such as `C:\`, or "." for a path with no directory at all. None of
+	// those name a project, so report the dep-graph builder's own placeholder
+	// rather than surfacing "/" or "." in the platform.
+	if filepath.Dir(dir) == dir {
+		return fallbackRootName
+	}
+
 	return filepath.Base(dir)
 }
 
@@ -207,6 +215,15 @@ func rootTargetFiles(dir string) ([]discovery.FindResult, error) {
 		return nil, fmt.Errorf("reading directory %s: %w", dir, err)
 	}
 
+	// FindResult.Path is documented as absolute, and discovery.FindFiles
+	// resolves it that way. Match that here: dir is frequently "." (the
+	// dep-graph workflow's default input directory), and a relative Path would
+	// leave the project with no directory to be named after.
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, fmt.Errorf("resolving absolute path for %s: %w", dir, err)
+	}
+
 	var files []discovery.FindResult
 
 	for _, entry := range entries {
@@ -215,13 +232,12 @@ func rootTargetFiles(dir string) ([]discovery.FindResult, error) {
 		}
 
 		files = append(files, discovery.FindResult{
-			Path:    filepath.Join(dir, entry.Name()),
+			Path:    filepath.Join(absDir, entry.Name()),
 			RelPath: entry.Name(),
 		})
 	}
 
-	objAssets := filepath.Join(dir, objDir, projectAssetsFile)
-	if fileExists(objAssets) {
+	if objAssets := filepath.Join(absDir, objDir, projectAssetsFile); fileExists(objAssets) {
 		files = append(files, discovery.FindResult{
 			Path:    objAssets,
 			RelPath: filepath.Join(objDir, projectAssetsFile),
