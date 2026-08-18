@@ -20,8 +20,10 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/v2/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/v2/internal/workflow"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/dotnet/nuget"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/legacy"
 	ecosystemslogger "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/orchestrator"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/python/uv"
 )
 
@@ -49,11 +51,34 @@ func handleSBOMResolution(
 		ctx,
 		config,
 		logger,
-		[]ecosystems.SCAPlugin{
-			uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL),
-			legacy.NewPlugin(ctx),
-		},
+		buildSCAPlugins(ctx, config, converter, remoteRepoURL),
 	)
+}
+
+// buildSCAPlugins assembles the plugin list for the SBOM resolution flow.
+//
+// The legacy plugin stays last: it is the fallback, and each plugin's
+// processed files are excluded from every plugin after it in the list.
+func buildSCAPlugins(
+	ctx gafworkflow.InvocationContext,
+	config configuration.Configuration,
+	converter *remoteconv.RemoteSBOMConverter,
+	remoteRepoURL string,
+) []ecosystems.SCAPlugin {
+	plugins := []ecosystems.SCAPlugin{
+		uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL),
+	}
+
+	// Opt-in per org: the .NET resolver does not resolve dependencies yet, so
+	// it reports an empty dep graph. It claims no processed files, so under
+	// --all-projects the legacy resolver still reports the same projects; for a
+	// single project the loop below breaks first and the empty graph is all the
+	// caller sees.
+	if config.GetBool(orchestrator.FlagDotnetResolver.Key) {
+		plugins = append(plugins, nuget.Plugin{})
+	}
+
+	return append(plugins, legacy.NewPlugin(ctx))
 }
 
 const errMsgNoSupportedProjects = "no supported projects detected"

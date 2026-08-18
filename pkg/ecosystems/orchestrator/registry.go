@@ -10,6 +10,7 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/bazel"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/dotnet/nuget"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/gradle"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/javascript/bun"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/javascript/pnpm"
@@ -67,6 +68,10 @@ func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry,
 	// rust
 	if err := r.register(cargo.Plugin{}, withFeatureFlagCheck(FlagCargoResolver), withPluginDependencies(bazelPluginName)); err != nil {
 		return nil, fmt.Errorf("failed to register cargo plugin: %w", err)
+	}
+	// dotnet
+	if err := r.register(nuget.Plugin{}, withFeatureFlagCheck(FlagDotnetResolver), withPluginDependencies(bazelPluginName)); err != nil {
+		return nil, fmt.Errorf("failed to register dotnet plugin: %w", err)
 	}
 
 	return r, nil
