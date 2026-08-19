@@ -35,6 +35,11 @@ var FlagPnpmResolver = flag{
 	Value: "internal-pnpm-resolver",
 }
 
+var FlagDotnetResolver = flag{
+	Key:   "internal-dotnet-resolver",
+	Value: "internal-dotnet-resolver",
+}
+
 var allFlags = []flag{
 	FlagUnifiedTestAPIOsCLI,
 	FlagNewGradleResolver,
@@ -42,6 +47,7 @@ var allFlags = []flag{
 	FlagBunResolver,
 	FlagCargoResolver,
 	FlagPnpmResolver,
+	FlagDotnetResolver,
 }
 
 // GetAllFlags returns all feature flags as a map of key to flag name.
