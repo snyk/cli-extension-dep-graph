@@ -1,0 +1,26 @@
+{
+  "version": 3,
+  "targets": {
+    "net8.0": {
+      "Newtonsoft.Json/13.0.3": { "type": "package" },
+      "Azure.Identity/1.10.4": {
+        "type": "package",
+        "dependencies": { "AZURE.CORE": "1.0.0" }
+      },
+      "Azure.Core/1.35.0": { "type": "package" }
+    }
+  },
+  "projectFileDependencyGroups": {
+    "net8.0": [
+      "newtonsoft.json >= 13.0.1",
+      "Azure.Identity >= 1.7.0",
+      "Microsoft.NETCore.App >= 8.0.0"
+    ]
+  },
+  "project": {
+    "version": "1.0.0",
+    "frameworks": {
+      "net8.0": { "targetAlias": "net8.0" }
+    }
+  }
+}

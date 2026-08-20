@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "nuget"
+  },
+  "pkgs": [
+    {
+      "id": "Alpha@1.0.0",
+      "info": {
+        "name": "Alpha",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "Top@1.0.0",
+      "info": {
+        "name": "Top",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "Zeta@1.0.0",
+      "info": {
+        "name": "Zeta",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "sibling-order-decides-pruning@1.0.0",
+      "info": {
+        "name": "sibling-order-decides-pruning",
+        "version": "1.0.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "Alpha@1.0.0",
+        "pkgId": "Alpha@1.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "Top@1.0.0",
+        "pkgId": "Top@1.0.0",
+        "deps": [
+          {
+            "nodeId": "Alpha@1.0.0"
+          },
+          {
+            "nodeId": "Zeta@1.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "Zeta@1.0.0",
+        "pkgId": "Zeta@1.0.0",
+        "deps": [
+          {
+            "nodeId": "Alpha@1.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "root-node",
+        "pkgId": "sibling-order-decides-pruning@1.0.0",
+        "deps": [
+          {
+            "nodeId": "Top@1.0.0"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -69,11 +69,16 @@ func buildSCAPlugins(
 		uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL),
 	}
 
-	// Opt-in per org: the .NET resolver does not resolve dependencies yet, so
-	// it reports an empty dep graph. It claims no processed files, so under
-	// --all-projects the legacy resolver still reports the same projects; for a
-	// single project the loop below breaks first and the empty graph is all the
-	// caller sees.
+	// Opt-in per org. The .NET resolver only claims SDK-style projects it could
+	// actually resolve from project.assets.json; it reports those as processed,
+	// so the legacy resolver skips them. Everything else it reports nothing for
+	// — packages.config and project.json projects, and any assets file it could
+	// not use — and the loop below moves on to the next plugin when one returns
+	// no results, so those still reach the legacy resolver.
+	//
+	// The exception is an explicit --file naming a path that does not exist:
+	// discovery treats that as a setup failure and the scan fails there rather
+	// than falling through, which is what the CLI does for a bad --file today.
 	if config.GetBool(orchestrator.FlagDotnetResolver.Key) {
 		plugins = append(plugins, nuget.Plugin{})
 	}
@@ -412,6 +417,11 @@ func workflowDataFromDepGraph(result *ecosystems.SCAResult) (gafworkflow.Data, e
 
 	if tf := result.ProjectDescriptor.Identity.TargetFile; tf != nil {
 		data.SetMetaData(workflow.MetaKeyTargetFileFromPlugin, *tf)
+	}
+
+	// Identifies which of a multi-targeting project's graphs this one is.
+	if tr := result.ProjectDescriptor.Identity.TargetRuntime; tr != nil {
+		data.SetMetaData(workflow.MetaKeyTargetRuntime, *tr)
 	}
 
 	return data, nil

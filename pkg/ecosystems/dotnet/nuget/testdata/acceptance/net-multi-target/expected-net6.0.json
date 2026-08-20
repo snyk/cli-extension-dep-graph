@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "nuget"
+  },
+  "pkgs": [
+    {
+      "id": "Newtonsoft.Json@13.0.1",
+      "info": {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.1"
+      }
+    },
+    {
+      "id": "net-multi-target@2.1.0",
+      "info": {
+        "name": "net-multi-target",
+        "version": "2.1.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "Newtonsoft.Json@13.0.1",
+        "pkgId": "Newtonsoft.Json@13.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "root-node",
+        "pkgId": "net-multi-target@2.1.0",
+        "deps": [
+          {
+            "nodeId": "Newtonsoft.Json@13.0.1"
+          }
+        ]
+      }
+    ]
+  }
+}

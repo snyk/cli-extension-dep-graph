@@ -1,0 +1,37 @@
+{
+  "version": 3,
+  "targets": {
+    "net8.0": {
+      "Top/1.0.0": {
+        "type": "package",
+        "dependencies": {
+          "Left": "1.0.0",
+          "Right": "1.0.0",
+          "runtime.native.System.Foo": "4.3.0"
+        }
+      },
+      "Left/1.0.0": {
+        "type": "package",
+        "dependencies": { "Shared": "1.0.0" }
+      },
+      "Right/1.0.0": {
+        "type": "package",
+        "dependencies": { "Shared": "1.0.0" }
+      },
+      "Shared/2.0.0": {
+        "type": "package",
+        "dependencies": { "Top": "1.0.0" }
+      },
+      "runtime.native.System.Foo/4.3.0": { "type": "package" }
+    }
+  },
+  "projectFileDependencyGroups": {
+    "net8.0": [ "Top >= 1.0.0" ]
+  },
+  "project": {
+    "version": "1.0.0",
+    "frameworks": {
+      "net8.0": { "targetAlias": "net8.0" }
+    }
+  }
+}

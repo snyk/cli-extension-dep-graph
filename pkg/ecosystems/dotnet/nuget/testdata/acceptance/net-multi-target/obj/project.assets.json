@@ -1,0 +1,31 @@
+{
+  "version": 3,
+  "targets": {
+    "net6.0": {
+      "Newtonsoft.Json/13.0.1": { "type": "package" }
+    },
+    "net6.0/linux-x64": {
+      "Newtonsoft.Json/13.0.1": { "type": "package" },
+      "runtime.linux-x64.Microsoft.NETCore.App/6.0.0": { "type": "package" }
+    },
+    "net7.0/linux-x64": {
+      "Newtonsoft.Json/13.0.3": { "type": "package" },
+      "runtime.linux-x64.Microsoft.NETCore.App/7.0.0": { "type": "package" }
+    },
+    "net7.0": {
+      "Newtonsoft.Json/13.0.3": { "type": "package" }
+    }
+  },
+  "projectFileDependencyGroups": {
+    "net6.0": [ "Newtonsoft.Json >= 13.0.1" ],
+    "net7.0": [ "Newtonsoft.Json >= 13.0.1" ]
+  },
+  "project": {
+    "version": "2.1.0",
+    "restore": { "projectName": "MultiTarget" },
+    "frameworks": {
+      "net6.0": { "targetAlias": "net6.0" },
+      "net7.0": { "targetAlias": "net7.0" }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "nuget"
+  },
+  "pkgs": [
+    {
+      "id": "System.Buffers@4.5.0",
+      "info": {
+        "name": "System.Buffers",
+        "version": "4.5.0"
+      }
+    },
+    {
+      "id": "System.Text.Json@4.7.2",
+      "info": {
+        "name": "System.Text.Json",
+        "version": "4.7.2"
+      }
+    },
+    {
+      "id": "netstandard-remap@1.0.0",
+      "info": {
+        "name": "netstandard-remap",
+        "version": "1.0.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "System.Buffers@4.5.0",
+        "pkgId": "System.Buffers@4.5.0",
+        "deps": []
+      },
+      {
+        "nodeId": "System.Text.Json@4.7.2",
+        "pkgId": "System.Text.Json@4.7.2",
+        "deps": [
+          {
+            "nodeId": "System.Buffers@4.5.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "root-node",
+        "pkgId": "netstandard-remap@1.0.0",
+        "deps": [
+          {
+            "nodeId": "System.Text.Json@4.7.2"
+          }
+        ]
+      }
+    ]
+  }
+}

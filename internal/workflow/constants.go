@@ -11,4 +11,5 @@ var (
 	MetaKeyNormalisedTargetFile = "normalisedTargetFile"
 	MetaKeyTargetFileFromPlugin = "targetFileFromPlugin"
 	MetaKeyTarget               = "target"
+	MetaKeyTargetRuntime        = "targetRuntime"
 )
