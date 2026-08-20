@@ -21,6 +21,7 @@ import (
 type mockPlugin struct {
 	name    string
 	results []ecosystems.SCAResult
+	err     error
 
 	// capturedExclude / capturedExcludePaths snapshot opts.Global.{Exclude,ExcludePaths}
 	// at the moment BuildDepGraphsFromDir is called, so tests can assert on what each
@@ -50,7 +51,7 @@ func (m *mockPlugin) BuildDepGraphsFromDir(
 			return err
 		}
 	}
-	return nil
+	return m.err
 }
 
 func TestPluginRegistry_OrderPreservedWithoutDependencies(t *testing.T) {
@@ -369,6 +370,30 @@ func TestPluginRegistry_ResolveDepgraphs_PropagatesProcessedFilesAsExcludePaths(
 		"processed files must NOT leak onto opts.Global.Exclude — that channel is for basename patterns only")
 	assert.Empty(t, pluginB.capturedExclude,
 		"processed files must NOT leak onto opts.Global.Exclude — that channel is for basename patterns only")
+}
+
+func TestPluginRegistry_ResolveDepgraphs_PropagatesPluginErrorAsResult(t *testing.T) {
+	r := &PluginRegistry{
+		ictx:    setupMockInvocationContext(t),
+		entries: make([]pluginEntry, 0),
+		plugins: make([]ecosystems.SCAPlugin, 0),
+	}
+
+	pluginErr := context.DeadlineExceeded
+	require.NoError(t, r.register(&mockPlugin{
+		name: "plugin-a",
+		err:  pluginErr,
+	}))
+
+	opts := ecosystems.NewPluginOptions()
+	opts.Global.AllProjects = true
+
+	resultsChan := r.ResolveDepgraphs("/test/dir", opts)
+
+	results := collectResults(resultsChan)
+
+	require.Len(t, results, 1)
+	assert.ErrorIs(t, results[0].Error, pluginErr)
 }
 
 func TestPluginRegistry_Register_WithFeatureFlag(t *testing.T) {

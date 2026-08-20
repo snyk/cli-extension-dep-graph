@@ -226,6 +226,10 @@ func executePluginWithResults(
 	})
 	if err != nil {
 		enhancedLogger.Warn().Err(err).Msg(fmt.Sprintf("%s plugin failed", plugin.GetName()))
+		select {
+		case resultsChan <- ecosystems.SCAResult{Error: err}:
+		case <-ctx.Done():
+		}
 		return processedFiles
 	}
 
