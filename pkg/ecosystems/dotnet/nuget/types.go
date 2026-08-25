@@ -1,53 +1,50 @@
 package nuget
 
 const (
-	// Target files this plugin recognizes as identifying a .NET project.
-	//
-	// Taken from what the CLI discovers today, in snyk/cli's
-	// src/lib/detect.ts: SUPPORTED_TARGET_FILES (the --file allowlist,
-	// lines 29-32) holds obj/project.assets.json, project.assets.json and
-	// packages.config; AUTO_DETECTABLE_FILES (lines 50-53, walked for
-	// --all-projects via src/lib/plugins/get-deps-from-plugin.ts) holds
-	// packages.config, project.json and project.assets.json.
-	//
-	// Note what is deliberately absent. *.csproj / *.vbproj / *.fsproj and
-	// *.sln are not discoverable target files: snyk-nuget-plugin reads project
-	// files internally to resolve target frameworks and the project name, but
-	// discovery keys on restore output and config files only. Matching that
-	// matters — recognizing project files here would make this resolver claim
-	// projects the current resolver never would.
-	//
-	// paket.dependencies is absent for a different reason: detect.ts routes it
-	// to a separate paket plugin (src/lib/plugins/index.ts), not to nuget.
-	projectAssetsFile  = "project.assets.json"
+	// projectAssetsFile is `dotnet restore` output for SDK-style
+	// (PackageReference) projects, and the only target file this plugin claims.
+	projectAssetsFile = "project.assets.json"
+
+	// packagesConfigFile and projectJSONFile are the .NET Framework manifests.
+	// The CLI discovers them (snyk/cli src/lib/detect.ts) but this resolver does
+	// not: they carry no resolved dependency set. Leaving them out of
+	// targetFileNames is what makes those projects fall back to the legacy
+	// resolver, which reports them exactly as it does today.
 	packagesConfigFile = "packages.config"
 	projectJSONFile    = "project.json"
 
-	// objDir is where `dotnet restore` writes project.assets.json. A target
-	// file inside it describes the project one directory up, matching
-	// getRootName in snyk-nuget-plugin's lib/nuget-parser/index.ts:86-91.
+	// objDir is where `dotnet restore` writes project.assets.json. A target file
+	// inside it describes the project one directory up.
 	objDir = "obj"
 
-	// placeholderTargetRuntime stands in for the project's target framework.
-	// .NET results carry one — the legacy resolver reports values like
-	// "net6.0" — and the platform uses it to tell a project's frameworks
-	// apart. Reading the real value means parsing the project or its restore
-	// output, which this placeholder resolver does not do, so report an
-	// obviously non-framework value rather than inventing a plausible one.
-	placeholderTargetRuntime = "unknown"
-
-	// defaultVersion is the root package version. No .NET target file carries a
-	// project version that is knowable without resolving the project, and the
-	// CLI's current static analysis reports the same value — see
-	// `version: '0.0.0'` at lib/nuget-parser/index.ts:423 in
-	// snyk-nuget-plugin, which roots every manifest type it supports.
+	// defaultVersion roots a project whose assets file declares no
+	// project.version, matching snyk-nuget-plugin.
 	defaultVersion = "0.0.0"
+
+	// filteredPackagePrefix drops `runtime` and `runtime.native.*` packages:
+	// platform-specific runtime assets rather than dependencies a user can act
+	// on. Matched case-sensitively against the declared name, as upstream does.
+	filteredPackagePrefix = "runtime"
+
+	// Target framework families whose `targets` key differs mechanically from
+	// their project.frameworks key. See assetsFrameworkName.
+	netstandardPrefix = "netstandard"
+	netcoreappPrefix  = "netcoreapp"
+	netPrefix         = "net"
+
+	// maxNetFrameworkDigits bounds a .NET Framework moniker's compact version.
+	// net481 is the longest that exists; the bound stops "net" rewriting
+	// monikers from other families.
+	maxNetFrameworkDigits = 3
+
+	// A dependency edge closing a cycle becomes a childless node suffixed like
+	// this and labeled, mirroring snyk-nuget-plugin's `<id>:pruned` nodes.
+	prunedNodeSuffix = ":pruned"
+	prunedLabelKey   = "pruned"
+	prunedLabelValue = "true"
 )
 
-// targetFileNames lists every file name discovery matches. All are exact names
-// rather than globs, so they double as basename matches for include patterns.
+// targetFileNames lists every file name discovery matches.
 var targetFileNames = []string{
 	projectAssetsFile,
-	packagesConfigFile,
-	projectJSONFile,
 }

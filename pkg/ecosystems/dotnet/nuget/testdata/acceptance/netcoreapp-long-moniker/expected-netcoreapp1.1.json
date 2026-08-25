@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "nuget"
+  },
+  "pkgs": [
+    {
+      "id": "CommandLineParser@2.2.1",
+      "info": {
+        "name": "CommandLineParser",
+        "version": "2.2.1"
+      }
+    },
+    {
+      "id": "Newtonsoft.Json@9.0.1",
+      "info": {
+        "name": "Newtonsoft.Json",
+        "version": "9.0.1"
+      }
+    },
+    {
+      "id": "netcoreapp-long-moniker@1.0.0",
+      "info": {
+        "name": "netcoreapp-long-moniker",
+        "version": "1.0.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "CommandLineParser@2.2.1",
+        "pkgId": "CommandLineParser@2.2.1",
+        "deps": []
+      },
+      {
+        "nodeId": "Newtonsoft.Json@9.0.1",
+        "pkgId": "Newtonsoft.Json@9.0.1",
+        "deps": []
+      },
+      {
+        "nodeId": "root-node",
+        "pkgId": "netcoreapp-long-moniker@1.0.0",
+        "deps": [
+          {
+            "nodeId": "CommandLineParser@2.2.1"
+          },
+          {
+            "nodeId": "Newtonsoft.Json@9.0.1"
+          }
+        ]
+      }
+    ]
+  }
+}

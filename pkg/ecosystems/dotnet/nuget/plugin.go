@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	snykecosystems "github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
+
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
@@ -14,28 +16,23 @@ import (
 )
 
 const (
-	// PluginName is "dotnet" rather than "nuget" to match the resolver
-	// ecosystem key used in-cluster, while the dep graphs themselves report
-	// the "nuget" package manager (see pkgManager).
+	// PluginName is "dotnet" to match the in-cluster resolver ecosystem key,
+	// while the dep graphs report the "nuget" package manager (see pkgManager).
 	PluginName = "dotnet"
 
-	logFieldTargetFile = "targetFile"
+	logFieldTargetFile      = "targetFile"
+	logFieldTargetFramework = "targetFramework"
+	logFieldTargetsKey      = "targetsKey"
 )
 
-// Plugin implements ecosystems.SCAPlugin for .NET projects.
+// Plugin implements ecosystems.SCAPlugin for .NET projects, resolving SDK-style
+// (PackageReference) projects from the project.assets.json that `dotnet restore`
+// leaves behind. It never runs `dotnet`: the assets file already holds the
+// resolved dependency set.
 //
-// It is currently a placeholder: it discovers .NET target files and emits one
-// empty dep graph per target file, logging that no resolution took place.
-// Driving `dotnet restore` and building real graphs comes later; landing the
-// plugin first lets the feature flag, registration, and end-to-end result
-// handling be exercised against a known-empty result.
-//
-// Because no dependencies are resolved, the plugin deliberately does not claim
-// its target files via SCAResult.ProcessedFiles, so the legacy resolver still
-// scans them and reports real results alongside the empty graphs. Note this
-// only holds for an --all-projects scan: consumers that stop at the first
-// resolver to return anything (as the CLI's dep-graph workflow does for a
-// single project) see the empty graph instead of the legacy result.
+// Only project.assets.json is claimed. packages.config and project.json carry no
+// resolved dependency set, so this plugin reports nothing for them and the
+// workflow moves on to the legacy resolver.
 type Plugin struct{}
 
 // Compile-time check that Plugin implements the SCAPlugin interface.
@@ -45,11 +42,9 @@ func (p Plugin) GetName() string {
 	return PluginName
 }
 
-// BuildDepGraphsFromDir discovers .NET target files under dir and emits one
-// empty dep graph per target file, each via onGraph as soon as it's built.
-//
-// Finding no .NET target files is not an error: the plugin reports nothing and
-// returns nil, which is how a plugin says "not my project".
+// BuildDepGraphsFromDir discovers .NET target files under dir and emits one dep
+// graph per target framework of each. Finding none is not an error: reporting
+// nothing is how a plugin says "not my project".
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context,
 	log logger.Logger,
@@ -74,7 +69,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 	log.Debug(ctx, "Discovered .NET target files", logger.Attr("count", len(files)))
 
 	for _, file := range files {
-		if err := onGraph(p.buildResult(ctx, log, file)); err != nil {
+		if err := p.emitResults(ctx, log, file, onGraph); err != nil {
 			return err
 		}
 	}
@@ -82,46 +77,104 @@ func (p Plugin) BuildDepGraphsFromDir(
 	return nil
 }
 
-// buildResult produces the placeholder SCAResult for a single target file.
-func (p Plugin) buildResult(ctx context.Context, log logger.Logger, file discovery.FindResult) ecosystems.SCAResult {
-	log.Info(ctx, "WARNING: dotnet resolver is not yet implemented; returning an empty dep-graph",
-		logger.Attr(logFieldTargetFile, file.RelPath),
-	)
-
+// emitResults resolves one target file and emits a result per target framework.
+// The results share a root name and target file, differing only in target
+// runtime — which is how snyk-nuget-plugin distinguishes them.
+//
+// A framework that cannot be resolved is reported as a failure against its own
+// runtime. An assets file that cannot be read or parsed at all is logged and
+// skipped, claiming nothing, so the legacy resolver still sees the project: it
+// reaches .NET projects through `dotnet` and can resolve some this one cannot.
+func (p Plugin) emitResults(
+	ctx context.Context,
+	log logger.Logger,
+	file discovery.FindResult,
+	onGraph ecosystems.OnGraphFunc,
+) error {
 	targetFile := file.RelPath
 	rootName := rootComponentName(file)
 
-	descriptor := identity.ProjectDescriptor{
-		Identity: newProjectIdentity(targetFile, placeholderTargetRuntime, rootName),
-	}
-	meta := &ecosystems.ResolverMetadata{
-		PluginName:           PluginName,
-		NormalisedTargetFile: targetFile,
+	assets, err := readProjectAssets(file.Path, targetFile)
+	if err != nil {
+		log.Error(ctx, "Leaving this .NET project to the legacy resolver: its assets file could not be used",
+			logger.Attr(logFieldTargetFile, targetFile), logger.Err(err))
+
+		return nil
 	}
 
-	graph, err := buildEmptyDepGraph(rootName, defaultVersion)
-	if err != nil {
-		return ecosystems.SCAResult{
-			ProjectDescriptor: descriptor,
-			ResolverMetadata:  meta,
-			Error:             err,
+	for _, framework := range assets.targetFrameworks() {
+		targetsKey := assets.matchTargetsKey(framework)
+		if targetsKey == "" {
+			// Guessing a sibling's packages would report the wrong dependencies
+			// under this framework's name.
+			err := snykecosystems.NewUnsupportedTargetFrameworkError(
+				fmt.Sprintf("No resolved packages for target framework %s in %s.", framework, targetFile),
+			)
+
+			if err := onGraph(p.errResult(targetFile, rootName, framework, err)); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		log.Debug(ctx, "Resolving .NET target framework",
+			logger.Attr(logFieldTargetFile, targetFile),
+			logger.Attr(logFieldTargetFramework, framework),
+			logger.Attr(logFieldTargetsKey, targetsKey),
+		)
+
+		graph, buildErr := buildDepGraph(ctx, assets, rootName, targetsKey)
+		if buildErr != nil {
+			if err := onGraph(p.errResult(targetFile, rootName, framework, buildErr)); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		result := p.newResult(targetFile, rootName, framework)
+		result.DepGraph = graph
+
+		if err := onGraph(result); err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+// newResult assembles the descriptor and metadata every result carries.
+// ProcessedFiles claims the assets file, which stops the legacy resolver
+// reporting the same project again — the workflow turns claimed files into
+// --exclude-paths for the plugins that follow.
+func (p Plugin) newResult(targetFile, rootName, targetRuntime string) ecosystems.SCAResult {
 	return ecosystems.SCAResult{
-		DepGraph:          graph,
-		ProjectDescriptor: descriptor,
-		ResolverMetadata:  meta,
+		ProjectDescriptor: identity.ProjectDescriptor{
+			Identity: newProjectIdentity(targetFile, targetRuntime, rootName),
+		},
+		ResolverMetadata: &ecosystems.ResolverMetadata{
+			PluginName:           PluginName,
+			NormalisedTargetFile: targetFile,
+		},
+		ProcessedFiles: []string{targetFile},
 	}
 }
 
-// newProjectIdentity builds the identity for one .NET project.
-//
-// targetRuntime is a required parameter rather than a field left to the
-// caller: every .NET result carries a target framework, so a constructor that
-// cannot be called without one keeps it from being quietly dropped as this
-// package grows. Promoting this to a shared helper in pkg/identity, so the
-// other ecosystems get the same treatment, is worth doing separately.
+// errResult reports a framework the resolver could not build a graph for. The
+// runtime is still set: it is what identifies the framework we failed on.
+func (p Plugin) errResult(targetFile, rootName, targetRuntime string, err error) ecosystems.SCAResult {
+	result := p.newResult(targetFile, rootName, targetRuntime)
+	result.DepGraph = nil
+	result.Error = err
+
+	return result
+}
+
+// newProjectIdentity builds the identity for one .NET project. targetRuntime is
+// a required parameter because it is part of a project's identity — it is what
+// tells a multi-targeting project's graphs apart. Promoting this to
+// pkg/identity is CMPA-721.
 func newProjectIdentity(targetFile, targetRuntime, rootComponentName string) identity.ProjectIdentity {
 	return identity.ProjectIdentity{
 		ProjectType:       pkgManager,
@@ -131,15 +184,10 @@ func newProjectIdentity(targetFile, targetRuntime, rootComponentName string) ide
 	}
 }
 
-// rootComponentName derives a root package name from a target file.
-//
-// Every recognized target file is a fixed name, so the containing directory
-// names the project — stepping over obj/ when the target file sits in it, as
-// getRootName does in snyk-nuget-plugin (lib/nuget-parser/index.ts:86-91).
-// The comparison is case-insensitive there, so it is here too.
-//
-// Derived from the absolute path so that a target file in the scanned root
-// (where RelPath's directory is ".") still yields a real name.
+// rootComponentName names the project after the directory containing its target
+// file, stepping over obj/ (case-insensitively, as snyk-nuget-plugin does).
+// Derived from the absolute path so a target file in the scanned root still
+// yields a real name.
 func rootComponentName(file discovery.FindResult) string {
 	dir := filepath.Dir(file.Path)
 	if strings.EqualFold(filepath.Base(dir), objDir) {
@@ -149,9 +197,8 @@ func rootComponentName(file discovery.FindResult) string {
 	return filepath.Base(dir)
 }
 
-// discoverTargetFiles finds the .NET target files to report on, honoring the
-// same three request shapes as the other resolvers: an explicit --file, a
-// full --all-projects scan, or the scanned root directory only.
+// discoverTargetFiles honors the same three request shapes as the other
+// resolvers: an explicit --file, an --all-projects scan, or the scanned root.
 func (p Plugin) discoverTargetFiles(
 	ctx context.Context,
 	dir string,
@@ -175,10 +222,8 @@ func (p Plugin) discoverTargetFiles(
 		return files, nil
 
 	case options.Global.AllProjects:
-		// WithCommonExcludes is [".build", "node_modules"], which matches the
-		// CLI's own ignoreFolders (src/lib/find-files.ts:55). Notably it does
-		// not prune obj/ or bin/, so obj/project.assets.json stays
-		// discoverable — as it is today.
+		// WithCommonExcludes matches the CLI's own ignoreFolders. It does not
+		// prune obj/ or bin/, so obj/project.assets.json stays discoverable.
 		findOpts := []discovery.FindOption{
 			discovery.WithIncludes(targetFileNames...),
 			discovery.WithCommonExcludes(),
@@ -205,23 +250,17 @@ func (p Plugin) discoverTargetFiles(
 	}
 }
 
-// rootTargetFiles lists the supported target files for a single project rooted
-// at dir, without descending into arbitrary subdirectories.
-//
-// obj/ is the one directory it does look into: restore writes
-// project.assets.json there, and detect.ts allows exactly that path
-// (obj/project.assets.json, src/lib/detect.ts:29). Without it a default scan of
-// an SDK-style project would find nothing at all.
+// rootTargetFiles lists the target files for a single project rooted at dir.
+// obj/ is the one subdirectory it looks into: restore writes
+// project.assets.json there, and detect.ts allows exactly that path.
 func rootTargetFiles(dir string) ([]discovery.FindResult, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("reading directory %s: %w", dir, err)
 	}
 
-	// FindResult.Path is documented as absolute, and discovery.FindFiles
-	// resolves it that way. Match that here: dir is frequently "." (the
-	// dep-graph workflow's default input directory), and a relative Path would
-	// leave the project with no directory to be named after.
+	// FindResult.Path is absolute. dir is frequently "." here, and a relative
+	// path would leave the project with no directory to be named after.
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, fmt.Errorf("resolving absolute path for %s: %w", dir, err)
@@ -256,10 +295,9 @@ func fileExists(path string) bool {
 	return err == nil && !info.IsDir()
 }
 
-// isSupportedTargetFile reports whether path's file name is one this plugin
-// recognizes. Only the base name is considered, matching how discovery applies
-// its include patterns — so --file=obj/project.assets.json is accepted, which
-// is the form detect.ts allows (src/lib/detect.ts:29).
+// isSupportedTargetFile reports whether path's base name is one this plugin
+// recognizes, matching how discovery applies its include patterns — so
+// --file=obj/project.assets.json is accepted.
 func isSupportedTargetFile(path string) bool {
 	base := filepath.Base(path)
 

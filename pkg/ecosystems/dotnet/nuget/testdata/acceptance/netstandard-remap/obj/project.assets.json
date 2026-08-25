@@ -1,0 +1,21 @@
+{
+  "version": 3,
+  "targets": {
+    ".NETStandard,Version=v2.1": {
+      "System.Text.Json/4.7.2": {
+        "type": "package",
+        "dependencies": { "System.Buffers": "4.5.0" }
+      },
+      "System.Buffers/4.5.0": { "type": "package" }
+    }
+  },
+  "projectFileDependencyGroups": {
+    ".NETStandard,Version=v2.1": [ "System.Text.Json >= 4.7.2" ]
+  },
+  "project": {
+    "version": "1.0.0",
+    "frameworks": {
+      "netstandard2.1": {}
+    }
+  }
+}

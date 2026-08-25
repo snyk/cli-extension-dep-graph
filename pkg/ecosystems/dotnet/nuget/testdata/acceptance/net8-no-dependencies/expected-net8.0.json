@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "nuget"
+  },
+  "pkgs": [
+    {
+      "id": "net8-no-dependencies@1.0.0",
+      "info": {
+        "name": "net8-no-dependencies",
+        "version": "1.0.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "root-node",
+        "pkgId": "net8-no-dependencies@1.0.0",
+        "deps": []
+      }
+    ]
+  }
+}

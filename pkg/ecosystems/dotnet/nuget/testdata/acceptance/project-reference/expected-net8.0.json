@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "nuget"
+  },
+  "pkgs": [
+    {
+      "id": "Newtonsoft.Json@13.0.3",
+      "info": {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.3"
+      }
+    },
+    {
+      "id": "Referenced@1.0.0",
+      "info": {
+        "name": "Referenced",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "project-reference@1.0.0",
+      "info": {
+        "name": "project-reference",
+        "version": "1.0.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "Newtonsoft.Json@13.0.3",
+        "pkgId": "Newtonsoft.Json@13.0.3",
+        "deps": []
+      },
+      {
+        "nodeId": "Referenced@1.0.0",
+        "pkgId": "Referenced@1.0.0",
+        "deps": [
+          {
+            "nodeId": "Newtonsoft.Json@13.0.3"
+          }
+        ]
+      },
+      {
+        "nodeId": "root-node",
+        "pkgId": "project-reference@1.0.0",
+        "deps": [
+          {
+            "nodeId": "Newtonsoft.Json@13.0.3"
+          },
+          {
+            "nodeId": "Referenced@1.0.0"
+          }
+        ]
+      }
+    ]
+  }
+}

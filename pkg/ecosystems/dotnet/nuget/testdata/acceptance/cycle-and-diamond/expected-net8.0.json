@@ -1,0 +1,106 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "nuget"
+  },
+  "pkgs": [
+    {
+      "id": "Left@1.0.0",
+      "info": {
+        "name": "Left",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "Right@1.0.0",
+      "info": {
+        "name": "Right",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "Shared@2.0.0",
+      "info": {
+        "name": "Shared",
+        "version": "2.0.0"
+      }
+    },
+    {
+      "id": "Top@1.0.0",
+      "info": {
+        "name": "Top",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "cycle-and-diamond@1.0.0",
+      "info": {
+        "name": "cycle-and-diamond",
+        "version": "1.0.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "Left@1.0.0",
+        "pkgId": "Left@1.0.0",
+        "deps": [
+          {
+            "nodeId": "Shared@2.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "Right@1.0.0",
+        "pkgId": "Right@1.0.0",
+        "deps": [
+          {
+            "nodeId": "Shared@2.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "Shared@2.0.0",
+        "pkgId": "Shared@2.0.0",
+        "deps": [
+          {
+            "nodeId": "Top@1.0.0:pruned"
+          }
+        ]
+      },
+      {
+        "nodeId": "Top@1.0.0",
+        "pkgId": "Top@1.0.0",
+        "deps": [
+          {
+            "nodeId": "Left@1.0.0"
+          },
+          {
+            "nodeId": "Right@1.0.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "Top@1.0.0:pruned",
+        "pkgId": "Top@1.0.0",
+        "info": {
+          "labels": {
+            "pruned": "true"
+          }
+        },
+        "deps": []
+      },
+      {
+        "nodeId": "root-node",
+        "pkgId": "cycle-and-diamond@1.0.0",
+        "deps": [
+          {
+            "nodeId": "Top@1.0.0"
+          }
+        ]
+      }
+    ]
+  }
+}
