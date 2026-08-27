@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "nuget"
+  },
+  "pkgs": [
+    {
+      "id": "Swagger.Net@0.5.5",
+      "info": {
+        "name": "Swagger.Net",
+        "version": "0.5.5"
+      }
+    },
+    {
+      "id": "WebActivator@1.5.1",
+      "info": {
+        "name": "WebActivator",
+        "version": "1.5.1"
+      }
+    },
+    {
+      "id": "jQuery@3.2.1",
+      "info": {
+        "name": "jQuery",
+        "version": "3.2.1"
+      }
+    },
+    {
+      "id": "packages-config-with-packages@0.0.0",
+      "info": {
+        "name": "packages-config-with-packages",
+        "version": "0.0.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "Swagger.Net@0.5.5",
+        "pkgId": "Swagger.Net@0.5.5",
+        "deps": [
+          {
+            "nodeId": "WebActivator@1.5.1"
+          }
+        ]
+      },
+      {
+        "nodeId": "WebActivator@1.5.1",
+        "pkgId": "WebActivator@1.5.1",
+        "deps": []
+      },
+      {
+        "nodeId": "jQuery@3.2.1",
+        "pkgId": "jQuery@3.2.1",
+        "deps": []
+      },
+      {
+        "nodeId": "root-node",
+        "pkgId": "packages-config-with-packages@0.0.0",
+        "deps": [
+          {
+            "nodeId": "Swagger.Net@0.5.5"
+          },
+          {
+            "nodeId": "jQuery@3.2.1"
+          }
+        ]
+      }
+    ]
+  }
+}

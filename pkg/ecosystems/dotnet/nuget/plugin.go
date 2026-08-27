@@ -23,6 +23,7 @@ const (
 	logFieldTargetFile      = "targetFile"
 	logFieldTargetFramework = "targetFramework"
 	logFieldTargetsKey      = "targetsKey"
+	logFieldPackagesFolder  = "packagesFolder"
 )
 
 // Plugin implements ecosystems.SCAPlugin for .NET projects. It never runs
@@ -31,8 +32,8 @@ const (
 // Two kinds of project, resolved differently. SDK-style (PackageReference)
 // projects come from the project.assets.json that `dotnet restore` leaves
 // behind, which holds a fully resolved dependency set. packages.config projects
-// hold no such thing, so they are resolved from the flattened list the manifest
-// itself carries.
+// hold no such thing, so they are resolved from the manifest plus the packages
+// folder `nuget restore` populates beside it.
 //
 // A manifest it cannot resolve in full is left alone entirely — no result, no
 // claimed file — so the legacy resolver still sees the project and behaves
@@ -61,6 +62,9 @@ func (p Plugin) BuildDepGraphsFromDir(
 	if log == nil {
 		log = logger.Nop()
 	}
+	if options == nil {
+		options = ecosystems.NewPluginOptions()
+	}
 
 	files, err := p.discoverTargetFiles(ctx, dir, options)
 	if err != nil {
@@ -75,7 +79,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 	log.Debug(ctx, "Discovered .NET target files", logger.Attr("count", len(files)))
 
 	for _, file := range files {
-		if err := p.emitResults(ctx, log, file, onGraph); err != nil {
+		if err := p.emitResults(ctx, log, file, options, onGraph); err != nil {
 			return err
 		}
 	}
@@ -88,13 +92,14 @@ func (p Plugin) emitResults(
 	ctx context.Context,
 	log logger.Logger,
 	file discovery.FindResult,
+	options *ecosystems.SCAPluginOptions,
 	onGraph ecosystems.OnGraphFunc,
 ) error {
 	if filepath.Base(file.Path) == projectAssetsFile {
 		return p.emitAssetsResults(ctx, log, file, onGraph)
 	}
 
-	return p.emitFrameworkResult(ctx, log, file, onGraph)
+	return p.emitFrameworkResult(ctx, log, file, options, onGraph)
 }
 
 // emitAssetsResults resolves an SDK-style project and emits a result per target
@@ -224,10 +229,6 @@ func (p Plugin) discoverTargetFiles(
 	dir string,
 	options *ecosystems.SCAPluginOptions,
 ) ([]discovery.FindResult, error) {
-	if options == nil {
-		options = ecosystems.NewPluginOptions()
-	}
-
 	switch {
 	case options.Global.TargetFile != nil:
 		if !isSupportedTargetFile(*options.Global.TargetFile) {
@@ -368,6 +369,7 @@ func (p Plugin) emitFrameworkResult(
 	ctx context.Context,
 	log logger.Logger,
 	file discovery.FindResult,
+	options *ecosystems.SCAPluginOptions,
 	onGraph ecosystems.OnGraphFunc,
 ) error {
 	targetFile := file.RelPath
@@ -393,19 +395,24 @@ func (p Plugin) emitFrameworkResult(
 		))
 	}
 
+	packagesFolder := resolvePackagesFolder(file.Path, options.Dotnet.PackagesFolder)
+
 	log.Debug(ctx, "Resolving .NET project",
 		logger.Attr(logFieldTargetFile, targetFile),
 		logger.Attr(logFieldTargetFramework, framework.original),
+		logger.Attr(logFieldPackagesFolder, packagesFolder),
 	)
 
-	declared := newPackageSet()
-	for _, pkg := range manifest.packages {
-		declared.add(pkg.name, pkg.version)
+	installed := installedPackages(ctx, log, manifest.packages, packagesFolder)
+
+	children, err := nuspecChildren(installed, packagesFolder, framework)
+	if err != nil {
+		return deferToLegacy(ctx, log, targetFile, err)
 	}
 
 	rootName := rootComponentName(file)
 
-	graph, err := buildFrameworkDepGraph(rootName, defaultVersion, declared)
+	graph, err := buildFrameworkDepGraph(ctx, rootName, defaultVersion, installed, children)
 	if err != nil {
 		return deferToLegacy(ctx, log, targetFile, err)
 	}
