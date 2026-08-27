@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "nuget"
+  },
+  "pkgs": [
+    {
+      "id": "Microsoft.Web.Infrastructure@1.0.0.0",
+      "info": {
+        "name": "Microsoft.Web.Infrastructure",
+        "version": "1.0.0.0"
+      }
+    },
+    {
+      "id": "Newtonsoft.Json@8.0.3",
+      "info": {
+        "name": "Newtonsoft.Json",
+        "version": "8.0.3"
+      }
+    },
+    {
+      "id": "WebActivatorEx@2.1.0",
+      "info": {
+        "name": "WebActivatorEx",
+        "version": "2.1.0"
+      }
+    },
+    {
+      "id": "project-json-with-csproj@0.0.0",
+      "info": {
+        "name": "project-json-with-csproj",
+        "version": "0.0.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "Microsoft.Web.Infrastructure@1.0.0.0",
+        "pkgId": "Microsoft.Web.Infrastructure@1.0.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "Newtonsoft.Json@8.0.3",
+        "pkgId": "Newtonsoft.Json@8.0.3",
+        "deps": []
+      },
+      {
+        "nodeId": "WebActivatorEx@2.1.0",
+        "pkgId": "WebActivatorEx@2.1.0",
+        "deps": []
+      },
+      {
+        "nodeId": "root-node",
+        "pkgId": "project-json-with-csproj@0.0.0",
+        "deps": [
+          {
+            "nodeId": "Microsoft.Web.Infrastructure@1.0.0.0"
+          },
+          {
+            "nodeId": "Newtonsoft.Json@8.0.3"
+          },
+          {
+            "nodeId": "WebActivatorEx@2.1.0"
+          }
+        ]
+      }
+    ]
+  }
+}

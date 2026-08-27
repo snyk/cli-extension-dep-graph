@@ -7,8 +7,8 @@ import (
 	godepgraph "github.com/snyk/dep-graph/go/pkg/depgraph"
 )
 
-// buildFrameworkDepGraph builds the dep graph for a packages.config project,
-// mirroring snyk-nuget-plugin's dotnet-framework-parser.
+// buildFrameworkDepGraph builds the dep graph for a packages.config or
+// project.json project, mirroring snyk-nuget-plugin's dotnet-framework-parser.
 //
 // Every installed package is a direct dependency of the root, whether the
 // project asked for it or something it depends on did. That is upstream's
