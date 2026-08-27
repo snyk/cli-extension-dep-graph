@@ -74,15 +74,36 @@ func sdkStyleProject(t *testing.T) string {
 	return dir
 }
 
-// frameworkProject writes a .NET Framework project — the shape the .NET
-// resolver declines, so that it falls back to the legacy one.
+// frameworkProject writes a .NET Framework project the resolver can handle: the
+// targetFramework attributes NuGet writes name a runtime, so it needs no .csproj.
 func frameworkProject(t *testing.T) string {
 	t.Helper()
 
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "packages.config"), []byte(""), 0o600))
+	writePackagesConfig(t, dir, `<packages>
+      <package id="Newtonsoft.Json" version="10.0.3" targetFramework="net45" />
+    </packages>`)
 
 	return dir
+}
+
+// unresolvableFrameworkProject writes a packages.config with nothing to name a
+// runtime by — no targetFramework attributes and no .csproj beside it.
+func unresolvableFrameworkProject(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	writePackagesConfig(t, dir, `<packages>
+      <package id="Newtonsoft.Json" version="10.0.3" />
+    </packages>`)
+
+	return dir
+}
+
+func writePackagesConfig(t *testing.T, dir, content string) {
+	t.Helper()
+
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "packages.config"), []byte(content), 0o600))
 }
 
 // Test_handleSBOMResolution_dotnetResolver drives the SBOM resolution flow over
@@ -200,10 +221,12 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 
 	// A mixed repo is the shape that would break first if the claim were ever
 	// widened from a file to its directory, or if ExcludePaths went from append
-	// to overwrite: the packages.config project would silently vanish.
+	// to overwrite: the manifest we declined would silently vanish.
 	t.Run("flag on with --all-projects: a mixed repo keeps both projects", func(t *testing.T) {
 		dir := sdkStyleProject(t)
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "packages.config"), []byte(""), 0o600))
+		writePackagesConfig(t, dir, `<packages>
+          <package id="Newtonsoft.Json" version="10.0.3" />
+        </packages>`)
 
 		workflowData, harness := run(t, dir, true, true, []string{"packages.config"})
 
@@ -230,11 +253,29 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 		assert.Empty(t, harness.CapturedExcludePaths(), "nothing was claimed from under it")
 	})
 
-	// A .NET project this resolver does not support must reach the legacy one
-	// even for a single project, which only works because the plugin returns no
-	// results at all rather than an empty graph.
-	t.Run("flag on: a packages.config project falls back to legacy", func(t *testing.T) {
+	t.Run("flag on: the resolver handles a packages.config project", func(t *testing.T) {
 		workflowData, harness := run(t, frameworkProject(t), true, false, []string{"packages.config"})
+
+		assert.False(t, harness.Called(),
+			"the loop stops once a plugin returns results, so legacy never runs")
+		require.Len(t, workflowData, 1)
+
+		payload, ok := workflowData[0].GetPayload().([]byte)
+		require.True(t, ok)
+
+		graph, err := dg.UnmarshalJSON(payload)
+		require.NoError(t, err)
+		assert.Equal(t, "nuget", graph.PkgManager.Name)
+		assert.Len(t, graph.Pkgs, 2, "the root plus its one dependency")
+		assert.Equal(t, "net45", metaString(t, workflowData[0], workflow.MetaKeyTargetRuntime))
+	})
+
+	// Nothing names a runtime for this project, and a .NET project has to have
+	// one. It reaches the legacy resolver only because the plugin returns no
+	// results at all rather than an empty graph — for a single project, that is
+	// the only thing that moves the workflow on to the next plugin.
+	t.Run("flag on: a packages.config with no target framework falls back to legacy", func(t *testing.T) {
+		workflowData, harness := run(t, unresolvableFrameworkProject(t), true, false, []string{"packages.config"})
 
 		assert.True(t, harness.Called(), "the legacy resolver must still handle it")
 		require.Len(t, workflowData, 1, "and its result is the only one")

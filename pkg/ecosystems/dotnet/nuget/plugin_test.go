@@ -17,6 +17,16 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/scatest"
 )
 
+// packagesConfigManifest is a .NET Framework manifest that needs no .csproj:
+// the targetFramework attributes NuGet writes are enough to name a runtime.
+const packagesConfigManifest = `<?xml version="1.0" encoding="utf-8"?>
+<packages>
+  <package id="Newtonsoft.Json" version="10.0.3" targetFramework="net45" />
+  <package id="jQuery" version="3.2.1" targetFramework="net45" />
+</packages>`
+
+const csprojNet45 = `<Project><PropertyGroup><TargetFramework>net45</TargetFramework></PropertyGroup></Project>`
+
 // recordingLogger captures logged messages so tests can assert on what the
 // resolver reported without depending on a real logger backend.
 type recordingLogger struct {
@@ -85,24 +95,33 @@ const multiTargetAssets = `{
 }`
 
 // writeFiles creates each named file (with intermediate directories) inside a
-// fresh temp dir and returns that dir. Files named project.assets.json get
-// resolvable content; anything else is created empty, since this resolver never
-// reads it.
+// fresh temp dir and returns that dir. Manifests and .csproj files get
+// resolvable content; anything else is created empty.
 func writeFiles(t *testing.T, names ...string) string {
 	t.Helper()
 
 	dir := t.TempDir()
 
 	for _, name := range names {
-		content := ""
-		if filepath.Base(name) == projectAssetsFile {
-			content = singleTargetAssets
-		}
-
-		write(t, dir, name, content)
+		write(t, dir, name, fixtureContent(name))
 	}
 
 	return dir
+}
+
+// fixtureContent gives a fixture file whatever content makes it resolvable, so
+// a test naming a file gets a real project rather than an empty one.
+func fixtureContent(name string) string {
+	switch base := filepath.Base(name); {
+	case base == projectAssetsFile:
+		return singleTargetAssets
+	case base == packagesConfigFile:
+		return packagesConfigManifest
+	case filepath.Ext(base) == csprojExt:
+		return csprojNet45
+	default:
+		return ""
+	}
 }
 
 // write creates one file under dir, making any parent directories it needs.
@@ -191,26 +210,76 @@ func TestPlugin_ProjectFilesAreNotTargetFiles(t *testing.T) {
 	assert.Empty(t, results)
 }
 
-// packages.config and project.json are .NET projects the CLI discovers, but they
-// carry no resolved dependency set. Reporting nothing for them is what hands
-// them back to the legacy resolver — including for a single project, where the
-// workflow only moves on to the next plugin because this one returned no
-// results at all.
-func TestPlugin_FrameworkManifestsAreLeftToLegacy(t *testing.T) {
-	for _, name := range []string{packagesConfigFile, projectJSONFile} {
-		t.Run(name, func(t *testing.T) {
-			dir := writeFiles(t, name)
+// A packages.config resolves without a .csproj: NuGet writes a targetFramework
+// onto every entry it installs, and that is enough to name a runtime.
+func TestPlugin_PackagesConfigResolves(t *testing.T) {
+	dir := writeFiles(t, packagesConfigFile)
 
-			results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
-			require.NoError(t, err, "an unsupported .NET manifest is not an error")
-			assert.Empty(t, results)
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, results, 1, "this manifest records one dependency set, so there is one result")
 
-			results, err = scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
-				ecosystems.NewPluginOptions().WithTargetFile(name))
-			require.NoError(t, err, "nor is one named explicitly with --file")
-			assert.Empty(t, results)
-		})
-	}
+	result := results[0]
+	require.NoError(t, result.Error)
+	require.NotNil(t, result.DepGraph)
+	assert.Equal(t, packagesConfigFile, result.ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, filepath.Base(dir), result.ProjectDescriptor.Identity.RootComponentName)
+	assert.Equal(t, pkgManager, result.ProjectDescriptor.Identity.ProjectType)
+	assert.Equal(t, []string{"net45"}, runtimes(t, results))
+
+	// Resolving it means claiming it, which is what stops the legacy resolver
+	// reporting the same project a second time.
+	assert.Equal(t, []string{packagesConfigFile}, result.ProcessedFiles)
+
+	assert.ElementsMatch(t,
+		[]string{result.DepGraph.GetRootPkg().ID, "Newtonsoft.Json@10.0.3", "jQuery@3.2.1"},
+		pkgIDs(result.DepGraph.Pkgs))
+}
+
+// project.json is a .NET manifest the CLI discovers, but this resolver does not
+// handle it yet. Reporting nothing is what hands it back to the legacy
+// resolver — including for a single project, where the workflow only moves on
+// to the next plugin because this one returned no results at all.
+func TestPlugin_ProjectJSONIsLeftToLegacy(t *testing.T) {
+	dir := writeFiles(t, projectJSONFile)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
+	require.NoError(t, err, "an unsupported .NET manifest is not an error")
+	assert.Empty(t, results)
+
+	results, err = scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithTargetFile(projectJSONFile))
+	require.NoError(t, err, "nor is one named explicitly with --file")
+	assert.Empty(t, results)
+}
+
+// Nothing names a framework for this project, and a .NET project has to have
+// one. Guessing would report it under a framework it does not target, so it
+// goes to the legacy resolver instead — which fails on it exactly as it does
+// today.
+func TestPlugin_ManifestWithNoTargetFrameworkIsLeftToLegacy(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, packagesConfigFile, `<packages><package id="Newtonsoft.Json" version="10.0.3" /></packages>`)
+
+	log := &recordingLogger{}
+	results, err := scatest.Run(context.Background(), Plugin{}, log, dir, ecosystems.NewPluginOptions())
+
+	require.NoError(t, err, "one unresolvable project must not end a scan of many")
+	assert.Empty(t, results)
+	assert.NotEmpty(t, log.errs, "the reason is logged, not swallowed")
+}
+
+func TestPlugin_UnreadableManifestIsLeftToLegacy(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, packagesConfigFile, `<configuration><package id="X" version="1.0" /></configuration>`)
+	write(t, dir, "App.csproj", csprojNet45)
+
+	log := &recordingLogger{}
+	results, err := scatest.Run(context.Background(), Plugin{}, log, dir, ecosystems.NewPluginOptions())
+
+	require.NoError(t, err)
+	assert.Empty(t, results, "claiming a manifest we could not read would hide it from the resolver that can")
+	assert.NotEmpty(t, log.errs)
 }
 
 func TestPlugin_DepGraphShape(t *testing.T) {
@@ -447,9 +516,9 @@ func TestPlugin_AllProjects(t *testing.T) {
 	dir := writeFiles(t,
 		"src/App/"+objDir+"/"+projectAssetsFile,
 		"src/Lib/"+objDir+"/"+projectAssetsFile,
+		"src/Legacy/"+packagesConfigFile,
 		// Not target files, or not reachable.
 		"src/App/App.csproj",
-		"src/Legacy/"+packagesConfigFile,
 		"src/Old/"+projectJSONFile,
 		"MySolution.sln",
 		"paket.dependencies",
@@ -467,6 +536,7 @@ func TestPlugin_AllProjects(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		filepath.Join("src", "App", objDir, projectAssetsFile),
 		filepath.Join("src", "Lib", objDir, projectAssetsFile),
+		filepath.Join("src", "Legacy", packagesConfigFile),
 	}, relPaths(t, results))
 }
 
@@ -590,10 +660,10 @@ func TestIsSupportedTargetFile(t *testing.T) {
 		"project.assets.json":         true,
 		"obj/project.assets.json":     true,
 		"src/App/project.assets.json": true,
-		// .NET Framework manifests: discovered by the CLI, but left to the
-		// legacy resolver until they can be resolved from a packages folder.
-		"packages.config": false,
-		"project.json":    false,
+		"packages.config":             true,
+		"src/Legacy/packages.config":  true,
+		// Discovered by the CLI, but not resolved here yet: CMPA-717.
+		"project.json": false,
 		// Project files are read by snyk-nuget-plugin, never discovered as targets.
 		"MyApp.csproj":   false,
 		"MyApp.vbproj":   false,
@@ -675,13 +745,46 @@ func TestNewProjectIdentity_SetsEveryField(t *testing.T) {
 // order, and a scan without --all-projects still emits every result a plugin
 // produces — so returning both would double-report the project.
 func TestPlugin_RootDirOnly_ManifestPrecedence(t *testing.T) {
-	dir := writeFiles(t, objDir+"/"+projectAssetsFile, projectAssetsFile)
+	tests := []struct {
+		name    string
+		present []string
+		want    string
+	}{
+		{
+			name:    "restore output outranks the manifests beside it",
+			present: []string{objDir + "/" + projectAssetsFile, projectAssetsFile, packagesConfigFile},
+			want:    filepath.Join(objDir, projectAssetsFile),
+		},
+		{
+			name:    "a root-level assets file outranks packages.config",
+			present: []string{projectAssetsFile, packagesConfigFile},
+			want:    projectAssetsFile,
+		},
+	}
 
-	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dir := writeFiles(t, test.present...)
+
+			results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			assert.Equal(t, test.want, results[0].ProjectDescriptor.GetTargetFile())
+		})
+	}
+}
+
+// --all-projects has no such precedence: every manifest is its own project,
+// which is what the CLI reports too.
+func TestPlugin_AllProjects_ReportsEveryManifestInADirectory(t *testing.T) {
+	dir := writeFiles(t, objDir+"/"+projectAssetsFile, packagesConfigFile)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithAllProjects(true))
 	require.NoError(t, err)
-	require.Len(t, results, 1)
-	assert.Equal(t, filepath.Join(objDir, projectAssetsFile), results[0].ProjectDescriptor.GetTargetFile(),
-		"restore output outranks a copy beside it")
+	assert.ElementsMatch(t,
+		[]string{filepath.Join(objDir, projectAssetsFile), packagesConfigFile},
+		relPaths(t, results))
 }
 
 // A scanned root that is not there at all is a setup failure, the same as a

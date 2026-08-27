@@ -1,11 +1,11 @@
 # .NET acceptance fixtures
 
-Each directory is a scannable .NET project: an `obj/project.assets.json` and one golden dep graph
-per target framework. `acceptance_test.go` runs the plugin over the directory and diffs the result
-against the goldens.
+Each directory is a scannable .NET project — one manifest and one golden dep graph per target
+framework. `acceptance_test.go` runs the plugin over the directory and diffs the result against
+the goldens.
 
-Nothing here needs a .NET SDK. The resolver only reads restore output, so the assets files are
-committed and the suite runs in the normal `test` job.
+Nothing here needs a .NET SDK or `nuget`. The resolver only reads what a restore leaves behind,
+so the fixtures are committed and the suite runs in the normal `test` job.
 
 ## Golden files
 
@@ -33,6 +33,8 @@ go test ./pkg/ecosystems/dotnet/nuget/... -run TestAcceptance -update
 | `pinned-and-case-insensitive` | Declared names differ in case from the `targets` keys; the resolved version wins over a lower declared minimum; a framework reference absent from `targets` is skipped rather than fatal. |
 | `cycle-and-diamond` | A diamond yields one node with two parents; a cycle yields a `…:pruned` leaf; a `runtime.native.*` package is filtered out. |
 | `sibling-order-decides-pruning` | `Top` declares `Zeta` before `Alpha`, and `Zeta` also depends on `Alpha`. In document order `Zeta → Alpha` is a real edge; walk the siblings in any other order and it becomes `Alpha@1.0.0:pruned` instead. This is the only fixture that fails if the resolver stops preserving document order — real NuGet output writes dependency keys already sorted, so no fixture taken from a real project can catch that regression. |
+
+| `packages-config-flat` | A .NET Framework project that was never restored: no `packages/` folder, no `.csproj`. Every package is a direct dependency of the root, and the runtime comes from the lowest `targetFramework` attribute — `net40`, not the `net45` that appears first. |
 
 `net8-no-dependencies` is real restore output from `snyk/cli` (`test/fixtures/nuget-app`); the rest
 are hand-written to stay small enough to read. Breadth over a real project is covered by

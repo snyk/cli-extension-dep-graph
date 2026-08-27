@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "nuget"
+  },
+  "pkgs": [
+    {
+      "id": "Antlr@3.4.1.9004",
+      "info": {
+        "name": "Antlr",
+        "version": "3.4.1.9004"
+      }
+    },
+    {
+      "id": "Microsoft.Web.Infrastructure@1.0.0.0",
+      "info": {
+        "name": "Microsoft.Web.Infrastructure",
+        "version": "1.0.0.0"
+      }
+    },
+    {
+      "id": "Newtonsoft.Json@10.0.3",
+      "info": {
+        "name": "Newtonsoft.Json",
+        "version": "10.0.3"
+      }
+    },
+    {
+      "id": "packages-config-flat@0.0.0",
+      "info": {
+        "name": "packages-config-flat",
+        "version": "0.0.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "Antlr@3.4.1.9004",
+        "pkgId": "Antlr@3.4.1.9004",
+        "deps": []
+      },
+      {
+        "nodeId": "Microsoft.Web.Infrastructure@1.0.0.0",
+        "pkgId": "Microsoft.Web.Infrastructure@1.0.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "Newtonsoft.Json@10.0.3",
+        "pkgId": "Newtonsoft.Json@10.0.3",
+        "deps": []
+      },
+      {
+        "nodeId": "root-node",
+        "pkgId": "packages-config-flat@0.0.0",
+        "deps": [
+          {
+            "nodeId": "Antlr@3.4.1.9004"
+          },
+          {
+            "nodeId": "Microsoft.Web.Infrastructure@1.0.0.0"
+          },
+          {
+            "nodeId": "Newtonsoft.Json@10.0.3"
+          }
+        ]
+      }
+    ]
+  }
+}
