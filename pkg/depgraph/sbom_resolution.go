@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -212,6 +213,16 @@ func buildPluginOptions(config configuration.Configuration) *ecosystems.SCAPlugi
 	if targetFile := config.GetString(workflow.FlagFile); targetFile != "" {
 		opts = opts.WithTargetFile(targetFile)
 	}
+
+	// The CLI documents --packages-folder as relative to the working directory,
+	// not to the scanned root, so it is resolved here rather than per project.
+	if packagesFolder := config.GetString(workflow.FlagNugetPkgsFolder); packagesFolder != "" {
+		if abs, err := filepath.Abs(packagesFolder); err == nil {
+			packagesFolder = abs
+		}
+		opts = opts.WithPackagesFolder(packagesFolder)
+	}
+
 	return opts
 }
 

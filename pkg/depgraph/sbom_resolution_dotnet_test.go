@@ -238,6 +238,24 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 			"the project we did not resolve must not be excluded from the legacy scan")
 	})
 
+	// Both manifests are ours now, and each is claimed separately, so the legacy
+	// resolver is told to skip both rather than reporting either a second time.
+	t.Run("flag on with --all-projects: two manifests in one directory are both claimed", func(t *testing.T) {
+		dir := sdkStyleProject(t)
+		writePackagesConfig(t, dir, `<packages>
+          <package id="Newtonsoft.Json" version="10.0.3" targetFramework="net45" />
+        </packages>`)
+
+		workflowData, harness := run(t, dir, true, true, []string{"package.json"})
+
+		require.True(t, harness.Called())
+		require.Len(t, workflowData, 3, "both .NET projects plus the legacy result for another ecosystem")
+
+		excluded := harness.CapturedExcludePaths()
+		assert.Contains(t, excluded, filepath.Join("obj", "project.assets.json"))
+		assert.Contains(t, excluded, "packages.config")
+	})
+
 	// An assets file we cannot use must not be claimed, or the resolver that
 	// could still handle it is told to skip it.
 	t.Run("flag on: an unusable assets file falls back to legacy", func(t *testing.T) {

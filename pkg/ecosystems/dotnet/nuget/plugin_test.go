@@ -818,3 +818,85 @@ func TestPlugin_UnreadableObjDirIsNotAnError(t *testing.T) {
 	require.Len(t, results, 1)
 	assert.Equal(t, projectAssetsFile, results[0].ProjectDescriptor.GetTargetFile())
 }
+
+// The packages folder changes what is reported, in both directions: a .nuspec
+// contributes a package the manifest never lists, and an installed version
+// overrides the one the manifest asked for. The default location is the
+// manifest's grandparent, which is the classic solution layout.
+func TestPlugin_PackagesFolderChangesTheReportedSet(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "Solution", "Project")
+	packages := filepath.Join(root, "Solution", packagesFolderName)
+
+	write(t, project, packagesConfigFile, `<packages>
+  <package id="Swagger.Net" version="0.5.5" targetFramework="net45" />
+  <package id="jQuery" version="1.9.1" targetFramework="net45" />
+</packages>`)
+
+	writeNupkg(t, packages, declaredPackage{"Swagger.Net", "0.5.5"},
+		zipEntry{"Swagger.Net" + nuspecExt, []byte(swaggerNuspec)})
+	makePackageDirs(t, packages, "jQuery.3.2.1")
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), project, ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	graph := results[0].DepGraph
+	require.NotNil(t, graph)
+
+	assert.ElementsMatch(t, []string{
+		graph.GetRootPkg().ID,
+		"Swagger.Net@0.5.5",
+		// Declared as 1.9.1; 3.2.1 is what is installed, and what would
+		// actually be exploited.
+		"jQuery@3.2.1",
+		// Named by no manifest, only by Swagger.Net's .nuspec.
+		"WebActivator@1.5.1",
+	}, pkgIDs(graph.Pkgs))
+
+	assert.Equal(t, []string{"WebActivator@1.5.1"}, depsOf(t, graph, "Swagger.Net@0.5.5"))
+}
+
+// A packages folder beside the manifest rather than above it is invisible to
+// the derived default, which is why --packages-folder exists. snyk/cli's own
+// end-to-end test for this shape passes the flag for the same reason.
+func TestPlugin_PackagesFolderFlag(t *testing.T) {
+	project := t.TempDir()
+	packages := filepath.Join(project, packagesFolderName)
+
+	write(t, project, packagesConfigFile,
+		`<packages><package id="Swagger.Net" version="0.5.5" targetFramework="net45" /></packages>`)
+	writeNupkg(t, packages, declaredPackage{"Swagger.Net", "0.5.5"},
+		zipEntry{"Swagger.Net" + nuspecExt, []byte(swaggerNuspec)})
+
+	withoutFlag, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), project, ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, withoutFlag, 1)
+	assert.NotContains(t, pkgIDs(withoutFlag[0].DepGraph.Pkgs), "WebActivator@1.5.1")
+
+	withFlag, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), project,
+		ecosystems.NewPluginOptions().WithPackagesFolder(packages))
+	require.NoError(t, err)
+	require.Len(t, withFlag, 1)
+	assert.Contains(t, pkgIDs(withFlag[0].DepGraph.Pkgs), "WebActivator@1.5.1")
+}
+
+// A truncated archive means we cannot know what that package pulls in, and
+// reporting the project anyway would claim the manifest while quietly omitting
+// them. The legacy resolver gets it instead.
+func TestPlugin_UnreadableNupkgIsLeftToLegacy(t *testing.T) {
+	project := t.TempDir()
+	packages := filepath.Join(project, packagesFolderName)
+
+	write(t, project, packagesConfigFile,
+		`<packages><package id="Swagger.Net" version="0.5.5" targetFramework="net45" /></packages>`)
+	write(t, filepath.Join(packages, "Swagger.Net.0.5.5"), "Swagger.Net.0.5.5"+nupkgExt, "not a zip")
+
+	log := &recordingLogger{}
+	results, err := scatest.Run(context.Background(), Plugin{}, log, project,
+		ecosystems.NewPluginOptions().WithPackagesFolder(packages))
+
+	require.NoError(t, err)
+	assert.Empty(t, results)
+	assert.NotEmpty(t, log.errs)
+}

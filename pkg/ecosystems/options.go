@@ -15,6 +15,7 @@ type SCAPluginOptions struct {
 	Python PythonOptions
 	Gradle GradleOptions
 	Bazel  BazelOptions
+	Dotnet DotnetOptions
 }
 
 // GlobalOptions contains options that apply globally across all SCA plugins.
@@ -87,11 +88,20 @@ type BazelOptions struct {
 	Platforms string `arg:"--bazel-platforms"`
 }
 
+// DotnetOptions contains .NET-specific options for dependency graph generation.
+type DotnetOptions struct {
+	// PackagesFolder is a custom location for the packages/ folder that
+	// `nuget restore` populates for packages.config and project.json projects.
+	// Empty means the location is derived from the manifest's own path.
+	PackagesFolder string `arg:"--packages-folder"`
+}
+
 func NewPluginOptions() *SCAPluginOptions {
 	return &SCAPluginOptions{
 		Python: PythonOptions{},
 		Gradle: GradleOptions{},
 		Bazel:  BazelOptions{},
+		Dotnet: DotnetOptions{},
 	}
 }
 
@@ -101,6 +111,7 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 		PythonOptions
 		GradleOptions
 		BazelOptions
+		DotnetOptions
 		StrictOutOfSync *string `arg:"--strict-out-of-sync"`
 	}
 
@@ -121,6 +132,7 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 		Python: args.PythonOptions,
 		Gradle: args.GradleOptions,
 		Bazel:  args.BazelOptions,
+		Dotnet: args.DotnetOptions,
 	}, nil
 }
 
@@ -260,5 +272,13 @@ func (o *SCAPluginOptions) WithBazelMaxTargets(n int) *SCAPluginOptions {
 // resolution to the host's auto-detected platform.
 func (o *SCAPluginOptions) WithBazelPlatforms(platforms string) *SCAPluginOptions {
 	o.Bazel.Platforms = platforms
+	return o
+}
+
+// WithPackagesFolder sets a custom location for the .NET packages/ folder,
+// mirroring the CLI's --packages-folder. Empty (the default) leaves the .NET
+// resolver to derive the location from each manifest's own path.
+func (o *SCAPluginOptions) WithPackagesFolder(packagesFolder string) *SCAPluginOptions {
+	o.Dotnet.PackagesFolder = packagesFolder
 	return o
 }
