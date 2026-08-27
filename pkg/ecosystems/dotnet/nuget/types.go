@@ -48,3 +48,13 @@ const (
 var targetFileNames = []string{
 	projectAssetsFile,
 }
+
+// rootTargetFilePrecedence orders the manifests a single-project scan chooses
+// between when a directory holds more than one, highest priority first. It
+// mirrors the CLI's own DETECTABLE_FILES order (snyk/cli src/lib/detect.ts),
+// which is what decides that a directory holding restore output alongside the
+// manifest it was generated from is one project, not two.
+var rootTargetFilePrecedence = []struct{ subdir, name string }{
+	{objDir, projectAssetsFile},
+	{"", projectAssetsFile},
+}

@@ -669,3 +669,49 @@ func TestNewProjectIdentity_SetsEveryField(t *testing.T) {
 	assert.Equal(t, "App", id.RootComponentName)
 	assert.Equal(t, pkgManager, id.ProjectType)
 }
+
+// A directory holding both a root-level assets file and restore output in obj/
+// is one project, not two. The CLI picks the first hit in DETECTABLE_FILES
+// order, and a scan without --all-projects still emits every result a plugin
+// produces — so returning both would double-report the project.
+func TestPlugin_RootDirOnly_ManifestPrecedence(t *testing.T) {
+	dir := writeFiles(t, objDir+"/"+projectAssetsFile, projectAssetsFile)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, filepath.Join(objDir, projectAssetsFile), results[0].ProjectDescriptor.GetTargetFile(),
+		"restore output outranks a copy beside it")
+}
+
+// A scanned root that is not there at all is a setup failure, the same as a
+// --file naming a path that does not exist. Reporting no target files instead
+// would send the scan on to the next plugin to rediscover the same problem.
+func TestPlugin_MissingScanRootIsAnError(t *testing.T) {
+	_, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(),
+		filepath.Join(t.TempDir(), "absent"), ecosystems.NewPluginOptions())
+
+	require.Error(t, err)
+}
+
+// An unrestored project has no obj/, which is ordinary rather than a failure.
+func TestPlugin_MissingObjDirIsNotAnError(t *testing.T) {
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), t.TempDir(), ecosystems.NewPluginOptions())
+
+	require.NoError(t, err)
+	assert.Empty(t, results)
+}
+
+// obj/ is where restore output lives, but a project is not required to have
+// one — and something else occupying the name must not take the scan down with
+// it. A returned error would reach the orchestrator as a failed result.
+func TestPlugin_UnreadableObjDirIsNotAnError(t *testing.T) {
+	dir := writeFiles(t, projectAssetsFile)
+	write(t, dir, objDir, "a regular file, not a directory")
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
+
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, projectAssetsFile, results[0].ProjectDescriptor.GetTargetFile())
+}
