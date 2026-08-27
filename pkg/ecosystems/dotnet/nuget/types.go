@@ -2,23 +2,27 @@ package nuget
 
 const (
 	// projectAssetsFile is `dotnet restore` output for SDK-style
-	// (PackageReference) projects, and the only target file this plugin claims.
+	// (PackageReference) projects: a fully resolved dependency set.
 	projectAssetsFile = "project.assets.json"
 
-	// packagesConfigFile and projectJSONFile are the .NET Framework manifests.
-	// The CLI discovers them (snyk/cli src/lib/detect.ts) but this resolver does
-	// not: they carry no resolved dependency set. Leaving them out of
-	// targetFileNames is what makes those projects fall back to the legacy
-	// resolver, which reports them exactly as it does today.
+	// packagesConfigFile is the .NET Framework manifest. It records no resolved
+	// dependency set — just a flattened list of what NuGet installed.
 	packagesConfigFile = "packages.config"
-	projectJSONFile    = "project.json"
+
+	// projectJSONFile is the pre-RTM .NET Core manifest. The CLI discovers it
+	// (snyk/cli src/lib/detect.ts) but this resolver does not yet: CMPA-717.
+	projectJSONFile = "project.json"
 
 	// objDir is where `dotnet restore` writes project.assets.json. A target file
 	// inside it describes the project one directory up.
 	objDir = "obj"
 
-	// defaultVersion roots a project whose assets file declares no
-	// project.version, matching snyk-nuget-plugin.
+	// csprojExt is the only project file extension consulted for a target
+	// framework. See csprojTargetFramework.
+	csprojExt = ".csproj"
+
+	// defaultVersion roots a project whose manifest declares no version,
+	// matching snyk-nuget-plugin.
 	defaultVersion = "0.0.0"
 
 	// filteredPackagePrefix drops `runtime` and `runtime.native.*` packages:
@@ -47,6 +51,7 @@ const (
 // targetFileNames lists every file name discovery matches.
 var targetFileNames = []string{
 	projectAssetsFile,
+	packagesConfigFile,
 }
 
 // rootTargetFilePrecedence orders the manifests a single-project scan chooses
@@ -57,4 +62,5 @@ var targetFileNames = []string{
 var rootTargetFilePrecedence = []struct{ subdir, name string }{
 	{objDir, projectAssetsFile},
 	{"", projectAssetsFile},
+	{"", packagesConfigFile},
 }

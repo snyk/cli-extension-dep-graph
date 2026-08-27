@@ -39,9 +39,8 @@ func buildDepGraph(ctx context.Context, assets *projectAssets, rootName, targets
 	}
 
 	g := &graphBuilder{
-		builder:  builder,
+		edgeSet:  newEdgeSet(builder),
 		resolved: resolvePackages(&target),
-		edges:    make(map[edge]struct{}),
 	}
 
 	direct := assets.directDependencies(targetsKey)
@@ -70,10 +69,39 @@ type edge struct {
 	child  string
 }
 
+// edgeSet wraps a builder so that an edge is added at most once. Both .NET
+// resolution paths walk a shared subtree once per route that reaches it, and
+// Builder.ConnectNodes appends without checking, whereas the graphlib
+// snyk-nuget-plugin builds on treats an edge as a set member. Without this the
+// same dependency would appear several times in a node's deps.
+type edgeSet struct {
+	builder *godepgraph.Builder
+	edges   map[edge]struct{}
+}
+
+func newEdgeSet(builder *godepgraph.Builder) *edgeSet {
+	return &edgeSet{builder: builder, edges: make(map[edge]struct{})}
+}
+
+// connect adds an edge unless it is already present.
+func (e *edgeSet) connect(parentNodeID, childNodeID string) error {
+	pair := edge{parent: parentNodeID, child: childNodeID}
+	if _, seen := e.edges[pair]; seen {
+		return nil
+	}
+
+	if err := e.builder.ConnectNodes(parentNodeID, childNodeID); err != nil {
+		return fmt.Errorf("connecting %s to %s: %w", parentNodeID, childNodeID, err)
+	}
+
+	e.edges[pair] = struct{}{}
+
+	return nil
+}
+
 type graphBuilder struct {
-	builder  *godepgraph.Builder
+	*edgeSet
 	resolved map[string]resolvedPackage
-	edges    map[edge]struct{}
 }
 
 // addChildren connects each named dependency to parentNodeID and recurses,
@@ -115,7 +143,7 @@ func (g *graphBuilder) addChildren(
 		}
 
 		info := &godepgraph.PkgInfo{Name: pkg.name, Version: pkg.version}
-		childNodeID := nodeID(pkg)
+		childNodeID := pkgNodeID(pkg.name, pkg.version)
 
 		if _, seen := local[childNodeID]; seen {
 			prunedNodeID := childNodeID + prunedNodeSuffix
@@ -147,27 +175,8 @@ func (g *graphBuilder) addChildren(
 	return nil
 }
 
-// connect adds an edge unless it is already present. The builder appends
-// without checking, while upstream's graphlib treats an edge as a set member —
-// and upstream re-walks shared subtrees, so this is what keeps the two graphs
-// the same shape.
-func (g *graphBuilder) connect(parentNodeID, childNodeID string) error {
-	e := edge{parent: parentNodeID, child: childNodeID}
-	if _, seen := g.edges[e]; seen {
-		return nil
-	}
-
-	if err := g.builder.ConnectNodes(parentNodeID, childNodeID); err != nil {
-		return fmt.Errorf("connecting %s to %s: %w", parentNodeID, childNodeID, err)
-	}
-
-	g.edges[e] = struct{}{}
-
-	return nil
-}
-
-// nodeID is the graph identity of a resolved package, matching the dep-graph
+// pkgNodeID is the graph identity of a package, matching the dep-graph
 // library's own getPkgID.
-func nodeID(pkg resolvedPackage) string {
-	return pkg.name + "@" + pkg.version
+func pkgNodeID(name, version string) string {
+	return name + "@" + version
 }
