@@ -73,13 +73,18 @@ func TestAcceptance(t *testing.T) {
 
 // fixtureOptions builds the options a fixture is scanned with.
 //
-// A fixture with a packages/ directory gets --packages-folder pointing at a
-// materialized copy of it. The derived default is the manifest's grandparent,
+// --all-projects, because it is the one mode that reaches every manifest: the
+// CLI does not detect a project.json by scanning a directory, only by walking
+// one. Which manifest a bare scan picks is a discovery question, and is covered
+// by TestPlugin_RootDirOnly_ManifestPrecedence rather than by a golden.
+//
+// A fixture with a packages/ directory also gets --packages-folder pointing at
+// a materialized copy of it. The derived default is the manifest's grandparent,
 // which here would be testdata/acceptance itself.
 func fixtureOptions(t *testing.T, dir string) *ecosystems.SCAPluginOptions {
 	t.Helper()
 
-	options := ecosystems.NewPluginOptions()
+	options := ecosystems.NewPluginOptions().WithAllProjects(true)
 
 	packages := filepath.Join(dir, "packages")
 	if _, err := os.Stat(packages); err != nil {
