@@ -382,7 +382,7 @@ workflows:
       # Main branch only - security scans and tagging (no test re-runs)
       - security-scans:
           context:
-            - analysis_unify
+            - open_source-managed
             - prodsec-orb-runtime
           <<: *filters_main_only
 
