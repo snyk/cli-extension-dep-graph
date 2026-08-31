@@ -30,8 +30,11 @@ type GlobalOptions struct {
 	ForceIncludeWorkspacePackages bool                 `arg:"--internal-uv-workspace-packages"`
 	ProjectName                   *string              `arg:"--project-name"`
 	IncludeProvenance             bool                 `arg:"--include-provenance"`
-	WorkspacePackage              *string              `arg:"--workspace-package"`
-	RawFlags                      []string
+	// IncludeComponentMetadata emits component-metadata node labels
+	// (hash:<alg> and, when the real resolution was observed, distribution:url).
+	IncludeComponentMetadata bool    `arg:"--include-component-metadata"`
+	WorkspacePackage         *string `arg:"--workspace-package"`
+	RawFlags                 []string
 }
 
 // CommaSeparatedString is a custom type that parses comma-separated values.
@@ -66,6 +69,11 @@ type GradleOptions struct {
 	// NormalizeDeps uses the SHAs of the dependencies provided by the IncludeProvenance flag
 	// to lookup the canonical GAV coordinates of the dependency and rewrite the produced DepGraphs.
 	NormalizeDeps bool `arg:"--gradle-normalize-deps"`
+	// RefreshDependencies forces `--refresh-dependencies` so metadata reads fire
+	// and distribution:url is populated even on a warm cache. Opt-in: forces
+	// network access and can re-resolve dynamic/SNAPSHOT versions. Only affects
+	// distribution:url coverage; hash:<alg> labels are unaffected.
+	RefreshDependencies bool `arg:"--gradle-refresh-dependencies"`
 }
 
 // BazelOptions contains Bazel-specific options for dependency graph generation.
@@ -226,6 +234,16 @@ func (o *SCAPluginOptions) WithGradleNormalizeDeps(normalizeDeps bool) *SCAPlugi
 
 func (o *SCAPluginOptions) WithIncludeProvenance(includeProvenance bool) *SCAPluginOptions {
 	o.Global.IncludeProvenance = includeProvenance
+	return o
+}
+
+func (o *SCAPluginOptions) WithIncludeComponentMetadata(includeComponentMetadata bool) *SCAPluginOptions {
+	o.Global.IncludeComponentMetadata = includeComponentMetadata
+	return o
+}
+
+func (o *SCAPluginOptions) WithGradleRefreshDependencies(refreshDependencies bool) *SCAPluginOptions {
+	o.Gradle.RefreshDependencies = refreshDependencies
 	return o
 }
 

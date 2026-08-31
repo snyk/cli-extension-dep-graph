@@ -1,0 +1,222 @@
+[
+  {
+    "depGraph": {
+      "schemaVersion": "1.3.0",
+      "pkgManager": {
+        "name": "gradle"
+      },
+      "pkgs": [
+        {
+          "id": "com.snyk.fixtures:simple-app@1.0.0",
+          "info": {
+            "name": "com.snyk.fixtures:simple-app",
+            "version": "1.0.0"
+          }
+        },
+        {
+          "id": "com.google.guava:guava@30.1.1-jre",
+          "info": {
+            "name": "com.google.guava:guava",
+            "version": "30.1.1-jre"
+          }
+        },
+        {
+          "id": "com.google.guava:failureaccess@1.0.1",
+          "info": {
+            "name": "com.google.guava:failureaccess",
+            "version": "1.0.1"
+          }
+        },
+        {
+          "id": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava",
+          "info": {
+            "name": "com.google.guava:listenablefuture",
+            "version": "9999.0-empty-to-avoid-conflict-with-guava"
+          }
+        },
+        {
+          "id": "com.google.code.findbugs:jsr305@3.0.2",
+          "info": {
+            "name": "com.google.code.findbugs:jsr305",
+            "version": "3.0.2"
+          }
+        },
+        {
+          "id": "org.checkerframework:checker-qual@3.8.0",
+          "info": {
+            "name": "org.checkerframework:checker-qual",
+            "version": "3.8.0"
+          }
+        },
+        {
+          "id": "com.google.errorprone:error_prone_annotations@2.5.1",
+          "info": {
+            "name": "com.google.errorprone:error_prone_annotations",
+            "version": "2.5.1"
+          }
+        },
+        {
+          "id": "com.google.j2objc:j2objc-annotations@1.3",
+          "info": {
+            "name": "com.google.j2objc:j2objc-annotations",
+            "version": "1.3"
+          }
+        },
+        {
+          "id": "org.apache.commons:commons-lang3@3.14.0",
+          "info": {
+            "name": "org.apache.commons:commons-lang3",
+            "version": "3.14.0"
+          }
+        }
+      ],
+      "graph": {
+        "rootNodeId": "root-node",
+        "nodes": [
+          {
+            "nodeId": "root-node",
+            "pkgId": "com.snyk.fixtures:simple-app@1.0.0",
+            "deps": [
+              {
+                "nodeId": "com.google.guava:guava@30.1.1-jre"
+              },
+              {
+                "nodeId": "org.apache.commons:commons-lang3@3.14.0"
+              }
+            ]
+          },
+          {
+            "nodeId": "com.google.guava:guava@30.1.1-jre",
+            "pkgId": "com.google.guava:guava@30.1.1-jre",
+            "info": {
+              "labels": {
+                "hash:md5": "05374f163d0a4141db672fff9df95b12",
+                "hash:sha-1": "87e0fd1df874ea3cbe577702fe6f17068b790fd8",
+                "hash:sha-256": "44ce229ce26d880bf3afc362bbfcec34d7e6903d195bbb1db9f3b6e0d9834f06",
+                "hash:sha-512": "025cdd70db7d896d57cc04a8a735ded609b393e8d56af23d454198b64a263147ab0d68fbdffabcb926b143433fccdc022f76aaed658b9448c5ce85f07c42140f"
+              }
+            },
+            "deps": [
+              {
+                "nodeId": "com.google.guava:failureaccess@1.0.1"
+              },
+              {
+                "nodeId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava"
+              },
+              {
+                "nodeId": "com.google.code.findbugs:jsr305@3.0.2"
+              },
+              {
+                "nodeId": "org.checkerframework:checker-qual@3.8.0"
+              },
+              {
+                "nodeId": "com.google.errorprone:error_prone_annotations@2.5.1"
+              },
+              {
+                "nodeId": "com.google.j2objc:j2objc-annotations@1.3"
+              }
+            ]
+          },
+          {
+            "nodeId": "com.google.guava:failureaccess@1.0.1",
+            "pkgId": "com.google.guava:failureaccess@1.0.1",
+            "info": {
+              "labels": {
+                "hash:md5": "091883993ef5bfa91da01dcc8fc52236",
+                "hash:sha-1": "1dcf1de382a0bf95a3d8b0849546c88bac1292c9",
+                "hash:sha-256": "a171ee4c734dd2da837e4b16be9df4661afab72a41adaf31eb84dfdaf936ca26",
+                "hash:sha-512": "f8d59b808d6ba617252305b66d5590937da9b2b843d492d06b8d0b1b1f397e39f360d5817707797b979a5bf20bf21987b35333e7a15c44ed7401fea2d2119cae"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava",
+            "pkgId": "com.google.guava:listenablefuture@9999.0-empty-to-avoid-conflict-with-guava",
+            "info": {
+              "labels": {
+                "hash:md5": "d094c22570d65e132c19cea5d352e381",
+                "hash:sha-1": "b421526c5f297295adef1c886e5246c39d4ac629",
+                "hash:sha-256": "b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99",
+                "hash:sha-512": "c5987a979174cbacae2e78b319f080420cc71bcdbcf7893745731eeb93c23ed13bff8d4599441f373f3a246023d33df03e882de3015ee932a74a774afdd0782f"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.code.findbugs:jsr305@3.0.2",
+            "pkgId": "com.google.code.findbugs:jsr305@3.0.2",
+            "info": {
+              "labels": {
+                "hash:md5": "dd83accb899363c32b07d7a1b2e4ce40",
+                "hash:sha-1": "25ea2e8b0c338a877313bd4672d3fe056ea78f0d",
+                "hash:sha-256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7",
+                "hash:sha-512": "bb09db62919a50fa5b55906013be6ca4fc7acb2e87455fac5eaf9ede2e41ce8bbafc0e5a385a561264ea4cd71bbbd3ef5a45e02d63277a201d06a0ae1636f804"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.checkerframework:checker-qual@3.8.0",
+            "pkgId": "org.checkerframework:checker-qual@3.8.0",
+            "info": {
+              "labels": {
+                "hash:md5": "b9822b33f72326c74abded69b7c717cc",
+                "hash:sha-1": "6b83e4a33220272c3a08991498ba9dc09519f190",
+                "hash:sha-256": "c88c2e6a5fdaeb9f26fcf879264042de8a9ee9d376e2477838feaabcfa44dda6",
+                "hash:sha-512": "742f5442d72b37cb7d2e8e069dbe03545e5e21f1cba51254fc62beea3ed688446cbb5c4e505670c4c4e3f12b35fe9292ec501bd799319c6f0dfc129495bc90c9"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.errorprone:error_prone_annotations@2.5.1",
+            "pkgId": "com.google.errorprone:error_prone_annotations@2.5.1",
+            "info": {
+              "labels": {
+                "hash:md5": "2bf3239388cf5c817cd83ecb692b045f",
+                "hash:sha-1": "562d366678b89ce5d6b6b82c1a073880341e3fba",
+                "hash:sha-256": "ff80626baaf12a09342befd4e84cba9d50662f5fcd7f7a9b3490a6b7cf87e66c",
+                "hash:sha-512": "24d512c97bbea2b972addff6bb28b9e7edae62249dfb6693835f077fe239395bb15ce82ad58d4ee42d8c4891a0e62b51398450ad6c9dec473173eacb6c6bcd3a"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "com.google.j2objc:j2objc-annotations@1.3",
+            "pkgId": "com.google.j2objc:j2objc-annotations@1.3",
+            "info": {
+              "labels": {
+                "hash:md5": "5fa4ec4ec0c5aa70af8a7d4922df1931",
+                "hash:sha-1": "ba035118bc8bac37d7eff77700720999acd9986d",
+                "hash:sha-256": "21af30c92267bd6122c0e0b4d20cccb6641a37eaf956c6540ec471d584e64a7b",
+                "hash:sha-512": "51ea975179f809cb260751d11a513881b643bf016d15949bcb63b57d3c8868a2197e0620ccbaa5739e032797ec6faa3aa6d64606e999fce32930314780ca4115"
+              }
+            },
+            "deps": []
+          },
+          {
+            "nodeId": "org.apache.commons:commons-lang3@3.14.0",
+            "pkgId": "org.apache.commons:commons-lang3@3.14.0",
+            "info": {
+              "labels": {
+                "hash:md5": "4e5c3f5e6b0b965ef241d7d72ac8971f",
+                "hash:sha-1": "1ed471194b02f2c6cb734a0cd6f6f107c673afae",
+                "hash:sha-256": "7b96bf3ee68949abb5bc465559ac270e0551596fa34523fddf890ec418dde13c",
+                "hash:sha-512": "0338b50767166e5746ada6d6aa2e071e7221d699323bfb629f7f204b294c1dc4cad140610a129ed751798443b43e74e0818989c7df7d33c5915aa29742be9ba8"
+              }
+            },
+            "deps": []
+          }
+        ]
+      }
+    },
+    "projectDescriptor": {
+      "identity": {
+        "type": "gradle",
+        "targetFile": "build.gradle",
+        "rootComponentName": "com.snyk.fixtures:simple-app"
+      }
+    }
+  }
+]

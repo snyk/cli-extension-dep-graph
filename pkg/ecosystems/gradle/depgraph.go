@@ -43,6 +43,9 @@ func buildDepGraph(proj *gradleProject, options *ecosystems.SCAPluginOptions) (*
 	// Create a map of dependency ID to provenance information for quick lookups
 	provenanceMap := buildProvenanceMap(proj.Configurations, options)
 
+	// Map of dependency ID to component metadata (hashes + distribution URL).
+	componentMetadataMap := buildComponentMetadataMap(proj.Configurations, options)
+
 	// Create function to ensure each edge is added only once across configurations
 	connectOnce := createEdgeDeduplicator(builder)
 
@@ -58,9 +61,10 @@ func buildDepGraph(proj *gradleProject, options *ecosystems.SCAPluginOptions) (*
 
 	// Create context with shared state for dependency graph building
 	ctx := &depGraphContext{
-		builder:       builder,
-		connectOnce:   connectOnce,
-		provenanceMap: provenanceMap,
+		builder:              builder,
+		connectOnce:          connectOnce,
+		provenanceMap:        provenanceMap,
+		componentMetadataMap: componentMetadataMap,
 	}
 
 	// Merge all configurations into a single graph.
@@ -91,6 +95,10 @@ type depGraphContext struct {
 	builder       *depgraph.Builder
 	connectOnce   func(parentID, childID string) error
 	provenanceMap map[string]*allDepEntry
+	// componentMetadataMap maps dependency ID to its component-metadata entry
+	// (hashes + distribution URL). Non-nil only when --include-component-metadata
+	// is set; used to attach hash:<alg>/distribution:url node labels.
+	componentMetadataMap map[string]*allDepEntry
 }
 
 // addDep recursively adds a resolved dependency node and its children to the
@@ -177,7 +185,12 @@ func (ctx *depGraphContext) addDep(dep *gradleDep, parentID string, processed ma
 		provenanceEntry = ctx.provenanceMap[dep.ID]
 	}
 	pkgInfo := createPkgInfo(name, version, provenanceEntry, ctx.provenanceMap != nil)
-	ctx.builder.AddNode(nodeID, pkgInfo)
+	// Attach component-metadata labels (hash:<alg>, distribution:url) when present.
+	if labels := ctx.componentMetadataLabels(dep.ID); len(labels) > 0 {
+		ctx.builder.AddNode(nodeID, pkgInfo, depgraph.WithNodeInfo(&depgraph.NodeInfo{Labels: labels}))
+	} else {
+		ctx.builder.AddNode(nodeID, pkgInfo)
+	}
 	if err := ctx.connectOnce(parentID, nodeID); err != nil {
 		return err
 	}
@@ -272,6 +285,57 @@ func buildProvenanceMap(configurations []gradleConfig, options *ecosystems.SCAPl
 		}
 	}
 	return provenanceMap
+}
+
+// buildComponentMetadataMap creates a map from dependency ID to its
+// component-metadata entry (file hashes and, when the real resolution was
+// observed, the distribution URL). Built only when --include-component-metadata
+// is enabled. First configuration to carry metadata for an ID wins.
+func buildComponentMetadataMap(configurations []gradleConfig, options *ecosystems.SCAPluginOptions) map[string]*allDepEntry {
+	if options == nil || !options.Global.IncludeComponentMetadata {
+		return nil
+	}
+
+	metadataMap := make(map[string]*allDepEntry)
+	for _, cfg := range configurations {
+		for i := range cfg.AllDependencies {
+			entry := &cfg.AllDependencies[i]
+			if len(entry.Hashes) == 0 && entry.DistributionURL == "" {
+				continue
+			}
+			if _, exists := metadataMap[entry.ID]; !exists {
+				metadataMap[entry.ID] = entry
+			}
+		}
+	}
+	return metadataMap
+}
+
+// componentMetadataLabels returns the node labels (hash:<alg>, distribution:url)
+// for a dependency ID, using the shared cross-ecosystem label vocabulary so SBOM
+// generation consumes them identically to Maven/npm. Returns nil when the
+// feature is off or no metadata is available.
+func (ctx *depGraphContext) componentMetadataLabels(depID string) map[string]string {
+	if ctx.componentMetadataMap == nil {
+		return nil
+	}
+	entry := ctx.componentMetadataMap[depID]
+	if entry == nil {
+		return nil
+	}
+	labels := make(map[string]string)
+	for alg, value := range entry.Hashes {
+		if value != "" {
+			labels["hash:"+alg] = value
+		}
+	}
+	if entry.DistributionURL != "" {
+		labels["distribution:url"] = entry.DistributionURL
+	}
+	if len(labels) == 0 {
+		return nil
+	}
+	return labels
 }
 
 // createEdgeDeduplicator creates a function that ensures each edge is only
