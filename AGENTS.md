@@ -57,16 +57,6 @@ Ecosystem-specific rules (bazel, bun, .NET, …) live in the plugin's own `pkg/e
 | `internal/snykclient` | Snyk API client: packages, sbom convert, types |
 | `internal/workflow` | Workflow ID constants and CLI flag definitions |
 
-### Danger zone
-
-Treat these areas as high-risk — they have been repeatedly patched:
-
-- **Python plugins** (`pkg/ecosystems/python` — pip/uv/pipenv): the most-fixed area in the repo (see #136, #128, #109 and others).
-- **Bun resolver** (`pkg/ecosystems/javascript/bun`): recurring fixes around workspace and env handling (see #157, #156).
-- **Gradle resolver** (`pkg/ecosystems/gradle` — init script and dep-graph construction): ordering and output-marker fixes (see #190, #192).
-
-For these, prefer the smallest possible change, add tests before modifying, and ask a human reviewer before landing.
-
 ## Code conventions
 
 ### Style and formatting
@@ -127,8 +117,8 @@ scope and may introduce incorrect assumptions about existing behavior. Do write 
 
 ## Local development
 
-- Requires the Go toolchain pinned in `.tool-versions` / `go.mod` (Go 1.26).
-- Install lint tooling with `make install-tools` (installs golangci-lint v2.9.0 into `.bin/`).
+- Requires the Go toolchain; the version is pinned in `.tool-versions` / `go.mod` — consult those rather than assuming.
+- Install lint tooling with `make install-tools` (installs the pinned `golangci-lint` into `.bin/`).
 - `make lint` runs `.bin/golangci-lint run` — keep the local golangci-lint version identical to CI so results are reproducible.
 
 ## Commits and PRs
