@@ -25,14 +25,20 @@ const (
 	logFieldTargetsKey      = "targetsKey"
 )
 
-// Plugin implements ecosystems.SCAPlugin for .NET projects, resolving SDK-style
-// (PackageReference) projects from the project.assets.json that `dotnet restore`
-// leaves behind. It never runs `dotnet`: the assets file already holds the
-// resolved dependency set.
+// Plugin implements ecosystems.SCAPlugin for .NET projects. It never runs
+// `dotnet` or `nuget`: everything it needs is already on disk.
 //
-// Only project.assets.json is claimed. packages.config and project.json carry no
-// resolved dependency set, so this plugin reports nothing for them and the
-// workflow moves on to the legacy resolver.
+// Two kinds of project, resolved differently. SDK-style (PackageReference)
+// projects come from the project.assets.json that `dotnet restore` leaves
+// behind, which holds a fully resolved dependency set. packages.config projects
+// hold no such thing, so they are resolved from the flattened list the manifest
+// itself carries.
+//
+// A manifest it cannot resolve in full is left alone entirely — no result, no
+// claimed file — so the legacy resolver still sees the project and behaves
+// exactly as it does today. Reporting a partial result would be worse than
+// reporting none: the file would be claimed, and the packages we failed to find
+// would go unreported rather than being found by the resolver that follows.
 type Plugin struct{}
 
 // Compile-time check that Plugin implements the SCAPlugin interface.
@@ -77,15 +83,29 @@ func (p Plugin) BuildDepGraphsFromDir(
 	return nil
 }
 
-// emitResults resolves one target file and emits a result per target framework.
-// The results share a root name and target file, differing only in target
-// runtime — which is how snyk-nuget-plugin distinguishes them.
+// emitResults resolves one target file, dispatching on which manifest it is.
+func (p Plugin) emitResults(
+	ctx context.Context,
+	log logger.Logger,
+	file discovery.FindResult,
+	onGraph ecosystems.OnGraphFunc,
+) error {
+	if filepath.Base(file.Path) == projectAssetsFile {
+		return p.emitAssetsResults(ctx, log, file, onGraph)
+	}
+
+	return p.emitFrameworkResult(ctx, log, file, onGraph)
+}
+
+// emitAssetsResults resolves an SDK-style project and emits a result per target
+// framework. The results share a root name and target file, differing only in
+// target runtime — which is how snyk-nuget-plugin distinguishes them.
 //
 // A framework that cannot be resolved is reported as a failure against its own
-// runtime. An assets file that cannot be read or parsed at all is logged and
-// skipped, claiming nothing, so the legacy resolver still sees the project: it
-// reaches .NET projects through `dotnet` and can resolve some this one cannot.
-func (p Plugin) emitResults(
+// runtime: the framework is named in the file, so the result is still
+// identifiable. An assets file that cannot be read or parsed at all is logged
+// and skipped, claiming nothing, so the legacy resolver still sees the project.
+func (p Plugin) emitAssetsResults(
 	ctx context.Context,
 	log logger.Logger,
 	file discovery.FindResult,
@@ -335,4 +355,73 @@ func isSupportedTargetFile(path string) bool {
 	}
 
 	return false
+}
+
+// emitFrameworkResult resolves a packages.config project and emits its single
+// result.
+//
+// One result, not one per framework: the manifest records no per-framework
+// resolution, so there is one dependency set and one runtime to report it
+// under. Anything that stops the project being resolved in full leaves it to
+// the legacy resolver — see the note on Plugin.
+func (p Plugin) emitFrameworkResult(
+	ctx context.Context,
+	log logger.Logger,
+	file discovery.FindResult,
+	onGraph ecosystems.OnGraphFunc,
+) error {
+	targetFile := file.RelPath
+
+	manifest, err := readPackagesConfig(file.Path, targetFile)
+	if err != nil {
+		return deferToLegacy(ctx, log, targetFile, err)
+	}
+
+	framework, ok, err := detectTargetFramework(filepath.Dir(file.Path), manifest)
+	if err != nil {
+		return deferToLegacy(ctx, log, targetFile, err)
+	}
+
+	// The target runtime is part of a project's identity, and nothing in this
+	// manifest records the framework a package was resolved for. Guessing one
+	// would report the project under a framework it does not target.
+	if !ok {
+		return deferToLegacy(ctx, log, targetFile, snykecosystems.NewNoTargetFrameworksFoundError(
+			fmt.Sprintf("Could not determine a target framework for %s. "+
+				"It needs a .csproj alongside it naming a TargetFramework, or targetFramework "+
+				"attributes on its entries.", targetFile),
+		))
+	}
+
+	log.Debug(ctx, "Resolving .NET project",
+		logger.Attr(logFieldTargetFile, targetFile),
+		logger.Attr(logFieldTargetFramework, framework.original),
+	)
+
+	declared := newPackageSet()
+	for _, pkg := range manifest.packages {
+		declared.add(pkg.name, pkg.version)
+	}
+
+	rootName := rootComponentName(file)
+
+	graph, err := buildFrameworkDepGraph(rootName, defaultVersion, declared)
+	if err != nil {
+		return deferToLegacy(ctx, log, targetFile, err)
+	}
+
+	result := p.newResult(targetFile, rootName, framework.original)
+	result.DepGraph = graph
+
+	return onGraph(result)
+}
+
+// deferToLegacy records why a project was left unresolved and reports nothing
+// for it, so the workflow moves on to the legacy resolver. It never returns an
+// error: one unresolvable project must not end a scan of many.
+func deferToLegacy(ctx context.Context, log logger.Logger, targetFile string, err error) error {
+	log.Error(ctx, "Leaving this .NET project to the legacy resolver",
+		logger.Attr(logFieldTargetFile, targetFile), logger.Err(err))
+
+	return nil
 }
