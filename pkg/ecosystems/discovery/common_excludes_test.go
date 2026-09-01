@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +28,7 @@ func TestCommonExcludes(t *testing.T) {
 
 	setupFiles(t, tmpDir, filesToSetup)
 
-	results, err := FindFiles(context.Background(), tmpDir,
+	results, err := FindFiles(context.Background(), logger.Nop(), tmpDir,
 		WithInclude("requirements.txt"),
 		WithCommonExcludes())
 

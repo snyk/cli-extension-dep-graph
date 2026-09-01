@@ -110,7 +110,7 @@ func pnpmTargets(
 	dir string,
 	options *ecosystems.SCAPluginOptions,
 ) ([]scanTarget, error) {
-	files, err := discoverLockFiles(ctx, dir, options)
+	files, err := discoverLockFiles(ctx, log, dir, options)
 	if err != nil {
 		return nil, err
 	}
@@ -248,6 +248,7 @@ func wrapRunError(err error) error {
 
 func discoverLockFiles(
 	ctx context.Context,
+	log logger.Logger,
 	dir string,
 	options *ecosystems.SCAPluginOptions,
 ) ([]discovery.FindResult, error) {
@@ -260,7 +261,7 @@ func discoverLockFiles(
 		if filepath.Base(*options.Global.TargetFile) != pnpmLockFile {
 			return nil, nil
 		}
-		files, err := discovery.FindFiles(ctx, dir, discovery.WithTargetFile(*options.Global.TargetFile))
+		files, err := discovery.FindFiles(ctx, log, dir, discovery.WithTargetFile(*options.Global.TargetFile))
 		if err != nil {
 			return nil, fmt.Errorf("discovering pnpm-lock.yaml files: %w", err)
 		}
@@ -277,7 +278,7 @@ func discoverLockFiles(
 		if len(options.Global.ExcludePaths) > 0 {
 			findOpts = append(findOpts, discovery.WithExcludes(options.Global.ExcludePaths...))
 		}
-		files, err := discovery.FindFiles(ctx, dir, findOpts...)
+		files, err := discovery.FindFiles(ctx, log, dir, findOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("discovering pnpm-lock.yaml files: %w", err)
 		}
