@@ -9,6 +9,8 @@ package nuget_test
 // the resolver only reads `dotnet restore` output, and that output is committed.
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"flag"
 	"os"
@@ -40,7 +42,7 @@ func TestAcceptance(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			dir := filepath.Join(acceptanceDir, name)
 
-			results, err := scatest.Run(t.Context(), nuget.Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
+			results, err := scatest.Run(t.Context(), nuget.Plugin{}, logger.Nop(), dir, fixtureOptions(t, dir))
 			require.NoError(t, err)
 			require.NotEmpty(t, results, "the plugin produced no results for %s", name)
 
@@ -67,6 +69,79 @@ func TestAcceptance(t *testing.T) {
 			compareGoldens(t, dir, byRuntime)
 		})
 	}
+}
+
+// fixtureOptions builds the options a fixture is scanned with.
+//
+// A fixture with a packages/ directory gets --packages-folder pointing at a
+// materialized copy of it. The derived default is the manifest's grandparent,
+// which here would be testdata/acceptance itself.
+func fixtureOptions(t *testing.T, dir string) *ecosystems.SCAPluginOptions {
+	t.Helper()
+
+	options := ecosystems.NewPluginOptions()
+
+	packages := filepath.Join(dir, "packages")
+	if _, err := os.Stat(packages); err != nil {
+		return options
+	}
+
+	return options.WithPackagesFolder(materializePackages(t, packages))
+}
+
+// materializePackages copies a fixture's packages folder into a temp directory,
+// zipping each committed .nuspec into the .nupkg that `nuget restore` would
+// have written.
+//
+// The .nuspec files are committed as plain XML rather than the archives
+// themselves so that a reviewer can read what a fixture claims, and so that
+// changing it is a diff rather than a new binary.
+func materializePackages(t *testing.T, source string) string {
+	t.Helper()
+
+	target := t.TempDir()
+
+	entries, err := os.ReadDir(source)
+	require.NoError(t, err)
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		packageDir := filepath.Join(target, entry.Name())
+		require.NoError(t, os.MkdirAll(packageDir, 0o750))
+
+		nuspec := filepath.Join(source, entry.Name(), entry.Name()+".nuspec")
+
+		content, err := os.ReadFile(nuspec)
+		if os.IsNotExist(err) {
+			// An installed package with no .nuspec beside it: enough to
+			// override a version, with no dependencies to contribute.
+			continue
+		}
+		require.NoError(t, err)
+
+		writeNupkgArchive(t, filepath.Join(packageDir, entry.Name()+".nupkg"), entry.Name()+".nuspec", content)
+	}
+
+	return target
+}
+
+// writeNupkgArchive writes a .nupkg holding a single .nuspec entry.
+func writeNupkgArchive(t *testing.T, path, name string, content []byte) {
+	t.Helper()
+
+	var buf bytes.Buffer
+
+	archive := zip.NewWriter(&buf)
+	writer, err := archive.Create(name)
+	require.NoError(t, err)
+	_, err = writer.Write(content)
+	require.NoError(t, err)
+	require.NoError(t, archive.Close())
+
+	require.NoError(t, os.WriteFile(path, buf.Bytes(), 0o600))
 }
 
 // discoverFixtures lists the fixture directories under base.

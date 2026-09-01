@@ -117,3 +117,21 @@ func (p *packageSet) add(name, version string) {
 	p.index[name] = len(p.packages)
 	p.packages = append(p.packages, declaredPackage{name: name, version: version})
 }
+
+// replace overwrites the version of a package already present, and ignores one
+// that is not. It never widens the set.
+func (p *packageSet) replace(name, version string) {
+	if at, exists := p.index[name]; exists {
+		p.packages[at].version = version
+	}
+}
+
+// get looks up a package by name.
+func (p *packageSet) get(name string) (declaredPackage, bool) {
+	at, exists := p.index[name]
+	if !exists {
+		return declaredPackage{}, false
+	}
+
+	return p.packages[at], true
+}

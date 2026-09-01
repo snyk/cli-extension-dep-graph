@@ -7,6 +7,16 @@ the goldens.
 Nothing here needs a .NET SDK or `nuget`. The resolver only reads what a restore leaves behind,
 so the fixtures are committed and the suite runs in the normal `test` job.
 
+## Packages folders
+
+A fixture with a `packages/` directory is scanned with `--packages-folder` pointing at it. The
+derived default is the manifest's grandparent, which here would be `testdata/acceptance` itself.
+
+Its `.nuspec` files are committed as plain XML; the test zips each one into the `.nupkg` that
+`nuget restore` would have written, in a temp directory. A reviewer can read what a fixture
+claims, and changing it is a diff rather than a new binary. A package directory with no `.nuspec`
+is still enough to override a version.
+
 ## Golden files
 
 One per target framework, named `expected-<targetRuntime>.json` — always, including for a
@@ -35,6 +45,8 @@ go test ./pkg/ecosystems/dotnet/nuget/... -run TestAcceptance -update
 | `sibling-order-decides-pruning` | `Top` declares `Zeta` before `Alpha`, and `Zeta` also depends on `Alpha`. In document order `Zeta → Alpha` is a real edge; walk the siblings in any other order and it becomes `Alpha@1.0.0:pruned` instead. This is the only fixture that fails if the resolver stops preserving document order — real NuGet output writes dependency keys already sorted, so no fixture taken from a real project can catch that regression. |
 
 | `packages-config-flat` | A .NET Framework project that was never restored: no `packages/` folder, no `.csproj`. Every package is a direct dependency of the root, and the runtime comes from the lowest `targetFramework` attribute — `net40`, not the `net45` that appears first. |
+
+| `packages-config-with-packages` | The same shape restored. `jQuery` is declared as `1.9.1` and installed as `3.2.1`, so the installed version is reported; `WebActivator@1.5.1` is named by no manifest at all and reaches the graph only through `Swagger.Net`'s `.nuspec`. |
 
 `net8-no-dependencies` is real restore output from `snyk/cli` (`test/fixtures/nuget-app`); the rest
 are hand-written to stay small enough to read. Breadth over a real project is covered by

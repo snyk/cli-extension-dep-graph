@@ -17,9 +17,16 @@ const (
 	// inside it describes the project one directory up.
 	objDir = "obj"
 
+	// packagesFolderName is the directory `nuget restore` installs into. Its
+	// default location is derived from the manifest's path; --packages-folder
+	// overrides it. See resolvePackagesFolder.
+	packagesFolderName = "packages"
+
 	// csprojExt is the only project file extension consulted for a target
 	// framework. See csprojTargetFramework.
 	csprojExt = ".csproj"
+	nupkgExt  = ".nupkg"
+	nuspecExt = ".nuspec"
 
 	// defaultVersion roots a project whose manifest declares no version,
 	// matching snyk-nuget-plugin.
