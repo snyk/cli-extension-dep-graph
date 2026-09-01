@@ -30,9 +30,8 @@ Every item is a blocking gate — a PR that violates any of these must not merge
 - **Never add methods or levels to the shared `Logger` interface** — adding to it is a breaking change for every implementor; reuse an existing level (e.g. `Debug`) instead.
 - **Keep the module on major version v2:** import it via its `/v2` path, and treat `!` / `BREAKING CHANGE:` as a minor bump — they never trigger a major bump. Split genuine breaking changes to keep the public API backwards-compatible, or raise for discussion before merging (see #199).
 - **PR titles must be valid Conventional Commits** (a GitHub Action enforces this) and PRs are merged with **Squash and merge** — the PR title becomes the release commit and drives automated versioning.
-- **.NET project identity must set `Identity.TargetRuntime`** and propagate it to workflow metadata; construct identity through the constructor that requires the runtime so it cannot be silently dropped (see #235, #230).
-- **When shelling out to bun, pass `--no-env-file` to `bun why`** (bun otherwise loads the repo's `.env`) and require bun ≥ 1.2.19 (see #157).
-- **In the bazel plugin, use `bazel query` for target discovery but keep `bazel cquery` for dependency resolution.** `query` and `cquery` return the same target set in the loading phase, so target discovery uses the cheaper `query`; but only `cquery` (the analysis phase) resolves `select()` / platform-conditional deps, which dependency/edge resolution needs for accurate graphs (`go.go`, `jvm.go`). Reference: [`pkg/ecosystems/bazel/query.go`](pkg/ecosystems/bazel/query.go) (see #224)
+
+Ecosystem-specific rules (bazel, bun, .NET, …) live in the plugin's own `pkg/ecosystems/<name>/AGENTS.md` so they only load when you work in that plugin, rather than in every session's context.
 
 ### Conventions
 
