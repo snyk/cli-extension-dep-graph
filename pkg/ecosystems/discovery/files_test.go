@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -65,7 +66,7 @@ func TestFindFiles_TargetFile(t *testing.T) {
 				opts = append(opts, WithExclude(tt.exclude))
 			}
 
-			results, err := FindFiles(context.Background(), tmpDir, opts...)
+			results, err := FindFiles(context.Background(), logger.Nop(), tmpDir, opts...)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "not found")
@@ -104,7 +105,7 @@ func TestFindFiles_IncludeGlob(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results, err := FindFiles(context.Background(), tmpDir, WithInclude(tt.pattern))
+			results, err := FindFiles(context.Background(), logger.Nop(), tmpDir, WithInclude(tt.pattern))
 			require.NoError(t, err)
 			assert.Len(t, results, tt.wantCount)
 		})
@@ -122,7 +123,7 @@ func TestFindFiles_ExcludePattern(t *testing.T) {
 	})
 
 	t.Run("excludes files by name", func(t *testing.T) {
-		results, err := FindFiles(context.Background(), tmpDir,
+		results, err := FindFiles(context.Background(), logger.Nop(), tmpDir,
 			WithInclude("*.json"),
 			WithExclude("package.json"))
 		require.NoError(t, err)
@@ -130,7 +131,7 @@ func TestFindFiles_ExcludePattern(t *testing.T) {
 	})
 
 	t.Run("excludes directories by name", func(t *testing.T) {
-		results, err := FindFiles(context.Background(), tmpDir,
+		results, err := FindFiles(context.Background(), logger.Nop(), tmpDir,
 			WithInclude("requirements.txt"),
 			WithExclude("node_modules"))
 		require.NoError(t, err)
@@ -141,7 +142,7 @@ func TestFindFiles_ExcludePattern(t *testing.T) {
 	})
 
 	t.Run("excludes hidden directories", func(t *testing.T) {
-		results, err := FindFiles(context.Background(), tmpDir,
+		results, err := FindFiles(context.Background(), logger.Nop(), tmpDir,
 			WithInclude("requirements.txt"),
 			WithExclude(".*"))
 		require.NoError(t, err)
@@ -151,7 +152,7 @@ func TestFindFiles_ExcludePattern(t *testing.T) {
 	})
 
 	t.Run("multiple exclude patterns", func(t *testing.T) {
-		results, err := FindFiles(context.Background(), tmpDir,
+		results, err := FindFiles(context.Background(), logger.Nop(), tmpDir,
 			WithInclude("requirements.txt"),
 			WithExclude("node_modules"),
 			WithExclude(".*"))
@@ -163,7 +164,7 @@ func TestFindFiles_ExcludePattern(t *testing.T) {
 	})
 
 	t.Run("WithExcludes variadic", func(t *testing.T) {
-		results, err := FindFiles(context.Background(), tmpDir,
+		results, err := FindFiles(context.Background(), logger.Nop(), tmpDir,
 			WithInclude("requirements.txt"),
 			WithExcludes("node_modules", ".*"))
 		require.NoError(t, err)
@@ -185,7 +186,7 @@ func TestFindFiles_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	_, err := FindFiles(ctx, tmpDir, WithInclude("*.txt"))
+	_, err := FindFiles(ctx, logger.Nop(), tmpDir, WithInclude("*.txt"))
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, context.Canceled)
 }
@@ -206,7 +207,7 @@ func TestFindFiles_ValidationErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := FindFiles(context.Background(), tt.rootDir, tt.opts...)
+			_, err := FindFiles(context.Background(), logger.Nop(), tt.rootDir, tt.opts...)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantErrMsg)
 		})
@@ -263,7 +264,7 @@ func TestFindFiles_MultipleTargetsAndGlobs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results, err := FindFiles(context.Background(), tmpDir, tt.opts...)
+			results, err := FindFiles(context.Background(), logger.Nop(), tmpDir, tt.opts...)
 			require.NoError(t, err)
 			assert.Len(t, results, tt.wantCount)
 		})
@@ -271,7 +272,7 @@ func TestFindFiles_MultipleTargetsAndGlobs(t *testing.T) {
 
 	// Test error case separately
 	t.Run("errors on missing target file", func(t *testing.T) {
-		_, err := FindFiles(context.Background(), tmpDir,
+		_, err := FindFiles(context.Background(), logger.Nop(), tmpDir,
 			WithTargetFile("missing.txt"),
 			WithTargetFile("requirements.txt"))
 		assert.Error(t, err)
@@ -283,7 +284,7 @@ func TestFindFiles_MultipleTargetsAndGlobs(t *testing.T) {
 func TestFindFiles_EdgeCases(t *testing.T) {
 	t.Run("empty directory", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		results, err := FindFiles(context.Background(), tmpDir, WithInclude("*.txt"))
+		results, err := FindFiles(context.Background(), logger.Nop(), tmpDir, WithInclude("*.txt"))
 		require.NoError(t, err)
 		assert.Empty(t, results)
 	})
@@ -293,7 +294,7 @@ func TestFindFiles_EdgeCases(t *testing.T) {
 		require.NoError(t, os.Mkdir(filepath.Join(tmpDir, "subdir1"), 0755))
 		require.NoError(t, os.Mkdir(filepath.Join(tmpDir, "subdir2"), 0755))
 
-		results, err := FindFiles(context.Background(), tmpDir, WithInclude("*.txt"))
+		results, err := FindFiles(context.Background(), logger.Nop(), tmpDir, WithInclude("*.txt"))
 		require.NoError(t, err)
 		assert.Empty(t, results)
 	})
@@ -307,7 +308,7 @@ func TestFindFiles_EdgeCases(t *testing.T) {
 		relDir, err := filepath.Rel(wd, tmpDir)
 		require.NoError(t, err)
 
-		results, err := FindFiles(context.Background(), relDir, WithInclude("*.txt"))
+		results, err := FindFiles(context.Background(), logger.Nop(), relDir, WithInclude("*.txt"))
 		require.NoError(t, err)
 		assert.Len(t, results, 1)
 		assert.True(t, filepath.IsAbs(results[0].Path), "path should be absolute")

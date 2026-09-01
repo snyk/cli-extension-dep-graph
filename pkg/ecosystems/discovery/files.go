@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
-	"log/slog"
 	"os"
 	"path/filepath"
+
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 )
 
 const (
@@ -88,7 +89,11 @@ type FindResult struct {
 // Returns a deduplicated list of matching files.
 //
 // The search can be canceled via the context.
-func FindFiles(ctx context.Context, rootDir string, options ...FindOption) ([]FindResult, error) {
+func FindFiles(ctx context.Context, log logger.Logger, rootDir string, options ...FindOption) ([]FindResult, error) {
+	if log == nil {
+		log = logger.Nop()
+	}
+
 	// Apply options
 	opts := &findOptions{
 		targetFiles:  []string{},
@@ -108,18 +113,18 @@ func FindFiles(ctx context.Context, rootDir string, options ...FindOption) ([]Fi
 		return nil, fmt.Errorf("failed to resolve absolute path for %s: %w", rootDir, err)
 	}
 
-	slog.Debug("Starting file discovery",
-		slog.String("root_dir", absRoot),
-		slog.Any("target_files", opts.targetFiles),
-		slog.Any("include_globs", opts.includeGlobs),
-		slog.Any("exclude_globs", opts.excludeGlobs))
+	log.Debug(ctx, "Starting file discovery",
+		logger.Attr("root_dir", absRoot),
+		logger.Attr("target_files", opts.targetFiles),
+		logger.Attr("include_globs", opts.includeGlobs),
+		logger.Attr("exclude_globs", opts.excludeGlobs))
 
 	// Use a map to deduplicate results by absolute path
 	resultMap := make(map[string]FindResult)
 
 	// Find all target files
 	for _, targetFile := range opts.targetFiles {
-		result, err := findTargetFile(absRoot, targetFile, opts.excludeGlobs)
+		result, err := findTargetFile(ctx, log, absRoot, targetFile, opts.excludeGlobs)
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +136,7 @@ func FindFiles(ctx context.Context, rootDir string, options ...FindOption) ([]Fi
 
 	// Walk directory for pattern matching if any globs specified
 	if len(opts.includeGlobs) > 0 {
-		globResults, err := walkDirectory(ctx, absRoot, opts)
+		globResults, err := walkDirectory(ctx, log, absRoot, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -146,9 +151,9 @@ func FindFiles(ctx context.Context, rootDir string, options ...FindOption) ([]Fi
 		results = append(results, result)
 	}
 
-	slog.Info("File discovery completed",
-		slog.String("root_dir", absRoot),
-		slog.Int("files_found", len(results)))
+	log.Info(ctx, "File discovery completed",
+		logger.Attr("root_dir", absRoot),
+		logger.Attr("files_found", len(results)))
 
 	return results, nil
 }
@@ -185,7 +190,7 @@ func validateInputs(rootDir string, opts *findOptions) error {
 // findTargetFile attempts to find a specific file by path.
 // Returns an error if the file is not found or is a directory.
 // Returns nil error with empty result if the file is excluded.
-func findTargetFile(absRoot, targetFile string, excludePatterns []string) (FindResult, error) {
+func findTargetFile(ctx context.Context, log logger.Logger, absRoot, targetFile string, excludePatterns []string) (FindResult, error) {
 	targetPath := targetFile
 	if !filepath.IsAbs(targetPath) {
 		targetPath = filepath.Join(absRoot, targetPath)
@@ -202,19 +207,19 @@ func findTargetFile(absRoot, targetFile string, excludePatterns []string) (FindR
 
 	relPath, err := filepath.Rel(absRoot, targetPath)
 	if err != nil {
-		slog.Debug("Failed to compute relative path for target file",
-			slog.String(logKeyFile, targetPath),
-			slog.Any(logKeyError, err))
+		log.Debug(ctx, "Failed to compute relative path for target file",
+			logger.Attr(logKeyFile, targetPath),
+			logger.Err(err))
 		relPath = targetPath
 	}
 
 	// Check if excluded - return empty result but no error
-	if isExcluded(filepath.Base(relPath), relPath, excludePatterns) {
-		slog.Debug("Target file excluded by pattern", slog.String(logKeyFile, targetFile))
+	if isExcluded(ctx, log, filepath.Base(relPath), relPath, excludePatterns) {
+		log.Debug(ctx, "Target file excluded by pattern", logger.Attr(logKeyFile, targetFile))
 		return FindResult{}, nil
 	}
 
-	slog.Debug("Found target file", slog.String(logKeyFile, targetPath))
+	log.Debug(ctx, "Found target file", logger.Attr(logKeyFile, targetPath))
 	return FindResult{
 		Path:    targetPath,
 		RelPath: relPath,
@@ -222,7 +227,7 @@ func findTargetFile(absRoot, targetFile string, excludePatterns []string) (FindR
 }
 
 // walkDirectory traverses the directory tree and finds files matching the include pattern.
-func walkDirectory(ctx context.Context, absRoot string, opts *findOptions) ([]FindResult, error) {
+func walkDirectory(ctx context.Context, log logger.Logger, absRoot string, opts *findOptions) ([]FindResult, error) {
 	// Pre-allocate with reasonable capacity to reduce allocations
 	results := make([]FindResult, 0, 16)
 
@@ -235,28 +240,28 @@ func walkDirectory(ctx context.Context, absRoot string, opts *findOptions) ([]Fi
 		}
 
 		if err != nil {
-			slog.Warn("Error accessing path", slog.String(logKeyPath, path), slog.Any(logKeyError, err))
+			log.Error(ctx, "Error accessing path", logger.Attr(logKeyPath, path), logger.Err(err))
 			return nil // Continue walking despite errors
 		}
 
 		relPath, err := filepath.Rel(absRoot, path)
 		if err != nil {
-			slog.Warn("Failed to compute relative path", slog.String(logKeyPath, path), slog.Any(logKeyError, err))
+			log.Error(ctx, "Failed to compute relative path", logger.Attr(logKeyPath, path), logger.Err(err))
 			return nil
 		}
 
 		// Handle directories
 		if d.IsDir() {
-			return handleDirectory(d, relPath, opts.excludeGlobs)
+			return handleDirectory(ctx, log, d, relPath, opts.excludeGlobs)
 		}
 
 		// Check exclusions and pattern match for files
-		if shouldIncludeFile(d, relPath, opts) {
+		if shouldIncludeFile(ctx, log, d, relPath, opts) {
 			results = append(results, FindResult{
 				Path:    path,
 				RelPath: relPath,
 			})
-			slog.Debug("Matched file", slog.String(logKeyFile, relPath))
+			log.Debug(ctx, "Matched file", logger.Attr(logKeyFile, relPath))
 		}
 
 		return nil
@@ -269,7 +274,7 @@ func walkDirectory(ctx context.Context, absRoot string, opts *findOptions) ([]Fi
 }
 
 // handleDirectory checks if a directory should be excluded and returns fs.SkipDir if so.
-func handleDirectory(d fs.DirEntry, relPath string, excludePatterns []string) error {
+func handleDirectory(ctx context.Context, log logger.Logger, d fs.DirEntry, relPath string, excludePatterns []string) error {
 	if len(excludePatterns) == 0 {
 		return nil
 	}
@@ -284,22 +289,22 @@ func handleDirectory(d fs.DirEntry, relPath string, excludePatterns []string) er
 		// Check relative path first (more specific)
 		matched, err := filepath.Match(pattern, relPath)
 		if err != nil {
-			slog.Warn("Invalid exclude pattern for directory", slog.String(logKeyPattern, pattern), slog.Any(logKeyError, err))
+			log.Error(ctx, "Invalid exclude pattern for directory", logger.Attr(logKeyPattern, pattern), logger.Err(err))
 			continue
 		}
 		if matched {
-			slog.Debug("Excluding directory by path", slog.String(logKeyDir, relPath), slog.String(logKeyPattern, pattern))
+			log.Debug(ctx, "Excluding directory by path", logger.Attr(logKeyDir, relPath), logger.Attr(logKeyPattern, pattern))
 			return fs.SkipDir
 		}
 
 		// Check directory name (matches anywhere in tree)
 		matched, err = filepath.Match(pattern, name)
 		if err != nil {
-			slog.Warn("Invalid exclude pattern for directory", slog.String(logKeyPattern, pattern), slog.Any(logKeyError, err))
+			log.Error(ctx, "Invalid exclude pattern for directory", logger.Attr(logKeyPattern, pattern), logger.Err(err))
 			continue
 		}
 		if matched {
-			slog.Debug("Excluding directory by name", slog.String(logKeyDir, name), slog.String(logKeyPattern, pattern))
+			log.Debug(ctx, "Excluding directory by name", logger.Attr(logKeyDir, name), logger.Attr(logKeyPattern, pattern))
 			return fs.SkipDir
 		}
 	}
@@ -309,12 +314,12 @@ func handleDirectory(d fs.DirEntry, relPath string, excludePatterns []string) er
 
 // shouldIncludeFile determines if a file should be included in results.
 // Returns true if the file matches any of the include globs and is not excluded.
-func shouldIncludeFile(d fs.DirEntry, relPath string, opts *findOptions) bool {
+func shouldIncludeFile(ctx context.Context, log logger.Logger, d fs.DirEntry, relPath string, opts *findOptions) bool {
 	name := d.Name()
 
 	// Check exclusions first (most likely to filter out files)
-	if isExcluded(name, relPath, opts.excludeGlobs) {
-		slog.Debug("Excluding file", slog.String(logKeyFile, relPath))
+	if isExcluded(ctx, log, name, relPath, opts.excludeGlobs) {
+		log.Debug(ctx, "Excluding file", logger.Attr(logKeyFile, relPath))
 		return false
 	}
 
@@ -322,7 +327,7 @@ func shouldIncludeFile(d fs.DirEntry, relPath string, opts *findOptions) bool {
 	for _, pattern := range opts.includeGlobs {
 		matched, err := filepath.Match(pattern, name)
 		if err != nil {
-			slog.Warn("Invalid include pattern for file", slog.String(logKeyPattern, pattern), slog.Any(logKeyError, err))
+			log.Error(ctx, "Invalid include pattern for file", logger.Attr(logKeyPattern, pattern), logger.Err(err))
 			continue
 		}
 		if matched {
@@ -335,7 +340,7 @@ func shouldIncludeFile(d fs.DirEntry, relPath string, opts *findOptions) bool {
 
 // isExcluded checks if a file/directory matches any of the exclude patterns.
 // Checks both the name (for matching anywhere in tree) and relPath (for specific paths).
-func isExcluded(name, relPath string, excludePatterns []string) bool {
+func isExcluded(ctx context.Context, log logger.Logger, name, relPath string, excludePatterns []string) bool {
 	if len(excludePatterns) == 0 {
 		return false
 	}
@@ -344,7 +349,7 @@ func isExcluded(name, relPath string, excludePatterns []string) bool {
 		// Check by name
 		matched, err := filepath.Match(pattern, name)
 		if err != nil {
-			slog.Warn("Invalid exclude pattern", slog.String(logKeyPattern, pattern), slog.Any(logKeyError, err))
+			log.Error(ctx, "Invalid exclude pattern", logger.Attr(logKeyPattern, pattern), logger.Err(err))
 			continue
 		}
 		if matched {
@@ -354,7 +359,7 @@ func isExcluded(name, relPath string, excludePatterns []string) bool {
 		// Check by relative path
 		matched, err = filepath.Match(pattern, relPath)
 		if err != nil {
-			slog.Warn("Invalid exclude pattern", slog.String(logKeyPattern, pattern), slog.Any(logKeyError, err))
+			log.Error(ctx, "Invalid exclude pattern", logger.Attr(logKeyPattern, pattern), logger.Err(err))
 			continue
 		}
 		if matched {

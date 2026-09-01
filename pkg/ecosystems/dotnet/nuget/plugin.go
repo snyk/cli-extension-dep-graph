@@ -66,7 +66,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 		options = ecosystems.NewPluginOptions()
 	}
 
-	files, err := p.discoverTargetFiles(ctx, dir, options)
+	files, err := p.discoverTargetFiles(ctx, log, dir, options)
 	if err != nil {
 		return err
 	}
@@ -226,6 +226,7 @@ func rootComponentName(file discovery.FindResult) string {
 // resolvers: an explicit --file, an --all-projects scan, or the scanned root.
 func (p Plugin) discoverTargetFiles(
 	ctx context.Context,
+	log logger.Logger,
 	dir string,
 	options *ecosystems.SCAPluginOptions,
 ) ([]discovery.FindResult, error) {
@@ -235,7 +236,7 @@ func (p Plugin) discoverTargetFiles(
 			return nil, nil
 		}
 
-		files, err := discovery.FindFiles(ctx, dir, discovery.WithTargetFile(*options.Global.TargetFile))
+		files, err := discovery.FindFiles(ctx, log, dir, discovery.WithTargetFile(*options.Global.TargetFile))
 		if err != nil {
 			return nil, fmt.Errorf("discovering .NET target files: %w", err)
 		}
@@ -257,7 +258,7 @@ func (p Plugin) discoverTargetFiles(
 			findOpts = append(findOpts, discovery.WithExcludes(options.Global.ExcludePaths...))
 		}
 
-		files, err := discovery.FindFiles(ctx, dir, findOpts...)
+		files, err := discovery.FindFiles(ctx, log, dir, findOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("discovering .NET target files: %w", err)
 		}

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 )
 
 func ptr(s string) *string { return &s }
@@ -85,7 +86,7 @@ func TestPlugin_DiscoverRequirementsFiles_HonorsExcludePaths(t *testing.T) {
 		WithAllProjects(true).
 		WithExcludePaths([]string{"a/requirements.txt"})
 
-	got, err := Plugin{}.discoverRequirementsFiles(t.Context(), tmpDir, opts)
+	got, err := Plugin{}.discoverRequirementsFiles(t.Context(), logger.Nop(), tmpDir, opts)
 	require.NoError(t, err)
 
 	rels := make([]string, len(got))

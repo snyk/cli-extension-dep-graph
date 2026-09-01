@@ -51,7 +51,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 	}
 
 	// Discover requirements.txt files
-	files, err := p.discoverRequirementsFiles(ctx, dir, options)
+	files, err := p.discoverRequirementsFiles(ctx, log, dir, options)
 	if err != nil {
 		return fmt.Errorf("failed to discover requirements files: %w", err)
 	}
@@ -115,7 +115,9 @@ func (p Plugin) BuildDepGraphsFromDir(
 }
 
 // discoverRequirementsFiles finds requirements.txt files based on the provided options.
-func (p Plugin) discoverRequirementsFiles(ctx context.Context, dir string, options *ecosystems.SCAPluginOptions) ([]discovery.FindResult, error) {
+func (p Plugin) discoverRequirementsFiles(
+	ctx context.Context, log logger.Logger, dir string, options *ecosystems.SCAPluginOptions,
+) ([]discovery.FindResult, error) {
 	var findOpts []discovery.FindOption
 
 	switch {
@@ -143,7 +145,7 @@ func (p Plugin) discoverRequirementsFiles(ctx context.Context, dir string, optio
 		}
 	}
 
-	files, err := discovery.FindFiles(ctx, dir, findOpts...)
+	files, err := discovery.FindFiles(ctx, log, dir, findOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find files: %w", err)
 	}

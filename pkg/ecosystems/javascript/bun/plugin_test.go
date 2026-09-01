@@ -380,7 +380,7 @@ func TestPlugin_DiscoverLockFiles_HonorsExcludePaths(t *testing.T) {
 		WithAllProjects(true).
 		WithExcludePaths([]string{"a/bun.lock"})
 
-	got, err := Plugin{}.discoverLockFiles(t.Context(), tmpDir, opts)
+	got, err := Plugin{}.discoverLockFiles(t.Context(), logger.Nop(), tmpDir, opts)
 	require.NoError(t, err)
 
 	rels := make([]string, len(got))

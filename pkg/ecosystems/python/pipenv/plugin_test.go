@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 )
 
 // TestPlugin_DiscoverPipfiles_HonorsExcludePaths locks in that the pipenv plugin reads
@@ -29,7 +30,7 @@ func TestPlugin_DiscoverPipfiles_HonorsExcludePaths(t *testing.T) {
 		WithAllProjects(true).
 		WithExcludePaths([]string{"a/Pipfile"})
 
-	got, err := Plugin{}.discoverPipfiles(t.Context(), tmpDir, opts)
+	got, err := Plugin{}.discoverPipfiles(t.Context(), logger.Nop(), tmpDir, opts)
 	require.NoError(t, err)
 
 	rels := make([]string, len(got))

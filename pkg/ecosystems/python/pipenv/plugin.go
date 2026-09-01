@@ -53,7 +53,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 	}
 
 	// Discover Pipfile files
-	files, err := p.discoverPipfiles(ctx, dir, options)
+	files, err := p.discoverPipfiles(ctx, log, dir, options)
 	if err != nil {
 		return fmt.Errorf("failed to discover Pipfiles: %w", err)
 	}
@@ -119,7 +119,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 }
 
 // discoverPipfiles finds Pipfile files based on the provided options.
-func (p Plugin) discoverPipfiles(ctx context.Context, dir string, options *ecosystems.SCAPluginOptions) ([]discovery.FindResult, error) {
+func (p Plugin) discoverPipfiles(ctx context.Context, log logger.Logger, dir string, options *ecosystems.SCAPluginOptions) ([]discovery.FindResult, error) {
 	var findOpts []discovery.FindOption
 
 	switch {
@@ -146,7 +146,7 @@ func (p Plugin) discoverPipfiles(ctx context.Context, dir string, options *ecosy
 		}
 	}
 
-	files, err := discovery.FindFiles(ctx, dir, findOpts...)
+	files, err := discovery.FindFiles(ctx, log, dir, findOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find files: %w", err)
 	}
