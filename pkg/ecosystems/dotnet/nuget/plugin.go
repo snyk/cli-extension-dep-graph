@@ -250,15 +250,15 @@ func (p Plugin) discoverTargetFiles(
 	}
 }
 
-// rootTargetFiles lists the target files for a single project rooted at dir.
-// obj/ is the one subdirectory it looks into: restore writes
-// project.assets.json there, and detect.ts allows exactly that path.
+// rootTargetFiles returns the one manifest a single-project scan of dir
+// resolves, or nothing when dir holds none.
+//
+// One, not all of them: a .NET project directory can hold more than one
+// manifest — restore output in obj/ beside a copy at the root — and the CLI
+// reports it as a single project, taking the first hit in DETECTABLE_FILES
+// order. Returning every match would turn one project into several, since a
+// scan without --all-projects still emits every result a plugin produces.
 func rootTargetFiles(dir string) ([]discovery.FindResult, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("reading directory %s: %w", dir, err)
-	}
-
 	// FindResult.Path is absolute. dir is frequently "." here, and a relative
 	// path would leave the project with no directory to be named after.
 	absDir, err := filepath.Abs(dir)
@@ -266,33 +266,60 @@ func rootTargetFiles(dir string) ([]discovery.FindResult, error) {
 		return nil, fmt.Errorf("resolving absolute path for %s: %w", dir, err)
 	}
 
-	var files []discovery.FindResult
+	// Failing to read the scanned root is a setup failure rather than an absent
+	// project, and is reported as one.
+	rootNames, err := fileNamesIn(absDir)
+	if err != nil {
+		return nil, err
+	}
 
-	for _, entry := range entries {
-		if entry.IsDir() || !isSupportedTargetFile(entry.Name()) {
+	// obj/ is optional, and anything that stops it being read — absent, or not
+	// a directory at all — means only that there is no restore output there.
+	// The manifests beside it are still worth reporting.
+	objNames, err := fileNamesIn(filepath.Join(absDir, objDir))
+	if err != nil {
+		objNames = nil
+	}
+
+	for _, candidate := range rootTargetFilePrecedence {
+		names := rootNames
+		if candidate.subdir != "" {
+			names = objNames
+		}
+
+		if !names[candidate.name] {
 			continue
 		}
 
-		files = append(files, discovery.FindResult{
-			Path:    filepath.Join(absDir, entry.Name()),
-			RelPath: entry.Name(),
-		})
+		relPath := filepath.Join(candidate.subdir, candidate.name)
+
+		return []discovery.FindResult{{Path: filepath.Join(absDir, relPath), RelPath: relPath}}, nil
 	}
 
-	if objAssets := filepath.Join(absDir, objDir, projectAssetsFile); fileExists(objAssets) {
-		files = append(files, discovery.FindResult{
-			Path:    objAssets,
-			RelPath: filepath.Join(objDir, projectAssetsFile),
-		})
-	}
-
-	return files, nil
+	return nil, nil
 }
 
-// fileExists reports whether path exists and is a regular file.
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
+// fileNamesIn lists the names of the regular files directly inside dir.
+//
+// Names are compared as the directory reports them rather than by stat-ing a
+// path, so a case-insensitive filesystem does not quietly match
+// Project.Assets.json where a case-sensitive one would not. Case-insensitive
+// discovery is CMPA-715.
+func fileNamesIn(dir string) (map[string]bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("reading directory %s: %w", dir, err)
+	}
+
+	names := make(map[string]bool, len(entries))
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			names[entry.Name()] = true
+		}
+	}
+
+	return names, nil
 }
 
 // isSupportedTargetFile reports whether path's base name is one this plugin
