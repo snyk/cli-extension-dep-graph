@@ -19,16 +19,16 @@ Every package-manager ecosystem is a plugin implementing the `ecosystems.SCAPlug
 Every item is a blocking gate — a PR that violates any of these must not merge.
 
 - **Every ecosystem is a plugin implementing `ecosystems.SCAPlugin`** (Discover → Resolve → Build → Return). Add a new ecosystem as a new plugin package and depend on the `SCAPlugin` abstraction; never add ecosystem logic by modifying core or orchestrator code, and keep each plugin's logic inside its own package. Reference: [`pkg/ecosystems/rust/cargo/plugin.go`](pkg/ecosystems/rust/cargo/plugin.go)
-- **Build graphs in the standard Snyk dep-graph format via `depgraph.Builder`** and return them on `SCAResult.DepGraph`; populate `PluginResult.ProcessedFiles` with every file you handled so other plugins skip it.
-- **Stream each `SCAResult` through the per-graph `OnGraphFunc` callback as it is produced** — never aggregate results into a returned slice. Reference: [`pkg/ecosystems/plugin_interface.go`](pkg/ecosystems/plugin_interface.go) (see #194)
-- **Surface resolver failures as typed per-result `SCAResult` errors propagated through the results channel** (missing binary, version too low, unparseable/unprocessable manifest, streaming failure); one ecosystem's failure must not abort the whole run (see #236).
-- **Emit deterministic dep-graph output:** sort file lists without mutating the input, and never depend on map iteration order — ranging over a map produces non-deterministic, colliding targets across runs (see #160).
+- **Build graphs in the standard Snyk dep-graph format via `depgraph.Builder`** and return them on `SCAResult.DepGraph`; populate `PluginResult.ProcessedFiles` with every file you handled so other plugins skip it. Reference: [`pkg/ecosystems/plugin_interface.go`](pkg/ecosystems/plugin_interface.go)
+- **Stream each `SCAResult` through the per-graph `OnGraphFunc` callback as it is produced** — never aggregate results into a returned slice. Reference: [`pkg/ecosystems/plugin_interface.go`](pkg/ecosystems/plugin_interface.go)
+- **Surface resolver failures as typed per-result `SCAResult` errors propagated through the results channel** (missing binary, version too low, unparseable/unprocessable manifest, streaming failure); one ecosystem's failure must not abort the whole run.
+- **Emit deterministic dep-graph output:** sort file lists without mutating the input, and never depend on map iteration order — ranging over a map produces non-deterministic, colliding targets across runs.
 - **Produce one dep graph per workspace package** (each member is a leaf of the root graph and root of its own); never emit a single mega-graph, which misattributes one package's transitive deps as another's vulnerabilities.
-- **Identify workspace members by the package manager's authoritative signal** (pnpm's `link:` version prefix, bun's `(requires …)` clause), never by package-name membership — name matching silently skips members when a workspace name collides with a real registry package (see #213).
-- **New Go resolvers preserve behavioural parity with the existing TypeScript plugins** (snyk-nuget-plugin, snyk/cli): root-component naming, file-discovery patterns, default root version, pruning. Do not diverge without an explicit decision, and cite the exact upstream plugin version a golden fixture came from (see #235, #230).
+- **Identify workspace members by the package manager's authoritative signal** (pnpm's `link:` version prefix, bun's `(requires …)` clause), never by package-name membership — name matching silently skips members when a workspace name collides with a real registry package.
+- **New Go resolvers preserve behavioural parity with the existing TypeScript plugins** (snyk-nuget-plugin, snyk/cli): root-component naming, file-discovery patterns, default root version, pruning. Do not diverge without an explicit decision, and cite the exact upstream plugin version a golden fixture came from.
 - **Fail loudly when a resolver's tool output is missing its expected file marker** — never silently fall back to a default file path.
-- **Never add methods or levels to the shared `Logger` interface** — adding to it is a breaking change for every implementor; reuse an existing level (e.g. `Debug`) instead.
-- **Keep the module on major version v2:** import it via its `/v2` path, and treat `!` / `BREAKING CHANGE:` as a minor bump — they never trigger a major bump. Split genuine breaking changes to keep the public API backwards-compatible, or raise for discussion before merging (see #199).
+- **Never add methods or levels to the shared `Logger` interface** — adding to it is a breaking change for every implementor; reuse an existing level (e.g. `Debug`) instead. Reference: [`pkg/ecosystems/logger/logger.go`](pkg/ecosystems/logger/logger.go)
+- **Keep the module on major version v2:** import it via its `/v2` path, and treat `!` / `BREAKING CHANGE:` as a minor bump — they never trigger a major bump. Split genuine breaking changes to keep the public API backwards-compatible, or raise for discussion before merging. Reference: [`docs/RELEASE.md`](docs/RELEASE.md)
 - **PR titles must be valid Conventional Commits** (a GitHub Action enforces this) and PRs are merged with **Squash and merge** — the PR title becomes the release commit and drives automated versioning.
 
 Ecosystem-specific rules (bazel, bun, .NET, …) live in the plugin's own `pkg/ecosystems/<name>/AGENTS.md` so they only load when you work in that plugin, rather than in every session's context.
@@ -38,10 +38,10 @@ Ecosystem-specific rules (bazel, bun, .NET, …) live in the plugin's own `pkg/e
 - Dependencies are injected as constructor params; plugin registration uses functional options (`withFeatureFlagCheck`, `withPluginDependencies`). No DI container, no globals outside the composition root. Reference: [`pkg/ecosystems/orchestrator/registry.go`](pkg/ecosystems/orchestrator/registry.go)
 - Each ecosystem package follows the same layout — `plugin.go` (implements `SCAPlugin`) alongside `executor.go`, `depgraph.go`, `types.go` — and is registered centrally in `pkg/ecosystems/orchestrator/registry.go` with explicit dependency ordering (bazel is a dependency of every other plugin) and feature-flag gating.
 - Define interfaces next to their consumers (small collaborator interfaces like `cargoRunner` in the consuming package); assert conformance with `var _ Iface = (*T)(nil)`.
-- User-facing resolver failures use typed Snyk error-catalog errors (`snyk_errors`, e.g. `NewUnprocessableFileError`, `NewUnparseableManifestError`), not plain `fmt.Errorf` (see #112).
-- Reuse the shared cross-ecosystem helpers instead of re-implementing them per ecosystem: the pruned-node contract, edge deduplication (`ConnectNodes` is not idempotent), and the golden-fixture harness (`pkg/ecosystems/scatest`) (see #235).
-- Use `identity.ProjectDescriptor` for project identity — the removed `ecosystems.Metadata` type must not be reintroduced — and use the standard keys from the `metadata` package for resolver metadata (see #139).
-- Keep legacy-CLI invocation/parsing code in `internal/legacycli` and shared constants/flags in `internal/workflow` to avoid the `pkg/depgraph` ↔ `pkg/ecosystems/legacy` import cycle (see #163, #166).
+- User-facing resolver failures use typed Snyk error-catalog errors (`snyk_errors`, e.g. `NewUnprocessableFileError`, `NewUnparseableManifestError`), not plain `fmt.Errorf`. Reference: [`pkg/depgraph/errors.go`](pkg/depgraph/errors.go)
+- Reuse the shared cross-ecosystem helpers instead of re-implementing them per ecosystem: the pruned-node contract, edge deduplication (`ConnectNodes` is not idempotent), and the golden-fixture harness. Reference: [`pkg/ecosystems/scatest`](pkg/ecosystems/scatest)
+- Use `identity.ProjectDescriptor` for project identity — the removed `ecosystems.Metadata` type must not be reintroduced — and use the standard keys from the `metadata` package for resolver metadata. Reference: [`pkg/identity`](pkg/identity)
+- Keep legacy-CLI invocation/parsing code in `internal/legacycli` and shared constants/flags in `internal/workflow` to avoid the `pkg/depgraph` ↔ `pkg/ecosystems/legacy` import cycle.
 
 ### Directory layout
 
@@ -61,7 +61,7 @@ Ecosystem-specific rules (bazel, bun, .NET, …) live in the plugin's own `pkg/e
 
 ### Style and formatting
 
-Formatting and linting are enforced by tooling — run `make fmt` (`go fmt` + gofumpt/goimports with local-prefix `github.com/snyk/cli-extension-dep-graph/v2`) and `make lint` (golangci-lint v2.9.0) instead of reasoning about style; they are authoritative. A `gitleaks` pre-commit hook scans for secrets.
+Formatting and linting are enforced by tooling — run `make fmt` (`go fmt` + gofumpt/goimports with local-prefix `github.com/snyk/cli-extension-dep-graph/v2`) and `make lint` instead of reasoning about style; they are authoritative. A `gitleaks` pre-commit hook scans for secrets.
 
 ### Patterns
 
@@ -143,13 +143,3 @@ Before presenting any change, verify each item below. Do not report work as comp
 - [ ] New code has test coverage (or the "unverified" warning is documented)
 - [ ] PR title is a valid Conventional Commit (the GitHub Action check passes)
 - [ ] Repository secret scan is clean (`gitleaks` pre-commit hook)
-
----
-
-## Human review checklist
-
-This file was generated by `/create-agents-md:create-agents-md` as a starting point. Complete these items to finish it:
-
-- [ ] Review test coverage and consider adding a CI coverage threshold (currently reported, not enforced).
-- [ ] Confirm the `.NET`/bun/bazel ecosystem rules are still current as those resolvers evolve.
-- [ ] Remove this section once all items above are resolved.
