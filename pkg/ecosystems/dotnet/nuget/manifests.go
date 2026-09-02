@@ -190,9 +190,15 @@ func scanForDependencies(node *orderedMap[json.RawMessage], into *packageSet, de
 // descend walks into objects and arrays, which is where nested dependency
 // groups live. Scalars terminate the walk.
 //
-// depth bounds how far down it goes. Each level re-decodes the subtree beneath
-// it, so the walk costs time quadratic in nesting depth — a 48KB file nested
-// 8000 deep takes four seconds. Real manifests nest a handful of levels, and
+// It decodes one level at a time, on the way down, rather than decoding the
+// whole document up front. That is what makes depth an effective bound: the
+// work below the limit is never done at all. Decoding eagerly into a tree would
+// read better here — there would be no errors to check — but it moves the cost
+// into json.Unmarshal, where depth cannot reach it. Measured on a 46KB file
+// nested 8000 deep: 1.4ms as written, 2.8s decoded eagerly.
+//
+// The cost is quadratic in nesting depth either way, because each level
+// re-reads the bytes beneath it. Real manifests nest a handful of levels, and
 // anything approaching the bound is not a .NET project.json, so stopping there
 // is both cheap and correct.
 func descend(raw json.RawMessage, into *packageSet, depth int) {
@@ -200,12 +206,12 @@ func descend(raw json.RawMessage, into *packageSet, depth int) {
 		return
 	}
 
-	// Neither decode below can fail. readProjectJSON parses the whole document
-	// before any of this runs, and that rejects a file with a malformed value
-	// anywhere in it — so every value reaching here is already known to be
-	// valid JSON of the kind jsonKind reported. The checks remain so that a
-	// value we could not read would be skipped rather than walked as empty, if
-	// that ever stops being true.
+	// Neither decode below can fail: readProjectJSON rejects a file with a
+	// malformed value anywhere in it before any of this runs, so every value
+	// reaching here is already known to be valid JSON of the kind jsonKind
+	// reported. They are checked rather than ignored so that a value we could
+	// not read would be skipped instead of walked as if it were empty, if that
+	// ever stops being true.
 	switch jsonKind(raw) {
 	case '{':
 		var object orderedMap[json.RawMessage]
@@ -265,6 +271,8 @@ func versionOf(value any) string {
 		if version, declared := value["version"]; declared {
 			return versionOf(version)
 		}
+	case nil, []any:
+		// A JSON null, or an array, states no version.
 	}
 
 	return unknownVersion

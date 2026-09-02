@@ -36,7 +36,9 @@ const (
 	unknownVersion = "unknown"
 
 	// maxProjectJSONDepth bounds how deep the search for dependency groups
-	// goes. See descend for why a bound is needed at all.
+	// goes, so that a small file nested pathologically deep cannot cost a
+	// scan seconds of work. See descend for the measurements, and for why the
+	// bound only bites because that walk decodes one level at a time.
 	maxProjectJSONDepth = 64
 
 	// filteredPackagePrefix drops `runtime` and `runtime.native.*` packages:
