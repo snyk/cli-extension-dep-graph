@@ -7,6 +7,11 @@ the goldens.
 Nothing here needs a .NET SDK or `nuget`. The resolver only reads what a restore leaves behind,
 so the fixtures are committed and the suite runs in the normal `test` job.
 
+Fixtures are scanned with `--all-projects`, because that is the one mode that reaches every
+manifest: the CLI does not detect a `project.json` by scanning a directory, only by walking one.
+Which manifest a bare scan picks is a discovery question, and is pinned by
+`TestPlugin_RootDirOnly_ManifestPrecedence` rather than by a golden.
+
 ## Packages folders
 
 A fixture with a `packages/` directory is scanned with `--packages-folder` pointing at it. The
@@ -43,10 +48,9 @@ go test ./pkg/ecosystems/dotnet/nuget/... -run TestAcceptance -update
 | `pinned-and-case-insensitive` | Declared names differ in case from the `targets` keys; the resolved version wins over a lower declared minimum; a framework reference absent from `targets` is skipped rather than fatal. |
 | `cycle-and-diamond` | A diamond yields one node with two parents; a cycle yields a `…:pruned` leaf; a `runtime.native.*` package is filtered out. |
 | `sibling-order-decides-pruning` | `Top` declares `Zeta` before `Alpha`, and `Zeta` also depends on `Alpha`. In document order `Zeta → Alpha` is a real edge; walk the siblings in any other order and it becomes `Alpha@1.0.0:pruned` instead. This is the only fixture that fails if the resolver stops preserving document order — real NuGet output writes dependency keys already sorted, so no fixture taken from a real project can catch that regression. |
-
 | `packages-config-flat` | A .NET Framework project that was never restored: no `packages/` folder, no `.csproj`. Every package is a direct dependency of the root, and the runtime comes from the lowest `targetFramework` attribute — `net40`, not the `net45` that appears first. |
-
 | `packages-config-with-packages` | The same shape restored. `jQuery` is declared as `1.9.1` and installed as `3.2.1`, so the installed version is reported; `WebActivator@1.5.1` is named by no manifest at all and reaches the graph only through `Swagger.Net`'s `.nuspec`. |
+| `project-json-with-csproj` | A pre-RTM .NET Core project. Its dependencies are spread across a top-level block and a per-framework one, and the runtime comes from the `.csproj` — `v4.6.1`, the spelling a non-SDK project file uses. |
 
 `net8-no-dependencies` is real restore output from `snyk/cli` (`test/fixtures/nuget-app`); the rest
 are hand-written to stay small enough to read. Breadth over a real project is covered by
