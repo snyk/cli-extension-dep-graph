@@ -45,6 +45,13 @@ func buildDepGraph(ctx context.Context, assets *projectAssets, rootName, targets
 
 	direct := assets.directDependencies(targetsKey)
 
+	// A framework the restore failed on cannot be trusted to describe its own
+	// dependencies, so report why rather than the graph. The restore recorded
+	// the reason.
+	if err := restoreFailure(assets.Logs, targetsKey); err != nil {
+		return nil, err
+	}
+
 	// Declared dependencies but no packages means the restore did not complete.
 	// The root-only graph that falls out of that would read as "no
 	// dependencies", which is worse than reporting the failure.
