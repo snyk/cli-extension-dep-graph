@@ -1,7 +1,7 @@
 {
   "name": "simple-version-range-override",
   "dependencies": {
-    "@google-cloud/storage": "4.7.2",
+    "@google-cloud/storage": "5.19.0",
     "eventid": "2.0.1"
   },
   "overrides": {
