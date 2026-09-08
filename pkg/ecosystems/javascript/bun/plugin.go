@@ -49,7 +49,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 		log = logger.Nop()
 	}
 
-	files, err := p.discoverLockFiles(ctx, dir, options)
+	files, err := p.discoverLockFiles(ctx, log, dir, options)
 	if err != nil {
 		return err
 	}
@@ -193,6 +193,7 @@ func (p Plugin) wrapRunError(err error) error {
 
 func (p Plugin) discoverLockFiles(
 	ctx context.Context,
+	log logger.Logger,
 	dir string,
 	options *ecosystems.SCAPluginOptions,
 ) ([]discovery.FindResult, error) {
@@ -206,7 +207,7 @@ func (p Plugin) discoverLockFiles(
 			return nil, nil
 		}
 
-		files, err := discovery.FindFiles(ctx, dir, discovery.WithTargetFile(*options.Global.TargetFile))
+		files, err := discovery.FindFiles(ctx, log, dir, discovery.WithTargetFile(*options.Global.TargetFile))
 		if err != nil {
 			return nil, fmt.Errorf("discovering bun.lock files: %w", err)
 		}
@@ -226,7 +227,7 @@ func (p Plugin) discoverLockFiles(
 			findOpts = append(findOpts, discovery.WithExcludes(options.Global.ExcludePaths...))
 		}
 
-		files, err := discovery.FindFiles(ctx, dir, findOpts...)
+		files, err := discovery.FindFiles(ctx, log, dir, findOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("discovering bun.lock files: %w", err)
 		}

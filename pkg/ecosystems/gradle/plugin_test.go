@@ -109,7 +109,7 @@ func TestDiscoverGradleFiles(t *testing.T) {
 			buildFile := filepath.Join(dir, filename)
 			require.NoError(t, os.WriteFile(buildFile, []byte(""), 0o644))
 
-			files, err := p.discoverGradleFiles(ctx, dir, &ecosystems.SCAPluginOptions{})
+			files, err := p.discoverGradleFiles(ctx, logger.Nop(), dir, &ecosystems.SCAPluginOptions{})
 			require.NoError(t, err)
 			require.Len(t, files, 1)
 			assert.Equal(t, buildFile, files[0].Path)
@@ -120,7 +120,7 @@ func TestDiscoverGradleFiles(t *testing.T) {
 	t.Run("returns no files when no Gradle build file found", func(t *testing.T) {
 		dir := t.TempDir()
 
-		files, err := p.discoverGradleFiles(ctx, dir, &ecosystems.SCAPluginOptions{})
+		files, err := p.discoverGradleFiles(ctx, logger.Nop(), dir, &ecosystems.SCAPluginOptions{})
 		require.NoError(t, err)
 		assert.Empty(t, files)
 	})
@@ -140,7 +140,7 @@ func TestDiscoverGradleFiles(t *testing.T) {
 				Global: ecosystems.GlobalOptions{TargetFile: &tf},
 			}
 
-			files, err := p.discoverGradleFiles(ctx, dir, opts)
+			files, err := p.discoverGradleFiles(ctx, logger.Nop(), dir, opts)
 			require.NoError(t, err)
 			require.Len(t, files, 1)
 			assert.Equal(t, buildFile, files[0].Path)
@@ -154,7 +154,7 @@ func TestDiscoverGradleFiles(t *testing.T) {
 			Global: ecosystems.GlobalOptions{TargetFile: &tf},
 		}
 
-		files, err := p.discoverGradleFiles(ctx, dir, opts)
+		files, err := p.discoverGradleFiles(ctx, logger.Nop(), dir, opts)
 		require.NoError(t, err)
 		assert.Empty(t, files)
 	})
@@ -171,7 +171,7 @@ func TestDiscoverGradleFiles(t *testing.T) {
 				Global: ecosystems.GlobalOptions{TargetFile: &filename},
 			}
 
-			files, err := p.discoverGradleFiles(ctx, dir, opts)
+			files, err := p.discoverGradleFiles(ctx, logger.Nop(), dir, opts)
 			require.NoError(t, err)
 			assert.Empty(t, files)
 		})
@@ -184,7 +184,7 @@ func TestDiscoverGradleFiles(t *testing.T) {
 			Global: ecosystems.GlobalOptions{TargetFile: &tf},
 		}
 
-		_, err := p.discoverGradleFiles(ctx, dir, opts)
+		_, err := p.discoverGradleFiles(ctx, logger.Nop(), dir, opts)
 		require.Error(t, err)
 	})
 
@@ -215,7 +215,7 @@ func TestDiscoverGradleFiles(t *testing.T) {
 			Global: ecosystems.GlobalOptions{AllProjects: true},
 		}
 
-		files, err := p.discoverGradleFiles(ctx, dir, opts)
+		files, err := p.discoverGradleFiles(ctx, logger.Nop(), dir, opts)
 		require.NoError(t, err)
 
 		// Should find all gradle files (discovery doesn't filter - deduplication happens at runtime)
@@ -244,7 +244,7 @@ func TestDiscoverGradleFiles(t *testing.T) {
 			Global: ecosystems.GlobalOptions{AllProjects: true},
 		}
 
-		files, err := p.discoverGradleFiles(ctx, dir, opts)
+		files, err := p.discoverGradleFiles(ctx, logger.Nop(), dir, opts)
 		require.NoError(t, err)
 		require.Len(t, files, 4)
 
@@ -263,7 +263,7 @@ func TestDiscoverGradleFiles(t *testing.T) {
 			settingsFile := filepath.Join(dir, filename)
 			require.NoError(t, os.WriteFile(settingsFile, []byte(""), 0o644))
 
-			files, err := p.discoverGradleFiles(ctx, dir, &ecosystems.SCAPluginOptions{})
+			files, err := p.discoverGradleFiles(ctx, logger.Nop(), dir, &ecosystems.SCAPluginOptions{})
 			require.NoError(t, err)
 			require.Len(t, files, 1)
 			assert.Equal(t, settingsFile, files[0].Path)
@@ -622,7 +622,7 @@ func TestPlugin_DiscoverAllGradleProjects_HonorsExcludePaths(t *testing.T) {
 		WithAllProjects(true).
 		WithExcludePaths([]string{"a/build.gradle"})
 
-	got, err := Plugin{}.discoverAllGradleProjects(t.Context(), tmpDir, opts)
+	got, err := Plugin{}.discoverAllGradleProjects(t.Context(), logger.Nop(), tmpDir, opts)
 	require.NoError(t, err)
 
 	rels := make([]string, len(got))

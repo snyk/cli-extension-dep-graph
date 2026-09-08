@@ -1034,7 +1034,7 @@ func TestPlugin_DiscoverLockFiles(t *testing.T) {
 				options = options.WithTargetFile(tt.targetFile)
 			}
 
-			files, err := plugin.discoverLockFiles(ctx, tmpDir, tt.targetFile, options)
+			files, err := plugin.discoverLockFiles(ctx, logger.Nop(), tmpDir, tt.targetFile, options)
 
 			if tt.expectedErr != "" {
 				require.Error(t, err)

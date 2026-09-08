@@ -2,6 +2,7 @@ package nuget
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,16 +24,23 @@ const (
 	logFieldTargetFile      = "targetFile"
 	logFieldTargetFramework = "targetFramework"
 	logFieldTargetsKey      = "targetsKey"
+	logFieldPackagesFolder  = "packagesFolder"
 )
 
-// Plugin implements ecosystems.SCAPlugin for .NET projects, resolving SDK-style
-// (PackageReference) projects from the project.assets.json that `dotnet restore`
-// leaves behind. It never runs `dotnet`: the assets file already holds the
-// resolved dependency set.
+// Plugin implements ecosystems.SCAPlugin for .NET projects. It never runs
+// `dotnet` or `nuget`: everything it needs is already on disk.
 //
-// Only project.assets.json is claimed. packages.config and project.json carry no
-// resolved dependency set, so this plugin reports nothing for them and the
-// workflow moves on to the legacy resolver.
+// Two kinds of project, resolved differently. SDK-style (PackageReference)
+// projects come from the project.assets.json that `dotnet restore` leaves
+// behind, which holds a fully resolved dependency set. packages.config and
+// project.json projects hold no such thing, so they are resolved from the
+// manifest plus the packages folder `nuget restore` populates beside it.
+//
+// A manifest it cannot resolve in full is left alone entirely — no result, no
+// claimed file — so the legacy resolver still sees the project and behaves
+// exactly as it does today. Reporting a partial result would be worse than
+// reporting none: the file would be claimed, and the packages we failed to find
+// would go unreported rather than being found by the resolver that follows.
 type Plugin struct{}
 
 // Compile-time check that Plugin implements the SCAPlugin interface.
@@ -55,8 +63,11 @@ func (p Plugin) BuildDepGraphsFromDir(
 	if log == nil {
 		log = logger.Nop()
 	}
+	if options == nil {
+		options = ecosystems.NewPluginOptions()
+	}
 
-	files, err := p.discoverTargetFiles(ctx, dir, options)
+	files, err := p.discoverTargetFiles(ctx, log, dir, options)
 	if err != nil {
 		return err
 	}
@@ -69,7 +80,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 	log.Debug(ctx, "Discovered .NET target files", logger.Attr("count", len(files)))
 
 	for _, file := range files {
-		if err := p.emitResults(ctx, log, file, onGraph); err != nil {
+		if err := p.emitResults(ctx, log, file, options, onGraph); err != nil {
 			return err
 		}
 	}
@@ -77,15 +88,30 @@ func (p Plugin) BuildDepGraphsFromDir(
 	return nil
 }
 
-// emitResults resolves one target file and emits a result per target framework.
-// The results share a root name and target file, differing only in target
-// runtime — which is how snyk-nuget-plugin distinguishes them.
+// emitResults resolves one target file, dispatching on which manifest it is.
+func (p Plugin) emitResults(
+	ctx context.Context,
+	log logger.Logger,
+	file discovery.FindResult,
+	options *ecosystems.SCAPluginOptions,
+	onGraph ecosystems.OnGraphFunc,
+) error {
+	if filepath.Base(file.Path) == projectAssetsFile {
+		return p.emitAssetsResults(ctx, log, file, onGraph)
+	}
+
+	return p.emitFrameworkResult(ctx, log, file, options, onGraph)
+}
+
+// emitAssetsResults resolves an SDK-style project and emits a result per target
+// framework. The results share a root name and target file, differing only in
+// target runtime — which is how snyk-nuget-plugin distinguishes them.
 //
 // A framework that cannot be resolved is reported as a failure against its own
-// runtime. An assets file that cannot be read or parsed at all is logged and
-// skipped, claiming nothing, so the legacy resolver still sees the project: it
-// reaches .NET projects through `dotnet` and can resolve some this one cannot.
-func (p Plugin) emitResults(
+// runtime: the framework is named in the file, so the result is still
+// identifiable. An assets file that cannot be read or parsed at all is logged
+// and skipped, claiming nothing, so the legacy resolver still sees the project.
+func (p Plugin) emitAssetsResults(
 	ctx context.Context,
 	log logger.Logger,
 	file discovery.FindResult,
@@ -201,20 +227,17 @@ func rootComponentName(file discovery.FindResult) string {
 // resolvers: an explicit --file, an --all-projects scan, or the scanned root.
 func (p Plugin) discoverTargetFiles(
 	ctx context.Context,
+	log logger.Logger,
 	dir string,
 	options *ecosystems.SCAPluginOptions,
 ) ([]discovery.FindResult, error) {
-	if options == nil {
-		options = ecosystems.NewPluginOptions()
-	}
-
 	switch {
 	case options.Global.TargetFile != nil:
 		if !isSupportedTargetFile(*options.Global.TargetFile) {
 			return nil, nil
 		}
 
-		files, err := discovery.FindFiles(ctx, dir, discovery.WithTargetFile(*options.Global.TargetFile))
+		files, err := discovery.FindFiles(ctx, log, dir, discovery.WithTargetFile(*options.Global.TargetFile))
 		if err != nil {
 			return nil, fmt.Errorf("discovering .NET target files: %w", err)
 		}
@@ -236,7 +259,7 @@ func (p Plugin) discoverTargetFiles(
 			findOpts = append(findOpts, discovery.WithExcludes(options.Global.ExcludePaths...))
 		}
 
-		files, err := discovery.FindFiles(ctx, dir, findOpts...)
+		files, err := discovery.FindFiles(ctx, log, dir, findOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("discovering .NET target files: %w", err)
 		}
@@ -250,15 +273,16 @@ func (p Plugin) discoverTargetFiles(
 	}
 }
 
-// rootTargetFiles lists the target files for a single project rooted at dir.
-// obj/ is the one subdirectory it looks into: restore writes
-// project.assets.json there, and detect.ts allows exactly that path.
+// rootTargetFiles returns the one manifest a single-project scan of dir
+// resolves, or nothing when dir holds none.
+//
+// One, not all of them: a .NET project directory routinely holds several
+// manifests — snyk/cli's own nuget-app fixture has packages.config,
+// project.json and project.assets.json side by side — and the CLI reports it as
+// a single project, taking the first hit in DETECTABLE_FILES order. Returning
+// every match would turn one project into three, since a scan without
+// --all-projects still emits every result a plugin produces.
 func rootTargetFiles(dir string) ([]discovery.FindResult, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("reading directory %s: %w", dir, err)
-	}
-
 	// FindResult.Path is absolute. dir is frequently "." here, and a relative
 	// path would leave the project with no directory to be named after.
 	absDir, err := filepath.Abs(dir)
@@ -266,33 +290,60 @@ func rootTargetFiles(dir string) ([]discovery.FindResult, error) {
 		return nil, fmt.Errorf("resolving absolute path for %s: %w", dir, err)
 	}
 
-	var files []discovery.FindResult
+	// Failing to read the scanned root is a setup failure rather than an absent
+	// project, and is reported as one.
+	rootNames, err := fileNamesIn(absDir)
+	if err != nil {
+		return nil, err
+	}
 
-	for _, entry := range entries {
-		if entry.IsDir() || !isSupportedTargetFile(entry.Name()) {
+	// obj/ is optional, and anything that stops it being read — absent, or not
+	// a directory at all — means only that there is no restore output there.
+	// The manifests beside it are still worth reporting.
+	objNames, err := fileNamesIn(filepath.Join(absDir, objDir))
+	if err != nil {
+		objNames = nil
+	}
+
+	for _, candidate := range rootTargetFilePrecedence {
+		names := rootNames
+		if candidate.subdir != "" {
+			names = objNames
+		}
+
+		if !names[candidate.name] {
 			continue
 		}
 
-		files = append(files, discovery.FindResult{
-			Path:    filepath.Join(absDir, entry.Name()),
-			RelPath: entry.Name(),
-		})
+		relPath := filepath.Join(candidate.subdir, candidate.name)
+
+		return []discovery.FindResult{{Path: filepath.Join(absDir, relPath), RelPath: relPath}}, nil
 	}
 
-	if objAssets := filepath.Join(absDir, objDir, projectAssetsFile); fileExists(objAssets) {
-		files = append(files, discovery.FindResult{
-			Path:    objAssets,
-			RelPath: filepath.Join(objDir, projectAssetsFile),
-		})
-	}
-
-	return files, nil
+	return nil, nil
 }
 
-// fileExists reports whether path exists and is a regular file.
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
+// fileNamesIn lists the names of the regular files directly inside dir.
+//
+// Names are compared as the directory reports them rather than by stat-ing a
+// path, so a case-insensitive filesystem does not quietly match
+// Packages.config where a case-sensitive one would not. Case-insensitive
+// discovery is CMPA-715.
+func fileNamesIn(dir string) (map[string]bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("reading directory %s: %w", dir, err)
+	}
+
+	names := make(map[string]bool, len(entries))
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			names[entry.Name()] = true
+		}
+	}
+
+	return names, nil
 }
 
 // isSupportedTargetFile reports whether path's base name is one this plugin
@@ -308,4 +359,110 @@ func isSupportedTargetFile(path string) bool {
 	}
 
 	return false
+}
+
+// emitFrameworkResult resolves a packages.config or project.json project and
+// emits its single result.
+//
+// One result, not one per framework: these manifests record no per-framework
+// resolution, so there is one dependency set and one runtime to report it
+// under. Anything that stops the project being resolved in full leaves it to
+// the legacy resolver — see the note on Plugin.
+func (p Plugin) emitFrameworkResult(
+	ctx context.Context,
+	log logger.Logger,
+	file discovery.FindResult,
+	options *ecosystems.SCAPluginOptions,
+	onGraph ecosystems.OnGraphFunc,
+) error {
+	targetFile := file.RelPath
+
+	manifest, err := readFrameworkManifest(file.Path, targetFile)
+	if err != nil {
+		return deferToLegacy(ctx, log, targetFile, err)
+	}
+
+	framework, ok, err := detectTargetFramework(filepath.Dir(file.Path), manifest)
+	if err != nil {
+		return deferToLegacy(ctx, log, targetFile, err)
+	}
+
+	// The target runtime is part of a project's identity, and nothing in these
+	// manifests records the framework a package was resolved for. Guessing one
+	// would misreport which .nuspec dependency groups apply.
+	if !ok {
+		return deferToLegacy(ctx, log, targetFile, snykecosystems.NewNoTargetFrameworksFoundError(
+			fmt.Sprintf("Could not determine a target framework for %s. "+
+				"It needs a .csproj alongside it naming a TargetFramework, or, for a packages.config, "+
+				"targetFramework attributes on its entries.", targetFile),
+		))
+	}
+
+	packagesFolder := resolvePackagesFolder(file.Path, options.Dotnet.PackagesFolder)
+
+	log.Debug(ctx, "Resolving .NET project",
+		logger.Attr(logFieldTargetFile, targetFile),
+		logger.Attr(logFieldTargetFramework, framework.original),
+		logger.Attr(logFieldPackagesFolder, packagesFolder),
+	)
+
+	installed := installedPackages(ctx, log, manifest.packages, packagesFolder)
+
+	children, err := nuspecChildren(installed, packagesFolder, framework)
+	if err != nil {
+		return deferToLegacy(ctx, log, targetFile, err)
+	}
+
+	rootName := manifest.rootName
+	if rootName == "" {
+		rootName = rootComponentName(file)
+	}
+
+	rootVersion := manifest.rootVersion
+	if rootVersion == "" {
+		rootVersion = defaultVersion
+	}
+
+	graph, err := buildFrameworkDepGraph(ctx, rootName, rootVersion, installed, children)
+	if err != nil {
+		return deferToLegacy(ctx, log, targetFile, err)
+	}
+
+	result := p.newResult(targetFile, rootName, framework.original)
+	result.DepGraph = graph
+
+	return onGraph(result)
+}
+
+// readFrameworkManifest reads whichever of the two older manifests this is.
+// Only the three names in targetFileNames reach here, and emitResults has
+// already taken project.assets.json.
+func readFrameworkManifest(path, displayPath string) (*frameworkManifest, error) {
+	if filepath.Base(path) == packagesConfigFile {
+		return readPackagesConfig(path, displayPath)
+	}
+
+	return readProjectJSON(path, displayPath)
+}
+
+// deferToLegacy records why a project was left unresolved and reports nothing
+// for it, so the workflow moves on to the legacy resolver. It never returns an
+// error: one unresolvable project must not end a scan of many.
+//
+// A file that turned out to belong to another ecosystem is logged at debug
+// rather than error. project.json is a common enough name that an Nx workspace
+// has one per package, and discovery matches every one of them — reporting each
+// as an error would bury the .NET projects that really did fail.
+func deferToLegacy(ctx context.Context, log logger.Logger, targetFile string, err error) error {
+	if errors.Is(err, errNotDotnetManifest) {
+		log.Debug(ctx, "Not a .NET project",
+			logger.Attr(logFieldTargetFile, targetFile), logger.Err(err))
+
+		return nil
+	}
+
+	log.Error(ctx, "Leaving this .NET project to the legacy resolver",
+		logger.Attr(logFieldTargetFile, targetFile), logger.Err(err))
+
+	return nil
 }

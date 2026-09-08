@@ -56,7 +56,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 		return nil
 	}
 
-	files, err := p.discoverLockFiles(ctx, inputDir, targetFile, options)
+	files, err := p.discoverLockFiles(ctx, log, inputDir, targetFile, options)
 	if err != nil {
 		return err
 	}
@@ -331,6 +331,7 @@ func findWorkspacePackage(depGraph *depgraph.DepGraph, workspacePackages []Works
 
 func (p Plugin) discoverLockFiles(
 	ctx context.Context,
+	log logger.Logger,
 	dir string,
 	targetFile string,
 	options *scaecosystems.SCAPluginOptions,
@@ -368,7 +369,7 @@ func (p Plugin) discoverLockFiles(
 		}
 	}
 
-	files, err := discovery.FindFiles(ctx, dir, findOpts...)
+	files, err := discovery.FindFiles(ctx, log, dir, findOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find uv lockfile(s): %w", err)
 	}

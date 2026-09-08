@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -69,12 +70,16 @@ func buildSCAPlugins(
 		uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL),
 	}
 
-	// Opt-in per org. The .NET resolver only claims SDK-style projects it could
-	// actually resolve from project.assets.json; it reports those as processed,
-	// so the legacy resolver skips them. Everything else it reports nothing for
-	// — packages.config and project.json projects, and any assets file it could
-	// not use — and the loop below moves on to the next plugin when one returns
-	// no results, so those still reach the legacy resolver.
+	// Opt-in per org. The .NET resolver claims every manifest it resolved in
+	// full — project.assets.json, packages.config and project.json alike — and
+	// reports those as processed, so the legacy resolver skips them.
+	//
+	// A manifest it could not resolve in full it reports nothing for, and the
+	// loop below moves on to the next plugin when one returns no results, so
+	// those still reach the legacy resolver. That covers an unreadable or
+	// malformed manifest, one whose target framework nothing names, and a
+	// packages folder holding an archive we could not open — cases where
+	// claiming a partial result would hide packages the legacy resolver finds.
 	//
 	// The exception is an explicit --file naming a path that does not exist:
 	// discovery treats that as a setup failure and the scan fails there rather
@@ -209,6 +214,16 @@ func buildPluginOptions(config configuration.Configuration) *ecosystems.SCAPlugi
 	if targetFile := config.GetString(workflow.FlagFile); targetFile != "" {
 		opts = opts.WithTargetFile(targetFile)
 	}
+
+	// The CLI documents --packages-folder as relative to the working directory,
+	// not to the scanned root, so it is resolved here rather than per project.
+	if packagesFolder := config.GetString(workflow.FlagNugetPkgsFolder); packagesFolder != "" {
+		if abs, err := filepath.Abs(packagesFolder); err == nil {
+			packagesFolder = abs
+		}
+		opts = opts.WithPackagesFolder(packagesFolder)
+	}
+
 	return opts
 }
 

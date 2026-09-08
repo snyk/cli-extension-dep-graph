@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"slices"
 	"strings"
 
 	snykecosystems "github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
@@ -31,10 +32,45 @@ type projectAssets struct {
 
 	Project assetsProject
 
+	// Logs holds the diagnostics the restore raised for this project, which is
+	// where the reason a target framework came out short is recorded. NuGet
+	// writes them here so an incremental restore can replay them, as far back as
+	// SDK 1.1.14 — the oldest that still publishes an image to test against.
+	//
+	// A file without them is still read: a restore that recorded no reason
+	// leaves the graph to speak for itself, as it did before this was decoded.
+	Logs []assetsLog
+
 	// projectPresent records whether the `project` field existed at all, so a
 	// missing one is reported differently from one that is merely empty.
 	projectPresent bool
 }
+
+// assetsLog is one diagnostic the restore raised.
+type assetsLog struct {
+	Code    string `json:"code"`
+	Level   string `json:"level"`
+	Message string `json:"message"`
+	// LibraryID is the package the diagnostic is about, absent when it is about
+	// the project as a whole.
+	LibraryID string `json:"libraryId"`
+	// TargetGraphs are the `targets` keys the diagnostic applies to, absent when
+	// it applies to every one of them. A multi-targeting project can fail on one
+	// framework and resolve on another.
+	TargetGraphs []string `json:"targetGraphs"`
+}
+
+// failedRestore reports whether the diagnostic is one that failed the restore.
+func (l *assetsLog) failedRestore() bool { return l.Level == assetsLogLevelError }
+
+// appliesTo reports whether the diagnostic covers targetsKey.
+func (l *assetsLog) appliesTo(targetsKey string) bool {
+	return len(l.TargetGraphs) == 0 || slices.Contains(l.TargetGraphs, targetsKey)
+}
+
+// assetsLogLevelError is the level NuGet gives a diagnostic that failed the
+// restore. Warnings share the array.
+const assetsLogLevelError = "Error"
 
 // assetsTargetEntry is one resolved package within a target framework.
 //
@@ -69,6 +105,7 @@ func (a *projectAssets) UnmarshalJSON(data []byte) error {
 		Targets                     orderedMap[orderedMap[assetsTargetEntry]] `json:"targets"`
 		ProjectFileDependencyGroups map[string][]string                       `json:"projectFileDependencyGroups"`
 		Project                     json.RawMessage                           `json:"project"`
+		Logs                        []assetsLog                               `json:"logs"`
 	}
 
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -77,6 +114,7 @@ func (a *projectAssets) UnmarshalJSON(data []byte) error {
 
 	a.Targets = raw.Targets
 	a.ProjectFileDependencyGroups = raw.ProjectFileDependencyGroups
+	a.Logs = raw.Logs
 	a.projectPresent = len(raw.Project) > 0 && string(raw.Project) != "null"
 
 	if a.projectPresent {

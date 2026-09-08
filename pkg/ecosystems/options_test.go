@@ -382,3 +382,16 @@ func TestWithIncludeProvenance(t *testing.T) {
 	options = NewPluginOptions().WithIncludeProvenance(false)
 	assert.False(t, options.Global.IncludeProvenance)
 }
+
+func TestNewPluginOptionsFromRawFlags_PackagesFolder(t *testing.T) {
+	opts, err := NewPluginOptionsFromRawFlags([]string{"--packages-folder", "/src/Solution/packages"})
+	assert.NoError(t, err)
+	assert.Equal(t, "/src/Solution/packages", opts.Dotnet.PackagesFolder)
+}
+
+func TestWithPackagesFolder(t *testing.T) {
+	opts := NewPluginOptions()
+	assert.Empty(t, opts.Dotnet.PackagesFolder, "the .NET resolver derives the location when this is unset")
+
+	assert.Equal(t, "/elsewhere", opts.WithPackagesFolder("/elsewhere").Dotnet.PackagesFolder)
+}

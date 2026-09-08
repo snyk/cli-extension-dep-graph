@@ -74,7 +74,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 		return fmt.Errorf("gradle: invalid options: %w", err)
 	}
 
-	files, err := p.discoverGradleFiles(ctx, dir, options)
+	files, err := p.discoverGradleFiles(ctx, log, dir, options)
 	if err != nil {
 		return fmt.Errorf("gradle: failed to discover files: %w", err)
 	}
@@ -107,21 +107,21 @@ func (p Plugin) BuildDepGraphsFromDir(
 }
 
 // discoverGradleFiles discovers Gradle build files based on the provided options.
-func (p Plugin) discoverGradleFiles(ctx context.Context, dir string, options *ecosystems.SCAPluginOptions) ([]discovery.FindResult, error) {
+func (p Plugin) discoverGradleFiles(ctx context.Context, log logger.Logger, dir string, options *ecosystems.SCAPluginOptions) ([]discovery.FindResult, error) {
 	switch {
 	case options.Global.TargetFile != nil:
 		// Validate target file is a Gradle build file
 		if !isBuildFile(*options.Global.TargetFile) {
 			return nil, nil // Not a Gradle build file, skip
 		}
-		files, err := discovery.FindFiles(ctx, dir, discovery.WithTargetFile(*options.Global.TargetFile))
+		files, err := discovery.FindFiles(ctx, log, dir, discovery.WithTargetFile(*options.Global.TargetFile))
 		if err != nil {
 			return nil, fmt.Errorf("failed to find target file: %w", err)
 		}
 		return files, nil
 
 	case options.Global.AllProjects:
-		return p.discoverAllGradleProjects(ctx, dir, options)
+		return p.discoverAllGradleProjects(ctx, log, dir, options)
 
 	default:
 		// Find best build file in root directory (priority order)
@@ -268,7 +268,9 @@ func (p Plugin) processGradleFile(
 
 // discoverAllGradleProjects finds all Gradle files recursively for --all-projects.
 // Uses simple discovery with runtime deduplication to avoid complex filtering logic.
-func (p Plugin) discoverAllGradleProjects(ctx context.Context, dir string, options *ecosystems.SCAPluginOptions) ([]discovery.FindResult, error) {
+func (p Plugin) discoverAllGradleProjects(
+	ctx context.Context, log logger.Logger, dir string, options *ecosystems.SCAPluginOptions,
+) ([]discovery.FindResult, error) {
 	// Find all Gradle files recursively (build files and settings files)
 	findOpts := []discovery.FindOption{
 		discovery.WithInclude("build.gradle"),
@@ -285,7 +287,7 @@ func (p Plugin) discoverAllGradleProjects(ctx context.Context, dir string, optio
 		findOpts = append(findOpts, discovery.WithExcludes(options.Global.ExcludePaths...))
 	}
 
-	files, err := discovery.FindFiles(ctx, dir, findOpts...)
+	files, err := discovery.FindFiles(ctx, log, dir, findOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find gradle files: %w", err)
 	}

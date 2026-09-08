@@ -2,14 +2,13 @@ package nuget
 
 const (
 	// projectAssetsFile is `dotnet restore` output for SDK-style
-	// (PackageReference) projects, and the only target file this plugin claims.
+	// (PackageReference) projects: a fully resolved dependency set.
 	projectAssetsFile = "project.assets.json"
 
-	// packagesConfigFile and projectJSONFile are the .NET Framework manifests.
-	// The CLI discovers them (snyk/cli src/lib/detect.ts) but this resolver does
-	// not: they carry no resolved dependency set. Leaving them out of
-	// targetFileNames is what makes those projects fall back to the legacy
-	// resolver, which reports them exactly as it does today.
+	// packagesConfigFile and projectJSONFile are the older manifests, for
+	// .NET Framework and for pre-RTM .NET Core respectively. Neither records a
+	// resolved dependency set, so resolving one means reading the packages
+	// folder that `nuget restore` populates beside it.
 	packagesConfigFile = "packages.config"
 	projectJSONFile    = "project.json"
 
@@ -17,9 +16,30 @@ const (
 	// inside it describes the project one directory up.
 	objDir = "obj"
 
-	// defaultVersion roots a project whose assets file declares no
-	// project.version, matching snyk-nuget-plugin.
+	// packagesFolderName is the directory `nuget restore` installs into. Its
+	// default location is derived from the manifest's path; --packages-folder
+	// overrides it. See resolvePackagesFolder.
+	packagesFolderName = "packages"
+
+	// csprojExt is the only project file extension consulted for a target
+	// framework. See csprojTargetFramework.
+	csprojExt = ".csproj"
+	nupkgExt  = ".nupkg"
+	nuspecExt = ".nuspec"
+
+	// defaultVersion roots a project whose manifest declares no version,
+	// matching snyk-nuget-plugin.
 	defaultVersion = "0.0.0"
+
+	// unknownVersion stands in for a project.json dependency declared with no
+	// version at all, as snyk-nuget-plugin's project-json-parser does.
+	unknownVersion = "unknown"
+
+	// maxProjectJSONDepth bounds how deep the search for dependency groups
+	// goes, so that a small file nested pathologically deep cannot cost a
+	// scan seconds of work. See descend for the measurements, and for why the
+	// bound only bites because that walk decodes one level at a time.
+	maxProjectJSONDepth = 64
 
 	// filteredPackagePrefix drops `runtime` and `runtime.native.*` packages:
 	// platform-specific runtime assets rather than dependencies a user can act
@@ -47,4 +67,22 @@ const (
 // targetFileNames lists every file name discovery matches.
 var targetFileNames = []string{
 	projectAssetsFile,
+	packagesConfigFile,
+	projectJSONFile,
+}
+
+// rootTargetFilePrecedence orders the manifests a single-project scan chooses
+// between when a directory holds more than one, highest priority first. It
+// mirrors the CLI's own DETECTABLE_FILES order (snyk/cli src/lib/detect.ts),
+// which is what decides today that a directory holding both packages.config and
+// project.assets.json is one project, not two.
+//
+// project.json is absent deliberately: the CLI lists it in AUTO_DETECTABLE_FILES
+// but not DETECTABLE_FILES, so a bare scan of a directory holding only a
+// project.json reports no supported target file. It stays reachable through
+// --file and --all-projects.
+var rootTargetFilePrecedence = []struct{ subdir, name string }{
+	{objDir, projectAssetsFile},
+	{"", projectAssetsFile},
+	{"", packagesConfigFile},
 }
