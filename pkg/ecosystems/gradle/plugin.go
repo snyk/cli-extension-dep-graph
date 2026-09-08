@@ -278,6 +278,7 @@ func (p Plugin) discoverAllGradleProjects(
 		discovery.WithInclude("settings.gradle"),
 		discovery.WithInclude("settings.gradle.kts"),
 		discovery.WithCommonExcludes(),
+		discovery.WithMaxDepth(options.Global.DetectionDepth),
 	}
 
 	if len(options.Global.Exclude) > 0 {

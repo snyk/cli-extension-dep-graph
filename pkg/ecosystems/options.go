@@ -32,7 +32,11 @@ type GlobalOptions struct {
 	ProjectName                   *string              `arg:"--project-name"`
 	IncludeProvenance             bool                 `arg:"--include-provenance"`
 	WorkspacePackage              *string              `arg:"--workspace-package"`
-	RawFlags                      []string
+	// DetectionDepth caps how deep --all-projects discovery walks, counted in
+	// path segments below the scanned root. 0 means unlimited, matching the
+	// CLI, which walks without a depth limit when --detection-depth is absent.
+	DetectionDepth int `arg:"--detection-depth"`
+	RawFlags       []string
 }
 
 // CommaSeparatedString is a custom type that parses comma-separated values.
@@ -193,6 +197,14 @@ func (o *SCAPluginOptions) WithForceIncludeWorkspacePackages(forceIncludeWorkspa
 
 func (o *SCAPluginOptions) WithProjectName(projectName string) *SCAPluginOptions {
 	o.Global.ProjectName = &projectName
+	return o
+}
+
+// WithDetectionDepth caps how deep --all-projects discovery walks, mirroring
+// the CLI's --detection-depth. See discovery.WithMaxDepth for the semantics;
+// values <= 0 leave the walk unlimited.
+func (o *SCAPluginOptions) WithDetectionDepth(depth int) *SCAPluginOptions {
+	o.Global.DetectionDepth = depth
 	return o
 }
 

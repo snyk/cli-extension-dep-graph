@@ -137,6 +137,7 @@ func (p Plugin) discoverRequirementsFiles(
 		findOpts = []discovery.FindOption{
 			discovery.WithInclude(requirementsFile),
 			discovery.WithExcludes(excludes...),
+			discovery.WithMaxDepth(options.Global.DetectionDepth),
 		}
 	default:
 		// Default: find requirements.txt at root only

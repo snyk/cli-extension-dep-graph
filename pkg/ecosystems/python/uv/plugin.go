@@ -343,6 +343,7 @@ func (p Plugin) discoverLockFiles(
 		findOpts = []discovery.FindOption{
 			discovery.WithInclude(LockFileName),
 			discovery.WithCommonExcludes(),
+			discovery.WithMaxDepth(options.Global.DetectionDepth),
 		}
 		if len(options.Global.Exclude) > 0 {
 			findOpts = append(findOpts, discovery.WithExcludes(options.Global.Exclude...))

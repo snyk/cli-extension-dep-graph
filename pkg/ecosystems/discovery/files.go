@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 )
@@ -16,6 +17,7 @@ const (
 	logKeyDir     = "dir"
 	logKeyError   = "error"
 	logKeyPattern = "pattern"
+	logKeyDepth   = "max_depth"
 )
 
 // findOptions configures file discovery behavior.
@@ -23,6 +25,7 @@ type findOptions struct {
 	targetFiles  []string
 	includeGlobs []string
 	excludeGlobs []string
+	maxDepth     int
 }
 
 // FindOption is a functional option for configuring file discovery.
@@ -67,6 +70,23 @@ func WithExclude(pattern string) FindOption {
 func WithExcludes(patterns ...string) FindOption {
 	return func(o *findOptions) {
 		o.excludeGlobs = append(o.excludeGlobs, patterns...)
+	}
+}
+
+// WithMaxDepth limits how deep the walk descends, mirroring the CLI's
+// --detection-depth. The value counts path segments relative to the scanned
+// root, not directories traversed: 1 finds only files sitting directly in the
+// root, 2 also finds files one directory down. Depth 0 is not "root only" —
+// snyk/cli rejects --detection-depth<=0 outright (InvalidDetectionDepthValue),
+// so any value <= 0 is treated as unset here. Unset means unlimited, again
+// matching snyk/cli: it leaves levelsDeep undefined when the flag is absent,
+// which makes its own depth check compare against NaN and never trip.
+//
+// Applies to the include-glob walk only; an explicit target file is always
+// honoured, as --detection-depth is a --all-projects flag in the CLI too.
+func WithMaxDepth(depth int) FindOption {
+	return func(o *findOptions) {
+		o.maxDepth = depth
 	}
 }
 
@@ -117,7 +137,8 @@ func FindFiles(ctx context.Context, log logger.Logger, rootDir string, options .
 		logger.Attr("root_dir", absRoot),
 		logger.Attr("target_files", opts.targetFiles),
 		logger.Attr("include_globs", opts.includeGlobs),
-		logger.Attr("exclude_globs", opts.excludeGlobs))
+		logger.Attr("exclude_globs", opts.excludeGlobs),
+		logger.Attr(logKeyDepth, opts.maxDepth))
 
 	// Use a map to deduplicate results by absolute path
 	resultMap := make(map[string]FindResult)
@@ -252,7 +273,7 @@ func walkDirectory(ctx context.Context, log logger.Logger, absRoot string, opts 
 
 		// Handle directories
 		if d.IsDir() {
-			return handleDirectory(ctx, log, d, relPath, opts.excludeGlobs)
+			return handleDirectory(ctx, log, d, relPath, opts)
 		}
 
 		// Check exclusions and pattern match for files
@@ -273,19 +294,30 @@ func walkDirectory(ctx context.Context, log logger.Logger, absRoot string, opts 
 	return results, nil
 }
 
-// handleDirectory checks if a directory should be excluded and returns fs.SkipDir if so.
-func handleDirectory(ctx context.Context, log logger.Logger, d fs.DirEntry, relPath string, excludePatterns []string) error {
-	if len(excludePatterns) == 0 {
-		return nil
-	}
-
+// handleDirectory checks if a directory should be pruned and returns
+// fs.SkipDir if so, either because it is excluded or because descending into
+// it could only yield files past the max depth.
+func handleDirectory(ctx context.Context, log logger.Logger, d fs.DirEntry, relPath string, opts *findOptions) error {
 	// Never exclude the root directory
 	if relPath == "." {
 		return nil
 	}
 
+	// Files inside this directory sit one segment deeper than the directory
+	// itself, so a directory already at the limit cannot hold a match.
+	if opts.maxDepth > 0 && pathDepth(relPath) >= opts.maxDepth {
+		log.Debug(ctx, "Skipping directory beyond max depth",
+			logger.Attr(logKeyDir, relPath),
+			logger.Attr(logKeyDepth, opts.maxDepth))
+		return fs.SkipDir
+	}
+
+	if len(opts.excludeGlobs) == 0 {
+		return nil
+	}
+
 	name := d.Name()
-	for _, pattern := range excludePatterns {
+	for _, pattern := range opts.excludeGlobs {
 		// Check relative path first (more specific)
 		matched, err := filepath.Match(pattern, relPath)
 		if err != nil {
@@ -368,4 +400,13 @@ func isExcluded(ctx context.Context, log logger.Logger, name, relPath string, ex
 	}
 
 	return false
+}
+
+// pathDepth counts the path segments in a root-relative path. The root itself
+// ("." from filepath.Rel) is depth 0, a file directly in the root is depth 1.
+func pathDepth(relPath string) int {
+	if relPath == "." {
+		return 0
+	}
+	return strings.Count(relPath, string(filepath.Separator)) + 1
 }

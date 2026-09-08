@@ -2231,3 +2231,30 @@ func TestWorkflowDataFromDepGraph(t *testing.T) {
 func stringPtr(s string) *string {
 	return &s
 }
+
+func TestBuildPluginOptions_DetectionDepth(t *testing.T) {
+	tests := []struct {
+		name      string
+		flagValue string
+		wantDepth int
+	}{
+		{"parses a positive depth", "3", 3},
+		{"unset leaves the walk unlimited", "", 0},
+		// snyk/cli rejects these before resolution runs, so they are treated
+		// as unset here rather than surfaced as an error.
+		{"zero is treated as unset", "0", 0},
+		{"negative is treated as unset", "-2", 0},
+		{"unparseable is treated as unset", "deep", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := configuration.New()
+			config.Set(workflow.FlagDetectionDepth, tt.flagValue)
+
+			opts := buildPluginOptions(config)
+
+			assert.Equal(t, tt.wantDepth, opts.Global.DetectionDepth)
+		})
+	}
+}

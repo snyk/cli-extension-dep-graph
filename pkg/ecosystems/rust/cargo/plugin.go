@@ -324,6 +324,7 @@ func (p Plugin) discoverLockFiles(
 		findOpts := []discovery.FindOption{
 			discovery.WithInclude(cargoLockFile),
 			discovery.WithCommonExcludes(),
+			discovery.WithMaxDepth(options.Global.DetectionDepth),
 		}
 
 		if len(options.Global.Exclude) > 0 {

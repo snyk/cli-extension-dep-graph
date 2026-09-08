@@ -40,6 +40,7 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 				"--bazel-max-targets", "50",
 				"--bazel-go",
 				"--bazel-platforms", "//:linux_x86_64",
+				"--detection-depth", "3",
 			},
 			expected: &SCAPluginOptions{
 				Global: GlobalOptions{
@@ -53,6 +54,7 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 					ForceSingleGraph:              true,
 					ForceIncludeWorkspacePackages: true,
 					IncludeProvenance:             true,
+					DetectionDepth:                3,
 				},
 				Python: PythonOptions{
 					NoBuildIsolation: true,
@@ -263,6 +265,33 @@ func TestNewPluginOptionsFromRawFlags_FailFast(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.True(t, got.Global.FailFast)
+}
+
+func TestNewPluginOptionsFromRawFlags_DetectionDepth(t *testing.T) {
+	tests := []struct {
+		name      string
+		rawFlags  []string
+		wantDepth int
+	}{
+		{"space separated", []string{"--detection-depth", "2"}, 2},
+		{"equals syntax", []string{"--detection-depth=4"}, 4},
+		// Unset must stay 0 so discovery keeps walking without a limit.
+		{"absent leaves it unset", []string{"--all-projects"}, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewPluginOptionsFromRawFlags(tt.rawFlags)
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantDepth, got.Global.DetectionDepth)
+		})
+	}
+}
+
+func TestWithDetectionDepth(t *testing.T) {
+	assert.Equal(t, 5, NewPluginOptions().WithDetectionDepth(5).Global.DetectionDepth)
+	assert.Zero(t, NewPluginOptions().Global.DetectionDepth)
 }
 
 func TestNewPluginOptionsFromRawFlags_ForceSingleGraph(t *testing.T) {

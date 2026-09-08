@@ -215,6 +215,14 @@ func buildPluginOptions(config configuration.Configuration) *ecosystems.SCAPlugi
 		opts = opts.WithTargetFile(targetFile)
 	}
 
+	// --detection-depth is a string flag here, so it needs parsing. snyk/cli
+	// rejects values <= 0 before resolution ever runs, so a non-positive or
+	// unparseable value is treated as unset — an unlimited walk — rather than
+	// as an error.
+	if depth, err := strconv.Atoi(config.GetString(workflow.FlagDetectionDepth)); err == nil && depth > 0 {
+		opts = opts.WithDetectionDepth(depth)
+	}
+
 	// The CLI documents --packages-folder as relative to the working directory,
 	// not to the scanned root, so it is resolved here rather than per project.
 	if packagesFolder := config.GetString(workflow.FlagNugetPkgsFolder); packagesFolder != "" {
