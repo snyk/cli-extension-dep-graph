@@ -123,9 +123,9 @@ scope and may introduce incorrect assumptions about existing behavior. Do write 
 
 ## Commits and PRs
 
-**Commit format:** `<type>(scope): <description>` (Conventional Commits) — also applies to PR titles, since PRs are squash-merged.
+**Commit format:** `<type>(scope): <description>` (Conventional Commits) — also applies to PR titles, since PRs are squash-merged (GitHub appends the `(#NNN)` PR reference to the squashed commit automatically).
 Allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert.
-Example: `feat(dotnet): resolve SDK-style projects from project.assets.json [CMPA-716] (#235)`
+Example: `feat(dotnet): resolve SDK-style projects from project.assets.json [CMPA-716]`
 **PR description sections:** Tests written and linted, Documentation written, Commit history is tidy, What this does.
 
 ## When in doubt
