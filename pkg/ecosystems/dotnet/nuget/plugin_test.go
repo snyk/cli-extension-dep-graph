@@ -25,6 +25,10 @@ const packagesConfigManifest = `<?xml version="1.0" encoding="utf-8"?>
   <package id="jQuery" version="3.2.1" targetFramework="net45" />
 </packages>`
 
+// projectJSONManifest carries no framework hint of its own, so a project.json
+// only resolves with a .csproj beside it.
+const projectJSONManifest = `{"dependencies": {"Newtonsoft.Json": "8.0.3", "RouteMagic": "1.3"}}`
+
 const csprojNet45 = `<Project><PropertyGroup><TargetFramework>net45</TargetFramework></PropertyGroup></Project>`
 
 // recordingLogger captures logged messages so tests can assert on what the
@@ -117,6 +121,8 @@ func fixtureContent(name string) string {
 		return singleTargetAssets
 	case base == packagesConfigFile:
 		return packagesConfigManifest
+	case base == projectJSONFile:
+		return projectJSONManifest
 	case filepath.Ext(base) == csprojExt:
 		return csprojNet45
 	default:
@@ -217,7 +223,7 @@ func TestPlugin_PackagesConfigResolves(t *testing.T) {
 
 	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
 	require.NoError(t, err)
-	require.Len(t, results, 1, "this manifest records one dependency set, so there is one result")
+	require.Len(t, results, 1, "these manifests record one dependency set, so there is one result")
 
 	result := results[0]
 	require.NoError(t, result.Error)
@@ -236,33 +242,103 @@ func TestPlugin_PackagesConfigResolves(t *testing.T) {
 		pkgIDs(result.DepGraph.Pkgs))
 }
 
-// project.json is a .NET manifest the CLI discovers, but this resolver does not
-// handle it yet. Reporting nothing is what hands it back to the legacy
-// resolver — including for a single project, where the workflow only moves on
-// to the next plugin because this one returned no results at all.
-func TestPlugin_ProjectJSONIsLeftToLegacy(t *testing.T) {
-	dir := writeFiles(t, projectJSONFile)
+func TestPlugin_ProjectJSONResolves(t *testing.T) {
+	dir := writeFiles(t, projectJSONFile, "App.csproj")
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithAllProjects(true))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	result := results[0]
+	require.NoError(t, result.Error)
+	assert.Equal(t, projectJSONFile, result.ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, []string{"net45"}, runtimes(t, results), "the runtime comes from the .csproj")
+	assert.Equal(t, []string{projectJSONFile}, result.ProcessedFiles)
+
+	assert.ElementsMatch(t,
+		[]string{result.DepGraph.GetRootPkg().ID, "Newtonsoft.Json@8.0.3", "RouteMagic@1.3"},
+		pkgIDs(result.DepGraph.Pkgs))
+}
+
+// The CLI lists project.json in AUTO_DETECTABLE_FILES but not DETECTABLE_FILES,
+// so a bare scan of a directory holding only one reports no supported target
+// file. Picking it up here would be new behavior rather than preserved
+// behavior, so it stays reachable only through --all-projects and --file.
+func TestPlugin_ProjectJSONIsNotFoundByABareScan(t *testing.T) {
+	dir := writeFiles(t, projectJSONFile, "App.csproj")
 
 	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
-	require.NoError(t, err, "an unsupported .NET manifest is not an error")
+	require.NoError(t, err)
 	assert.Empty(t, results)
 
 	results, err = scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
 		ecosystems.NewPluginOptions().WithTargetFile(projectJSONFile))
-	require.NoError(t, err, "nor is one named explicitly with --file")
-	assert.Empty(t, results)
+	require.NoError(t, err)
+	assert.Len(t, results, 1, "--file names it explicitly, which the CLI does support")
 }
 
-// Nothing names a framework for this project, and a .NET project has to have
-// one. Guessing would report it under a framework it does not target, so it
-// goes to the legacy resolver instead — which fails on it exactly as it does
-// today.
+// A directory holding several manifests is one project, not several. The CLI
+// picks the first hit in DETECTABLE_FILES order, and a scan without
+// --all-projects still emits every result a plugin produces — so returning all
+// three would turn one project into three.
+func TestPlugin_RootDirOnly_ManifestPrecedence(t *testing.T) {
+	tests := []struct {
+		name    string
+		present []string
+		want    string
+	}{
+		{
+			name:    "restore output outranks the manifests beside it",
+			present: []string{objDir + "/" + projectAssetsFile, projectAssetsFile, packagesConfigFile, projectJSONFile},
+			want:    filepath.Join(objDir, projectAssetsFile),
+		},
+		{
+			name:    "a root-level assets file outranks packages.config",
+			present: []string{projectAssetsFile, packagesConfigFile, projectJSONFile},
+			want:    projectAssetsFile,
+		},
+		{
+			// snyk/cli's own nuget-app fixture is this shape.
+			name:    "packages.config outranks project.json",
+			present: []string{packagesConfigFile, projectJSONFile, "App.csproj"},
+			want:    packagesConfigFile,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dir := writeFiles(t, test.present...)
+
+			results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			assert.Equal(t, test.want, results[0].ProjectDescriptor.GetTargetFile())
+		})
+	}
+}
+
+// --all-projects has no such precedence: every manifest is its own project,
+// which is what the CLI reports too.
+func TestPlugin_AllProjects_ReportsEveryManifestInADirectory(t *testing.T) {
+	dir := writeFiles(t, packagesConfigFile, projectJSONFile, "App.csproj")
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithAllProjects(true))
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{packagesConfigFile, projectJSONFile}, relPaths(t, results))
+}
+
+// Nothing in a project.json names a framework, so without a .csproj there is no
+// runtime to report the project under. Guessing one would misreport which
+// .nuspec dependency groups apply, so the project goes to the legacy resolver
+// instead — which fails on it exactly as it does today.
 func TestPlugin_ManifestWithNoTargetFrameworkIsLeftToLegacy(t *testing.T) {
-	dir := t.TempDir()
-	write(t, dir, packagesConfigFile, `<packages><package id="Newtonsoft.Json" version="10.0.3" /></packages>`)
+	dir := writeFiles(t, projectJSONFile)
 
 	log := &recordingLogger{}
-	results, err := scatest.Run(context.Background(), Plugin{}, log, dir, ecosystems.NewPluginOptions())
+	results, err := scatest.Run(context.Background(), Plugin{}, log, dir,
+		ecosystems.NewPluginOptions().WithAllProjects(true))
 
 	require.NoError(t, err, "one unresolvable project must not end a scan of many")
 	assert.Empty(t, results)
@@ -270,16 +346,29 @@ func TestPlugin_ManifestWithNoTargetFrameworkIsLeftToLegacy(t *testing.T) {
 }
 
 func TestPlugin_UnreadableManifestIsLeftToLegacy(t *testing.T) {
-	dir := t.TempDir()
-	write(t, dir, packagesConfigFile, `<configuration><package id="X" version="1.0" /></configuration>`)
-	write(t, dir, "App.csproj", csprojNet45)
+	tests := map[string]string{
+		packagesConfigFile: `<configuration><package id="X" version="1.0" /></configuration>`,
+		// Truncated rather than belonging to another ecosystem: this one is a
+		// real failure, and TestPlugin_OtherEcosystemsAreNotLoggedAsErrors
+		// covers the file that was simply never ours.
+		projectJSONFile: `{"dependencies": {"A": `,
+	}
 
-	log := &recordingLogger{}
-	results, err := scatest.Run(context.Background(), Plugin{}, log, dir, ecosystems.NewPluginOptions())
+	for name, content := range tests {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			write(t, dir, name, content)
+			write(t, dir, "App.csproj", csprojNet45)
 
-	require.NoError(t, err)
-	assert.Empty(t, results, "claiming a manifest we could not read would hide it from the resolver that can")
-	assert.NotEmpty(t, log.errs)
+			log := &recordingLogger{}
+			results, err := scatest.Run(context.Background(), Plugin{}, log, dir,
+				ecosystems.NewPluginOptions().WithAllProjects(true))
+
+			require.NoError(t, err)
+			assert.Empty(t, results, "claiming a manifest we could not read would hide it from the resolver that can")
+			assert.NotEmpty(t, log.errs)
+		})
+	}
 }
 
 func TestPlugin_DepGraphShape(t *testing.T) {
@@ -517,9 +606,10 @@ func TestPlugin_AllProjects(t *testing.T) {
 		"src/App/"+objDir+"/"+projectAssetsFile,
 		"src/Lib/"+objDir+"/"+projectAssetsFile,
 		"src/Legacy/"+packagesConfigFile,
+		"src/Old/"+projectJSONFile,
+		"src/Old/Old.csproj",
 		// Not target files, or not reachable.
 		"src/App/App.csproj",
-		"src/Old/"+projectJSONFile,
 		"MySolution.sln",
 		"paket.dependencies",
 		"node_modules/pkg/"+projectAssetsFile,
@@ -537,6 +627,7 @@ func TestPlugin_AllProjects(t *testing.T) {
 		filepath.Join("src", "App", objDir, projectAssetsFile),
 		filepath.Join("src", "Lib", objDir, projectAssetsFile),
 		filepath.Join("src", "Legacy", packagesConfigFile),
+		filepath.Join("src", "Old", projectJSONFile),
 	}, relPaths(t, results))
 }
 
@@ -660,10 +751,11 @@ func TestIsSupportedTargetFile(t *testing.T) {
 		"project.assets.json":         true,
 		"obj/project.assets.json":     true,
 		"src/App/project.assets.json": true,
-		"packages.config":             true,
-		"src/Legacy/packages.config":  true,
-		// Discovered by the CLI, but not resolved here yet: CMPA-717.
-		"project.json": false,
+		// The .NET Framework manifests, resolved from the manifest plus the
+		// packages folder beside it.
+		"packages.config":            true,
+		"src/Legacy/packages.config": true,
+		"project.json":               true,
 		// Project files are read by snyk-nuget-plugin, never discovered as targets.
 		"MyApp.csproj":   false,
 		"MyApp.vbproj":   false,
@@ -738,85 +830,6 @@ func TestNewProjectIdentity_SetsEveryField(t *testing.T) {
 	assert.Equal(t, "src/App/"+projectAssetsFile, *id.TargetFile)
 	assert.Equal(t, "App", id.RootComponentName)
 	assert.Equal(t, pkgManager, id.ProjectType)
-}
-
-// A directory holding both a root-level assets file and restore output in obj/
-// is one project, not two. The CLI picks the first hit in DETECTABLE_FILES
-// order, and a scan without --all-projects still emits every result a plugin
-// produces — so returning both would double-report the project.
-func TestPlugin_RootDirOnly_ManifestPrecedence(t *testing.T) {
-	tests := []struct {
-		name    string
-		present []string
-		want    string
-	}{
-		{
-			name:    "restore output outranks the manifests beside it",
-			present: []string{objDir + "/" + projectAssetsFile, projectAssetsFile, packagesConfigFile},
-			want:    filepath.Join(objDir, projectAssetsFile),
-		},
-		{
-			name:    "a root-level assets file outranks packages.config",
-			present: []string{projectAssetsFile, packagesConfigFile},
-			want:    projectAssetsFile,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			dir := writeFiles(t, test.present...)
-
-			results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
-			require.NoError(t, err)
-			require.Len(t, results, 1)
-			assert.Equal(t, test.want, results[0].ProjectDescriptor.GetTargetFile())
-		})
-	}
-}
-
-// --all-projects has no such precedence: every manifest is its own project,
-// which is what the CLI reports too.
-func TestPlugin_AllProjects_ReportsEveryManifestInADirectory(t *testing.T) {
-	dir := writeFiles(t, objDir+"/"+projectAssetsFile, packagesConfigFile)
-
-	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
-		ecosystems.NewPluginOptions().WithAllProjects(true))
-	require.NoError(t, err)
-	assert.ElementsMatch(t,
-		[]string{filepath.Join(objDir, projectAssetsFile), packagesConfigFile},
-		relPaths(t, results))
-}
-
-// A scanned root that is not there at all is a setup failure, the same as a
-// --file naming a path that does not exist. Reporting no target files instead
-// would send the scan on to the next plugin to rediscover the same problem.
-func TestPlugin_MissingScanRootIsAnError(t *testing.T) {
-	_, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(),
-		filepath.Join(t.TempDir(), "absent"), ecosystems.NewPluginOptions())
-
-	require.Error(t, err)
-}
-
-// An unrestored project has no obj/, which is ordinary rather than a failure.
-func TestPlugin_MissingObjDirIsNotAnError(t *testing.T) {
-	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), t.TempDir(), ecosystems.NewPluginOptions())
-
-	require.NoError(t, err)
-	assert.Empty(t, results)
-}
-
-// obj/ is where restore output lives, but a project is not required to have
-// one — and something else occupying the name must not take the scan down with
-// it. A returned error would reach the orchestrator as a failed result.
-func TestPlugin_UnreadableObjDirIsNotAnError(t *testing.T) {
-	dir := writeFiles(t, projectAssetsFile)
-	write(t, dir, objDir, "a regular file, not a directory")
-
-	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
-
-	require.NoError(t, err)
-	require.Len(t, results, 1)
-	assert.Equal(t, projectAssetsFile, results[0].ProjectDescriptor.GetTargetFile())
 }
 
 // The packages folder changes what is reported, in both directions: a .nuspec
@@ -899,4 +912,55 @@ func TestPlugin_UnreadableNupkgIsLeftToLegacy(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, results)
 	assert.NotEmpty(t, log.errs)
+}
+
+// A scanned root that is not there at all is a setup failure, the same as a
+// --file naming a path that does not exist. Reporting no target files instead
+// would send the scan on to the next plugin to rediscover the same problem.
+func TestPlugin_MissingScanRootIsAnError(t *testing.T) {
+	_, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(),
+		filepath.Join(t.TempDir(), "absent"), ecosystems.NewPluginOptions())
+
+	require.Error(t, err)
+}
+
+// An unrestored project has no obj/, which is ordinary rather than a failure.
+func TestPlugin_MissingObjDirIsNotAnError(t *testing.T) {
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), t.TempDir(), ecosystems.NewPluginOptions())
+
+	require.NoError(t, err)
+	assert.Empty(t, results)
+}
+
+// obj/ is where restore output lives, but a project is not required to have
+// one — and something else occupying the name must not take the scan down with
+// it. A returned error would reach the orchestrator as a failed result.
+func TestPlugin_UnreadableObjDirIsNotAnError(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, packagesConfigFile, packagesConfigManifest)
+	write(t, dir, objDir, "a regular file, not a directory")
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
+
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, packagesConfigFile, results[0].ProjectDescriptor.GetTargetFile())
+}
+
+// Discovery matches project.json by name, and an Nx workspace has one per
+// package. Reporting each as an error would bury the .NET projects that really
+// did fail.
+func TestPlugin_OtherEcosystemsAreNotLoggedAsErrors(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, "apps/web/"+projectJSONFile, `{"name": "web", "projectType": "application", "targets": {}}`)
+	write(t, dir, "apps/api/"+projectJSONFile, `{"name": "api", "projectType": "library", "targets": {}}`)
+
+	log := &recordingLogger{}
+	results, err := scatest.Run(context.Background(), Plugin{}, log, dir,
+		ecosystems.NewPluginOptions().WithAllProjects(true))
+
+	require.NoError(t, err)
+	assert.Empty(t, results, "they still reach the legacy resolver")
+	assert.Empty(t, log.errs)
+	assert.NotEmpty(t, log.debug, "and the reason is still recorded")
 }

@@ -1,30 +1,50 @@
 package nuget
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"strconv"
 
 	snykecosystems "github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 )
 
-// declaredPackage is one dependency as a manifest names it.
+// errNotDotnetManifest marks a file whose name this resolver matched but whose
+// contents belong to another ecosystem. Reporting nothing for it is the right
+// outcome and not a failure, so it is told apart from a manifest that is
+// genuinely broken — see deferToLegacy.
+var errNotDotnetManifest = errors.New("not a .NET manifest")
+
+// declaredPackage is one dependency as a manifest names it, before the packages
+// folder gets a say over the version.
 type declaredPackage struct {
 	name    string
 	version string
 }
 
-// frameworkManifest is what a packages.config contributes to resolution.
+// frameworkManifest is what a packages.config or project.json contributes to
+// resolution. Both feed the same downstream path, so they are read into one
+// shape here and differ only in what they can fill in.
 type frameworkManifest struct {
 	// packages is every dependency the manifest declares, in document order.
 	// packages.config lists the whole flattened set, transitive dependencies
-	// included.
+	// included; project.json lists only what the project asked for.
 	packages []declaredPackage
 
-	// frameworkHints are the targetFramework attributes NuGet writes onto the
-	// entries it installs, and are consulted only when the project has no
-	// .csproj to read.
+	// frameworkHints are the targetFramework attributes a packages.config
+	// carries, and are consulted only when the project has no .csproj. Always
+	// empty for project.json: snyk-nuget-plugin gives it no such fallback, so a
+	// project.json without a .csproj alongside it cannot be resolved.
 	frameworkHints []string
+
+	// rootName and rootVersion override the directory-derived defaults when a
+	// project.json declares them. Empty otherwise, which is the usual case —
+	// these fields belong to project.assets.json and are vanishingly rare here.
+	rootName    string
+	rootVersion string
 }
 
 // readPackagesConfig loads a packages.config.
@@ -77,6 +97,47 @@ func readPackagesConfig(path, displayPath string) (*frameworkManifest, error) {
 	return manifest, nil
 }
 
+// readProjectJSON loads a project.json.
+//
+// project.json predates the PackageReference format and lists only direct
+// dependencies; the resolved set lived in project.lock.json, which neither this
+// resolver nor snyk-nuget-plugin reads.
+func readProjectJSON(path, displayPath string) (*frameworkManifest, error) {
+	data, err := readManifestFile(path, displayPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var doc orderedMap[json.RawMessage]
+	if err := json.Unmarshal(toUTF8(data), &doc); err != nil {
+		return nil, snykecosystems.NewUnparseableManifestError(
+			fmt.Sprintf("Could not parse %s as JSON.", displayPath),
+			snyk_errors.WithCause(err),
+		)
+	}
+
+	// The same check snyk-nuget-plugin makes before committing to this parser.
+	// project.json is a generic enough name that other ecosystems use it — Nx
+	// workspaces most notably — and resolving one of those as a .NET project
+	// would report nonsense rather than nothing.
+	//
+	// The error is a plain one rather than a catalog one: it is never shown to
+	// anyone, because a file belonging to another ecosystem is not a problem to
+	// report.
+	if !hasAny(&doc, "dependencies", "frameworks", "runtimes", "supports") {
+		return nil, fmt.Errorf("%w: %s declares none of dependencies, frameworks, runtimes or supports",
+			errNotDotnetManifest, displayPath)
+	}
+
+	declared := newPackageSet()
+	scanForDependencies(&doc, declared, maxProjectJSONDepth)
+
+	manifest := &frameworkManifest{packages: declared.packages}
+	manifest.rootName, manifest.rootVersion = projectJSONRoot(&doc)
+
+	return manifest, nil
+}
+
 // readManifestFile reads a manifest, reporting a missing or unreadable one
 // through the error catalog: the dep-graph workflow only shows the user a
 // message when snyk_errors.Error.Detail is set.
@@ -92,9 +153,157 @@ func readManifestFile(path, displayPath string) ([]byte, error) {
 	return data, nil
 }
 
+// scanForDependencies walks the document and collects every object under a
+// `dependencies` key, at any depth, mirroring snyk-nuget-plugin's function of
+// the same name. That is how a project.json declaring per-framework
+// dependencies under `frameworks.<tfm>.dependencies` is picked up without this
+// resolver knowing the schema.
+//
+// A `dependencies` object is read one level deep and not descended into, so a
+// package literally named "dependencies" is not mistaken for another group.
+func scanForDependencies(node *orderedMap[json.RawMessage], into *packageSet, depth int) {
+	if depth <= 0 {
+		return
+	}
+
+	for _, key := range node.Keys() {
+		raw, _ := node.Get(key)
+
+		if key == "dependencies" {
+			var group orderedMap[json.RawMessage]
+			if err := json.Unmarshal(raw, &group); err != nil {
+				continue
+			}
+
+			for _, name := range group.Keys() {
+				value, _ := group.Get(name)
+				into.set(name, dependencyVersion(value))
+			}
+
+			continue
+		}
+
+		descend(raw, into, depth-1)
+	}
+}
+
+// descend walks into objects and arrays, which is where nested dependency
+// groups live. Scalars terminate the walk.
+//
+// It decodes one level at a time, on the way down, rather than decoding the
+// whole document up front. That is what makes depth an effective bound: the
+// work below the limit is never done at all. Decoding eagerly into a tree would
+// read better here — there would be no errors to check — but it moves the cost
+// into json.Unmarshal, where depth cannot reach it. Measured on a 46KB file
+// nested 8000 deep: 1.4ms as written, 2.8s decoded eagerly.
+//
+// The cost is quadratic in nesting depth either way, because each level
+// re-reads the bytes beneath it. Real manifests nest a handful of levels, and
+// anything approaching the bound is not a .NET project.json, so stopping there
+// is both cheap and correct.
+func descend(raw json.RawMessage, into *packageSet, depth int) {
+	if depth <= 0 {
+		return
+	}
+
+	// Neither decode below can fail: readProjectJSON rejects a file with a
+	// malformed value anywhere in it before any of this runs, so every value
+	// reaching here is already known to be valid JSON of the kind jsonKind
+	// reported. They are checked rather than ignored so that a value we could
+	// not read would be skipped instead of walked as if it were empty, if that
+	// ever stops being true.
+	switch jsonKind(raw) {
+	case '{':
+		var object orderedMap[json.RawMessage]
+		if err := json.Unmarshal(raw, &object); err == nil {
+			scanForDependencies(&object, into, depth)
+		}
+	case '[':
+		var elements []json.RawMessage
+		if err := json.Unmarshal(raw, &elements); err == nil {
+			for _, element := range elements {
+				descend(element, into, depth-1)
+			}
+		}
+	}
+}
+
+// dependencyVersion reads the version out of a dependency's value, which
+// project.json allows to be either a bare version or an object carrying one.
+// Anything with no version at all becomes "unknown" rather than empty, so the
+// package still appears in the graph and is visibly unversioned.
+//
+// UseNumber keeps a numeric version as written: decoding into a plain any would
+// make 10.0 a float64 and report it as "10".
+func dependencyVersion(raw json.RawMessage) string {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+
+	var value any
+	if err := decoder.Decode(&value); err != nil {
+		return unknownVersion
+	}
+
+	return versionOf(value)
+}
+
+// versionOf reads a version out of one decoded project.json dependency value.
+//
+// Falling through to "unknown" is an ordinary outcome, not a failure: a JSON
+// null decodes to a nil any and an array to []any, neither of which matches a
+// case here, and a build-only dependency is routinely written as an object with
+// no version at all. The result is visible in the graph as `Name@unknown`,
+// which says more than a log line would.
+//
+// The `version` key is matched case-sensitively, as snyk-nuget-plugin's
+// property access is. Decoding into a struct would not: encoding/json matches
+// field names case-insensitively, so `VERSION` would resolve here and not
+// upstream.
+func versionOf(value any) string {
+	switch value := value.(type) {
+	case string:
+		return value
+	case json.Number:
+		return value.String()
+	case bool:
+		return strconv.FormatBool(value)
+	case map[string]any:
+		if version, declared := value["version"]; declared {
+			return versionOf(version)
+		}
+	case nil, []any:
+		// A JSON null, or an array, states no version.
+	}
+
+	return unknownVersion
+}
+
+// projectJSONRoot reads the project name and version a project.json may carry.
+// snyk-nuget-plugin looks for them under `project`, the shape project.assets.json
+// uses; real project.json files almost never have it.
+func projectJSONRoot(doc *orderedMap[json.RawMessage]) (name, version string) {
+	raw, ok := doc.Get("project")
+	if !ok {
+		return "", ""
+	}
+
+	var project struct {
+		Version string `json:"version"`
+		Restore struct {
+			ProjectName string `json:"projectName"`
+		} `json:"restore"`
+	}
+
+	if err := json.Unmarshal(raw, &project); err != nil {
+		return "", ""
+	}
+
+	return project.Restore.ProjectName, project.Version
+}
+
 // packageSet accumulates packages keyed by name while keeping the order they
 // were first seen in, the way assigning to a JavaScript object does: a repeated
-// name keeps its original position.
+// name keeps its original position, whatever happens to its version.
 //
 // Names are matched case-sensitively. Unlike project.assets.json, nothing on
 // this path folds case: snyk-nuget-plugin indexes these by plain object key.
@@ -105,6 +314,16 @@ type packageSet struct {
 
 func newPackageSet() *packageSet {
 	return &packageSet{index: make(map[string]int)}
+}
+
+// set inserts a package, or overwrites the version of one already present.
+func (p *packageSet) set(name, version string) {
+	if at, exists := p.index[name]; exists {
+		p.packages[at].version = version
+		return
+	}
+
+	p.add(name, version)
 }
 
 // add inserts a package unless the name is already present, so the first
@@ -134,4 +353,29 @@ func (p *packageSet) get(name string) (declaredPackage, bool) {
 	}
 
 	return p.packages[at], true
+}
+
+// hasAny reports whether the object declares at least one of the given keys.
+func hasAny(doc *orderedMap[json.RawMessage], keys ...string) bool {
+	for _, key := range keys {
+		if _, ok := doc.Get(key); ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+// jsonKind reports the first meaningful byte of a JSON value, which is enough to
+// tell an object from an array without decoding.
+//
+// descend needs the value left as raw JSON: it decodes objects into orderedMap
+// to keep their key order, which decoding into a map[string]any would lose.
+func jsonKind(raw json.RawMessage) byte {
+	trimmed := bytes.TrimLeft(raw, " \t\r\n")
+	if len(trimmed) == 0 {
+		return 0
+	}
+
+	return trimmed[0]
 }

@@ -71,14 +71,15 @@ func buildSCAPlugins(
 	}
 
 	// Opt-in per org. The .NET resolver claims every manifest it resolved in
-	// full — project.assets.json and packages.config alike — and reports those
-	// as processed, so the legacy resolver skips them.
+	// full — project.assets.json, packages.config and project.json alike — and
+	// reports those as processed, so the legacy resolver skips them.
 	//
 	// A manifest it could not resolve in full it reports nothing for, and the
 	// loop below moves on to the next plugin when one returns no results, so
 	// those still reach the legacy resolver. That covers an unreadable or
-	// malformed manifest and one whose target framework nothing names, as well
-	// as project.json, which it does not handle yet.
+	// malformed manifest, one whose target framework nothing names, and a
+	// packages folder holding an archive we could not open — cases where
+	// claiming a partial result would hide packages the legacy resolver finds.
 	//
 	// The exception is an explicit --file naming a path that does not exist:
 	// discovery treats that as a setup failure and the scan fails there rather
