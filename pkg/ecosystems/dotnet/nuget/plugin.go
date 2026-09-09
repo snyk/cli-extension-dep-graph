@@ -25,6 +25,15 @@ const (
 	logFieldTargetFramework = "targetFramework"
 	logFieldTargetsKey      = "targetsKey"
 	logFieldPackagesFolder  = "packagesFolder"
+	logFieldProjectPath     = "projectPath"
+
+	// Reported when a solution is handed back to the legacy resolver. Asserted on
+	// in tests, so they stay tied to what a user would see in a debug log.
+	msgSolutionUnreadable   = "Leaving this solution to the legacy resolver: it could not be read"
+	msgSolutionUnrestored   = "Leaving this solution to the legacy resolver: a project in it has no assets file"
+	msgSolutionUnresolvable = "Leaving this solution to the legacy resolver: a project in it could not be resolved"
+	msgSolutionEscapesScan  = "Leaving this solution to the legacy resolver: it references a project outside the scanned directory"
+	msgSolutionHoldsNothing = "Solution holds no projects"
 )
 
 // Plugin implements ecosystems.SCAPlugin for .NET projects. It never runs
@@ -67,7 +76,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 		options = ecosystems.NewPluginOptions()
 	}
 
-	files, err := p.discoverTargetFiles(ctx, log, dir, options)
+	files, fromSolution, err := p.discoverTargetFiles(ctx, log, dir, options)
 	if err != nil {
 		return err
 	}
@@ -79,8 +88,60 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	log.Debug(ctx, "Discovered .NET target files", logger.Attr("count", len(files)))
 
+	if fromSolution {
+		return p.emitSolutionResults(ctx, log, files, options, onGraph)
+	}
+
 	for _, file := range files {
 		if err := p.emitResults(ctx, log, file, options, onGraph); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// emitSolutionResults resolves every project a solution holds, emitting nothing
+// unless all of them produced a result.
+//
+// The all-or-nothing rule cannot be enforced when the target files are chosen:
+// an assets file that exists can still turn out to be unreadable, or to declare
+// no framework we can resolve, and `emitResults` reports nothing for it. Emitting
+// the projects that did work would leave the rest reported by *nobody* — the
+// workflow stops after the first resolver that reports anything unless
+// --all-projects is set, so the legacy resolver would never see them. Buffering
+// until the last project is in is what keeps "claims all of it or none of it"
+// true rather than merely intended.
+func (p Plugin) emitSolutionResults(
+	ctx context.Context,
+	log logger.Logger,
+	files []discovery.FindResult,
+	options *ecosystems.SCAPluginOptions,
+	onGraph ecosystems.OnGraphFunc,
+) error {
+	buffered := make([]ecosystems.SCAResult, 0, len(files))
+
+	for _, file := range files {
+		before := len(buffered)
+
+		err := p.emitResults(ctx, log, file, options, func(result ecosystems.SCAResult) error {
+			buffered = append(buffered, result)
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+
+		if len(buffered) == before {
+			log.Debug(ctx, msgSolutionUnresolvable,
+				logger.Attr(logFieldTargetFile, file.RelPath))
+
+			return nil
+		}
+	}
+
+	for i := range buffered {
+		if err := onGraph(buffered[i]); err != nil {
 			return err
 		}
 	}
@@ -225,24 +286,32 @@ func rootComponentName(file discovery.FindResult) string {
 
 // discoverTargetFiles honors the same three request shapes as the other
 // resolvers: an explicit --file, an --all-projects scan, or the scanned root.
+//
+// The second return value reports whether the target files came from a solution,
+// which is what makes them all-or-nothing to claim.
 func (p Plugin) discoverTargetFiles(
 	ctx context.Context,
 	log logger.Logger,
 	dir string,
 	options *ecosystems.SCAPluginOptions,
-) ([]discovery.FindResult, error) {
+) ([]discovery.FindResult, bool, error) {
 	switch {
 	case options.Global.TargetFile != nil:
+		if isSlnxFile(*options.Global.TargetFile) {
+			files, err := solutionTargetFiles(ctx, log, dir, *options.Global.TargetFile)
+			return files, true, err
+		}
+
 		if !isSupportedTargetFile(*options.Global.TargetFile) {
-			return nil, nil
+			return nil, false, nil
 		}
 
 		files, err := discovery.FindFiles(ctx, log, dir, discovery.WithTargetFile(*options.Global.TargetFile))
 		if err != nil {
-			return nil, fmt.Errorf("discovering .NET target files: %w", err)
+			return nil, false, fmt.Errorf("discovering .NET target files: %w", err)
 		}
 
-		return files, nil
+		return files, false, nil
 
 	case options.Global.AllProjects:
 		// WithCommonExcludes matches the CLI's own ignoreFolders. It does not
@@ -261,16 +330,116 @@ func (p Plugin) discoverTargetFiles(
 
 		files, err := discovery.FindFiles(ctx, log, dir, findOpts...)
 		if err != nil {
-			return nil, fmt.Errorf("discovering .NET target files: %w", err)
+			return nil, false, fmt.Errorf("discovering .NET target files: %w", err)
 		}
 
-		return files, nil
+		return files, false, nil
 
 	default:
 		// Check the root directory only; return empty (not an error) when it
 		// holds no .NET target file.
-		return rootTargetFiles(dir)
+		files, err := rootTargetFiles(dir)
+		return files, false, err
 	}
+}
+
+// solutionTargetFiles expands a `.slnx` solution passed to --file into the
+// assets file of each project it holds. A solution is a target selector rather
+// than a manifest: `--file=App.slnx` means "the projects App.slnx holds", which
+// is how the CLI has always treated `--file=App.sln`.
+//
+// Only restore output is expanded: a project is taken to be the
+// obj/project.assets.json beside it. The manifests this plugin resolves without
+// restore output — packages.config and project.json — are not reached through a
+// solution, because a solution names projects rather than manifests and nothing
+// in it says which manifest a project carries.
+//
+// It is all or nothing. If any project in the solution has no
+// project.assets.json to read, this resolver claims none of them and the legacy
+// resolver takes the whole solution — it reaches projects this path does not,
+// including ones it can restore itself. Claiming only the projects we can
+// resolve would silently drop the rest, because the workflow stops after the
+// first resolver that reports anything unless --all-projects is set. The rest of
+// that rule is enforced in emitSolutionResults, which is where an
+// existing-but-unusable assets file surfaces.
+//
+// A solution can reference a project anywhere on disk, including outside the
+// directory being scanned. Every other resolver discovers its target files by
+// walking down from that directory, so a target file's path relative to it has
+// always been inside it — and that relative path becomes the project's identity.
+// Rather than mint a new `../`-shaped identity here, a solution that reaches
+// outside the scan goes to the legacy resolver, which re-roots each project
+// before any manifest plugin sees it.
+func solutionTargetFiles(
+	ctx context.Context,
+	log logger.Logger,
+	dir string,
+	solutionFile string,
+) ([]discovery.FindResult, error) {
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, fmt.Errorf("resolving absolute path for %s: %w", dir, err)
+	}
+
+	solutionPath := solutionFile
+	if !filepath.IsAbs(solutionPath) {
+		solutionPath = filepath.Join(absDir, solutionPath)
+	}
+
+	projectPaths, err := parseSlnx(solutionPath)
+	if err != nil {
+		log.Error(ctx, msgSolutionUnreadable,
+			logger.Attr(logFieldTargetFile, solutionFile), logger.Err(err))
+
+		return nil, nil
+	}
+
+	solutionDir := filepath.Dir(solutionPath)
+	files := make([]discovery.FindResult, 0, len(projectPaths))
+	// A hand-edited or badly merged solution can name the same project twice, or
+	// name two projects that share a directory. Both resolve to one assets file,
+	// and reporting it once per mention would submit the same project repeatedly.
+	claimed := make(map[string]struct{}, len(projectPaths))
+
+	for _, projectPath := range projectPaths {
+		assetsPath := filepath.Join(
+			solutionProjectDir(solutionDir, projectPath), objDir, projectAssetsFile,
+		)
+
+		if !fileExists(assetsPath) {
+			log.Debug(ctx, msgSolutionUnrestored,
+				logger.Attr(logFieldTargetFile, solutionFile),
+				logger.Attr(logFieldProjectPath, projectPath))
+
+			return nil, nil
+		}
+
+		relPath, relErr := filepath.Rel(absDir, assetsPath)
+		if relErr != nil || escapesDir(relPath) {
+			log.Debug(ctx, msgSolutionEscapesScan,
+				logger.Attr(logFieldTargetFile, solutionFile),
+				logger.Attr(logFieldProjectPath, projectPath))
+
+			// Not an error to report: a project we cannot name relative to the
+			// scan is one we hand to the legacy resolver, which re-roots each
+			// project itself. Claiming nothing is how that handover happens.
+			return nil, nil //nolint:nilerr // deliberate handover, see above
+		}
+
+		if _, seen := claimed[assetsPath]; seen {
+			continue
+		}
+		claimed[assetsPath] = struct{}{}
+
+		files = append(files, discovery.FindResult{Path: assetsPath, RelPath: relPath})
+	}
+
+	if len(files) == 0 {
+		log.Debug(ctx, msgSolutionHoldsNothing,
+			logger.Attr(logFieldTargetFile, solutionFile))
+	}
+
+	return files, nil
 }
 
 // rootTargetFiles returns the one manifest a single-project scan of dir
@@ -344,6 +513,18 @@ func fileNamesIn(dir string) (map[string]bool, error) {
 	}
 
 	return names, nil
+}
+
+// escapesDir reports whether a path relative to the scanned directory points
+// outside it.
+func escapesDir(relPath string) bool {
+	return relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator))
+}
+
+// fileExists reports whether path exists and is a regular file.
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 // isSupportedTargetFile reports whether path's base name is one this plugin
