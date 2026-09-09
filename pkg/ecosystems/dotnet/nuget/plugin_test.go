@@ -1023,3 +1023,143 @@ func TestPlugin_OtherEcosystemsAreNotLoggedAsErrors(t *testing.T) {
 	assert.Empty(t, log.errs)
 	assert.NotEmpty(t, log.debug, "and the reason is still recorded")
 }
+
+func TestPlugin_TargetFrameworkSelectsOneOfMany(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, projectAssetsFile, multiTargetAssets)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithDotnetTargetFramework("net8.0"))
+	require.NoError(t, err)
+	require.Len(t, results, 1, "only the requested framework is reported")
+
+	result := results[0]
+	require.NoError(t, result.Error)
+	require.NotNil(t, result.ProjectDescriptor.Identity.TargetRuntime)
+	assert.Equal(t, "net8.0", *result.ProjectDescriptor.Identity.TargetRuntime)
+	assert.Contains(t, pkgIDs(result.DepGraph.Pkgs), "Newtonsoft.Json@13.0.3",
+		"the packages come from the requested framework, not its sibling")
+	assert.Equal(t, []string{projectAssetsFile}, result.ProcessedFiles,
+		"the file is still claimed, so the exclude set does not depend on the flag")
+}
+
+func TestPlugin_TargetFrameworkIsMatchedIgnoringCase(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, projectAssetsFile, multiTargetAssets)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithDotnetTargetFramework("NET8.0"))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	require.NotNil(t, results[0].ProjectDescriptor.Identity.TargetRuntime)
+	assert.Equal(t, "net8.0", *results[0].ProjectDescriptor.Identity.TargetRuntime,
+		"the runtime is the framework the project declared, not the spelling on the command line")
+}
+
+// TestPlugin_TargetFrameworkNotDeclaredIsReportedNotGuessed encodes the design
+// decision behind the filter: the framework is selected from what the manifest
+// declares and never substituted into matchTargetsKey, whose single-key
+// fallback would otherwise report this project's net6.0 packages under net9.0.
+// The failure is reported rather than declined, and the file is still claimed,
+// so the legacy resolver cannot answer with a framework this scan excluded.
+func TestPlugin_TargetFrameworkNotDeclaredIsReportedNotGuessed(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, projectAssetsFile, multiTargetAssets)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithDotnetTargetFramework("net9.0"))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	result := results[0]
+	require.Error(t, result.Error)
+	assert.Nil(t, result.DepGraph, "no graph is reported for a framework the project does not have")
+
+	require.NotNil(t, result.ProjectDescriptor.Identity.TargetRuntime)
+	assert.Equal(t, "net9.0", *result.ProjectDescriptor.Identity.TargetRuntime,
+		"the requested name is the only identity a framework the project never declared has")
+
+	detail := detailOf(t, result.Error)
+	assert.Contains(t, detail, "net9.0")
+	assert.Contains(t, detail, "net6.0", "the declared frameworks are named, so the flag can be corrected")
+	assert.Contains(t, detail, "net8.0")
+
+	assert.Equal(t, []string{projectAssetsFile}, result.ProcessedFiles)
+}
+
+func TestPlugin_TargetFrameworkDoesNotReachPackagesConfig(t *testing.T) {
+	// packages.config records one dependency set and one runtime, so there is
+	// nothing to select between; the flag is ignored rather than dropping the
+	// project.
+	dir := writeFiles(t, packagesConfigFile)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithDotnetTargetFramework("net8.0"))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	require.NoError(t, results[0].Error)
+	require.NotNil(t, results[0].ProjectDescriptor.Identity.TargetRuntime)
+	assert.Equal(t, "net45", *results[0].ProjectDescriptor.Identity.TargetRuntime)
+}
+
+func TestPlugin_AssetsProjectNameUsesTheRestoreName(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, projectAssetsFile, singleTargetAssets)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, filepath.Base(dir), results[0].ProjectDescriptor.Identity.RootComponentName,
+		"the derived name is kept while the flag is off, even though the restore recorded one")
+
+	results, err = scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithAssetsProjectName(true))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	result := results[0]
+	assert.Equal(t, "FromAssetsFile", result.ProjectDescriptor.Identity.RootComponentName)
+	assert.Equal(t, "FromAssetsFile", result.DepGraph.GetRootPkg().Info.Name,
+		"the graph root is renamed too — the identity and the graph must agree")
+}
+
+func TestPlugin_AssetsProjectNameFallsBackWhenTheRestoreNamedNothing(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, projectAssetsFile, multiTargetAssets)
+
+	log := &recordingLogger{}
+	results, err := scatest.Run(context.Background(), Plugin{}, log, dir,
+		ecosystems.NewPluginOptions().WithAssetsProjectName(true))
+	require.NoError(t, err)
+	require.NotEmpty(t, results)
+
+	assert.Equal(t, filepath.Base(dir), results[0].ProjectDescriptor.Identity.RootComponentName)
+	assert.Contains(t, strings.Join(log.debug, "\n"), "restore recorded no project name",
+		"the fallback is logged, so the flag does not look like it did nothing")
+}
+
+func TestPlugin_AssetsProjectNameDoesNotChangeAProjectJSONName(t *testing.T) {
+	// project.json's own name override ports project-json-parser.ts, which is
+	// flag-free upstream. Coupling it to --assets-project-name would be a silent
+	// regression for every project.json scan.
+	const named = `{"dependencies": {"Newtonsoft.Json": "8.0.3"},
+      "project": { "restore": { "projectName": "FromProjectJSON" } }}`
+
+	for _, assetsProjectName := range []bool{false, true} {
+		dir := t.TempDir()
+		write(t, dir, projectJSONFile, named)
+		write(t, dir, "app.csproj", csprojNet45)
+
+		// project.json is reachable only through --all-projects or --file: the
+		// CLI lists it in AUTO_DETECTABLE_FILES but not DETECTABLE_FILES.
+		results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+			ecosystems.NewPluginOptions().WithAllProjects(true).WithAssetsProjectName(assetsProjectName))
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, "FromProjectJSON", results[0].ProjectDescriptor.Identity.RootComponentName,
+			"--assets-project-name=%t must not change a project.json name", assetsProjectName)
+	}
+}

@@ -126,6 +126,26 @@ type DotnetOptions struct {
 	// `nuget restore` populates for packages.config and project.json projects.
 	// Empty means the location is derived from the manifest's own path.
 	PackagesFolder string `arg:"--packages-folder"`
+
+	// TargetFramework narrows an SDK-style project to the one target framework
+	// named here, for a project that multi-targets and whose owner only cares
+	// about one of them. It selects among the frameworks project.assets.json
+	// declares and never stands in for one it does not: resolving a framework
+	// against another's packages is what projectAssets.matchTargetsKey exists to
+	// prevent. Empty means every framework the project declares is reported,
+	// which is what the CLI documents as the default. packages.config and
+	// project.json record no per-framework resolution, so this does not reach
+	// them.
+	TargetFramework string `arg:"--dotnet-target-framework"`
+
+	// AssetsProjectName names an SDK-style project after the project name its
+	// restore recorded, rather than after the directory holding the manifest -
+	// which for a project.assets.json under obj/ is all the resolver otherwise
+	// has to go on. False (the default) keeps the derived name, as does a
+	// restore that recorded no name. project.assets.json only: nothing in a
+	// packages.config names its project, and a project.json that does is
+	// already honored without a flag.
+	AssetsProjectName bool `arg:"--assets-project-name"`
 }
 
 func NewPluginOptions() *SCAPluginOptions {
@@ -329,5 +349,21 @@ func (o *SCAPluginOptions) WithBazelPlatforms(platforms string) *SCAPluginOption
 // resolver to derive the location from each manifest's own path.
 func (o *SCAPluginOptions) WithPackagesFolder(packagesFolder string) *SCAPluginOptions {
 	o.Dotnet.PackagesFolder = packagesFolder
+	return o
+}
+
+// WithDotnetTargetFramework narrows the .NET resolver to one target framework,
+// mirroring the CLI's --dotnet-target-framework. Empty (the default) reports
+// every framework an SDK-style project declares.
+func (o *SCAPluginOptions) WithDotnetTargetFramework(targetFramework string) *SCAPluginOptions {
+	o.Dotnet.TargetFramework = targetFramework
+	return o
+}
+
+// WithAssetsProjectName reports an SDK-style project under the name recorded in
+// its project.assets.json, mirroring the CLI's --assets-project-name. False (the
+// default) names it after the directory holding the manifest.
+func (o *SCAPluginOptions) WithAssetsProjectName(assetsProjectName bool) *SCAPluginOptions {
+	o.Dotnet.AssetsProjectName = assetsProjectName
 	return o
 }

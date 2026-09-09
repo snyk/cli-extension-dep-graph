@@ -25,6 +25,7 @@ const (
 	logFieldTargetFramework = "targetFramework"
 	logFieldTargetsKey      = "targetsKey"
 	logFieldPackagesFolder  = "packagesFolder"
+	logFieldRootName        = "rootName"
 )
 
 // Plugin implements ecosystems.SCAPlugin for .NET projects. It never runs
@@ -97,15 +98,17 @@ func (p Plugin) emitResults(
 	onGraph ecosystems.OnGraphFunc,
 ) error {
 	if filepath.Base(file.Path) == projectAssetsFile {
-		return p.emitAssetsResults(ctx, log, file, onGraph)
+		return p.emitAssetsResults(ctx, log, file, options, onGraph)
 	}
 
 	return p.emitFrameworkResult(ctx, log, file, options, onGraph)
 }
 
 // emitAssetsResults resolves an SDK-style project and emits a result per target
-// framework. The results share a root name and target file, differing only in
-// target runtime — which is how snyk-nuget-plugin distinguishes them.
+// framework it reports on — every framework the project declares, or the single
+// one --dotnet-target-framework asked for. The results share a root name and
+// target file, differing only in target runtime — which is how
+// snyk-nuget-plugin distinguishes them.
 //
 // A framework that cannot be resolved is reported as a failure against its own
 // runtime: the framework is named in the file, so the result is still
@@ -115,10 +118,10 @@ func (p Plugin) emitAssetsResults(
 	ctx context.Context,
 	log logger.Logger,
 	file discovery.FindResult,
+	options *ecosystems.SCAPluginOptions,
 	onGraph ecosystems.OnGraphFunc,
 ) error {
 	targetFile := file.RelPath
-	rootName := rootComponentName(file)
 
 	// The assets file is what the dependencies are read from, and what messages
 	// about them name, but it is restore output under obj/ rather than the
@@ -139,7 +142,39 @@ func (p Plugin) emitAssetsResults(
 		return nil
 	}
 
-	for _, framework := range assets.targetFrameworks() {
+	rootName := rootComponentName(file)
+	if options.Dotnet.AssetsProjectName {
+		if named := assets.Project.Restore.ProjectName; named != "" {
+			rootName = named
+		} else {
+			// Silently keeping the derived name would look like the flag did
+			// nothing.
+			log.Debug(ctx, "The restore recorded no project name, so the .NET project keeps its directory-derived name",
+				logger.Attr(logFieldTargetFile, targetFile), logger.Attr(logFieldRootName, rootName))
+		}
+	}
+
+	frameworks := assets.targetFrameworks()
+
+	if requested := options.Dotnet.TargetFramework; requested != "" {
+		selected, ok := selectTargetFramework(frameworks, requested)
+		if !ok {
+			// The project is understood in full; it is the framework asked for
+			// that is not one of its. Reported against the requested name — the
+			// only identity a framework the project never declared has — and the
+			// file is claimed, so the legacy resolver cannot answer with a
+			// framework this scan excluded.
+			err := snykecosystems.NewUnsupportedTargetFrameworkError(fmt.Sprintf(
+				"Target framework %s was not found in %s, which declares %s.",
+				requested, targetFile, strings.Join(frameworks, ", ")))
+
+			return onGraph(p.errResult(targetFile, rootName, requested, err))
+		}
+
+		frameworks = []string{selected}
+	}
+
+	for _, framework := range frameworks {
 		targetsKey := assets.matchTargetsKey(framework)
 		if targetsKey == "" {
 			// Guessing a sibling's packages would report the wrong dependencies
