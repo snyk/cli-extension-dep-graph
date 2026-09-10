@@ -159,7 +159,7 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 		if err != nil {
 			return nil, err
 		}
-		args.GlobalOptions.DetectionDepth = depth
+		args.DetectionDepth = depth
 	}
 
 	if args.StrictOutOfSync != nil {

@@ -83,7 +83,7 @@ func WithExcludes(patterns ...string) FindOption {
 // which makes its own depth check compare against NaN and never trip.
 //
 // Applies to the include-glob walk only; an explicit target file is always
-// honoured, as --detection-depth is a --all-projects flag in the CLI too.
+// honored, as --detection-depth is a --all-projects flag in the CLI too.
 func WithMaxDepth(depth int) FindOption {
 	return func(o *findOptions) {
 		o.maxDepth = depth

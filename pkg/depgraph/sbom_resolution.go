@@ -220,7 +220,7 @@ func buildPluginOptions(config configuration.Configuration) (*ecosystems.SCAPlug
 
 	depth, err := ecosystems.ParseDetectionDepth(config.GetString(workflow.FlagDetectionDepth))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("building plugin options: %w", err)
 	}
 	opts = opts.WithDetectionDepth(depth)
 
