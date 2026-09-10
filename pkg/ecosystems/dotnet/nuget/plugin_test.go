@@ -1157,6 +1157,30 @@ func TestPlugin_TargetFrameworkKeepsAMatchingPackagesConfig(t *testing.T) {
 	assert.Equal(t, "net45", *results[0].ProjectDescriptor.Identity.TargetRuntime)
 }
 
+// The claim a filtered-out project makes has to be the same one it would have
+// made had it resolved. A claim only excludes the path it names, and an
+// SDK-style project is reported under its .csproj — so claiming just the assets
+// file under obj/ would let the legacy resolver report a project this scan
+// deliberately left out, which is the whole point of claiming it.
+func TestPlugin_TargetFrameworkClaimsTheProjectFileOfAProjectItLeavesOut(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, filepath.Join(objDir, projectAssetsFile), multiTargetAssets) // net6.0, net8.0
+	write(t, dir, "App.csproj", csprojNet45)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithDotnetTargetFramework("net9.0"))
+	require.NoError(t, err)
+
+	claimed := make([]string, 0, len(results))
+	for _, result := range results {
+		claimed = append(claimed, result.ProcessedFiles...)
+	}
+
+	assert.Contains(t, claimed, "App.csproj",
+		"the .csproj is what an SDK-style project is reported under, so it is what has to be excluded")
+	assert.Contains(t, claimed, filepath.Join(objDir, projectAssetsFile))
+}
+
 // The case that makes the filter usable on a real solution: the projects that
 // target something else are claimed and left out silently. Reporting each of
 // them as an error would turn a 50-project solution into 40 warnings and a

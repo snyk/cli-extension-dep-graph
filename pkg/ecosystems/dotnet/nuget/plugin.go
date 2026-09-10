@@ -109,14 +109,19 @@ func (p Plugin) BuildDepGraphsFromDir(
 type targetFrameworkFilter struct {
 	requested string
 	matched   int
-	declined  []declinedProject
+	declined  []scannedProject
 	found     []string
 }
 
-// declinedProject is a project the filter turned away, kept so the scan-level
-// error can be attributed to a real project rather than to the directory.
-type declinedProject struct {
+// scannedProject is what a result for one project is attributed to: the file it
+// is reported under, the files it claims, and the name it carries. The filter
+// keeps this for a project it turned away, so that project is claimed exactly as
+// it would have been had it been resolved — a claim only excludes the path it
+// names, so claiming less here would let the legacy resolver report a project
+// this scan deliberately left out.
+type scannedProject struct {
 	targetFile string
+	claimed    []string
 	rootName   string
 }
 
@@ -126,13 +131,10 @@ func (f *targetFrameworkFilter) active() bool { return f.requested != "" }
 // keep reports whether a project declaring these frameworks is in scope,
 // returning the one to resolve. Frameworks are the project's own, in the
 // spelling it declared them.
-func (f *targetFrameworkFilter) keep(file discovery.FindResult, frameworks []string) (string, bool) {
+func (f *targetFrameworkFilter) keep(project scannedProject, frameworks []string) (string, bool) {
 	selected, ok := selectTargetFramework(frameworks, f.requested)
 	if !ok {
-		f.declined = append(f.declined, declinedProject{
-			targetFile: file.RelPath,
-			rootName:   rootComponentName(file),
-		})
+		f.declined = append(f.declined, project)
 
 		for _, framework := range frameworks {
 			if !slices.Contains(f.found, framework) {
@@ -173,7 +175,7 @@ func (f *targetFrameworkFilter) reportIfNothingMatched(
 		"No .NET project matched target framework %s. The %d .NET project(s) found declare: %s.",
 		f.requested, len(f.declined), strings.Join(f.found, ", ")))
 
-	return onGraph(p.errResult(attributed.targetFile, attributed.rootName, f.requested, err))
+	return onGraph(p.errResult(attributed.targetFile, attributed.claimed, attributed.rootName, f.requested, err))
 }
 
 // emitResults resolves one target file, dispatching on which manifest it is.
@@ -246,7 +248,9 @@ func (p Plugin) emitAssetsResults(
 	frameworks := assets.targetFrameworks()
 
 	if filter.active() {
-		selected, ok := filter.keep(file, frameworks)
+		project := scannedProject{targetFile: projectFile, claimed: claimed, rootName: rootName}
+
+		selected, ok := filter.keep(project, frameworks)
 		if !ok {
 			// Out of scope rather than broken, so nothing is reported for it —
 			// a project that targets something else is not a failure. The file
@@ -258,7 +262,7 @@ func (p Plugin) emitAssetsResults(
 				logger.Attr(logFieldTargetFramework, filter.requested),
 			)
 
-			return onGraph(p.claimOnlyResult(targetFile))
+			return onGraph(p.claimOnlyResult(project))
 		}
 
 		frameworks = []string{selected}
@@ -336,13 +340,13 @@ func (p Plugin) errResult(targetFile string, claimed []string, rootName, targetR
 // project was recognized and deliberately left out of scope. It carries no
 // identity, because a project left out has no target runtime to be identified
 // by, and none is needed — the claim is by path.
-func (p Plugin) claimOnlyResult(targetFile string) ecosystems.SCAResult {
+func (p Plugin) claimOnlyResult(project scannedProject) ecosystems.SCAResult {
 	return ecosystems.SCAResult{
 		ResolverMetadata: &ecosystems.ResolverMetadata{
 			PluginName:           PluginName,
-			NormalisedTargetFile: targetFile,
+			NormalisedTargetFile: project.targetFile,
 		},
-		ProcessedFiles: []string{targetFile},
+		ProcessedFiles: project.claimed,
 	}
 }
 
@@ -583,18 +587,32 @@ func (p Plugin) emitFrameworkResult(
 		))
 	}
 
+	rootName := manifest.rootName
+	if rootName == "" {
+		rootName = rootComponentName(file)
+	}
+
 	// These manifests resolve one dependency set rather than one per framework,
 	// but they still have exactly one — detectTargetFramework just named it —
 	// so --dotnet-target-framework applies here too. Ignoring it would report a
 	// .NET Framework project under a framework the user filtered out.
+	//
+	// The manifest leads the claim here, not the project file: a project
+	// resolved from packages.config or project.json is reported under that file.
 	if filter.active() {
-		if _, ok := filter.keep(file, []string{framework.original}); !ok {
+		project := scannedProject{
+			targetFile: targetFile,
+			claimed:    claimedFiles(projectFileOf(file), targetFile),
+			rootName:   rootName,
+		}
+
+		if _, ok := filter.keep(project, []string{framework.original}); !ok {
 			log.Debug(ctx, "Leaving out a .NET project that does not declare the requested target framework",
 				logger.Attr(logFieldTargetFile, targetFile),
 				logger.Attr(logFieldTargetFramework, filter.requested),
 			)
 
-			return onGraph(p.claimOnlyResult(targetFile))
+			return onGraph(p.claimOnlyResult(project))
 		}
 	}
 
@@ -611,11 +629,6 @@ func (p Plugin) emitFrameworkResult(
 	children, err := nuspecChildren(installed, packagesFolder, framework)
 	if err != nil {
 		return deferToLegacy(ctx, log, targetFile, err)
-	}
-
-	rootName := manifest.rootName
-	if rootName == "" {
-		rootName = rootComponentName(file)
 	}
 
 	rootVersion := manifest.rootVersion
