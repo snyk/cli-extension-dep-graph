@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	snykecosystems "github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
@@ -139,19 +140,34 @@ func csprojTargetFramework(dir string) (targetFramework, bool, error) {
 	return targetFramework{}, false, nil
 }
 
-// firstCsproj returns the first .csproj in dir by name. Go sorts directory
-// entries, so which one wins is stable across runs — Node's readdirSync leaves
-// that to the filesystem.
+// firstCsproj returns the first .csproj in dir by name.
+//
+// Only .csproj, and case-sensitively, as snyk-nuget-plugin's /.*\.csproj$/ is:
+// matching App.CSPROJ here would resolve a project the CLI cannot.
 func firstCsproj(dir string) (path string, found bool, err error) {
+	return firstFileWithExt(dir, csprojExt)
+}
+
+// firstProjectFile returns the first file in dir naming a .NET project, by name.
+//
+// Wider than firstCsproj: an F# or VB project restores exactly as a C# one does
+// and is reported under its own extension, so naming such a project after its
+// restore output would leave it claimed by nothing.
+func firstProjectFile(dir string) (path string, found bool, err error) {
+	return firstFileWithExt(dir, projectFileExtensions...)
+}
+
+// firstFileWithExt returns the first file in dir carrying one of exts, by name.
+// Go sorts directory entries, so which one wins is stable across runs — Node's
+// readdirSync leaves that to the filesystem.
+func firstFileWithExt(dir string, exts ...string) (path string, found bool, err error) {
 	entries, readErr := os.ReadDir(dir)
 	if readErr != nil {
 		return "", false, fmt.Errorf("reading directory %s: %w", dir, readErr)
 	}
 
 	for _, entry := range entries {
-		// Case-sensitively, as snyk-nuget-plugin's /.*\.csproj$/ is: matching
-		// App.CSPROJ here would resolve a project the CLI cannot.
-		if entry.IsDir() || filepath.Ext(entry.Name()) != csprojExt {
+		if entry.IsDir() || !slices.Contains(exts, filepath.Ext(entry.Name())) {
 			continue
 		}
 

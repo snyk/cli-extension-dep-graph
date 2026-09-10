@@ -64,6 +64,15 @@ const (
 	prunedLabelValue = "true"
 )
 
+// projectFileExtensions are the extensions that name a .NET project, and the set
+// the legacy resolver treats as one. Matched case-sensitively against this
+// lowercase set, as it is: an App.CSPROJ is a file it never reports, so claiming
+// one would exclude nothing.
+//
+// Wider than csprojExt, which stays .csproj-only because it feeds target-framework
+// detection, where the narrower match is snyk-nuget-plugin's behavior.
+var projectFileExtensions = []string{csprojExt, ".fsproj", ".vbproj"}
+
 // targetFileNames lists every file name discovery matches.
 var targetFileNames = []string{
 	projectAssetsFile,

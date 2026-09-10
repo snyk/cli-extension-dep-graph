@@ -254,7 +254,8 @@ func TestPlugin_ProjectJSONResolves(t *testing.T) {
 	require.NoError(t, result.Error)
 	assert.Equal(t, projectJSONFile, result.ProjectDescriptor.GetTargetFile())
 	assert.Equal(t, []string{"net45"}, runtimes(t, results), "the runtime comes from the .csproj")
-	assert.Equal(t, []string{projectJSONFile}, result.ProcessedFiles)
+	assert.Equal(t, []string{"App.csproj", projectJSONFile}, result.ProcessedFiles,
+		"the .csproj beside it is claimed too, since that is what the project is reported under")
 
 	assert.ElementsMatch(t,
 		[]string{result.DepGraph.GetRootPkg().ID, "Newtonsoft.Json@8.0.3", "RouteMagic@1.3"},
@@ -399,6 +400,56 @@ func TestPlugin_ClaimsProcessedFiles(t *testing.T) {
 	require.Len(t, results, 1)
 
 	assert.Equal(t, []string{filepath.Join(objDir, projectAssetsFile)}, results[0].ProcessedFiles)
+	assert.Equal(t, filepath.Join(objDir, projectAssetsFile), results[0].ProjectDescriptor.GetTargetFile(),
+		"with no .csproj to name it, the project falls back to the assets file")
+}
+
+// An SDK-style project is reported under its .csproj, so that file has to be
+// claimed. Claiming only the assets file under obj/ excludes nothing, and the
+// project comes back twice.
+func TestPlugin_ClaimsTheProjectFileBesideTheAssetsFile(t *testing.T) {
+	dir := writeFiles(t, filepath.Join(objDir, projectAssetsFile), "App.csproj")
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	assert.Equal(t, []string{"App.csproj", filepath.Join(objDir, projectAssetsFile)}, results[0].ProcessedFiles)
+	assert.Equal(t, "App.csproj", results[0].ProjectDescriptor.GetTargetFile(),
+		"the project is identified by its .csproj, not by the restore output under obj/")
+}
+
+// The .csproj sits beside the project, not beside the assets file it is found
+// through, so a nested project claims a path one directory up from obj/.
+func TestPlugin_ClaimsTheProjectFileOfANestedProject(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, filepath.Join("src", "Api", objDir, projectAssetsFile), singleTargetAssets)
+	write(t, dir, filepath.Join("src", "Api", "Api.csproj"), "<Project></Project>")
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithAllProjects(true))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	assert.Equal(t, []string{
+		filepath.Join("src", "Api", "Api.csproj"),
+		filepath.Join("src", "Api", objDir, projectAssetsFile),
+	}, results[0].ProcessedFiles)
+	assert.Equal(t, filepath.Join("src", "Api", "Api.csproj"), results[0].ProjectDescriptor.GetTargetFile())
+}
+
+// An F# project restores exactly as a C# one does and is reported under its
+// .fsproj, so it is named and claimed the same way. Naming it after its restore
+// output instead would leave it claimed by nothing.
+func TestPlugin_NamesAnFsprojProjectByItsProjectFile(t *testing.T) {
+	dir := writeFiles(t, filepath.Join(objDir, projectAssetsFile), "Lib.fsproj")
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	assert.Equal(t, "Lib.fsproj", results[0].ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, []string{"Lib.fsproj", filepath.Join(objDir, projectAssetsFile)}, results[0].ProcessedFiles)
 }
 
 // A project can target several frameworks, and each resolves to its own
@@ -608,8 +659,10 @@ func TestPlugin_AllProjects(t *testing.T) {
 		"src/Legacy/"+packagesConfigFile,
 		"src/Old/"+projectJSONFile,
 		"src/Old/Old.csproj",
-		// Not target files, or not reachable.
+		// A .csproj is never a target file, but it names the project an SDK-style
+		// result identifies on. src/Lib deliberately has none.
 		"src/App/App.csproj",
+		// Not target files, or not reachable.
 		"MySolution.sln",
 		"paket.dependencies",
 		"node_modules/pkg/"+projectAssetsFile,
@@ -623,8 +676,14 @@ func TestPlugin_AllProjects(t *testing.T) {
 
 	// obj/ is deliberately not pruned: the CLI ignores only node_modules and
 	// .build (src/lib/find-files.ts:55), so restore output stays discoverable.
+	//
+	// One target file per project, but not one identity shape: an SDK-style
+	// project identifies on its .csproj, falling back to the assets file when it
+	// has none (src/Lib). packages.config and project.json identify on the
+	// manifest itself, which is what they are reported under — src/Old keeps
+	// project.json even though Old.csproj sits beside it.
 	assert.ElementsMatch(t, []string{
-		filepath.Join("src", "App", objDir, projectAssetsFile),
+		filepath.Join("src", "App", "App.csproj"),
 		filepath.Join("src", "Lib", objDir, projectAssetsFile),
 		filepath.Join("src", "Legacy", packagesConfigFile),
 		filepath.Join("src", "Old", projectJSONFile),

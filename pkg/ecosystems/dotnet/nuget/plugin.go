@@ -120,6 +120,17 @@ func (p Plugin) emitAssetsResults(
 	targetFile := file.RelPath
 	rootName := rootComponentName(file)
 
+	// The assets file is what the dependencies are read from, and what messages
+	// about them name, but it is restore output under obj/ rather than the
+	// project itself. Identity names the project file instead, which is what the
+	// legacy resolver reports an SDK-style project under — so a result and the
+	// one it replaces name the same project.
+	projectFile := projectFileOf(file)
+	if projectFile == "" {
+		projectFile = targetFile
+	}
+	claimed := claimedFiles(projectFile, targetFile)
+
 	assets, err := readProjectAssets(file.Path, targetFile)
 	if err != nil {
 		log.Error(ctx, "Leaving this .NET project to the legacy resolver: its assets file could not be used",
@@ -137,7 +148,7 @@ func (p Plugin) emitAssetsResults(
 				fmt.Sprintf("No resolved packages for target framework %s in %s.", framework, targetFile),
 			)
 
-			if err := onGraph(p.errResult(targetFile, rootName, framework, err)); err != nil {
+			if err := onGraph(p.errResult(projectFile, claimed, rootName, framework, err)); err != nil {
 				return err
 			}
 
@@ -152,14 +163,14 @@ func (p Plugin) emitAssetsResults(
 
 		graph, buildErr := buildDepGraph(ctx, assets, rootName, targetsKey)
 		if buildErr != nil {
-			if err := onGraph(p.errResult(targetFile, rootName, framework, buildErr)); err != nil {
+			if err := onGraph(p.errResult(projectFile, claimed, rootName, framework, buildErr)); err != nil {
 				return err
 			}
 
 			continue
 		}
 
-		result := p.newResult(targetFile, rootName, framework)
+		result := p.newResult(projectFile, claimed, rootName, framework)
 		result.DepGraph = graph
 
 		if err := onGraph(result); err != nil {
@@ -171,10 +182,9 @@ func (p Plugin) emitAssetsResults(
 }
 
 // newResult assembles the descriptor and metadata every result carries.
-// ProcessedFiles claims the assets file, which stops the legacy resolver
-// reporting the same project again — the workflow turns claimed files into
-// --exclude-paths for the plugins that follow.
-func (p Plugin) newResult(targetFile, rootName, targetRuntime string) ecosystems.SCAResult {
+// claimed stops the legacy resolver reporting the same project again — the
+// workflow turns claimed files into --exclude-paths for the plugins that follow.
+func (p Plugin) newResult(targetFile string, claimed []string, rootName, targetRuntime string) ecosystems.SCAResult {
 	return ecosystems.SCAResult{
 		ProjectDescriptor: identity.ProjectDescriptor{
 			Identity: newProjectIdentity(targetFile, targetRuntime, rootName),
@@ -183,14 +193,14 @@ func (p Plugin) newResult(targetFile, rootName, targetRuntime string) ecosystems
 			PluginName:           PluginName,
 			NormalisedTargetFile: targetFile,
 		},
-		ProcessedFiles: []string{targetFile},
+		ProcessedFiles: claimed,
 	}
 }
 
 // errResult reports a framework the resolver could not build a graph for. The
 // runtime is still set: it is what identifies the framework we failed on.
-func (p Plugin) errResult(targetFile, rootName, targetRuntime string, err error) ecosystems.SCAResult {
-	result := p.newResult(targetFile, rootName, targetRuntime)
+func (p Plugin) errResult(targetFile string, claimed []string, rootName, targetRuntime string, err error) ecosystems.SCAResult {
+	result := p.newResult(targetFile, claimed, rootName, targetRuntime)
 	result.DepGraph = nil
 	result.Error = err
 
@@ -211,16 +221,50 @@ func newProjectIdentity(targetFile, targetRuntime, rootComponentName string) ide
 }
 
 // rootComponentName names the project after the directory containing its target
-// file, stepping over obj/ (case-insensitively, as snyk-nuget-plugin does).
-// Derived from the absolute path so a target file in the scanned root still
-// yields a real name.
+// file, stepping over obj/. Derived from the absolute path so a target file in
+// the scanned root still yields a real name.
 func rootComponentName(file discovery.FindResult) string {
-	dir := filepath.Dir(file.Path)
+	return filepath.Base(projectDirOf(file.Path))
+}
+
+// projectDirOf returns the directory of the project path belongs to, stepping
+// over obj/ (case-insensitively, as snyk-nuget-plugin does) for a restore output
+// written there.
+func projectDirOf(path string) string {
+	dir := filepath.Dir(path)
 	if strings.EqualFold(filepath.Base(dir), objDir) {
-		dir = filepath.Dir(dir)
+		return filepath.Dir(dir)
 	}
 
-	return filepath.Base(dir)
+	return dir
+}
+
+// projectFileOf returns the project file naming the project, relative to the
+// scanned root, or "" when there is none beside it or the directory could not be
+// read. Callers fall back to the manifest they were resolving.
+func projectFileOf(file discovery.FindResult) string {
+	projectFile, found, err := firstProjectFile(projectDirOf(file.Path))
+	if err != nil || !found {
+		return ""
+	}
+
+	return filepath.Join(projectDirOf(file.RelPath), filepath.Base(projectFile))
+}
+
+// claimedFiles are the files a result claims so the legacy resolver does not
+// report the same project a second time.
+//
+// The project file leads: a claim only excludes the path it names, and an
+// SDK-style project is reported under its project file, so claiming the assets
+// file alone would exclude nothing. The manifest is claimed alongside it because
+// a project resolved from packages.config or project.json is reported under that
+// file instead.
+func claimedFiles(projectFile, targetFile string) []string {
+	if projectFile == "" || projectFile == targetFile {
+		return []string{targetFile}
+	}
+
+	return []string{projectFile, targetFile}
 }
 
 // discoverTargetFiles honors the same three request shapes as the other
@@ -428,7 +472,7 @@ func (p Plugin) emitFrameworkResult(
 		return deferToLegacy(ctx, log, targetFile, err)
 	}
 
-	result := p.newResult(targetFile, rootName, framework.original)
+	result := p.newResult(targetFile, claimedFiles(projectFileOf(file), targetFile), rootName, framework.original)
 	result.DepGraph = graph
 
 	return onGraph(result)
