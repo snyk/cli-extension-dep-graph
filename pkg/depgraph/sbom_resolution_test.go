@@ -2237,14 +2237,17 @@ func TestBuildPluginOptions_DetectionDepth(t *testing.T) {
 		name      string
 		flagValue string
 		wantDepth int
+		wantErr   bool
 	}{
-		{"parses a positive depth", "3", 3},
-		{"unset leaves the walk unlimited", "", 0},
-		// snyk/cli rejects these before resolution runs, so they are treated
-		// as unset here rather than surfaced as an error.
-		{"zero is treated as unset", "0", 0},
-		{"negative is treated as unset", "-2", 0},
-		{"unparseable is treated as unset", "deep", 0},
+		{name: "parses a positive depth", flagValue: "3", wantDepth: 3},
+		{name: "unset leaves the walk unlimited", flagValue: "", wantDepth: 0},
+		{name: "trims surrounding whitespace", flagValue: " 3 ", wantDepth: 3},
+		// snyk/cli rejects each of these, so we do too.
+		{name: "rejects zero", flagValue: "0", wantErr: true},
+		{name: "rejects a negative depth", flagValue: "-2", wantErr: true},
+		{name: "rejects a non-numeric value", flagValue: "abc", wantErr: true},
+		// Deliberate divergence: snyk/cli's Number() coercion accepts this.
+		{name: "rejects a fractional depth", flagValue: "3.5", wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -2252,8 +2255,20 @@ func TestBuildPluginOptions_DetectionDepth(t *testing.T) {
 			config := configuration.New()
 			config.Set(workflow.FlagDetectionDepth, tt.flagValue)
 
-			opts := buildPluginOptions(config)
+			opts, err := buildPluginOptions(config)
 
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Nil(t, opts)
+
+				var snykErr snyk_errors.Error
+				require.ErrorAs(t, err, &snykErr)
+				assert.Contains(t, snykErr.Detail, "Expected a positive integer")
+				assert.Contains(t, snykErr.Detail, tt.flagValue)
+				return
+			}
+
+			require.NoError(t, err)
 			assert.Equal(t, tt.wantDepth, opts.Global.DetectionDepth)
 		})
 	}
