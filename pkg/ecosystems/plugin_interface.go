@@ -19,6 +19,12 @@ type ResolverMetadata struct {
 // either a successfully-built dep-graph for one project, or an error
 // surfaced against the project's descriptor.
 //
+// A result with neither a DepGraph nor an Error claims its ProcessedFiles and
+// reports nothing: the plugin recognized the project and deliberately left it
+// out of scope, so no later plugin should answer for it either. Consumers must
+// skip such a result rather than treat it as a graph — marshaling a nil
+// DepGraph yields a `null` payload.
+//
 // ProcessedFiles lists the files this result was derived from
 // (lockfile + any manifests consulted). Per-graph attribution; if a
 // consumer wants a deduped union across all results, it computes it

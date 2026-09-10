@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	snykecosystems "github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
@@ -25,6 +26,7 @@ const (
 	logFieldTargetFramework = "targetFramework"
 	logFieldTargetsKey      = "targetsKey"
 	logFieldPackagesFolder  = "packagesFolder"
+	logFieldRootName        = "rootName"
 )
 
 // Plugin implements ecosystems.SCAPlugin for .NET projects. It never runs
@@ -79,13 +81,101 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	log.Debug(ctx, "Discovered .NET target files", logger.Attr("count", len(files)))
 
+	// Trimmed here rather than at either wiring path, so both the CLI flag and
+	// a raw --dotnet-target-framework get the same treatment: a moniker read
+	// from a CI variable routinely arrives with a trailing newline, and
+	// comparing that against what a project declares would match nothing and
+	// fail the scan with a message whose two monikers look identical.
+	// Whitespace alone is no request at all, which active() then reports.
+	filter := &targetFrameworkFilter{requested: strings.TrimSpace(options.Dotnet.TargetFramework)}
+
 	for _, file := range files {
-		if err := p.emitResults(ctx, log, file, options, onGraph); err != nil {
+		if err := p.emitResults(ctx, log, file, options, filter, onGraph); err != nil {
 			return err
 		}
 	}
 
-	return nil
+	// A filter that matched nothing anywhere is a mistake in the flag rather
+	// than a property of the repo, and saying so is the only way the user finds
+	// out: every project it turned away reported nothing. Failing here is
+	// deliberate — a scan that quietly tested no projects at all is worse than
+	// one that stops.
+	return filter.reportIfNothingMatched(ctx, log, p, onGraph)
+}
+
+// targetFrameworkFilter applies --dotnet-target-framework across one run. It
+// remembers what it turned away so that a filter matching nothing can name the
+// frameworks the scan did find.
+type targetFrameworkFilter struct {
+	requested string
+	matched   int
+	declined  []scannedProject
+	found     []string
+}
+
+// scannedProject is what a result for one project is attributed to: the file it
+// is reported under, the files it claims, and the name it carries. The filter
+// keeps this for a project it turned away, so that project is claimed exactly as
+// it would have been had it been resolved — a claim only excludes the path it
+// names, so claiming less here would let the legacy resolver report a project
+// this scan deliberately left out.
+type scannedProject struct {
+	targetFile string
+	claimed    []string
+	rootName   string
+}
+
+// active reports whether a target framework was requested at all.
+func (f *targetFrameworkFilter) active() bool { return f.requested != "" }
+
+// keep reports whether a project declaring these frameworks is in scope,
+// returning the one to resolve. Frameworks are the project's own, in the
+// spelling it declared them.
+func (f *targetFrameworkFilter) keep(project scannedProject, frameworks []string) (string, bool) {
+	selected, ok := selectTargetFramework(frameworks, f.requested)
+	if !ok {
+		f.declined = append(f.declined, project)
+
+		for _, framework := range frameworks {
+			if !slices.Contains(f.found, framework) {
+				f.found = append(f.found, framework)
+			}
+		}
+
+		return "", false
+	}
+
+	f.matched++
+
+	return selected, true
+}
+
+// reportIfNothingMatched emits one error result when the filter turned away
+// every project it saw and kept none. Attributed to the first project it
+// declined: there is no single file at fault, and the message names the whole
+// scan rather than that project.
+func (f *targetFrameworkFilter) reportIfNothingMatched(
+	ctx context.Context,
+	log logger.Logger,
+	p Plugin,
+	onGraph ecosystems.OnGraphFunc,
+) error {
+	if !f.active() || f.matched > 0 || len(f.declined) == 0 {
+		return nil
+	}
+
+	log.Debug(ctx, "No .NET project declares the requested target framework",
+		logger.Attr(logFieldTargetFramework, f.requested),
+		logger.Attr("declinedProjects", len(f.declined)),
+	)
+
+	attributed := f.declined[0]
+
+	err := snykecosystems.NewUnsupportedTargetFrameworkError(fmt.Sprintf(
+		"No .NET project matched target framework %s. The %d .NET project(s) found declare: %s.",
+		f.requested, len(f.declined), strings.Join(f.found, ", ")))
+
+	return onGraph(p.errResult(attributed.targetFile, attributed.claimed, attributed.rootName, f.requested, err))
 }
 
 // emitResults resolves one target file, dispatching on which manifest it is.
@@ -94,18 +184,21 @@ func (p Plugin) emitResults(
 	log logger.Logger,
 	file discovery.FindResult,
 	options *ecosystems.SCAPluginOptions,
+	filter *targetFrameworkFilter,
 	onGraph ecosystems.OnGraphFunc,
 ) error {
 	if filepath.Base(file.Path) == projectAssetsFile {
-		return p.emitAssetsResults(ctx, log, file, onGraph)
+		return p.emitAssetsResults(ctx, log, file, options, filter, onGraph)
 	}
 
-	return p.emitFrameworkResult(ctx, log, file, options, onGraph)
+	return p.emitFrameworkResult(ctx, log, file, options, filter, onGraph)
 }
 
 // emitAssetsResults resolves an SDK-style project and emits a result per target
-// framework. The results share a root name and target file, differing only in
-// target runtime — which is how snyk-nuget-plugin distinguishes them.
+// framework it reports on — every framework the project declares, or the single
+// one --dotnet-target-framework asked for. The results share a root name and
+// target file, differing only in target runtime — which is how
+// snyk-nuget-plugin distinguishes them.
 //
 // A framework that cannot be resolved is reported as a failure against its own
 // runtime: the framework is named in the file, so the result is still
@@ -115,10 +208,11 @@ func (p Plugin) emitAssetsResults(
 	ctx context.Context,
 	log logger.Logger,
 	file discovery.FindResult,
+	options *ecosystems.SCAPluginOptions,
+	filter *targetFrameworkFilter,
 	onGraph ecosystems.OnGraphFunc,
 ) error {
 	targetFile := file.RelPath
-	rootName := rootComponentName(file)
 
 	// The assets file is what the dependencies are read from, and what messages
 	// about them name, but it is restore output under obj/ rather than the
@@ -139,7 +233,42 @@ func (p Plugin) emitAssetsResults(
 		return nil
 	}
 
-	for _, framework := range assets.targetFrameworks() {
+	rootName := rootComponentName(file)
+	if options.Dotnet.AssetsProjectName {
+		if named := assets.Project.Restore.ProjectName; named != "" {
+			rootName = named
+		} else {
+			// Silently keeping the derived name would look like the flag did
+			// nothing.
+			log.Debug(ctx, "The restore recorded no project name, so the .NET project keeps its directory-derived name",
+				logger.Attr(logFieldTargetFile, targetFile), logger.Attr(logFieldRootName, rootName))
+		}
+	}
+
+	frameworks := assets.targetFrameworks()
+
+	if filter.active() {
+		project := scannedProject{targetFile: projectFile, claimed: claimed, rootName: rootName}
+
+		selected, ok := filter.keep(project, frameworks)
+		if !ok {
+			// Out of scope rather than broken, so nothing is reported for it —
+			// a project that targets something else is not a failure. The file
+			// is still claimed, so the legacy resolver cannot answer with a
+			// framework this scan excluded, and the exclude set stays the same
+			// whether or not the flag was passed.
+			log.Debug(ctx, "Leaving out a .NET project that does not declare the requested target framework",
+				logger.Attr(logFieldTargetFile, targetFile),
+				logger.Attr(logFieldTargetFramework, filter.requested),
+			)
+
+			return onGraph(p.claimOnlyResult(project))
+		}
+
+		frameworks = []string{selected}
+	}
+
+	for _, framework := range frameworks {
 		targetsKey := assets.matchTargetsKey(framework)
 		if targetsKey == "" {
 			// Guessing a sibling's packages would report the wrong dependencies
@@ -205,6 +334,20 @@ func (p Plugin) errResult(targetFile string, claimed []string, rootName, targetR
 	result.Error = err
 
 	return result
+}
+
+// claimOnlyResult claims a target file without reporting anything for it: the
+// project was recognized and deliberately left out of scope. It carries no
+// identity, because a project left out has no target runtime to be identified
+// by, and none is needed — the claim is by path.
+func (p Plugin) claimOnlyResult(project scannedProject) ecosystems.SCAResult {
+	return ecosystems.SCAResult{
+		ResolverMetadata: &ecosystems.ResolverMetadata{
+			PluginName:           PluginName,
+			NormalisedTargetFile: project.targetFile,
+		},
+		ProcessedFiles: project.claimed,
+	}
 }
 
 // newProjectIdentity builds the identity for one .NET project. targetRuntime is
@@ -418,6 +561,7 @@ func (p Plugin) emitFrameworkResult(
 	log logger.Logger,
 	file discovery.FindResult,
 	options *ecosystems.SCAPluginOptions,
+	filter *targetFrameworkFilter,
 	onGraph ecosystems.OnGraphFunc,
 ) error {
 	targetFile := file.RelPath
@@ -443,6 +587,35 @@ func (p Plugin) emitFrameworkResult(
 		))
 	}
 
+	rootName := manifest.rootName
+	if rootName == "" {
+		rootName = rootComponentName(file)
+	}
+
+	// These manifests resolve one dependency set rather than one per framework,
+	// but they still have exactly one — detectTargetFramework just named it —
+	// so --dotnet-target-framework applies here too. Ignoring it would report a
+	// .NET Framework project under a framework the user filtered out.
+	//
+	// The manifest leads the claim here, not the project file: a project
+	// resolved from packages.config or project.json is reported under that file.
+	if filter.active() {
+		project := scannedProject{
+			targetFile: targetFile,
+			claimed:    claimedFiles(projectFileOf(file), targetFile),
+			rootName:   rootName,
+		}
+
+		if _, ok := filter.keep(project, []string{framework.original}); !ok {
+			log.Debug(ctx, "Leaving out a .NET project that does not declare the requested target framework",
+				logger.Attr(logFieldTargetFile, targetFile),
+				logger.Attr(logFieldTargetFramework, filter.requested),
+			)
+
+			return onGraph(p.claimOnlyResult(project))
+		}
+	}
+
 	packagesFolder := resolvePackagesFolder(file.Path, options.Dotnet.PackagesFolder)
 
 	log.Debug(ctx, "Resolving .NET project",
@@ -456,11 +629,6 @@ func (p Plugin) emitFrameworkResult(
 	children, err := nuspecChildren(installed, packagesFolder, framework)
 	if err != nil {
 		return deferToLegacy(ctx, log, targetFile, err)
-	}
-
-	rootName := manifest.rootName
-	if rootName == "" {
-		rootName = rootComponentName(file)
 	}
 
 	rootVersion := manifest.rootVersion
