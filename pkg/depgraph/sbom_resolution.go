@@ -401,6 +401,13 @@ func processResultsIndividually(logger *zerolog.Logger, results []ecosystems.SCA
 			continue
 		}
 
+		// A result with neither a graph nor an error claims its files and
+		// reports nothing — a project the plugin recognized and left out of
+		// scope. Marshaling it would emit a `null` dep graph.
+		if result.DepGraph == nil {
+			continue
+		}
+
 		data, err := workflowDataFromDepGraph(result)
 		if err != nil {
 			return nil, problemResults, fmt.Errorf("failed to create workflow data: %w", err)

@@ -1057,51 +1057,111 @@ func TestPlugin_TargetFrameworkIsMatchedIgnoringCase(t *testing.T) {
 		"the runtime is the framework the project declared, not the spelling on the command line")
 }
 
-// TestPlugin_TargetFrameworkNotDeclaredIsReportedNotGuessed encodes the design
-// decision behind the filter: the framework is selected from what the manifest
-// declares and never substituted into matchTargetsKey, whose single-key
-// fallback would otherwise report this project's net6.0 packages under net9.0.
-// The failure is reported rather than declined, and the file is still claimed,
-// so the legacy resolver cannot answer with a framework this scan excluded.
-func TestPlugin_TargetFrameworkNotDeclaredIsReportedNotGuessed(t *testing.T) {
+// TestPlugin_TargetFrameworkNotDeclaredIsReported encodes the design decision
+// behind the filter: the framework is selected from what the manifest declares
+// and never substituted into matchTargetsKey, whose single-key fallback would
+// otherwise report this project's net6.0 packages under net9.0.
+//
+// The project itself is claimed and reports nothing — targeting something else
+// is not a failure of that project — and because the filter then matched
+// nothing at all, one scan-level error says so.
+func TestPlugin_TargetFrameworkNotDeclaredIsReported(t *testing.T) {
 	dir := t.TempDir()
 	write(t, dir, projectAssetsFile, multiTargetAssets)
 
 	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
 		ecosystems.NewPluginOptions().WithDotnetTargetFramework("net9.0"))
 	require.NoError(t, err)
-	require.Len(t, results, 1)
 
-	result := results[0]
-	require.Error(t, result.Error)
-	assert.Nil(t, result.DepGraph, "no graph is reported for a framework the project does not have")
+	for _, result := range results {
+		assert.Nil(t, result.DepGraph, "no graph is reported for a framework the project does not have")
+		assert.Equal(t, []string{projectAssetsFile}, result.ProcessedFiles,
+			"the file is claimed either way, so the exclude set does not depend on the flag")
+	}
 
-	require.NotNil(t, result.ProjectDescriptor.Identity.TargetRuntime)
-	assert.Equal(t, "net9.0", *result.ProjectDescriptor.Identity.TargetRuntime,
-		"the requested name is the only identity a framework the project never declared has")
+	problems := errorResults(results)
+	require.Len(t, problems, 1, "one scan-level error, not one per project")
 
-	detail := detailOf(t, result.Error)
+	detail := detailOf(t, problems[0].Error)
 	assert.Contains(t, detail, "net9.0")
-	assert.Contains(t, detail, "net6.0", "the declared frameworks are named, so the flag can be corrected")
+	assert.Contains(t, detail, "net6.0", "the frameworks the scan found are named, so the flag can be corrected")
 	assert.Contains(t, detail, "net8.0")
-
-	assert.Equal(t, []string{projectAssetsFile}, result.ProcessedFiles)
 }
 
-func TestPlugin_TargetFrameworkDoesNotReachPackagesConfig(t *testing.T) {
-	// packages.config records one dependency set and one runtime, so there is
-	// nothing to select between; the flag is ignored rather than dropping the
-	// project.
-	dir := writeFiles(t, packagesConfigFile)
+// The filter reaches packages.config and project.json too. They resolve one
+// dependency set rather than one per framework, but they still have exactly one
+// framework, so a project targeting something else must not be reported.
+func TestPlugin_TargetFrameworkReachesPackagesConfig(t *testing.T) {
+	dir := writeFiles(t, packagesConfigFile) // net45
 
 	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
 		ecosystems.NewPluginOptions().WithDotnetTargetFramework("net8.0"))
 	require.NoError(t, err)
+
+	for _, result := range results {
+		assert.Nil(t, result.DepGraph, "a net45 project is not reported when net8.0 was asked for")
+	}
+	require.Len(t, errorResults(results), 1)
+	assert.Contains(t, detailOf(t, errorResults(results)[0].Error), "net45",
+		"the framework the project does declare is named")
+}
+
+func TestPlugin_TargetFrameworkKeepsAMatchingPackagesConfig(t *testing.T) {
+	dir := writeFiles(t, packagesConfigFile) // net45
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithDotnetTargetFramework("net45"))
+	require.NoError(t, err)
 	require.Len(t, results, 1)
 
 	require.NoError(t, results[0].Error)
+	require.NotNil(t, results[0].DepGraph)
 	require.NotNil(t, results[0].ProjectDescriptor.Identity.TargetRuntime)
 	assert.Equal(t, "net45", *results[0].ProjectDescriptor.Identity.TargetRuntime)
+}
+
+// The case that makes the filter usable on a real solution: the projects that
+// target something else are claimed and left out silently. Reporting each of
+// them as an error would turn a 50-project solution into 40 warnings and a
+// "40/50 projects failed" tally for a scan that did exactly what was asked.
+func TestPlugin_TargetFrameworkLeavesOutNonMatchingProjectsQuietly(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, filepath.Join("Modern", projectAssetsFile), singleTargetAssets) // net8.0
+	write(t, dir, filepath.Join("Legacy", projectAssetsFile), multiTargetAssets)  // net6.0, net8.0
+	write(t, dir, filepath.Join("Old", packagesConfigFile), packagesConfigManifest)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithAllProjects(true).WithDotnetTargetFramework("net8.0"))
+	require.NoError(t, err)
+
+	assert.Empty(t, errorResults(results), "targeting another framework is not a failure")
+
+	claimed := make([]string, 0, len(results))
+	graphs := 0
+	for _, result := range results {
+		claimed = append(claimed, result.ProcessedFiles...)
+		if result.DepGraph != nil {
+			graphs++
+			require.NotNil(t, result.ProjectDescriptor.Identity.TargetRuntime)
+			assert.Equal(t, "net8.0", *result.ProjectDescriptor.Identity.TargetRuntime)
+		}
+	}
+
+	assert.Equal(t, 2, graphs, "both net8.0 projects resolve; the net45 one does not")
+	assert.Contains(t, claimed, filepath.Join("Old", packagesConfigFile),
+		"the project left out is still claimed, so legacy cannot report it either")
+}
+
+// errorResults picks out the results carrying an error.
+func errorResults(results []ecosystems.SCAResult) []ecosystems.SCAResult {
+	var problems []ecosystems.SCAResult
+	for _, result := range results {
+		if result.Error != nil {
+			problems = append(problems, result)
+		}
+	}
+
+	return problems
 }
 
 func TestPlugin_AssetsProjectNameUsesTheRestoreName(t *testing.T) {

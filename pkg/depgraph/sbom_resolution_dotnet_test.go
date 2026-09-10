@@ -320,8 +320,8 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 	})
 
 	// A solution routinely mixes frameworks. The project that has the requested
-	// one resolves; the project that does not is reported against it, and both
-	// stay claimed so the legacy resolver cannot answer for either.
+	// one resolves; the project that does not is left out, and both stay claimed
+	// so the legacy resolver cannot answer for either.
 	t.Run("flag on: --dotnet-target-framework across projects that differ", func(t *testing.T) {
 		dir := t.TempDir()
 		writeAssetsProject(t, filepath.Join(dir, "Modern"), "net8.0")
@@ -339,6 +339,70 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 		assert.Contains(t, excluded, filepath.Join("Modern", "obj", "project.assets.json"))
 		assert.Contains(t, excluded, filepath.Join("Legacy", "obj", "project.assets.json"),
 			"the project that lacks the framework is claimed too, so the exclude set does not depend on the flag")
+	})
+
+	// The mixed-solution case: the filter must reach packages.config too, or a
+	// project targeting a framework the user filtered out is still reported.
+	t.Run("flag on: --dotnet-target-framework reaches a packages.config project", func(t *testing.T) {
+		dir := t.TempDir()
+		writeAssetsProject(t, filepath.Join(dir, "Modern"), "net8.0")
+		writePackagesConfig(t, dir, `<packages>
+          <package id="Newtonsoft.Json" version="10.0.3" targetFramework="net45" />
+        </packages>`)
+
+		workflowData, harness := run(t, dir, true, true, nil,
+			func(config configuration.Configuration) {
+				config.Set(workflow.FlagDotnetTargetFramework, "net8.0")
+			})
+
+		require.Len(t, workflowData, 1, "the net45 project is not reported")
+		assert.Equal(t, "net8.0", metaString(t, workflowData[0], workflow.MetaKeyTargetRuntime))
+
+		excluded := harness.CapturedExcludePaths()
+		assert.Contains(t, excluded, "packages.config",
+			"the project left out is still claimed, so legacy cannot report it either")
+	})
+
+	// Being out of scope is not a failure: a project targeting another framework
+	// must not surface as a warning or count toward the failed-projects tally.
+	t.Run("flag on: a project left out by the filter is not a warning", func(t *testing.T) {
+		dir := t.TempDir()
+		writeAssetsProject(t, filepath.Join(dir, "Modern"), "net8.0")
+		writeAssetsProject(t, filepath.Join(dir, "Legacy"), "net6.0")
+
+		tc := setupTestContext(t, true)
+		harness := NewLegacyHarness(tc)
+		tc.config.Set(configuration.INPUT_DIRECTORY, dir)
+		tc.config.Set(workflow.FlagAllProjects, true)
+		tc.config.Set(workflow.FlagFailFast, true)
+		tc.config.Set(orchestrator.FlagDotnetResolver.Key, true)
+		tc.config.Set(workflow.FlagDotnetTargetFramework, "net8.0")
+
+		plugins := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+
+		// --fail-fast aborts on any error result, so this passing at all is the
+		// assertion that the filter produces none.
+		workflowData, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, plugins)
+		require.NoError(t, err, "--fail-fast must not trip on a project that targets another framework")
+		require.Len(t, workflowData, 1)
+		assert.Equal(t, "net8.0", metaString(t, workflowData[0], workflow.MetaKeyTargetRuntime))
+		assert.Contains(t, harness.CapturedExcludePaths(), filepath.Join("Legacy", "obj", "project.assets.json"))
+	})
+
+	// Matching nothing anywhere is a mistake in the flag, and a scan that
+	// quietly tested no projects would hide it.
+	t.Run("flag on: a --dotnet-target-framework matching nothing is an error", func(t *testing.T) {
+		tc := setupTestContext(t, true)
+		NewLegacyHarness(tc)
+		tc.config.Set(configuration.INPUT_DIRECTORY, sdkStyleProject(t)) // net8.0 only
+		tc.config.Set(workflow.FlagAllProjects, false)
+		tc.config.Set(orchestrator.FlagDotnetResolver.Key, true)
+		tc.config.Set(workflow.FlagDotnetTargetFramework, "net9.0")
+
+		plugins := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+
+		_, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, plugins)
+		require.Error(t, err, "the user asked for a framework that exists nowhere in the scan")
 	})
 
 	t.Run("flag on: --assets-project-name renames the project", func(t *testing.T) {
