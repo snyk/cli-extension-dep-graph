@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
@@ -40,6 +41,7 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 				"--bazel-max-targets", "50",
 				"--bazel-go",
 				"--bazel-platforms", "//:linux_x86_64",
+				"--detection-depth", "3",
 			},
 			expected: &SCAPluginOptions{
 				Global: GlobalOptions{
@@ -53,6 +55,7 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 					ForceSingleGraph:              true,
 					ForceIncludeWorkspacePackages: true,
 					IncludeProvenance:             true,
+					DetectionDepth:                3,
 				},
 				Python: PythonOptions{
 					NoBuildIsolation: true,
@@ -263,6 +266,61 @@ func TestNewPluginOptionsFromRawFlags_FailFast(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.True(t, got.Global.FailFast)
+}
+
+func TestNewPluginOptionsFromRawFlags_DetectionDepth(t *testing.T) {
+	tests := []struct {
+		name      string
+		rawFlags  []string
+		wantDepth int
+		wantErr   bool
+	}{
+		{name: "space separated", rawFlags: []string{"--detection-depth", "2"}, wantDepth: 2},
+		{name: "equals syntax", rawFlags: []string{"--detection-depth=4"}, wantDepth: 4},
+		{name: "trims surrounding whitespace", rawFlags: []string{"--detection-depth= 4 "}, wantDepth: 4},
+		// Unset must stay 0 so discovery keeps walking without a limit.
+		{name: "absent leaves it unset", rawFlags: []string{"--all-projects"}, wantDepth: 0},
+		{name: "empty value leaves it unset", rawFlags: []string{"--detection-depth="}, wantDepth: 0},
+		// snyk/cli rejects each of these, so we do too.
+		{name: "rejects zero", rawFlags: []string{"--detection-depth=0"}, wantErr: true},
+		{name: "rejects a negative depth", rawFlags: []string{"--detection-depth=-2"}, wantErr: true},
+		{name: "rejects a non-numeric value", rawFlags: []string{"--detection-depth=abc"}, wantErr: true},
+		// Deliberate divergence: snyk/cli's Number() coercion accepts this.
+		{name: "rejects a fractional depth", rawFlags: []string{"--detection-depth=3.5"}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewPluginOptionsFromRawFlags(tt.rawFlags)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Nil(t, got)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantDepth, got.Global.DetectionDepth)
+		})
+	}
+}
+
+func TestParseDetectionDepth(t *testing.T) {
+	depth, err := ParseDetectionDepth("2")
+	require.NoError(t, err)
+	assert.Equal(t, 2, depth)
+
+	depth, err = ParseDetectionDepth("")
+	require.NoError(t, err)
+	assert.Zero(t, depth)
+
+	_, err = ParseDetectionDepth("3.5")
+	require.Error(t, err)
+}
+
+func TestWithDetectionDepth(t *testing.T) {
+	assert.Equal(t, 5, NewPluginOptions().WithDetectionDepth(5).Global.DetectionDepth)
+	assert.Zero(t, NewPluginOptions().Global.DetectionDepth)
 }
 
 func TestNewPluginOptionsFromRawFlags_ForceSingleGraph(t *testing.T) {

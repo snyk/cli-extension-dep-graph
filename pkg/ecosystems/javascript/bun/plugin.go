@@ -218,6 +218,7 @@ func (p Plugin) discoverLockFiles(
 		findOpts := []discovery.FindOption{
 			discovery.WithInclude(bunLockFile),
 			discovery.WithCommonExcludes(),
+			discovery.WithMaxDepth(options.Global.DetectionDepth),
 		}
 
 		if len(options.Global.Exclude) > 0 {

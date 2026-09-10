@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	clierrors "github.com/snyk/error-catalog-golang-public/cli"
+
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/argparser"
 )
 
@@ -32,7 +34,12 @@ type GlobalOptions struct {
 	ProjectName                   *string              `arg:"--project-name"`
 	IncludeProvenance             bool                 `arg:"--include-provenance"`
 	WorkspacePackage              *string              `arg:"--workspace-package"`
-	RawFlags                      []string
+	// DetectionDepth caps how deep --all-projects discovery walks, counted in
+	// path segments below the scanned root. 0 means unlimited. Parsed by
+	// ParseDetectionDepth rather than by the argparser so that both entry
+	// points share one validation rule.
+	DetectionDepth int
+	RawFlags       []string
 }
 
 // CommaSeparatedString is a custom type that parses comma-separated values.
@@ -42,6 +49,31 @@ type CommaSeparatedString []string
 func (c *CommaSeparatedString) UnmarshalText(text []byte) error {
 	*c = strings.Split(string(text), ",")
 	return nil
+}
+
+// ParseDetectionDepth parses --detection-depth. Empty means absent, which
+// leaves discovery unlimited — snyk/cli skips a falsy value and passes
+// levelsDeep: undefined, so its own depth check never trips.
+//
+// Non-positive and non-numeric values are rejected, as snyk/cli rejects them.
+// So are fractional ones, which is a deliberate divergence: Number() lets
+// --detection-depth=3.5 past its validation and caps the walk at 3, but its
+// own error message promises "a positive integer", so we surface it rather
+// than silently flooring.
+func ParseDetectionDepth(raw string) (int, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return 0, nil
+	}
+
+	depth, err := strconv.Atoi(trimmed)
+	if err != nil || depth <= 0 {
+		return 0, clierrors.NewInvalidFlagOptionError(
+			fmt.Sprintf("Unsupported value for --detection-depth flag: %q. Expected a positive integer.", raw),
+		)
+	}
+
+	return depth, nil
 }
 
 // PythonOptions contains Python-specific options for dependency graph generation.
@@ -112,7 +144,8 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 		GradleOptions
 		BazelOptions
 		DotnetOptions
-		StrictOutOfSync *string `arg:"--strict-out-of-sync"`
+		StrictOutOfSync   *string `arg:"--strict-out-of-sync"`
+		DetectionDepthRaw *string `arg:"--detection-depth"`
 	}
 
 	if err := argparser.Parse(rawFlags, &args); err != nil {
@@ -120,6 +153,14 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 	}
 
 	args.RawFlags = rawFlags
+
+	if args.DetectionDepthRaw != nil {
+		depth, err := ParseDetectionDepth(*args.DetectionDepthRaw)
+		if err != nil {
+			return nil, err
+		}
+		args.DetectionDepth = depth
+	}
 
 	if args.StrictOutOfSync != nil {
 		if parsed, err := strconv.ParseBool(*args.StrictOutOfSync); err == nil {
@@ -193,6 +234,14 @@ func (o *SCAPluginOptions) WithForceIncludeWorkspacePackages(forceIncludeWorkspa
 
 func (o *SCAPluginOptions) WithProjectName(projectName string) *SCAPluginOptions {
 	o.Global.ProjectName = &projectName
+	return o
+}
+
+// WithDetectionDepth caps how deep --all-projects discovery walks, mirroring
+// the CLI's --detection-depth. See discovery.WithMaxDepth for the semantics;
+// values <= 0 leave the walk unlimited.
+func (o *SCAPluginOptions) WithDetectionDepth(depth int) *SCAPluginOptions {
+	o.Global.DetectionDepth = depth
 	return o
 }
 

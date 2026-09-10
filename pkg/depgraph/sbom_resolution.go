@@ -114,7 +114,10 @@ func handleSBOMResolutionDI(
 	failFast := config.GetBool(workflow.FlagFailFast)
 	forceIncludeWorkspacePackages := config.GetBool(workflow.FlagUvWorkspacePackages)
 	targetFile := config.GetString(workflow.FlagFile)
-	pluginOptions := buildPluginOptions(config)
+	pluginOptions, err := buildPluginOptions(config)
+	if err != nil {
+		return nil, err
+	}
 
 	pluginLogger := ecosystemslogger.NewFromZerolog(logger)
 	workflowData := []gafworkflow.Data{}
@@ -195,7 +198,7 @@ func handleSBOMResolutionDI(
 	return workflowData, nil
 }
 
-func buildPluginOptions(config configuration.Configuration) *ecosystems.SCAPluginOptions {
+func buildPluginOptions(config configuration.Configuration) (*ecosystems.SCAPluginOptions, error) {
 	strictOutOfSync := true
 	if parsed, err := strconv.ParseBool(config.GetString(workflow.FlagStrictOutOfSync)); err == nil {
 		strictOutOfSync = parsed
@@ -215,6 +218,12 @@ func buildPluginOptions(config configuration.Configuration) *ecosystems.SCAPlugi
 		opts = opts.WithTargetFile(targetFile)
 	}
 
+	depth, err := ecosystems.ParseDetectionDepth(config.GetString(workflow.FlagDetectionDepth))
+	if err != nil {
+		return nil, fmt.Errorf("building plugin options: %w", err)
+	}
+	opts = opts.WithDetectionDepth(depth)
+
 	// The CLI documents --packages-folder as relative to the working directory,
 	// not to the scanned root, so it is resolved here rather than per project.
 	if packagesFolder := config.GetString(workflow.FlagNugetPkgsFolder); packagesFolder != "" {
@@ -224,7 +233,7 @@ func buildPluginOptions(config configuration.Configuration) *ecosystems.SCAPlugi
 		opts = opts.WithPackagesFolder(packagesFolder)
 	}
 
-	return opts
+	return opts, nil
 }
 
 func checkFailFast(logger *zerolog.Logger, failFast, allProjects bool, results []ecosystems.SCAResult) error {

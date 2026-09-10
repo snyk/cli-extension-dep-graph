@@ -294,6 +294,7 @@ func (p Plugin) discoverTargetFiles(
 		findOpts := []discovery.FindOption{
 			discovery.WithIncludes(targetFileNames...),
 			discovery.WithCommonExcludes(),
+			discovery.WithMaxDepth(options.Global.DetectionDepth),
 		}
 
 		if len(options.Global.Exclude) > 0 {

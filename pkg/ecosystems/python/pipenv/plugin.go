@@ -138,6 +138,7 @@ func (p Plugin) discoverPipfiles(ctx context.Context, log logger.Logger, dir str
 		findOpts = []discovery.FindOption{
 			discovery.WithInclude(pipfileFile),
 			discovery.WithExcludes(excludes...),
+			discovery.WithMaxDepth(options.Global.DetectionDepth),
 		}
 	default:
 		// Default: find Pipfile at root only

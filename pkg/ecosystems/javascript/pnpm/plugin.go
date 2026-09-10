@@ -271,6 +271,7 @@ func discoverLockFiles(
 		findOpts := []discovery.FindOption{
 			discovery.WithInclude(pnpmLockFile),
 			discovery.WithCommonExcludes(),
+			discovery.WithMaxDepth(options.Global.DetectionDepth),
 		}
 		if len(options.Global.Exclude) > 0 {
 			findOpts = append(findOpts, discovery.WithExcludes(options.Global.Exclude...))
