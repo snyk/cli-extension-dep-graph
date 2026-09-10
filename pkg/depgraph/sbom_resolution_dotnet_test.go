@@ -435,7 +435,8 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 
 func Test_buildPluginOptions_dotnetFlags(t *testing.T) {
 	t.Run("defaults leave every .NET option unset", func(t *testing.T) {
-		opts := buildPluginOptions(configuration.New())
+		opts, err := buildPluginOptions(configuration.New())
+		require.NoError(t, err)
 
 		assert.Empty(t, opts.Dotnet.TargetFramework, "every declared framework is reported")
 		assert.False(t, opts.Dotnet.AssetsProjectName, "the directory-derived name is kept")
@@ -447,7 +448,8 @@ func Test_buildPluginOptions_dotnetFlags(t *testing.T) {
 		config.Set(workflow.FlagDotnetTargetFramework, "net8.0")
 		config.Set(workflow.FlagNugetAssetsProjectName, true)
 
-		opts := buildPluginOptions(config)
+		opts, err := buildPluginOptions(config)
+		require.NoError(t, err)
 
 		assert.Equal(t, "net8.0", opts.Dotnet.TargetFramework)
 		assert.True(t, opts.Dotnet.AssetsProjectName)
@@ -459,7 +461,9 @@ func Test_buildPluginOptions_dotnetFlags(t *testing.T) {
 		config := configuration.New()
 		config.Set(workflow.FlagDotnetTargetFramework, "net7.0-windows")
 
-		assert.Equal(t, "net7.0-windows", buildPluginOptions(config).Dotnet.TargetFramework)
+		opts, err := buildPluginOptions(config)
+		require.NoError(t, err)
+		assert.Equal(t, "net7.0-windows", opts.Dotnet.TargetFramework)
 	})
 
 	t.Run("a packages folder is made absolute", func(t *testing.T) {
@@ -468,7 +472,10 @@ func Test_buildPluginOptions_dotnetFlags(t *testing.T) {
 
 		abs, err := filepath.Abs("packages")
 		require.NoError(t, err)
-		assert.Equal(t, abs, buildPluginOptions(config).Dotnet.PackagesFolder)
+
+		opts, err := buildPluginOptions(config)
+		require.NoError(t, err)
+		assert.Equal(t, abs, opts.Dotnet.PackagesFolder)
 	})
 }
 
