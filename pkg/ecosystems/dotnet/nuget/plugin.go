@@ -81,7 +81,13 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	log.Debug(ctx, "Discovered .NET target files", logger.Attr("count", len(files)))
 
-	filter := &targetFrameworkFilter{requested: options.Dotnet.TargetFramework}
+	// Trimmed here rather than at either wiring path, so both the CLI flag and
+	// a raw --dotnet-target-framework get the same treatment: a moniker read
+	// from a CI variable routinely arrives with a trailing newline, and
+	// comparing that against what a project declares would match nothing and
+	// fail the scan with a message whose two monikers look identical.
+	// Whitespace alone is no request at all, which active() then reports.
+	filter := &targetFrameworkFilter{requested: strings.TrimSpace(options.Dotnet.TargetFramework)}
 
 	for _, file := range files {
 		if err := p.emitResults(ctx, log, file, options, filter, onGraph); err != nil {

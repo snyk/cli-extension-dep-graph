@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -1055,6 +1056,42 @@ func TestPlugin_TargetFrameworkIsMatchedIgnoringCase(t *testing.T) {
 	require.NotNil(t, results[0].ProjectDescriptor.Identity.TargetRuntime)
 	assert.Equal(t, "net8.0", *results[0].ProjectDescriptor.Identity.TargetRuntime,
 		"the runtime is the framework the project declared, not the spelling on the command line")
+}
+
+// A moniker read from a CI variable routinely arrives with a trailing newline.
+// Without trimming it matches nothing, and the scan fails with a message whose
+// requested and declared monikers look identical.
+func TestPlugin_TargetFrameworkIgnoresSurroundingWhitespace(t *testing.T) {
+	for _, requested := range []string{" net8.0", "net8.0 ", "\tnet8.0\n"} {
+		t.Run(strconv.Quote(requested), func(t *testing.T) {
+			dir := t.TempDir()
+			write(t, dir, projectAssetsFile, multiTargetAssets)
+
+			results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+				ecosystems.NewPluginOptions().WithDotnetTargetFramework(requested))
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+
+			require.NoError(t, results[0].Error)
+			require.NotNil(t, results[0].ProjectDescriptor.Identity.TargetRuntime)
+			assert.Equal(t, "net8.0", *results[0].ProjectDescriptor.Identity.TargetRuntime)
+		})
+	}
+}
+
+// Whitespace alone is no request at all, so it must not filter everything out
+// and fail the scan.
+func TestPlugin_TargetFrameworkOfWhitespaceIsNoRequest(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, projectAssetsFile, multiTargetAssets)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithDotnetTargetFramework("   "))
+	require.NoError(t, err)
+
+	assert.Empty(t, errorResults(results))
+	assert.Equal(t, []string{"net6.0", "net8.0"}, runtimes(t, results),
+		"every declared framework is reported, as if the flag were absent")
 }
 
 // TestPlugin_TargetFrameworkNotDeclaredIsReported encodes the design decision

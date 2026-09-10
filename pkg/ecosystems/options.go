@@ -127,15 +127,21 @@ type DotnetOptions struct {
 	// Empty means the location is derived from the manifest's own path.
 	PackagesFolder string `arg:"--packages-folder"`
 
-	// TargetFramework narrows an SDK-style project to the one target framework
-	// named here, for a project that multi-targets and whose owner only cares
-	// about one of them. It selects among the frameworks project.assets.json
-	// declares and never stands in for one it does not: resolving a framework
-	// against another's packages is what projectAssets.matchTargetsKey exists to
-	// prevent. Empty means every framework the project declares is reported,
-	// which is what the CLI documents as the default. packages.config and
-	// project.json record no per-framework resolution, so this does not reach
-	// them.
+	// TargetFramework narrows the scan to the one target framework named here,
+	// for a solution whose owner only cares about one of the several its
+	// projects target. An SDK-style project reports just that framework out of
+	// the several project.assets.json declares; a packages.config or
+	// project.json project, which resolves one dependency set against a single
+	// framework, is either kept or left out whole.
+	//
+	// It only ever selects among the frameworks a project declares, and never
+	// stands in for one it does not: resolving a framework against another's
+	// packages is what projectAssets.matchTargetsKey exists to prevent.
+	//
+	// Surrounding whitespace is ignored, so a moniker read from a CI variable
+	// still matches. Empty — or whitespace alone — means every framework each
+	// project declares is reported, which is what the CLI documents as the
+	// default.
 	TargetFramework string `arg:"--dotnet-target-framework"`
 
 	// AssetsProjectName names an SDK-style project after the project name its
