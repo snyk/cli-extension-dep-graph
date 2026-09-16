@@ -1,0 +1,53 @@
+{
+  "version": 3,
+  "targets": {
+    "net8.0": {
+      "Microsoft.DotNet.ILCompiler/8.0.16": {
+        "type": "package",
+        "build": { "build/Microsoft.DotNet.ILCompiler.props": {} }
+      },
+      "Microsoft.NET.ILLink.Tasks/8.0.16": {
+        "type": "package",
+        "build": { "build/Microsoft.NET.ILLink.Tasks.props": {} }
+      },
+      "Newtonsoft.Json/13.0.3": {
+        "type": "package",
+        "compile": { "lib/net6.0/Newtonsoft.Json.dll": {} },
+        "runtime": { "lib/net6.0/Newtonsoft.Json.dll": {} }
+      }
+    }
+  },
+  "projectFileDependencyGroups": {
+    "net8.0": [
+      "Microsoft.DotNet.ILCompiler >= 8.0.16",
+      "Microsoft.NET.ILLink.Tasks >= 8.0.16",
+      "Newtonsoft.Json >= 13.0.3"
+    ]
+  },
+  "project": {
+    "version": "1.0.0",
+    "frameworks": {
+      "net8.0": {
+        "targetAlias": "net8.0",
+        "dependencies": {
+          "Microsoft.DotNet.ILCompiler": {
+            "suppressParent": "All",
+            "target": "Package",
+            "version": "[8.0.16, )",
+            "autoReferenced": true
+          },
+          "Microsoft.NET.ILLink.Tasks": {
+            "suppressParent": "All",
+            "target": "Package",
+            "version": "[8.0.16, )",
+            "autoReferenced": true
+          },
+          "Newtonsoft.Json": {
+            "target": "Package",
+            "version": "[13.0.3, )"
+          }
+        }
+      }
+    }
+  }
+}
