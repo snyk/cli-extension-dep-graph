@@ -82,12 +82,22 @@ type assetsTargetEntry struct {
 	Dependencies orderedMap[string] `json:"dependencies"`
 }
 
-// project.restore is absent until --assets-project-name is honored (CMPA-718).
-// Upstream reads restore.projectName there; decoding it before the flag exists
-// would only suggest it is already supported.
+// assetsProject is the `project` section: what the project declares about
+// itself, as distinct from what the restore resolved for it.
+//
+// restore.projectPath is read upstream only to locate a .csproj for the dotnet
+// CLI, which this resolver never runs, so it is omitted for the same reason
+// `libraries` and `packageFolders` are.
 type assetsProject struct {
 	Version    string                             `json:"version"`
+	Restore    assetsProjectRestore               `json:"restore"`
 	Frameworks orderedMap[assetsProjectFramework] `json:"frameworks"`
+}
+
+// assetsProjectRestore is the restore metadata NuGet records for the project.
+// Only the project name is read, and only --assets-project-name reports it.
+type assetsProjectRestore struct {
+	ProjectName string `json:"projectName"`
 }
 
 type assetsProjectFramework struct {
@@ -366,6 +376,28 @@ func anyPrefixMatch(key string, names []string) bool {
 	}
 
 	return false
+}
+
+// selectTargetFramework picks the project's framework the user asked for,
+// reporting false when the project declares none like it.
+//
+// Compared case-insensitively, because a moniker is user input here rather than
+// a filesystem name - a --dotnet-target-framework=NET8.0 names the same
+// framework as the net8.0 the project declared. The declared spelling is what
+// comes back: the target runtime is part of a project's identity, so it stays a
+// property of the project and not of the command line.
+//
+// Exact, never a prefix: matchTargetsKey reconciles a moniker with a `targets`
+// key because both come from the manifest, whereas accepting "net8" for
+// "net8.0" here would silently swallow a typo and report a graph under it.
+func selectTargetFramework(frameworks []string, requested string) (string, bool) {
+	for _, framework := range frameworks {
+		if strings.EqualFold(framework, requested) {
+			return framework, true
+		}
+	}
+
+	return "", false
 }
 
 // directDependencies extracts the direct dependency names for a framework from

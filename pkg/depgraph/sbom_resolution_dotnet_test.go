@@ -1,6 +1,7 @@
 package depgraph
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -111,7 +112,10 @@ func writePackagesConfig(t *testing.T, dir, content string) {
 // each kind of project.
 func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 	// run drives the flow with the plugin list production would assemble.
-	run := func(t *testing.T, inputDir string, dotnetEnabled, allProjects bool, legacyTargets []string) ([]gafworkflow.Data, *LegacyHarness) {
+	run := func(
+		t *testing.T, inputDir string, dotnetEnabled, allProjects bool, legacyTargets []string,
+		configure ...func(configuration.Configuration),
+	) ([]gafworkflow.Data, *LegacyHarness) {
 		t.Helper()
 
 		tc := setupTestContext(t, true)
@@ -122,6 +126,9 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 		tc.config.Set(workflow.FlagAllProjects, allProjects)
 		if dotnetEnabled {
 			tc.config.Set(orchestrator.FlagDotnetResolver.Key, true)
+		}
+		for _, apply := range configure {
+			apply(tc.config)
 		}
 
 		plugins := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
@@ -299,4 +306,224 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 		require.Len(t, workflowData, 1, "and its result is the only one")
 		assert.Empty(t, harness.CapturedExcludePaths(), "nothing was claimed from under it")
 	})
+
+	// The flag has to survive buildPluginOptions and reach the plugin; a unit
+	// test on the options alone would not catch it being dropped in between.
+	t.Run("flag on: --dotnet-target-framework narrows a multi-targeting project", func(t *testing.T) {
+		workflowData, _ := run(t, multiTargetProject(t), true, true, nil,
+			func(config configuration.Configuration) {
+				config.Set(workflow.FlagDotnetTargetFramework, "net8.0")
+			})
+
+		require.Len(t, workflowData, 1, "only the requested framework is reported")
+		assert.Equal(t, "net8.0", metaString(t, workflowData[0], workflow.MetaKeyTargetRuntime))
+	})
+
+	// A solution routinely mixes frameworks. The project that has the requested
+	// one resolves; the project that does not is left out, and both stay claimed
+	// so the legacy resolver cannot answer for either.
+	t.Run("flag on: --dotnet-target-framework across projects that differ", func(t *testing.T) {
+		dir := t.TempDir()
+		writeAssetsProject(t, filepath.Join(dir, "Modern"), "net8.0")
+		writeAssetsProject(t, filepath.Join(dir, "Legacy"), "net6.0")
+
+		workflowData, harness := run(t, dir, true, true, nil,
+			func(config configuration.Configuration) {
+				config.Set(workflow.FlagDotnetTargetFramework, "net8.0")
+			})
+
+		require.Len(t, workflowData, 1, "only the project that declares net8.0 yields a graph")
+		assert.Equal(t, "net8.0", metaString(t, workflowData[0], workflow.MetaKeyTargetRuntime))
+
+		excluded := harness.CapturedExcludePaths()
+		assert.Contains(t, excluded, filepath.Join("Modern", "obj", "project.assets.json"))
+		assert.Contains(t, excluded, filepath.Join("Legacy", "obj", "project.assets.json"),
+			"the project that lacks the framework is claimed too, so the exclude set does not depend on the flag")
+	})
+
+	// The mixed-solution case: the filter must reach packages.config too, or a
+	// project targeting a framework the user filtered out is still reported.
+	t.Run("flag on: --dotnet-target-framework reaches a packages.config project", func(t *testing.T) {
+		dir := t.TempDir()
+		writeAssetsProject(t, filepath.Join(dir, "Modern"), "net8.0")
+		writePackagesConfig(t, dir, `<packages>
+          <package id="Newtonsoft.Json" version="10.0.3" targetFramework="net45" />
+        </packages>`)
+
+		workflowData, harness := run(t, dir, true, true, nil,
+			func(config configuration.Configuration) {
+				config.Set(workflow.FlagDotnetTargetFramework, "net8.0")
+			})
+
+		require.Len(t, workflowData, 1, "the net45 project is not reported")
+		assert.Equal(t, "net8.0", metaString(t, workflowData[0], workflow.MetaKeyTargetRuntime))
+
+		excluded := harness.CapturedExcludePaths()
+		assert.Contains(t, excluded, "packages.config",
+			"the project left out is still claimed, so legacy cannot report it either")
+	})
+
+	// Being out of scope is not a failure: a project targeting another framework
+	// must not surface as a warning or count toward the failed-projects tally.
+	t.Run("flag on: a project left out by the filter is not a warning", func(t *testing.T) {
+		dir := t.TempDir()
+		writeAssetsProject(t, filepath.Join(dir, "Modern"), "net8.0")
+		writeAssetsProject(t, filepath.Join(dir, "Legacy"), "net6.0")
+
+		tc := setupTestContext(t, true)
+		harness := NewLegacyHarness(tc)
+		tc.config.Set(configuration.INPUT_DIRECTORY, dir)
+		tc.config.Set(workflow.FlagAllProjects, true)
+		tc.config.Set(workflow.FlagFailFast, true)
+		tc.config.Set(orchestrator.FlagDotnetResolver.Key, true)
+		tc.config.Set(workflow.FlagDotnetTargetFramework, "net8.0")
+
+		plugins := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+
+		// --fail-fast aborts on any error result, so this passing at all is the
+		// assertion that the filter produces none.
+		workflowData, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, plugins)
+		require.NoError(t, err, "--fail-fast must not trip on a project that targets another framework")
+		require.Len(t, workflowData, 1)
+		assert.Equal(t, "net8.0", metaString(t, workflowData[0], workflow.MetaKeyTargetRuntime))
+		assert.Contains(t, harness.CapturedExcludePaths(), filepath.Join("Legacy", "obj", "project.assets.json"))
+	})
+
+	// Matching nothing anywhere is a mistake in the flag, and a scan that
+	// quietly tested no projects would hide it.
+	t.Run("flag on: a --dotnet-target-framework matching nothing is an error", func(t *testing.T) {
+		tc := setupTestContext(t, true)
+		NewLegacyHarness(tc)
+		tc.config.Set(configuration.INPUT_DIRECTORY, sdkStyleProject(t)) // net8.0 only
+		tc.config.Set(workflow.FlagAllProjects, false)
+		tc.config.Set(orchestrator.FlagDotnetResolver.Key, true)
+		tc.config.Set(workflow.FlagDotnetTargetFramework, "net9.0")
+
+		plugins := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+
+		_, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, plugins)
+		require.Error(t, err, "the user asked for a framework that exists nowhere in the scan")
+	})
+
+	t.Run("flag on: --assets-project-name renames the project", func(t *testing.T) {
+		dir := t.TempDir()
+		writeAssets(t, dir, `{
+          "version": 3,
+          "targets": { "net8.0": { "Newtonsoft.Json/13.0.3": { "type": "package" } } },
+          "projectFileDependencyGroups": { "net8.0": [ "Newtonsoft.Json >= 13.0.3" ] },
+          "project": {
+            "version": "1.0.0",
+            "restore": { "projectName": "NamedByRestore" },
+            "frameworks": { "net8.0": { "targetAlias": "net8.0" } }
+          }
+        }`)
+
+		workflowData, _ := run(t, dir, true, false, nil,
+			func(config configuration.Configuration) {
+				config.Set(workflow.FlagNugetAssetsProjectName, true)
+			})
+
+		require.Len(t, workflowData, 1)
+
+		payload, ok := workflowData[0].GetPayload().([]byte)
+		require.True(t, ok)
+		graph, err := dg.UnmarshalJSON(payload)
+		require.NoError(t, err)
+		assert.Equal(t, "NamedByRestore", graph.GetRootPkg().Info.Name)
+	})
+}
+
+func Test_buildPluginOptions_dotnetFlags(t *testing.T) {
+	t.Run("defaults leave every .NET option unset", func(t *testing.T) {
+		opts, err := buildPluginOptions(configuration.New())
+		require.NoError(t, err)
+
+		assert.Empty(t, opts.Dotnet.TargetFramework, "every declared framework is reported")
+		assert.False(t, opts.Dotnet.AssetsProjectName, "the directory-derived name is kept")
+		assert.Empty(t, opts.Dotnet.PackagesFolder, "the resolver derives the location")
+	})
+
+	t.Run("the .NET flags reach DotnetOptions", func(t *testing.T) {
+		config := configuration.New()
+		config.Set(workflow.FlagDotnetTargetFramework, "net8.0")
+		config.Set(workflow.FlagNugetAssetsProjectName, true)
+
+		opts, err := buildPluginOptions(config)
+		require.NoError(t, err)
+
+		assert.Equal(t, "net8.0", opts.Dotnet.TargetFramework)
+		assert.True(t, opts.Dotnet.AssetsProjectName)
+	})
+
+	// A moniker is not a path, so unlike --packages-folder it must survive
+	// verbatim — the resolver compares it against what each project declares.
+	t.Run("a target framework is forwarded verbatim", func(t *testing.T) {
+		config := configuration.New()
+		config.Set(workflow.FlagDotnetTargetFramework, "net7.0-windows")
+
+		opts, err := buildPluginOptions(config)
+		require.NoError(t, err)
+		assert.Equal(t, "net7.0-windows", opts.Dotnet.TargetFramework)
+	})
+
+	t.Run("a packages folder is made absolute", func(t *testing.T) {
+		config := configuration.New()
+		config.Set(workflow.FlagNugetPkgsFolder, "packages")
+
+		abs, err := filepath.Abs("packages")
+		require.NoError(t, err)
+
+		opts, err := buildPluginOptions(config)
+		require.NoError(t, err)
+		assert.Equal(t, abs, opts.Dotnet.PackagesFolder)
+	})
+}
+
+// multiTargetProject writes a restored project targeting both net6.0 and net8.0.
+func multiTargetProject(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	writeAssets(t, dir, `{
+      "version": 3,
+      "targets": {
+        "net6.0": { "Newtonsoft.Json/13.0.1": { "type": "package" } },
+        "net8.0": { "Newtonsoft.Json/13.0.3": { "type": "package" } }
+      },
+      "projectFileDependencyGroups": {
+        "net6.0": [ "Newtonsoft.Json >= 13.0.1" ],
+        "net8.0": [ "Newtonsoft.Json >= 13.0.1" ]
+      },
+      "project": {
+        "version": "1.0.0",
+        "frameworks": {
+          "net6.0": { "targetAlias": "net6.0" },
+          "net8.0": { "targetAlias": "net8.0" }
+        }
+      }
+    }`)
+
+	return dir
+}
+
+// writeAssetsProject writes a single-framework restored project under dir.
+func writeAssetsProject(t *testing.T, dir, framework string) {
+	t.Helper()
+
+	require.NoError(t, os.MkdirAll(dir, 0o750))
+	writeAssets(t, dir, fmt.Sprintf(`{
+      "version": 3,
+      "targets": { %[1]q: { "Newtonsoft.Json/13.0.3": { "type": "package" } } },
+      "projectFileDependencyGroups": { %[1]q: [ "Newtonsoft.Json >= 13.0.3" ] },
+      "project": { "version": "1.0.0", "frameworks": { %[1]q: { "targetAlias": %[1]q } } }
+    }`, framework))
+}
+
+// writeAssets writes an assets file at the obj/ path a restore produces.
+func writeAssets(t *testing.T, dir, content string) {
+	t.Helper()
+
+	path := filepath.Join(dir, "obj", "project.assets.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 }

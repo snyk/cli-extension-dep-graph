@@ -517,3 +517,72 @@ func TestIsFilteredPackage(t *testing.T) {
 		})
 	}
 }
+
+func TestSelectTargetFramework(t *testing.T) {
+	declared := []string{"net6.0", "net8.0", "net8.0-windows"}
+
+	tests := []struct {
+		name      string
+		requested string
+		expected  string
+		found     bool
+	}{
+		{name: "exact match", requested: "net8.0", expected: "net8.0", found: true},
+		{name: "first declared", requested: "net6.0", expected: "net6.0", found: true},
+		{
+			name:      "case is ignored, and the declared spelling comes back",
+			requested: "NET8.0",
+			expected:  "net8.0",
+			found:     true,
+		},
+		{
+			name:      "a platform suffix is a different framework, not a match for the base",
+			requested: "net8.0-windows",
+			expected:  "net8.0-windows",
+			found:     true,
+		},
+		{name: "not declared", requested: "net9.0", found: false},
+		{
+			name:      "a prefix is a typo rather than a match",
+			requested: "net8",
+			found:     false,
+		},
+		{name: "empty is never a match", requested: "", found: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			selected, ok := selectTargetFramework(declared, tt.requested)
+			assert.Equal(t, tt.found, ok)
+			assert.Equal(t, tt.expected, selected)
+		})
+	}
+}
+
+func TestSelectTargetFrameworkMatchesTheAliasNotTheKey(t *testing.T) {
+	// targetFrameworks() reports the alias, so that is the spelling a user has
+	// to name — the long key is NuGet's internal form and matchTargetsKey
+	// reaches it on its own once the framework is selected.
+	assets := assetsFrom(t, `{
+      "project": {
+        "frameworks": { "net7.0-windows7.0": { "targetAlias": "net7.0-windows" } }
+      }
+    }`)
+
+	selected, ok := selectTargetFramework(assets.targetFrameworks(), "net7.0-windows")
+	assert.True(t, ok)
+	assert.Equal(t, "net7.0-windows", selected)
+
+	_, ok = selectTargetFramework(assets.targetFrameworks(), "net7.0-windows7.0")
+	assert.False(t, ok, "the long targets-key spelling is not what the project declares")
+}
+
+func TestProjectAssets_RestoreProjectName(t *testing.T) {
+	assets := assetsFrom(t, singleTargetAssets)
+	assert.Equal(t, "FromAssetsFile", assets.Project.Restore.ProjectName)
+
+	// A restore that recorded no name is ordinary; --assets-project-name
+	// degrades to the derived name rather than failing.
+	assets = assetsFrom(t, multiTargetAssets)
+	assert.Empty(t, assets.Project.Restore.ProjectName)
+}

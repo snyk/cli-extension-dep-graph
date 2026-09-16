@@ -453,3 +453,50 @@ func TestWithPackagesFolder(t *testing.T) {
 
 	assert.Equal(t, "/elsewhere", opts.WithPackagesFolder("/elsewhere").Dotnet.PackagesFolder)
 }
+
+func TestNewPluginOptionsFromRawFlags_DotnetTargetFramework(t *testing.T) {
+	tests := []struct {
+		name     string
+		rawFlags []string
+	}{
+		{name: "space separated", rawFlags: []string{"--dotnet-target-framework", "net8.0"}},
+		{name: "equals syntax", rawFlags: []string{"--dotnet-target-framework=net8.0"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts, err := NewPluginOptionsFromRawFlags(tt.rawFlags)
+			assert.NoError(t, err)
+			assert.Equal(t, "net8.0", opts.Dotnet.TargetFramework)
+		})
+	}
+}
+
+func TestNewPluginOptionsFromRawFlags_DotnetTargetFrameworkDefault(t *testing.T) {
+	opts, err := NewPluginOptionsFromRawFlags([]string{})
+	assert.NoError(t, err)
+	assert.Empty(t, opts.Dotnet.TargetFramework, "every declared target framework is reported when this is unset")
+}
+
+func TestWithDotnetTargetFramework(t *testing.T) {
+	opts := NewPluginOptions()
+	assert.Empty(t, opts.Dotnet.TargetFramework)
+	assert.Equal(t, "net8.0", opts.WithDotnetTargetFramework("net8.0").Dotnet.TargetFramework)
+}
+
+func TestNewPluginOptionsFromRawFlags_AssetsProjectName(t *testing.T) {
+	opts, err := NewPluginOptionsFromRawFlags([]string{"--assets-project-name"})
+	assert.NoError(t, err)
+	assert.True(t, opts.Dotnet.AssetsProjectName)
+
+	opts, err = NewPluginOptionsFromRawFlags([]string{})
+	assert.NoError(t, err)
+	assert.False(t, opts.Dotnet.AssetsProjectName, "the directory-derived name is kept when this is unset")
+}
+
+func TestWithAssetsProjectName(t *testing.T) {
+	opts := NewPluginOptions()
+	assert.False(t, opts.Dotnet.AssetsProjectName)
+	assert.True(t, opts.WithAssetsProjectName(true).Dotnet.AssetsProjectName)
+	assert.False(t, opts.WithAssetsProjectName(false).Dotnet.AssetsProjectName)
+}
