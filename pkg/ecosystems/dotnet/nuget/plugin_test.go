@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -1022,4 +1023,264 @@ func TestPlugin_OtherEcosystemsAreNotLoggedAsErrors(t *testing.T) {
 	assert.Empty(t, results, "they still reach the legacy resolver")
 	assert.Empty(t, log.errs)
 	assert.NotEmpty(t, log.debug, "and the reason is still recorded")
+}
+
+func TestPlugin_TargetFrameworkSelectsOneOfMany(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, projectAssetsFile, multiTargetAssets)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithDotnetTargetFramework("net8.0"))
+	require.NoError(t, err)
+	require.Len(t, results, 1, "only the requested framework is reported")
+
+	result := results[0]
+	require.NoError(t, result.Error)
+	require.NotNil(t, result.ProjectDescriptor.Identity.TargetRuntime)
+	assert.Equal(t, "net8.0", *result.ProjectDescriptor.Identity.TargetRuntime)
+	assert.Contains(t, pkgIDs(result.DepGraph.Pkgs), "Newtonsoft.Json@13.0.3",
+		"the packages come from the requested framework, not its sibling")
+	assert.Equal(t, []string{projectAssetsFile}, result.ProcessedFiles,
+		"the file is still claimed, so the exclude set does not depend on the flag")
+}
+
+func TestPlugin_TargetFrameworkIsMatchedIgnoringCase(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, projectAssetsFile, multiTargetAssets)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithDotnetTargetFramework("NET8.0"))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	require.NotNil(t, results[0].ProjectDescriptor.Identity.TargetRuntime)
+	assert.Equal(t, "net8.0", *results[0].ProjectDescriptor.Identity.TargetRuntime,
+		"the runtime is the framework the project declared, not the spelling on the command line")
+}
+
+// A moniker read from a CI variable routinely arrives with a trailing newline.
+// Without trimming it matches nothing, and the scan fails with a message whose
+// requested and declared monikers look identical.
+func TestPlugin_TargetFrameworkIgnoresSurroundingWhitespace(t *testing.T) {
+	for _, requested := range []string{" net8.0", "net8.0 ", "\tnet8.0\n"} {
+		t.Run(strconv.Quote(requested), func(t *testing.T) {
+			dir := t.TempDir()
+			write(t, dir, projectAssetsFile, multiTargetAssets)
+
+			results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+				ecosystems.NewPluginOptions().WithDotnetTargetFramework(requested))
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+
+			require.NoError(t, results[0].Error)
+			require.NotNil(t, results[0].ProjectDescriptor.Identity.TargetRuntime)
+			assert.Equal(t, "net8.0", *results[0].ProjectDescriptor.Identity.TargetRuntime)
+		})
+	}
+}
+
+// Whitespace alone is no request at all, so it must not filter everything out
+// and fail the scan.
+func TestPlugin_TargetFrameworkOfWhitespaceIsNoRequest(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, projectAssetsFile, multiTargetAssets)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithDotnetTargetFramework("   "))
+	require.NoError(t, err)
+
+	assert.Empty(t, errorResults(results))
+	assert.Equal(t, []string{"net6.0", "net8.0"}, runtimes(t, results),
+		"every declared framework is reported, as if the flag were absent")
+}
+
+// TestPlugin_TargetFrameworkNotDeclaredIsReported encodes the design decision
+// behind the filter: the framework is selected from what the manifest declares
+// and never substituted into matchTargetsKey, whose single-key fallback would
+// otherwise report this project's net6.0 packages under net9.0.
+//
+// The project itself is claimed and reports nothing — targeting something else
+// is not a failure of that project — and because the filter then matched
+// nothing at all, one scan-level error says so.
+func TestPlugin_TargetFrameworkNotDeclaredIsReported(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, projectAssetsFile, multiTargetAssets)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithDotnetTargetFramework("net9.0"))
+	require.NoError(t, err)
+
+	for _, result := range results {
+		assert.Nil(t, result.DepGraph, "no graph is reported for a framework the project does not have")
+		assert.Equal(t, []string{projectAssetsFile}, result.ProcessedFiles,
+			"the file is claimed either way, so the exclude set does not depend on the flag")
+	}
+
+	problems := errorResults(results)
+	require.Len(t, problems, 1, "one scan-level error, not one per project")
+
+	detail := detailOf(t, problems[0].Error)
+	assert.Contains(t, detail, "net9.0")
+	assert.Contains(t, detail, "net6.0", "the frameworks the scan found are named, so the flag can be corrected")
+	assert.Contains(t, detail, "net8.0")
+}
+
+// The filter reaches packages.config and project.json too. They resolve one
+// dependency set rather than one per framework, but they still have exactly one
+// framework, so a project targeting something else must not be reported.
+func TestPlugin_TargetFrameworkReachesPackagesConfig(t *testing.T) {
+	dir := writeFiles(t, packagesConfigFile) // net45
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithDotnetTargetFramework("net8.0"))
+	require.NoError(t, err)
+
+	for _, result := range results {
+		assert.Nil(t, result.DepGraph, "a net45 project is not reported when net8.0 was asked for")
+	}
+	require.Len(t, errorResults(results), 1)
+	assert.Contains(t, detailOf(t, errorResults(results)[0].Error), "net45",
+		"the framework the project does declare is named")
+}
+
+func TestPlugin_TargetFrameworkKeepsAMatchingPackagesConfig(t *testing.T) {
+	dir := writeFiles(t, packagesConfigFile) // net45
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithDotnetTargetFramework("net45"))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	require.NoError(t, results[0].Error)
+	require.NotNil(t, results[0].DepGraph)
+	require.NotNil(t, results[0].ProjectDescriptor.Identity.TargetRuntime)
+	assert.Equal(t, "net45", *results[0].ProjectDescriptor.Identity.TargetRuntime)
+}
+
+// The claim a filtered-out project makes has to be the same one it would have
+// made had it resolved. A claim only excludes the path it names, and an
+// SDK-style project is reported under its .csproj — so claiming just the assets
+// file under obj/ would let the legacy resolver report a project this scan
+// deliberately left out, which is the whole point of claiming it.
+func TestPlugin_TargetFrameworkClaimsTheProjectFileOfAProjectItLeavesOut(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, filepath.Join(objDir, projectAssetsFile), multiTargetAssets) // net6.0, net8.0
+	write(t, dir, "App.csproj", csprojNet45)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithDotnetTargetFramework("net9.0"))
+	require.NoError(t, err)
+
+	claimed := make([]string, 0, len(results))
+	for _, result := range results {
+		claimed = append(claimed, result.ProcessedFiles...)
+	}
+
+	assert.Contains(t, claimed, "App.csproj",
+		"the .csproj is what an SDK-style project is reported under, so it is what has to be excluded")
+	assert.Contains(t, claimed, filepath.Join(objDir, projectAssetsFile))
+}
+
+// The case that makes the filter usable on a real solution: the projects that
+// target something else are claimed and left out silently. Reporting each of
+// them as an error would turn a 50-project solution into 40 warnings and a
+// "40/50 projects failed" tally for a scan that did exactly what was asked.
+func TestPlugin_TargetFrameworkLeavesOutNonMatchingProjectsQuietly(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, filepath.Join("Modern", projectAssetsFile), singleTargetAssets) // net8.0
+	write(t, dir, filepath.Join("Legacy", projectAssetsFile), multiTargetAssets)  // net6.0, net8.0
+	write(t, dir, filepath.Join("Old", packagesConfigFile), packagesConfigManifest)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithAllProjects(true).WithDotnetTargetFramework("net8.0"))
+	require.NoError(t, err)
+
+	assert.Empty(t, errorResults(results), "targeting another framework is not a failure")
+
+	claimed := make([]string, 0, len(results))
+	graphs := 0
+	for _, result := range results {
+		claimed = append(claimed, result.ProcessedFiles...)
+		if result.DepGraph != nil {
+			graphs++
+			require.NotNil(t, result.ProjectDescriptor.Identity.TargetRuntime)
+			assert.Equal(t, "net8.0", *result.ProjectDescriptor.Identity.TargetRuntime)
+		}
+	}
+
+	assert.Equal(t, 2, graphs, "both net8.0 projects resolve; the net45 one does not")
+	assert.Contains(t, claimed, filepath.Join("Old", packagesConfigFile),
+		"the project left out is still claimed, so legacy cannot report it either")
+}
+
+// errorResults picks out the results carrying an error.
+func errorResults(results []ecosystems.SCAResult) []ecosystems.SCAResult {
+	var problems []ecosystems.SCAResult
+	for _, result := range results {
+		if result.Error != nil {
+			problems = append(problems, result)
+		}
+	}
+
+	return problems
+}
+
+func TestPlugin_AssetsProjectNameUsesTheRestoreName(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, projectAssetsFile, singleTargetAssets)
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, filepath.Base(dir), results[0].ProjectDescriptor.Identity.RootComponentName,
+		"the derived name is kept while the flag is off, even though the restore recorded one")
+
+	results, err = scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithAssetsProjectName(true))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	result := results[0]
+	assert.Equal(t, "FromAssetsFile", result.ProjectDescriptor.Identity.RootComponentName)
+	assert.Equal(t, "FromAssetsFile", result.DepGraph.GetRootPkg().Info.Name,
+		"the graph root is renamed too — the identity and the graph must agree")
+}
+
+func TestPlugin_AssetsProjectNameFallsBackWhenTheRestoreNamedNothing(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, projectAssetsFile, multiTargetAssets)
+
+	log := &recordingLogger{}
+	results, err := scatest.Run(context.Background(), Plugin{}, log, dir,
+		ecosystems.NewPluginOptions().WithAssetsProjectName(true))
+	require.NoError(t, err)
+	require.NotEmpty(t, results)
+
+	assert.Equal(t, filepath.Base(dir), results[0].ProjectDescriptor.Identity.RootComponentName)
+	assert.Contains(t, strings.Join(log.debug, "\n"), "restore recorded no project name",
+		"the fallback is logged, so the flag does not look like it did nothing")
+}
+
+func TestPlugin_AssetsProjectNameDoesNotChangeAProjectJSONName(t *testing.T) {
+	// project.json's own name override ports project-json-parser.ts, which is
+	// flag-free upstream. Coupling it to --assets-project-name would be a silent
+	// regression for every project.json scan.
+	const named = `{"dependencies": {"Newtonsoft.Json": "8.0.3"},
+      "project": { "restore": { "projectName": "FromProjectJSON" } }}`
+
+	for _, assetsProjectName := range []bool{false, true} {
+		dir := t.TempDir()
+		write(t, dir, projectJSONFile, named)
+		write(t, dir, "app.csproj", csprojNet45)
+
+		// project.json is reachable only through --all-projects or --file: the
+		// CLI lists it in AUTO_DETECTABLE_FILES but not DETECTABLE_FILES.
+		results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+			ecosystems.NewPluginOptions().WithAllProjects(true).WithAssetsProjectName(assetsProjectName))
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, "FromProjectJSON", results[0].ProjectDescriptor.Identity.RootComponentName,
+			"--assets-project-name=%t must not change a project.json name", assetsProjectName)
+	}
 }

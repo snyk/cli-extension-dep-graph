@@ -212,7 +212,8 @@ func buildPluginOptions(config configuration.Configuration) (*ecosystems.SCAPlug
 		WithExclude(parseExcludeFlag(config.GetString(workflow.FlagExclude))).
 		WithExcludePaths(parseExcludeFlag(config.GetString(workflow.FlagExcludePaths))).
 		WithFailFast(config.GetBool(workflow.FlagFailFast)).
-		WithForceSingleGraph(config.GetBool(workflow.FlagForceSingleGraph))
+		WithForceSingleGraph(config.GetBool(workflow.FlagForceSingleGraph)).
+		WithAssetsProjectName(config.GetBool(workflow.FlagNugetAssetsProjectName))
 
 	if targetFile := config.GetString(workflow.FlagFile); targetFile != "" {
 		opts = opts.WithTargetFile(targetFile)
@@ -231,6 +232,13 @@ func buildPluginOptions(config configuration.Configuration) (*ecosystems.SCAPlug
 			packagesFolder = abs
 		}
 		opts = opts.WithPackagesFolder(packagesFolder)
+	}
+
+	// A target framework moniker, not a path: unlike --packages-folder there is
+	// nothing to resolve, and the resolver compares it against the frameworks
+	// each project declares.
+	if targetFramework := config.GetString(workflow.FlagDotnetTargetFramework); targetFramework != "" {
+		opts = opts.WithDotnetTargetFramework(targetFramework)
 	}
 
 	return opts, nil
@@ -390,6 +398,13 @@ func processResultsIndividually(logger *zerolog.Logger, results []ecosystems.SCA
 				return nil, problemResults, result.Error
 			}
 
+			continue
+		}
+
+		// A result with neither a graph nor an error claims its files and
+		// reports nothing — a project the plugin recognized and left out of
+		// scope. Marshaling it would emit a `null` dep graph.
+		if result.DepGraph == nil {
 			continue
 		}
 
