@@ -80,6 +80,23 @@ const assetsLogLevelError = "Error"
 // a `type: "project"` entry becomes an ordinary node.
 type assetsTargetEntry struct {
 	Dependencies orderedMap[string] `json:"dependencies"`
+
+	// Build, Compile and Runtime are decoded for presence alone — which kinds
+	// of asset the package contributes, never what they are. See buildOnly.
+	Build   json.RawMessage `json:"build"`
+	Compile json.RawMessage `json:"compile"`
+	Runtime json.RawMessage `json:"runtime"`
+}
+
+// buildOnly reports whether the package contributes MSBuild logic and nothing
+// the project compiles against or runs.
+//
+// A section counts as present even when its only entry is NuGet's `_._` empty
+// placeholder. NETStandard.Library resolves exactly that way — compile and
+// runtime hold `lib/netstandard1.0/_._` and nothing else — and it is a package
+// to report, so reading the placeholder as "no assets" would drop it.
+func (e *assetsTargetEntry) buildOnly() bool {
+	return len(e.Build) > 0 && len(e.Compile) == 0 && len(e.Runtime) == 0
 }
 
 // assetsProject is the `project` section: what the project declares about
@@ -105,6 +122,18 @@ type assetsProjectFramework struct {
 	// where the framework key itself is a longer one ("net7.0-windows7.0"). It
 	// is not always present.
 	TargetAlias string `json:"targetAlias"`
+
+	// Dependencies is the project's own reference list, and the only place the
+	// file records who wrote a reference. Keyed by declared name, which NuGet
+	// treats case-insensitively.
+	Dependencies map[string]assetsProjectDependency `json:"dependencies"`
+}
+
+// assetsProjectDependency is one of the project's references. Only the flag
+// marking a reference the SDK added is read: the version range beside it is a
+// minimum constraint, and the resolved version comes from `targets`.
+type assetsProjectDependency struct {
+	AutoReferenced bool `json:"autoReferenced"`
 }
 
 // UnmarshalJSON decodes the assets file, recording whether `project` was present
@@ -401,8 +430,10 @@ func selectTargetFramework(frameworks []string, requested string) (string, bool)
 }
 
 // directDependencies extracts the direct dependency names for a framework from
-// projectFileDependencyGroups. Entries look like "Newtonsoft.Json >= 13.0.3";
-// the constraint is ignored, since the resolved version comes from `targets`.
+// projectFileDependencyGroups, less the build tooling the SDK injected (see
+// sdkInjected).
+// Entries look like "Newtonsoft.Json >= 13.0.3"; the constraint is ignored,
+// since the resolved version comes from `targets`.
 //
 // Upstream indexes this map unguarded and throws when the key is missing, taking
 // down the scan. Degrade instead: use the sole group where there is one, and
@@ -418,6 +449,7 @@ func (a *projectAssets) directDependencies(targetsKey string) []string {
 
 	names := make([]string, 0, len(entries))
 	seen := make(map[string]struct{}, len(entries))
+	injected := a.sdkInjected(targetsKey)
 
 	for _, entry := range entries {
 		fields := strings.Fields(entry)
@@ -432,11 +464,98 @@ func (a *projectAssets) directDependencies(targetsKey string) []string {
 			continue
 		}
 
+		if _, sdkAdded := injected[strings.ToLower(name)]; sdkAdded {
+			continue
+		}
+
 		seen[name] = struct{}{}
 		names = append(names, name)
 	}
 
 	return names
+}
+
+// sdkInjected returns the lowercased names of the build tooling the SDK added
+// to the framework reported under targetsKey. Two things have to hold: NuGet
+// flagged the reference `autoReferenced`, and the package it resolved to is
+// nothing but MSBuild logic.
+//
+// The pair the SDK injects for PublishAot and PublishTrimmed —
+// Microsoft.DotNet.ILCompiler and Microsoft.NET.ILLink.Tasks — takes its
+// version from whichever SDK ran the restore, so reporting them as the
+// project's own dependencies moves the graph when the restoring SDK changes and
+// the project did not. Neither resolves to anything the application compiles
+// against or ships.
+//
+// The flag alone is too broad: NETStandard.Library and
+// Microsoft.NETFramework.ReferenceAssemblies carry it too, and both stay in the
+// graph. Their versions are fixed by the target framework rather than by the
+// SDK, and the first of them does deliver assemblies.
+//
+// snyk-nuget-plugin reports every one of these, so this is a divergence from
+// it, and a deliberate one rather than a port defect.
+func (a *projectAssets) sdkInjected(targetsKey string) map[string]struct{} {
+	autoReferenced := a.autoReferencedNames(targetsKey)
+	if len(autoReferenced) == 0 {
+		return nil
+	}
+
+	// A reference the restore did not resolve has no package to judge, so it is
+	// reported rather than dropped.
+	target, ok := a.Targets.Get(targetsKey)
+	if !ok {
+		return nil
+	}
+
+	injected := make(map[string]struct{}, len(autoReferenced))
+
+	for _, key := range target.Keys() {
+		name, _, found := strings.Cut(key, "/")
+		if !found {
+			continue
+		}
+
+		lowered := strings.ToLower(name)
+		if _, added := autoReferenced[lowered]; !added {
+			continue
+		}
+
+		if entry, _ := target.Get(key); entry.buildOnly() {
+			injected[lowered] = struct{}{}
+		}
+	}
+
+	return injected
+}
+
+// autoReferencedNames returns the lowercased names of the references NuGet
+// recorded as the SDK's rather than the developer's, for the framework reported
+// under targetsKey.
+//
+// project.frameworks is keyed by the moniker the project declared, which is not
+// the `targets` key before net5.0, so each framework is mapped forwards to find
+// the one describing targetsKey. The first match wins, which only matters for a
+// project whose frameworks all resolve to a single `targets` key — there they
+// already share a package set.
+func (a *projectAssets) autoReferencedNames(targetsKey string) map[string]struct{} {
+	for _, key := range a.Project.Frameworks.Keys() {
+		if a.matchTargetsKey(key) != targetsKey {
+			continue
+		}
+
+		framework, _ := a.Project.Frameworks.Get(key)
+		names := make(map[string]struct{}, len(framework.Dependencies))
+
+		for name, dependency := range framework.Dependencies {
+			if dependency.AutoReferenced {
+				names[strings.ToLower(name)] = struct{}{}
+			}
+		}
+
+		return names
+	}
+
+	return nil
 }
 
 // soleDependencyGroup returns the only dependency group, when there is exactly

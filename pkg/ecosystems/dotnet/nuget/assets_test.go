@@ -428,6 +428,161 @@ func TestProjectAssets_DirectDependencies(t *testing.T) {
 	})
 }
 
+// The SDK writes references of its own into a project, and
+// projectFileDependencyGroups lists them next to the ones the developer wrote.
+// `autoReferenced` in the project section marks them, and the `targets` entry
+// says whether the package is only MSBuild logic. Every shape here is from real
+// `dotnet restore` output on SDK 8.0.409.
+func TestProjectAssets_DirectDependenciesExcludeSDKBuildTooling(t *testing.T) {
+	// PublishAot on a net8.0 project injects the two compiler packs, each of
+	// which resolves to a single .props file and nothing else.
+	t.Run("an injected build-only pack is dropped", func(t *testing.T) {
+		assets := assetsFrom(t, `{
+          "targets": { "net8.0": {
+            "Microsoft.DotNet.ILCompiler/8.0.16": {
+              "type": "package",
+              "build": { "build/Microsoft.DotNet.ILCompiler.props": {} }
+            },
+            "Newtonsoft.Json/13.0.3": {
+              "type": "package",
+              "compile": { "lib/net6.0/Newtonsoft.Json.dll": {} },
+              "runtime": { "lib/net6.0/Newtonsoft.Json.dll": {} }
+            }
+          } },
+          "projectFileDependencyGroups": {
+            "net8.0": [ "Microsoft.DotNet.ILCompiler >= 8.0.16", "Newtonsoft.Json >= 13.0.3" ]
+          },
+          "project": { "frameworks": { "net8.0": { "dependencies": {
+            "Microsoft.DotNet.ILCompiler": { "suppressParent": "All", "version": "[8.0.16, )", "autoReferenced": true },
+            "Newtonsoft.Json": { "version": "[13.0.3, )" }
+          } } } }
+        }`)
+
+		assert.Equal(t, []string{"Newtonsoft.Json"}, assets.directDependencies("net8.0"))
+	})
+
+	// The flag describes the reference, not the package: someone who declares
+	// the pack themselves still gets it reported.
+	t.Run("the same pack declared by the project is kept", func(t *testing.T) {
+		assets := assetsFrom(t, `{
+          "targets": { "net8.0": {
+            "Microsoft.DotNet.ILCompiler/8.0.16": {
+              "type": "package",
+              "build": { "build/Microsoft.DotNet.ILCompiler.props": {} }
+            }
+          } },
+          "projectFileDependencyGroups": {
+            "net8.0": [ "Microsoft.DotNet.ILCompiler >= 8.0.16" ]
+          },
+          "project": { "frameworks": { "net8.0": { "dependencies": {
+            "Microsoft.DotNet.ILCompiler": { "version": "[8.0.16, )" }
+          } } } }
+        }`)
+
+		assert.Equal(t, []string{"Microsoft.DotNet.ILCompiler"}, assets.directDependencies("net8.0"))
+	})
+
+	// NuGet names are case-insensitive and the assets file is inconsistent
+	// between its own sections.
+	t.Run("names are matched without regard to case", func(t *testing.T) {
+		assets := assetsFrom(t, `{
+          "targets": { "net8.0": {
+            "Microsoft.NET.ILLink.Tasks/8.0.16": {
+              "type": "package",
+              "build": { "build/Microsoft.NET.ILLink.Tasks.props": {} }
+            },
+            "Humanizer/2.14.1": { "type": "package", "compile": { "lib/net6.0/Humanizer.dll": {} } }
+          } },
+          "projectFileDependencyGroups": {
+            "net8.0": [ "microsoft.net.illink.tasks >= 8.0.16", "Humanizer >= 2.14.1" ]
+          },
+          "project": { "frameworks": { "net8.0": { "dependencies": {
+            "Microsoft.NET.ILLink.Tasks": { "autoReferenced": true },
+            "Humanizer": {}
+          } } } }
+        }`)
+
+		assert.Equal(t, []string{"Humanizer"}, assets.directDependencies("net8.0"))
+	})
+
+	// NETStandard.Library, which every netstandard2.x project gets injected, is
+	// the case that decides how the `_._` placeholder is read: its compile and
+	// runtime sections hold nothing else. Treating a lone placeholder as "no
+	// assets" would drop the package, so presence of the section is what counts.
+	//
+	// project.frameworks is also keyed by the moniker the project declared,
+	// which before net5.0 is not the `targets` key, so this exercises that
+	// mapping too.
+	t.Run("an injected package with compile assets is kept", func(t *testing.T) {
+		assets := assetsFrom(t, `{
+          "targets": { ".NETStandard,Version=v2.0": {
+            "NETStandard.Library/2.0.3": {
+              "type": "package",
+              "dependencies": { "Microsoft.NETCore.Platforms": "1.1.0" },
+              "compile": { "lib/netstandard1.0/_._": {} },
+              "runtime": { "lib/netstandard1.0/_._": {} },
+              "build": { "build/netstandard2.0/NETStandard.Library.targets": {} }
+            }
+          } },
+          "projectFileDependencyGroups": {
+            ".NETStandard,Version=v2.0": [ "NETStandard.Library >= 2.0.3" ]
+          },
+          "project": { "frameworks": { "netstandard2.0": { "dependencies": {
+            "NETStandard.Library": { "suppressParent": "All", "version": "[2.0.3, )", "autoReferenced": true }
+          } } } }
+        }`)
+
+		assert.Equal(t, []string{"NETStandard.Library"}, assets.directDependencies(".NETStandard,Version=v2.0"))
+	})
+
+	// The pack a net4x project gets injected carries no assets of its own at
+	// all — it is a shim over a per-framework package — so the build-only test
+	// does not catch it.
+	t.Run("an injected package with no build assets is kept", func(t *testing.T) {
+		assets := assetsFrom(t, `{
+          "targets": { ".NETFramework,Version=v4.7.2": {
+            "Microsoft.NETFramework.ReferenceAssemblies/1.0.3": {
+              "type": "package",
+              "dependencies": { "Microsoft.NETFramework.ReferenceAssemblies.net472": "1.0.3" }
+            }
+          } },
+          "projectFileDependencyGroups": {
+            ".NETFramework,Version=v4.7.2": [ "Microsoft.NETFramework.ReferenceAssemblies >= 1.0.3" ]
+          },
+          "project": { "frameworks": { "net472": { "dependencies": {
+            "Microsoft.NETFramework.ReferenceAssemblies": { "suppressParent": "All", "version": "[1.0.3, )", "autoReferenced": true }
+          } } } }
+        }`)
+
+		assert.Equal(t, []string{"Microsoft.NETFramework.ReferenceAssemblies"},
+			assets.directDependencies(".NETFramework,Version=v4.7.2"))
+	})
+
+	// Nothing resolved means nothing to judge the package by, and a reference
+	// the restore did not resolve is not the place to start dropping entries.
+	t.Run("an injected package absent from targets is kept", func(t *testing.T) {
+		assets := assetsFrom(t, `{
+          "targets": { "net8.0": {} },
+          "projectFileDependencyGroups": { "net8.0": [ "Microsoft.DotNet.ILCompiler >= 8.0.16" ] },
+          "project": { "frameworks": { "net8.0": { "dependencies": {
+            "Microsoft.DotNet.ILCompiler": { "autoReferenced": true }
+          } } } }
+        }`)
+
+		assert.Equal(t, []string{"Microsoft.DotNet.ILCompiler"}, assets.directDependencies("net8.0"))
+	})
+
+	t.Run("a project section without dependencies drops nothing", func(t *testing.T) {
+		assets := assetsFrom(t, `{
+          "targets": { "net8.0": {} },
+          "projectFileDependencyGroups": { "net8.0": [ "Humanizer >= 2.14.1" ] },
+          "project": { "frameworks": { "net8.0": {} } }
+        }`)
+
+		assert.Equal(t, []string{"Humanizer"}, assets.directDependencies("net8.0"))
+	})
+}
+
 func TestResolvePackages(t *testing.T) {
 	assets := assetsFrom(t, `{
       "targets": {
