@@ -199,12 +199,39 @@ def resolveConfiguration(config, includeProvenance = false) {
     ]
 }
 
-// ── Recursive tree walk ─────────────────────────────────────────────
+// ── Iterative tree walk ─────────────────────────────────────────────
 
+// Walks the resolution result with an explicit work stack rather than by
+// recursion. This recursed once per dependency edge until CMPA-770, and Groovy
+// closure dispatch burns enough real JVM stack per level that a few hundred
+// chained modules overflow the thread stack whatever the heap is set to — deep
+// multi-module builds failed with a StackOverflowError that no customer-side
+// memory setting could fix.
+//
+// Frame order reproduces the recursive traversal exactly, which matters:
+// `processed` is a strict visited set, so which parent a component is expanded
+// under depends on the order it is first reached. Each dependency edge is
+// therefore its own frame, classified when it is popped rather than when its
+// parent is expanded, and frames are pushed in reverse so they pop in the
+// order `component.dependencies` yields them.
 def walkDependencies(component, Set<String> processed, Set<String> ancestry, Set<String> resolvedNames = new HashSet<>()) {
-    def children = []
+    def rootChildren = []
+    Deque<Map> stack = new ArrayDeque<Map>()
+    pushDependencyFrames(stack, component, rootChildren)
 
-    component.dependencies.each { dep ->
+    while (!stack.isEmpty()) {
+        def frame = stack.pop()
+
+        // Marker frame: the subtree pushed alongside it has been fully walked,
+        // so this component is no longer on the ancestor chain.
+        if (frame.leaving != null) {
+            ancestry.remove(frame.leaving)
+            continue
+        }
+
+        def dep = frame.dep
+        def children = frame.children
+
         // Use duck typing rather than instanceof — Gradle API classes are not on the
         // classpath when the init script compiles, so instanceof causes a parse error.
         def selected = dep.hasProperty('selected') ? dep.selected : null
@@ -215,7 +242,7 @@ def walkDependencies(component, Set<String> processed, Set<String> ancestry, Set
             // Constraint edges originate from platform BOMs, dependency locking, and
             // explicit constraints {} blocks. They influence version selection but do
             // not represent real artifact dependencies. Emit them as leaves and do not
-            // recurse, mark the target as visited, or affect ancestry — otherwise a
+            // descend, mark the target as visited, or affect ancestry — otherwise a
             // real edge to the same component would be incorrectly reported as
             // pruned: visited. Property check guards against older Gradle versions
             // (pre-4.6) where DependencyResult.isConstraint() does not exist.
@@ -240,11 +267,15 @@ def walkDependencies(component, Set<String> processed, Set<String> ancestry, Set
             } else {
                 processed.add(id)
                 ancestry.add(id)
+                def grandChildren = []
                 children << [
                     id          : id,
-                    dependencies: walkDependencies(selected, processed, ancestry, resolvedNames),
+                    dependencies: grandChildren,
                 ]
-                ancestry.remove(id)
+                // Marker first so it pops after the whole subtree, mirroring the
+                // ancestry.remove(id) that used to follow the recursive call.
+                stack.push([leaving: id])
+                pushDependencyFrames(stack, selected, grandChildren)
             }
         } else if (dep.hasProperty('attempted')) {
             // UnresolvedDependencyResult: use attempted when available, fall back to requested.
@@ -252,10 +283,10 @@ def walkDependencies(component, Set<String> processed, Set<String> ancestry, Set
                 ? dep.attempted
                 : (dep.hasProperty('requested') ? dep.requested : null)
             // Skip project deps and other non-Maven selectors that have no GAV coordinate.
-            if (selector == null || !selector.hasProperty('group') || !selector.hasProperty('module')) return
+            if (selector == null || !selector.hasProperty('group') || !selector.hasProperty('module')) continue
             // Skip lock-rejected requests — the module resolved fine at the locked version.
             def selectorName = "${selector.group}:${selector.module}".toString()
-            if (resolvedNames.contains(selectorName)) return
+            if (resolvedNames.contains(selectorName)) continue
             def vc = selector.hasProperty('versionConstraint') ? selector.versionConstraint : null
             def simpleVersion = selector.hasProperty('version') ? (selector.version ?: 'unspecified') : 'unspecified'
             def selectorVersion = vc?.requiredVersion ?: vc?.preferredVersion ?: simpleVersion
@@ -267,7 +298,16 @@ def walkDependencies(component, Set<String> processed, Set<String> ancestry, Set
         }
     }
 
-    return children
+    return rootChildren
+}
+
+// Push one frame per dependency edge onto the work stack, reversed so they pop
+// in the order `component.dependencies` yields them.
+def pushDependencyFrames(Deque<Map> stack, component, List children) {
+    def deps = component.dependencies.toList()
+    for (int i = deps.size() - 1; i >= 0; i--) {
+        stack.push([dep: deps[i], children: children])
+    }
 }
 
 // ── Artifact lookup optimization ───────────────────────────────────
