@@ -34,6 +34,11 @@ func (p Plugin) GetName() string {
 	return PluginName
 }
 
+// DetectionGlobs implements ecosystems.SCAPlugin.
+func (p Plugin) DetectionGlobs() []string {
+	return []string{requirementsFile}
+}
+
 // Compile-time check to ensure Plugin implements SCAPlugin interface.
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 

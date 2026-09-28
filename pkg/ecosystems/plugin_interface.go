@@ -66,4 +66,8 @@ type SCAPlugin interface {
 		onGraph OnGraphFunc,
 	) error
 	GetName() string
+	// DetectionGlobs returns base-name globs for the files whose presence means this
+	// plugin should run on a directory, so a caller holding only a file listing
+	// can choose plugins. Nil means it applies whatever the directory holds.
+	DetectionGlobs() []string
 }

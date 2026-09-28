@@ -52,6 +52,16 @@ func (p Plugin) GetName() string {
 	return PluginName
 }
 
+// DetectionGlobs implements ecosystems.SCAPlugin. Project files count although
+// discovery reads only restore output: a restore turns them into it.
+func (p Plugin) DetectionGlobs() []string {
+	globs := make([]string, 0, len(projectFileExtensions)+len(targetFileNames))
+	for _, ext := range projectFileExtensions {
+		globs = append(globs, "*"+ext)
+	}
+	return append(globs, targetFileNames...)
+}
+
 // BuildDepGraphsFromDir discovers .NET target files under dir and emits one dep
 // graph per target framework of each. Finding none is not an error: reporting
 // nothing is how a plugin says "not my project".

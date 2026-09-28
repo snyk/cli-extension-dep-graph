@@ -40,6 +40,11 @@ func (p Plugin) GetName() string {
 	return PluginName
 }
 
+// DetectionGlobs implements ecosystems.SCAPlugin.
+func (p Plugin) DetectionGlobs() []string {
+	return []string{pipfileFile, pipfileLockFile}
+}
+
 // BuildDepGraphsFromDir discovers and builds dependency graphs for
 // Pipenv projects. Build work runs concurrently (bounded by
 // maxConcurrentInstalls); onGraph invocations are serialized under a
