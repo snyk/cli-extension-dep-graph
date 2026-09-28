@@ -55,11 +55,10 @@ func (p Plugin) GetName() string {
 // DetectionGlobs implements ecosystems.SCAPlugin. Project files count although
 // discovery reads only restore output: a restore turns them into it.
 func (p Plugin) DetectionGlobs() []string {
-	globs := make([]string, 0, len(projectFileExtensions)+len(treeMarkerFiles)+len(targetFileNames))
+	globs := make([]string, 0, len(projectFileExtensions)+len(targetFileNames))
 	for _, ext := range projectFileExtensions {
 		globs = append(globs, "*"+ext)
 	}
-	globs = append(globs, treeMarkerFiles...)
 	return append(globs, targetFileNames...)
 }
 

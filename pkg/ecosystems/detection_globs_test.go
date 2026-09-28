@@ -42,8 +42,7 @@ func TestSCAPlugin_DetectionGlobsClaimOnlyTheirOwnFiles(t *testing.T) {
 			// restore turns them into what it reads.
 			plugin: nuget.Plugin{},
 			claims: []string{
-				"App.csproj", "App.fsproj", "App.vbproj", "App.sln", "App.slnx",
-				"dirs.proj", "Directory.Packages.props", "Directory.Build.props",
+				"App.csproj", "App.fsproj", "App.vbproj",
 				"project.assets.json", "packages.config", "project.json",
 			},
 			ignores: []string{"package.json", "pom.xml"},
