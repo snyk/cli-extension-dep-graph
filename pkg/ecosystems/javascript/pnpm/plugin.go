@@ -37,6 +37,11 @@ func (p Plugin) GetName() string {
 	return PluginName
 }
 
+// DetectionGlobs implements ecosystems.SCAPlugin.
+func (p Plugin) DetectionGlobs() []string {
+	return []string{pnpmLockFile, pnpmWorkspaceFile, rushJSONFile}
+}
+
 // scanTarget is a single prepared pnpm-list invocation. Every adapter
 // (bare-pnpm discovery, Rush staging) collapses its asymmetry into this struct
 // so runAndBuild can treat them uniformly.

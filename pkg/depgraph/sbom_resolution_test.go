@@ -55,6 +55,8 @@ func (m *mockScaPlugin) GetName() string {
 	return m.name
 }
 
+func (m *mockScaPlugin) DetectionGlobs() []string { return nil }
+
 func (m *mockScaPlugin) BuildDepGraphsFromDir(
 	_ context.Context,
 	_ logger.Logger,

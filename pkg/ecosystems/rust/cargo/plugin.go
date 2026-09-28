@@ -39,6 +39,11 @@ func (p Plugin) GetName() string {
 	return PluginName
 }
 
+// DetectionGlobs implements ecosystems.SCAPlugin.
+func (p Plugin) DetectionGlobs() []string {
+	return []string{cargoTomlFile, cargoLockFile}
+}
+
 // BuildDepGraphsFromDir discovers Cargo.lock files under dir and produces one
 // dep graph per workspace member for each lockfile. A non-workspace single
 // crate yields one result; an N-member workspace yields N results.

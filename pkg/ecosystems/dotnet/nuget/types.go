@@ -73,6 +73,10 @@ const (
 // detection, where the narrower match is snyk-nuget-plugin's behavior.
 var projectFileExtensions = []string{csprojExt, ".fsproj", ".vbproj"}
 
+// treeMarkerFiles mark a .NET tree without being project files. A solution alone
+// is enough, since a restore walks its ProjectReferences.
+var treeMarkerFiles = []string{"*.sln", "*.slnx", "dirs.proj", "Directory.Packages.props", "Directory.Build.props"}
+
 // targetFileNames lists every file name discovery matches.
 var targetFileNames = []string{
 	projectAssetsFile,

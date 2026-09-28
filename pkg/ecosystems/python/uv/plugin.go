@@ -39,6 +39,11 @@ func (p Plugin) GetName() string {
 	return PluginName
 }
 
+// DetectionGlobs implements ecosystems.SCAPlugin.
+func (p Plugin) DetectionGlobs() []string {
+	return []string{LockFileName}
+}
+
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context,
 	log logger.Logger,

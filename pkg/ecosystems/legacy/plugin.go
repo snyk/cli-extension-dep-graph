@@ -34,6 +34,12 @@ func (l *Resolver) GetName() string {
 	return PluginName
 }
 
+// DetectionGlobs implements ecosystems.SCAPlugin. Nil: the legacy CLI detects every
+// ecosystem itself.
+func (l *Resolver) DetectionGlobs() []string {
+	return nil
+}
+
 var _ ecosystems.SCAPlugin = (*Resolver)(nil)
 
 // BuildDepGraphsFromDir invokes the legacy CLI workflow and emits one

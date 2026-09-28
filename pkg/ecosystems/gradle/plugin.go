@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -25,6 +26,9 @@ const (
 	logAttrProjectDir = "project_dir"
 )
 
+// buildFileNames are the Gradle build and settings files discovery looks for.
+var buildFileNames = []string{"build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"}
+
 // Plugin is the Gradle SCA plugin.  It has no exported fields; all
 // configuration is passed through ecosystems.SCAPluginOptions at call time.
 type Plugin struct {
@@ -36,6 +40,11 @@ var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 
 func (p Plugin) GetName() string {
 	return PluginName
+}
+
+// DetectionGlobs implements ecosystems.SCAPlugin.
+func (p Plugin) DetectionGlobs() []string {
+	return slices.Clone(buildFileNames)
 }
 
 func NewGradlePlugin() *Plugin {
@@ -273,10 +282,7 @@ func (p Plugin) discoverAllGradleProjects(
 ) ([]discovery.FindResult, error) {
 	// Find all Gradle files recursively (build files and settings files)
 	findOpts := []discovery.FindOption{
-		discovery.WithInclude("build.gradle"),
-		discovery.WithInclude("build.gradle.kts"),
-		discovery.WithInclude("settings.gradle"),
-		discovery.WithInclude("settings.gradle.kts"),
+		discovery.WithIncludes(buildFileNames...),
 		discovery.WithCommonExcludes(),
 		discovery.WithMaxDepth(options.Global.DetectionDepth),
 	}
