@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	snykecosystems "github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
@@ -61,7 +62,7 @@ func readPackagesConfig(path, displayPath string) (*frameworkManifest, error) {
 		Packages []struct {
 			ID              string `xml:"id,attr"`
 			Version         string `xml:"version,attr"`
-			TargetFramework string `xml:"targetFramework,attr"`
+			TargetFramework string `xml:"targetframework,attr"`
 		} `xml:"package"`
 	}
 
@@ -77,7 +78,7 @@ func readPackagesConfig(path, displayPath string) (*frameworkManifest, error) {
 	// not <packages>, and a <package> element is matched by name wherever it
 	// sits — so a NuGet.config-shaped file would otherwise parse cleanly and
 	// look like an ordinary project.
-	if root := xmlRootElement(data); root != "packages" {
+	if root := xmlRootElement(data); !strings.EqualFold(root, "packages") {
 		return nil, snykecosystems.NewUnparseableManifestError(
 			fmt.Sprintf("%s has a <%s> root element rather than <packages>. "+
 				"See https://learn.microsoft.com/en-us/nuget/reference/packages-config#schema.", displayPath, root),

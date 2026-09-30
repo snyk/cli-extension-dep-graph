@@ -105,10 +105,10 @@ func csprojTargetFramework(dir string) (targetFramework, bool, error) {
 
 	var project struct {
 		PropertyGroups []struct {
-			TargetFrameworkVersion []string `xml:"TargetFrameworkVersion"`
-			TargetFramework        []string `xml:"TargetFramework"`
-			TargetFrameworks       []string `xml:"TargetFrameworks"`
-		} `xml:"PropertyGroup"`
+			TargetFrameworkVersion []string `xml:"targetframeworkversion"`
+			TargetFramework        []string `xml:"targetframework"`
+			TargetFrameworks       []string `xml:"targetframeworks"`
+		} `xml:"propertygroup"`
 	}
 
 	if err := decodeXML(data, &project); err != nil {

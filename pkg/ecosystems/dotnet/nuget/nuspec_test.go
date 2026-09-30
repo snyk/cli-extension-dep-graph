@@ -141,6 +141,27 @@ func TestNuspecDependencyList_VersionComparisonIsTextual(t *testing.T) {
 	}
 }
 
+func TestNuspecDependencyList_NamesIgnoreCase(t *testing.T) {
+	const nuspec = `<Package>
+  <METADATA>
+    <Dependencies>
+      <Group TargetFramework="">
+        <Dependency ID="Grouped" VERSION="1.0" />
+      </Group>
+      <DEPENDENCY Id="Bare" Version="2.0" />
+    </Dependencies>
+  </METADATA>
+</Package>`
+
+	folder := t.TempDir()
+	pkg := declaredPackage{"Pkg", "1.0.0"}
+	writeNupkg(t, folder, pkg, zipEntry{"Pkg" + nuspecExt, []byte(nuspec)})
+
+	children, err := nuspecDependencyList(folder, pkg, framework(t, "net45"))
+	require.NoError(t, err)
+	assert.Equal(t, []declaredPackage{{"Grouped", "1.0"}, {"Bare", "2.0"}}, children)
+}
+
 func TestNuspecDependencyList_UTF16(t *testing.T) {
 	folder := t.TempDir()
 	pkg := declaredPackage{"Swagger.Net", "0.5.5"}
