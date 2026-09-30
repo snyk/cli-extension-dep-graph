@@ -52,6 +52,15 @@ func TestReadPackagesConfig(t *testing.T) {
 			content: "\xef\xbb\xbf<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<packages>\n</packages>",
 		},
 		{
+			name: "element and attribute names are matched without regard to case",
+			content: `<Packages>
+  <Package ID="jQuery" Version="3.2.1" TargetFramework="net461" />
+  <package id="Moment.js" VERSION="2.20.1" targetframework="net452" />
+</Packages>`,
+			packages: []declaredPackage{{"jQuery", "3.2.1"}, {"Moment.js", "2.20.1"}},
+			hints:    []string{"net461", "net452"},
+		},
+		{
 			// Order is kept as written. Deduplication happens once the packages
 			// folder has had its say, so both entries have to survive to there.
 			name: "a repeated id keeps both entries in order",
