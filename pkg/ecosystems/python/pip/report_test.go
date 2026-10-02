@@ -126,6 +126,26 @@ func TestClassifyPipError(t *testing.T) {
 			},
 			wantErrCode: "SNYK-OS-PYTHON-0007",
 		},
+		"backend_unavailable_misclassified_as_conflict": {
+			// Real traceback captured from a --no-build-isolation dry run against a
+			// public sdist whose pyproject.toml declares a build backend that isn't
+			// installed in the image (OSM-3631, OSM-3816). This is a build-environment
+			// gap, not a version conflict, but resolvelib's internal `_incompatible_ids`
+			// attribute name (line 32 below) happens to contain the substring
+			// "incompatible", so it must not fall into the conflict bucket.
+			err: &pipError{
+				err: fmt.Errorf("exit status 1"),
+				stderr: `ERROR: Exception:
+Traceback (most recent call last):
+  File "pip/_internal/resolution/resolvelib/found_candidates.py", line 149, in <genexpr>
+    return (c for c in iterator if id(c) not in self._incompatible_ids)
+  File "pip/_vendor/pyproject_hooks/_impl.py", line 402, in _call_hook
+    raise BackendUnavailable(
+pip._vendor.pyproject_hooks._impl.BackendUnavailable: Cannot import 'wheel_stub.buildapi'
+`,
+			},
+			wantErrCode: "SNYK-OS-PYTHON-0009",
+		},
 		"context_canceled": {
 			err: &pipError{
 				err:    context.Canceled,
