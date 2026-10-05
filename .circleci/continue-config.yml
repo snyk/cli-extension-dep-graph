@@ -405,7 +405,7 @@ workflows:
       - python_integration_test:
           matrix:
             parameters:
-              python_version: [ "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14" ]
+              python_version: [ "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "3.15" ]
           <<: *filters_pr_only
 
   # Conditional workflow for Gradle integration tests (only runs when Gradle files changed).
