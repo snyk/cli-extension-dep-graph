@@ -37,6 +37,12 @@ func (p Plugin) DetectionGlobs() []string {
 	return []string{bunLockFile, bunBinaryLockFile}
 }
 
+// InputGlobs implements ecosystems.SCAPlugin. The package.json files are those of
+// the workspace packages the text lockfile describes.
+func (p Plugin) InputGlobs() []string {
+	return []string{bunLockFile, bunBinaryLockFile, packageJSONFile}
+}
+
 // BuildDepGraphsFromDir discovers bun.lock files under dir and produces dep
 // graphs for each one. Workspace projects yield one SCAResult per workspace
 // package plus one for the root; non-workspace projects yield a single result.

@@ -317,6 +317,13 @@ To add support for a new ecosystem:
    func (p *Plugin) DetectionGlobs() []string {
        return []string{"tool.lock"}
    }
+
+   // InputGlobs returns base-name globs for every file the plugin may read, a
+   // superset of DetectionGlobs. A plugin that cannot name its files returns
+   // ecosystems.AllFilesGlob.
+   func (p *Plugin) InputGlobs() []string {
+       return []string{"tool.lock", "tool.toml"}
+   }
    ```
 
 3. **Add ecosystem-specific options** (if needed):

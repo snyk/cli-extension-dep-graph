@@ -47,6 +47,13 @@ func (p Plugin) DetectionGlobs() []string {
 	return slices.Clone(buildFileNames)
 }
 
+// InputGlobs implements ecosystems.SCAPlugin. Gradle compiles buildSrc and
+// included builds, which hold source code, before it reads a build file, so the
+// files it needs cannot be listed.
+func (p Plugin) InputGlobs() []string {
+	return []string{ecosystems.AllFilesGlob}
+}
+
 func NewGradlePlugin() *Plugin {
 	return &Plugin{normalizeDepsPostHook: nil}
 }
