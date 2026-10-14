@@ -77,7 +77,7 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 		allProjects  bool
 		exclude      []string // basename/dirname patterns (--exclude semantic)
 		excludePaths []string // exact path patterns (--exclude-paths semantic / processed-files channel)
-		expectedDirs []string // expected directories (relative paths) that should be processed
+		expectedDirs []string // expected directories, relative to the input dir, that should be processed
 		expectedErr  string   // if non-empty, expect error containing this string
 	}{
 		// Happy path - single file
@@ -246,7 +246,10 @@ func TestPlugin_BuildDepGraphsFromDir(t *testing.T) {
 
 			// Verify correct directories were processed
 			gotDirs := mockClient.CalledDirs
-			expectedDirs := append([]string{}, tt.expectedDirs...)
+			expectedDirs := make([]string, 0, len(tt.expectedDirs))
+			for _, d := range tt.expectedDirs {
+				expectedDirs = append(expectedDirs, filepath.Join(tmpDir, d))
+			}
 			sort.Strings(gotDirs)
 			sort.Strings(expectedDirs)
 
@@ -349,7 +352,7 @@ func TestPlugin_ShouldNotSkipProcessingWhenTargetFileIsRelativeFolderPath(t *tes
 
 	require.Len(t, findings, 1, "Should return findings for the specific uv.lock file")
 	require.NotEmpty(t, mockClient.CalledDirs, "Should have called the uv client")
-	require.Equal(t, "my-project", mockClient.CalledDirs[0], "Should have called uv client with the correct directory")
+	require.Equal(t, filepath.Join(tmpDir, "my-project"), mockClient.CalledDirs[0], "Should have called uv client with the correct directory")
 }
 
 func TestPlugin_ShouldSkipProcessingWhenTargetFileIsNotUvLockInRelativeFolderPath(t *testing.T) {
@@ -424,7 +427,7 @@ func TestPlugin_BuildDepGraphsFromDir_MixedSuccessAndFailure(t *testing.T) {
 	// Setup mock to fail for project1 but succeed for others
 	mockClient := &MockClient{
 		ErrorDirs: map[string]error{
-			"project1": errors.New("uv export failed"),
+			filepath.Join(tmpDir, "project1"): errors.New("uv export failed"),
 		},
 	}
 	ctx := context.Background()

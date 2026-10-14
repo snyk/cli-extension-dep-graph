@@ -74,7 +74,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 		lockFileDir := filepath.Dir(lockFilePath)
 		log.Info(ctx, "Building dependency graph", logger.Attr("lockFile", lockFilePath)) //nolint:goconst // logger key, not worth a constant
 
-		sbom, err := p.client.ExportSBOM(lockFileDir, options)
+		sbom, err := p.client.ExportSBOM(filepath.Dir(file.Path), options)
 		if err != nil {
 			log.Error(ctx, "Failed to build dependency graph", logger.Attr("lockFile", lockFilePath), logger.Err(err))
 			wrappedErr := fmt.Errorf("failed to build dependency graph for %s: %w", lockFilePath, err)
