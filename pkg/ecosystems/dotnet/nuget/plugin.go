@@ -62,6 +62,12 @@ func (p Plugin) DetectionGlobs() []string {
 	return append(globs, targetFileNames...)
 }
 
+// InputGlobs implements ecosystems.SCAPlugin. These are the files a restore needs
+// to produce what discovery reads.
+func (p Plugin) InputGlobs() []string {
+	return slices.Clone(inputFileGlobs)
+}
+
 // BuildDepGraphsFromDir discovers .NET target files under dir and emits one dep
 // graph per target framework of each. Finding none is not an error: reporting
 // nothing is how a plugin says "not my project".

@@ -42,6 +42,13 @@ func (p Plugin) DetectionGlobs() []string {
 	return []string{pnpmLockFile, pnpmWorkspaceFile, rushJSONFile}
 }
 
+// InputGlobs implements ecosystems.SCAPlugin. Listing from the lockfile reads the
+// package.json of each workspace package. Rush projects add rush.json and its
+// subspaces setting.
+func (p Plugin) InputGlobs() []string {
+	return []string{packageJSONFile, pnpmLockFile, pnpmWorkspaceFile, rushJSONFile, "subspaces.json"}
+}
+
 // scanTarget is a single prepared pnpm-list invocation. Every adapter
 // (bare-pnpm discovery, Rush staging) collapses its asymmetry into this struct
 // so runAndBuild can treat them uniformly.

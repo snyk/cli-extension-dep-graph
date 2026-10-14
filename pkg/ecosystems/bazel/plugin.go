@@ -38,6 +38,13 @@ func (p Plugin) DetectionGlobs() []string {
 	return slices.Clone(workspaceMarkers)
 }
 
+// InputGlobs implements ecosystems.SCAPlugin. A query follows load statements
+// into .bzl and BUILD files across the repository, so the files it needs cannot be
+// listed.
+func (p Plugin) InputGlobs() []string {
+	return []string{ecosystems.AllFilesGlob}
+}
+
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context,
 	log logger.Logger,

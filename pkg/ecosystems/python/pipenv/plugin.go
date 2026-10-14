@@ -45,6 +45,11 @@ func (p Plugin) DetectionGlobs() []string {
 	return []string{pipfileFile, pipfileLockFile}
 }
 
+// InputGlobs implements ecosystems.SCAPlugin. Both files are parsed directly.
+func (p Plugin) InputGlobs() []string {
+	return []string{pipfileFile, pipfileLockFile}
+}
+
 // BuildDepGraphsFromDir discovers and builds dependency graphs for
 // Pipenv projects. Build work runs concurrently (bounded by
 // maxConcurrentInstalls); onGraph invocations are serialized under a

@@ -39,6 +39,13 @@ func (p Plugin) DetectionGlobs() []string {
 	return []string{requirementsFile}
 }
 
+// InputGlobs implements ecosystems.SCAPlugin. Requirements files include others
+// with -r and -c under any name, and a local path requirement is read from its
+// project files.
+func (p Plugin) InputGlobs() []string {
+	return []string{"*.txt", "pyproject.toml", "setup.py", "setup.cfg"}
+}
+
 // Compile-time check to ensure Plugin implements SCAPlugin interface.
 var _ ecosystems.SCAPlugin = (*Plugin)(nil)
 

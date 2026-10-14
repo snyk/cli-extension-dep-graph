@@ -44,6 +44,13 @@ func (p Plugin) DetectionGlobs() []string {
 	return []string{LockFileName}
 }
 
+// InputGlobs implements ecosystems.SCAPlugin. A locked export reads the lockfile
+// and the pyproject.toml of the project and of each workspace member. uv.toml
+// holds project settings.
+func (p Plugin) InputGlobs() []string {
+	return []string{LockFileName, PyprojectTomlFileName, "uv.toml"}
+}
+
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context,
 	log logger.Logger,

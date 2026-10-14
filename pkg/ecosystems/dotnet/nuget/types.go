@@ -80,6 +80,24 @@ var targetFileNames = []string{
 	projectJSONFile,
 }
 
+// inputFileGlobs lists the files a restore reads: everything that defines or
+// configures the projects of a repository, in any .NET language, and none of its
+// source code. That is the project files of every language and type, solutions,
+// the MSBuild files they import, NuGet and SDK configuration, lock files, and
+// packages a feed committed to the repository holds. Paket files are for projects
+// that use Paket instead of NuGet. NuGet reads its configuration by exact name on Linux, so config files
+// are listed in both spellings.
+var inputFileGlobs = []string{
+	"*.*proj", "*.projitems", "*.vcxitems",
+	"*.sln", "*.slnx", "*.slnf",
+	"*.props", "*.targets", "*.rsp", "*.msbuild", "*.tasks",
+	"*.ruleset", "*.globalconfig",
+	"*.config", "*.Config",
+	"*.json",
+	"*.nuspec", "*.nupkg",
+	"paket.dependencies", "paket.lock", "paket.references",
+}
+
 // rootTargetFilePrecedence orders the manifests a single-project scan chooses
 // between when a directory holds more than one, highest priority first. It
 // mirrors the CLI's own DETECTABLE_FILES order (snyk/cli src/lib/detect.ts),

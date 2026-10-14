@@ -44,6 +44,13 @@ func (p Plugin) DetectionGlobs() []string {
 	return []string{cargoTomlFile, cargoLockFile}
 }
 
+// InputGlobs implements ecosystems.SCAPlugin. Workspace members and path
+// dependencies each have a Cargo.toml. Cargo takes registry and source settings
+// from config.toml.
+func (p Plugin) InputGlobs() []string {
+	return []string{cargoTomlFile, cargoLockFile, "config.toml"}
+}
+
 // BuildDepGraphsFromDir discovers Cargo.lock files under dir and produces one
 // dep graph per workspace member for each lockfile. A non-workspace single
 // crate yields one result; an N-member workspace yields N results.

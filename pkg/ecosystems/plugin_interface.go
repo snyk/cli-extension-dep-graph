@@ -41,6 +41,10 @@ type SCAResult struct {
 // for each emitted SCAResult. See SCAPlugin for the contract.
 type OnGraphFunc func(SCAResult) error
 
+// AllFilesGlob matches every file. A plugin returns it from InputGlobs when it
+// needs the whole directory.
+const AllFilesGlob = "*"
+
 // SCAPlugin builds dependency graphs from a directory containing
 // project files. Results are emitted one at a time via onGraph as the
 // plugin produces them — there is no aggregated return value. This
@@ -70,4 +74,9 @@ type SCAPlugin interface {
 	// plugin should run on a directory, so a caller holding only a file listing
 	// can choose plugins. Nil means it applies whatever the directory holds.
 	DetectionGlobs() []string
+	// InputGlobs returns base-name globs for every file the plugin may read to build
+	// a dep graph, so a caller holding a file listing can fetch only those. It
+	// includes DetectionGlobs. A plugin that cannot name its files returns
+	// AllFilesGlob.
+	InputGlobs() []string
 }
