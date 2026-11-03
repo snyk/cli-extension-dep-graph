@@ -99,6 +99,44 @@ func TestBuildFrameworkDepGraph_UninstalledChildKeepsItsConstraint(t *testing.T)
 	assert.Contains(t, pkgIDs(graph.Pkgs), "Missing@[1.0.0,2.0.0)")
 }
 
+// NuGet ids are case-insensitive: bootstrap's .nuspec declares `jquery` while
+// the project installed `jQuery`, and they are one package. Reporting both is
+// what left a vulnerable jQuery with no dependency path.
+func TestBuildFrameworkDepGraph_NuspecChildMatchesInstalledCaseInsensitively(t *testing.T) {
+	graph := buildFramework(t,
+		[]declaredPackage{{"bootstrap", "3.0.0"}, {"jQuery", "1.10.2"}},
+		map[string][]declaredPackage{"bootstrap": {{"jquery", "[1.9.0, 3.0)"}}})
+
+	assert.ElementsMatch(t, []string{"App@0.0.0", "bootstrap@3.0.0", "jQuery@1.10.2"}, pkgIDs(graph.Pkgs),
+		"no second, differently cased jquery node")
+	assert.Equal(t, []string{"jQuery@1.10.2"}, depsOf(t, graph, "bootstrap@3.0.0"))
+}
+
+func TestBuildFrameworkDepGraph_ChildrenKeyedInAnotherCaseStillApply(t *testing.T) {
+	graph := buildFramework(t,
+		[]declaredPackage{{"bootstrap", "3.0.0"}, {"jQuery", "1.10.2"}, {"Leaf", "1.0.0"}},
+		map[string][]declaredPackage{
+			"Bootstrap": {{"jquery", "1.9.0"}},
+			"JQUERY":    {{"leaf", "1.0.0"}},
+		})
+
+	assert.Equal(t, []string{"jQuery@1.10.2"}, depsOf(t, graph, "bootstrap@3.0.0"))
+	assert.Equal(t, []string{"Leaf@1.0.0"}, depsOf(t, graph, "jQuery@1.10.2"))
+}
+
+// A dependency that is not installed in any casing still gets a node, under the
+// name the .nuspec used.
+func TestBuildFrameworkDepGraph_UninstalledChildStillGetsANodeWhenCasingDiffers(t *testing.T) {
+	graph := buildFramework(t,
+		[]declaredPackage{{"bootstrap", "3.0.0"}, {"jQuery", "1.10.2"}},
+		map[string][]declaredPackage{"bootstrap": {{"jquery", "1.9.0"}, {"popper.JS", "1.0.0"}}})
+
+	assert.ElementsMatch(t,
+		[]string{"App@0.0.0", "bootstrap@3.0.0", "jQuery@1.10.2", "popper.JS@1.0.0"},
+		pkgIDs(graph.Pkgs))
+	assert.Equal(t, []string{"jQuery@1.10.2", "popper.JS@1.0.0"}, depsOf(t, graph, "bootstrap@3.0.0"))
+}
+
 func TestBuildFrameworkDepGraph_DiamondSharesOneNode(t *testing.T) {
 	graph := buildFramework(t,
 		[]declaredPackage{{"Left", "1.0.0"}, {"Right", "1.0.0"}, {"Shared", "2.0.0"}},
