@@ -321,11 +321,19 @@ func newPackageSet() *packageSet {
 	return &packageSet{index: make(map[string]int)}
 }
 
-// set inserts a package, or overwrites the version of one already present. The
-// name keeps the casing it was first inserted with.
+// set inserts a package, or overwrites the version of one already present under
+// exactly the same name — the way assigning to a JavaScript object key does.
+//
+// A name that differs only in case is not an overwrite: snyk-nuget-plugin reads
+// project.json into a plain object, where `jquery` and `jQuery` are two keys,
+// and its case-insensitive merge afterwards keeps the first and drops the
+// other. Ignoring the later one here gives the same result.
 func (p *packageSet) set(name, version string) {
 	if at, exists := p.index[foldName(name)]; exists {
-		p.packages[at].version = version
+		if p.packages[at].name == name {
+			p.packages[at].version = version
+		}
+
 		return
 	}
 

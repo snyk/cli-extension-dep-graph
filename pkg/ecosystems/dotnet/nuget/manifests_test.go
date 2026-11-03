@@ -223,6 +223,21 @@ func TestReadProjectJSON_ProjectNameAndVersion(t *testing.T) {
 	assert.Equal(t, "4.5.6", manifest.rootVersion)
 }
 
+// The same package spelled two ways across groups is one package: the first
+// spelling and its version are kept, as snyk-nuget-plugin's case-insensitive
+// merge does, while a repeat of the exact same spelling still overwrites.
+func TestReadProjectJSON_PackageIDsDifferingInCaseAreOnePackage(t *testing.T) {
+	path := writeTemp(t, projectJSONFile, `{"frameworks": {
+		"net45": {"dependencies": {"jquery": "1.9.0", "Other": "1.0"}},
+		"net46": {"dependencies": {"jQuery": "1.10.2", "jquery": "1.9.1"}}
+	}}`)
+
+	manifest, err := readProjectJSON(path, projectJSONFile)
+	require.NoError(t, err)
+
+	assert.Equal(t, []declaredPackage{{"jquery", "1.9.1"}, {"Other", "1.0"}}, manifest.packages)
+}
+
 func TestReadProjectJSON_Rejects(t *testing.T) {
 	tests := []struct {
 		name string
@@ -308,8 +323,11 @@ func TestPackageSet(t *testing.T) {
 
 	set.add("b", "9.0")
 	set.set("c", "2.0")
-	assert.Equal(t, []declaredPackage{{"A", "4.0"}, {"B", "3.0"}, {"C", "2.0"}}, set.packages,
-		"a differently cased add or set matches the existing package and keeps its casing")
+	assert.Equal(t, []declaredPackage{{"A", "4.0"}, {"B", "3.0"}, {"C", "1.0"}}, set.packages,
+		"a differently cased add or set matches the existing package: the first declaration wins")
+
+	set.set("C", "5.0")
+	assert.Equal(t, declaredPackage{"C", "5.0"}, set.packages[2], "set still overwrites under the exact name")
 }
 
 func TestPackageSet_ReplaceAdoptsTheNewCasing(t *testing.T) {
