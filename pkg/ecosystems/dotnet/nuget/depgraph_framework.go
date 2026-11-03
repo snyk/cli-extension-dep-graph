@@ -33,6 +33,7 @@ func buildFrameworkDepGraph(
 		edgeSet:   newEdgeSet(builder),
 		installed: installed,
 		children:  children,
+		childKeys: foldedKeys(children),
 		expanded:  make(map[string]struct{}),
 	}
 	rootNodeID := builder.GetRootNode().NodeID
@@ -53,7 +54,7 @@ func buildFrameworkDepGraph(
 	for _, pkg := range installed.packages {
 		nodeID := pkgNodeID(pkg.name, pkg.version)
 
-		declared, ok := children[pkg.name]
+		declared, ok := graph.childrenOf(pkg.name)
 		if !ok {
 			continue
 		}
@@ -87,6 +88,10 @@ type frameworkGraph struct {
 	// children maps a package name to what its .nuspec declares. A package with
 	// no .nupkg on disk is absent rather than empty.
 	children map[string][]declaredPackage
+	// childKeys maps a lowercased package name to its key in children, since
+	// NuGet ids are case-insensitive and the key's casing need not match the
+	// installed package's.
+	childKeys map[string]string
 	// expanded holds the nodes whose own children have already been emitted, so
 	// a subtree several packages share is walked once rather than once per route
 	// that reaches it. What a package depends on follows from its name and
@@ -97,6 +102,37 @@ type frameworkGraph struct {
 	// shared dependencies is re-walked exponentially. onPath is what keeps the
 	// graph acyclic.
 	expanded map[string]struct{}
+}
+
+// childrenOf looks up what a package's .nuspec declares, by name in any casing.
+// An exact key wins over a differently cased one.
+func (g *frameworkGraph) childrenOf(name string) ([]declaredPackage, bool) {
+	if declared, ok := g.children[name]; ok {
+		return declared, true
+	}
+
+	key, ok := g.childKeys[foldName(name)]
+	if !ok {
+		return nil, false
+	}
+
+	return g.children[key], true
+}
+
+// foldedKeys indexes a children map by lowercased key. Where keys differ only
+// by case the lexically smallest wins, so the result does not depend on map
+// iteration order.
+func foldedKeys(children map[string][]declaredPackage) map[string]string {
+	keys := make(map[string]string, len(children))
+
+	for key := range children {
+		folded := foldName(key)
+		if existing, taken := keys[folded]; !taken || key < existing {
+			keys[folded] = key
+		}
+	}
+
+	return keys
 }
 
 // addChildren connects a package's declared dependencies and recurses.
@@ -151,7 +187,7 @@ func (g *frameworkGraph) addChildren(
 			return err
 		}
 
-		grandchildren, ok := g.children[resolved.name]
+		grandchildren, ok := g.childrenOf(resolved.name)
 		if !ok {
 			continue
 		}

@@ -301,10 +301,31 @@ func TestPackageSet(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, declaredPackage{"A", "4.0"}, pkg)
 
-	// Nothing on this path folds case: snyk-nuget-plugin indexes these by plain
-	// object key, so JQUERY and jQuery are two packages.
-	_, ok = set.get("a")
-	assert.False(t, ok)
+	// NuGet ids are case-insensitive, and the casing stored stays canonical.
+	pkg, ok = set.get("a")
+	require.True(t, ok)
+	assert.Equal(t, declaredPackage{"A", "4.0"}, pkg)
+
+	set.add("b", "9.0")
+	set.set("c", "2.0")
+	assert.Equal(t, []declaredPackage{{"A", "4.0"}, {"B", "3.0"}, {"C", "2.0"}}, set.packages,
+		"a differently cased add or set matches the existing package and keeps its casing")
+}
+
+func TestPackageSet_ReplaceAdoptsTheNewCasing(t *testing.T) {
+	set := newPackageSet()
+	set.add("jquery", "1.9.0")
+	set.add("Other", "1.0")
+
+	set.replace("jQuery", "1.10.2")
+
+	assert.Equal(t, []declaredPackage{{"jQuery", "1.10.2"}, {"Other", "1.0"}}, set.packages,
+		"the package keeps its position and takes the casing and version it was replaced with")
+	assert.Len(t, set.index, 2, "no stale key is left behind for the old casing")
+
+	pkg, ok := set.get("JQUERY")
+	require.True(t, ok)
+	assert.Equal(t, declaredPackage{"jQuery", "1.10.2"}, pkg)
 }
 
 // writeTemp writes one file into a fresh temp directory and returns its path.

@@ -930,6 +930,46 @@ func TestPlugin_PackagesFolderChangesTheReportedSet(t *testing.T) {
 	assert.Equal(t, []string{"WebActivator@1.5.1"}, depsOf(t, graph, "Swagger.Net@0.5.5"))
 }
 
+// bootstrap's .nuspec names jquery in lower case while the project installs
+// jQuery. NuGet ids are case-insensitive, so that is one package; reporting a
+// second jquery@1.9.0 node is what left jQuery without a dependency path.
+func TestPlugin_NuspecDependencyMatchesInstalledPackageCaseInsensitively(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "Solution", "Project")
+	packages := filepath.Join(root, "Solution", packagesFolderName)
+
+	write(t, project, packagesConfigFile, `<packages>
+  <package id="bootstrap" version="3.0.0" targetFramework="net45" />
+  <package id="jQuery" version="1.10.2" targetFramework="net45" />
+</packages>`)
+
+	const bootstrapNuspec = `<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>bootstrap</id>
+    <version>3.0.0</version>
+    <dependencies>
+      <dependency id="jquery" version="1.9.0" />
+    </dependencies>
+  </metadata>
+</package>`
+
+	writeNupkg(t, packages, declaredPackage{"bootstrap", "3.0.0"},
+		zipEntry{"bootstrap" + nuspecExt, []byte(bootstrapNuspec)})
+	makePackageDirs(t, packages, "jQuery.1.10.2")
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), project, ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	graph := results[0].DepGraph
+	require.NotNil(t, graph)
+
+	assert.ElementsMatch(t,
+		[]string{graph.GetRootPkg().ID, "bootstrap@3.0.0", "jQuery@1.10.2"}, pkgIDs(graph.Pkgs))
+	assert.Equal(t, []string{"jQuery@1.10.2"}, depsOf(t, graph, "bootstrap@3.0.0"))
+}
+
 // A packages folder beside the manifest rather than above it is invisible to
 // the derived default, which is why --packages-folder exists. snyk/cli's own
 // end-to-end test for this shape passes the flag for the same reason.

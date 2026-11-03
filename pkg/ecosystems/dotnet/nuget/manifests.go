@@ -306,20 +306,25 @@ func projectJSONRoot(doc *orderedMap[json.RawMessage]) (name, version string) {
 // were first seen in, the way assigning to a JavaScript object does: a repeated
 // name keeps its original position, whatever happens to its version.
 //
-// Names are matched case-sensitively. Unlike project.assets.json, nothing on
-// this path folds case: snyk-nuget-plugin indexes these by plain object key.
+// Names are matched case-insensitively, because NuGet package ids are: a
+// .nuspec may declare `jquery` for a package installed as `jQuery`, and they
+// are one package. The casing stored is the canonical one — the first seen, or
+// the one replace was given — and that is what lookups hand back, so a
+// differently cased reference never creates a second package.
 type packageSet struct {
 	packages []declaredPackage
-	index    map[string]int
+	// index maps the lowercased name to a position in packages.
+	index map[string]int
 }
 
 func newPackageSet() *packageSet {
 	return &packageSet{index: make(map[string]int)}
 }
 
-// set inserts a package, or overwrites the version of one already present.
+// set inserts a package, or overwrites the version of one already present. The
+// name keeps the casing it was first inserted with.
 func (p *packageSet) set(name, version string) {
-	if at, exists := p.index[name]; exists {
+	if at, exists := p.index[foldName(name)]; exists {
 		p.packages[at].version = version
 		return
 	}
@@ -327,33 +332,45 @@ func (p *packageSet) set(name, version string) {
 	p.add(name, version)
 }
 
-// add inserts a package unless the name is already present, so the first
-// declaration of a name wins.
+// add inserts a package unless the name is already present in any casing, so
+// the first declaration of a name wins.
 func (p *packageSet) add(name, version string) {
-	if _, exists := p.index[name]; exists {
+	key := foldName(name)
+	if _, exists := p.index[key]; exists {
 		return
 	}
 
-	p.index[name] = len(p.packages)
+	p.index[key] = len(p.packages)
 	p.packages = append(p.packages, declaredPackage{name: name, version: version})
 }
 
-// replace overwrites the version of a package already present, and ignores one
-// that is not. It never widens the set.
+// replace overwrites a package already present, and ignores one that is not. It
+// never widens the set.
+//
+// The name is replaced along with the version: the caller is reporting what is
+// really on disk, so its casing supersedes the one the manifest happened to use.
+// The package keeps its position, and since the index is keyed by the folded
+// name no stale entry is left behind under the old casing.
 func (p *packageSet) replace(name, version string) {
-	if at, exists := p.index[name]; exists {
-		p.packages[at].version = version
+	if at, exists := p.index[foldName(name)]; exists {
+		p.packages[at] = declaredPackage{name: name, version: version}
 	}
 }
 
-// get looks up a package by name.
+// get looks up a package by name in any casing, returning it under its
+// canonical casing.
 func (p *packageSet) get(name string) (declaredPackage, bool) {
-	at, exists := p.index[name]
+	at, exists := p.index[foldName(name)]
 	if !exists {
 		return declaredPackage{}, false
 	}
 
 	return p.packages[at], true
+}
+
+// foldName is the form package ids are compared in.
+func foldName(name string) string {
+	return strings.ToLower(name)
 }
 
 // hasAny reports whether the object declares at least one of the given keys.
