@@ -253,6 +253,29 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 		)
 	}
 
+	// Check for an unavailable PEP 517 build backend (e.g. a sdist whose
+	// pyproject.toml declares a build backend that --no-build-isolation didn't
+	// install into the image). pip surfaces this as an uncaught exception with a
+	// full resolvelib traceback rather than its usual formatted error, and that
+	// traceback's internal `_incompatible_ids` attribute name contains the
+	// substring "incompatible" — so this check must come before the conflict
+	// check below, or a build-environment gap gets mislabeled as a version
+	// conflict (verified on OSM-3631 and OSM-3816).
+	if strings.Contains(stderr, "BackendUnavailable") {
+		msg := "Pip install failed: required build backend is unavailable in the isolated build environment"
+		if backend := extractUnavailableBackend(stderr); backend != "" {
+			msg = fmt.Sprintf("Pip install failed: build backend '%s' is unavailable in the isolated build environment", backend)
+		}
+		if log != nil {
+			log.Error(ctx, "Pip install failed - build backend unavailable",
+				logger.Attr("full_stderr", stderr))
+		}
+		return ecosystems.NewInstallationFailureError(
+			msg,
+			snyk_errors.WithCause(errors.New(stderr)),
+		)
+	}
+
 	// Check for conflicting requirements
 	if strings.Contains(stderr, "Conflict") ||
 		strings.Contains(stderr, "conflicting") ||
@@ -341,5 +364,21 @@ func extractFailedPackageName(stderr string) string {
 		return stderr[start : start+end]
 	}
 
+	return ""
+}
+
+// extractUnavailableBackend extracts the build-backend module name from a
+// BackendUnavailable exception, e.g. "Cannot import 'wheel_stub.buildapi'" -> "wheel_stub.buildapi".
+// pip's --quiet flag suppresses the "Building wheel for <package>" line that would
+// otherwise name the package, so the backend module is the only identifying detail
+// available in this failure mode.
+func extractUnavailableBackend(stderr string) string {
+	const marker = "Cannot import '"
+	if idx := strings.Index(stderr, marker); idx != -1 {
+		start := idx + len(marker)
+		if end := strings.Index(stderr[start:], "'"); end != -1 {
+			return stderr[start : start+end]
+		}
+	}
 	return ""
 }
