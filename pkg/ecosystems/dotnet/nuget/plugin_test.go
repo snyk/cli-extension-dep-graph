@@ -243,6 +243,21 @@ func TestPlugin_PackagesConfigResolves(t *testing.T) {
 		pkgIDs(result.DepGraph.Pkgs))
 }
 
+// The legacy resolver reports a packages.config under the project file beside
+// it, so the result must too, or the project is stored a second time.
+func TestPlugin_PackagesConfigIsReportedUnderTheProjectFileBesideIt(t *testing.T) {
+	dir := writeFiles(t, packagesConfigFile, "App.csproj")
+
+	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	result := results[0]
+	require.NoError(t, result.Error)
+	assert.Equal(t, "App.csproj", result.ProjectDescriptor.GetTargetFile())
+	assert.Equal(t, []string{"App.csproj", packagesConfigFile}, result.ProcessedFiles)
+}
+
 func TestPlugin_ProjectJSONResolves(t *testing.T) {
 	dir := writeFiles(t, projectJSONFile, "App.csproj")
 
@@ -256,7 +271,7 @@ func TestPlugin_ProjectJSONResolves(t *testing.T) {
 	assert.Equal(t, projectJSONFile, result.ProjectDescriptor.GetTargetFile())
 	assert.Equal(t, []string{"net45"}, runtimes(t, results), "the runtime comes from the .csproj")
 	assert.Equal(t, []string{"App.csproj", projectJSONFile}, result.ProcessedFiles,
-		"the .csproj beside it is claimed too, since that is what the project is reported under")
+		"the .csproj beside it is claimed too, so the legacy resolver does not report it again")
 
 	assert.ElementsMatch(t,
 		[]string{result.DepGraph.GetRootPkg().ID, "Newtonsoft.Json@8.0.3", "RouteMagic@1.3"},
@@ -304,7 +319,7 @@ func TestPlugin_RootDirOnly_ManifestPrecedence(t *testing.T) {
 			// snyk/cli's own nuget-app fixture is this shape.
 			name:    "packages.config outranks project.json",
 			present: []string{packagesConfigFile, projectJSONFile, "App.csproj"},
-			want:    packagesConfigFile,
+			want:    "App.csproj",
 		},
 	}
 
@@ -328,7 +343,7 @@ func TestPlugin_AllProjects_ReportsEveryManifestInADirectory(t *testing.T) {
 	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
 		ecosystems.NewPluginOptions().WithAllProjects(true))
 	require.NoError(t, err)
-	assert.ElementsMatch(t, []string{packagesConfigFile, projectJSONFile}, relPaths(t, results))
+	assert.ElementsMatch(t, []string{"App.csproj", projectJSONFile}, relPaths(t, results))
 }
 
 // Nothing in a project.json names a framework, so without a .csproj there is no

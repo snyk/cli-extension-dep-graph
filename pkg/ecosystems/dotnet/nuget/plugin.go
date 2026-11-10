@@ -416,8 +416,8 @@ func projectFileOf(file discovery.FindResult) string {
 // The project file leads: a claim only excludes the path it names, and an
 // SDK-style project is reported under its project file, so claiming the assets
 // file alone would exclude nothing. The manifest is claimed alongside it because
-// a project resolved from packages.config or project.json is reported under that
-// file instead.
+// the legacy resolver reports some projects under the manifest instead (see
+// frameworkIdentityFile).
 func claimedFiles(projectFile, targetFile string) []string {
 	if projectFile == "" || projectFile == targetFile {
 		return []string{targetFile}
@@ -608,17 +608,18 @@ func (p Plugin) emitFrameworkResult(
 		rootName = rootComponentName(file)
 	}
 
+	projectFile := projectFileOf(file)
+	claimed := claimedFiles(projectFile, targetFile)
+	identityFile := frameworkIdentityFile(targetFile, projectFile)
+
 	// These manifests resolve one dependency set rather than one per framework,
 	// but they still have exactly one — detectTargetFramework just named it —
 	// so --dotnet-target-framework applies here too. Ignoring it would report a
 	// .NET Framework project under a framework the user filtered out.
-	//
-	// The manifest leads the claim here, not the project file: a project
-	// resolved from packages.config or project.json is reported under that file.
 	if filter.active() {
 		project := scannedProject{
-			targetFile: targetFile,
-			claimed:    claimedFiles(projectFileOf(file), targetFile),
+			targetFile: identityFile,
+			claimed:    claimed,
 			rootName:   rootName,
 		}
 
@@ -657,10 +658,22 @@ func (p Plugin) emitFrameworkResult(
 		return deferToLegacy(ctx, log, targetFile, err)
 	}
 
-	result := p.newResult(targetFile, claimedFiles(projectFileOf(file), targetFile), rootName, framework.original)
+	result := p.newResult(identityFile, claimed, rootName, framework.original)
 	result.DepGraph = graph
 
 	return onGraph(result)
+}
+
+// frameworkIdentityFile is the target file a packages.config or project.json
+// project is reported under. The legacy resolver reports a packages.config
+// under the project file beside it, and under the manifest only when there is
+// none. It always reports a project.json under the manifest.
+func frameworkIdentityFile(manifest, projectFile string) string {
+	if projectFile != "" && filepath.Base(manifest) == packagesConfigFile {
+		return projectFile
+	}
+
+	return manifest
 }
 
 // readFrameworkManifest reads whichever of the two older manifests this is.
