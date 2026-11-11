@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/legacy"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 )
 
@@ -75,6 +76,7 @@ func TestPipeline_ChannelAndCallbackAdaptersSharePolicy(t *testing.T) {
 			registry := &PluginRegistry{ictx: setupMockInvocationContext(t)}
 			require.NoError(t, registry.register(&mockPlugin{name: "first", results: []ecosystems.SCAResult{tt.first}}))
 			require.NoError(t, registry.register(&mockPlugin{name: "second", results: []ecosystems.SCAResult{{ProcessedFiles: []string{"second.lock"}}}}))
+			require.NoError(t, registry.register(legacy.NewPlugin(registry.ictx), withPluginDependencies("first", "second")))
 			opts := ecosystems.NewPluginOptions()
 			opts.Global.AllProjects, opts.Global.FailFast = tt.allProjects, tt.failFast
 			var callbackResults []ecosystems.SCAResult

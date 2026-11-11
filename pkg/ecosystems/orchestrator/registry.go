@@ -64,14 +64,14 @@ func NewPluginRegistry(ictx workflow.InvocationContext, options ...RegistryOptio
 	}
 
 	// bazel, a dependency of every other plugin because it's a build tool that can build any other language.
-	if err := r.register(bazel.Plugin{}, withFeatureFlagCheck(FlagBazelResolver)); err != nil {
+	if err := r.register(nativePlugin{SCAPlugin: bazel.Plugin{}}, withFeatureFlagCheck(FlagBazelResolver)); err != nil {
 		return nil, fmt.Errorf("failed to register bazel plugin: %w", err)
 	}
 	// javascript
-	if err := r.register(bun.Plugin{}, withFeatureFlagCheck(FlagBunResolver), withPluginDependencies(bazelPluginName)); err != nil {
+	if err := r.register(nativePlugin{SCAPlugin: bun.Plugin{}}, withFeatureFlagCheck(FlagBunResolver), withPluginDependencies(bazelPluginName)); err != nil {
 		return nil, fmt.Errorf("failed to register bun plugin: %w", err)
 	}
-	if err := r.register(pnpm.Plugin{}, withFeatureFlagCheck(FlagPnpmResolver), withPluginDependencies(bazelPluginName)); err != nil {
+	if err := r.register(nativePlugin{SCAPlugin: pnpm.Plugin{}}, withFeatureFlagCheck(FlagPnpmResolver), withPluginDependencies(bazelPluginName)); err != nil {
 		return nil, fmt.Errorf("failed to register pnpm plugin: %w", err)
 	}
 	// gradle (opt-in via feature flag)
@@ -82,15 +82,15 @@ func NewPluginRegistry(ictx workflow.InvocationContext, options ...RegistryOptio
 		cfg.GetString(configuration.ORGANIZATION),
 	)
 	gradlePlugin := gradle.NewGradlePluginWithNormalizeDepsHook(normalizeDepsPostHook)
-	if err := r.register(gradlePlugin, withFeatureFlagCheck(FlagNewGradleResolver), withPluginDependencies(bazelPluginName)); err != nil {
+	if err := r.register(nativePlugin{SCAPlugin: gradlePlugin}, withFeatureFlagCheck(FlagNewGradleResolver), withPluginDependencies(bazelPluginName)); err != nil {
 		return nil, fmt.Errorf("failed to register gradle plugin: %w", err)
 	}
 	// rust
-	if err := r.register(cargo.Plugin{}, withFeatureFlagCheck(FlagCargoResolver), withPluginDependencies(bazelPluginName)); err != nil {
+	if err := r.register(nativePlugin{SCAPlugin: cargo.Plugin{}}, withFeatureFlagCheck(FlagCargoResolver), withPluginDependencies(bazelPluginName)); err != nil {
 		return nil, fmt.Errorf("failed to register cargo plugin: %w", err)
 	}
 	// dotnet
-	if err := r.register(nuget.Plugin{}, withFeatureFlagCheck(FlagDotnetResolver), withPluginDependencies(bazelPluginName)); err != nil {
+	if err := r.register(nativePlugin{SCAPlugin: nuget.Plugin{}}, withFeatureFlagCheck(FlagDotnetResolver), withPluginDependencies(bazelPluginName)); err != nil {
 		return nil, fmt.Errorf("failed to register dotnet plugin: %w", err)
 	}
 
@@ -109,20 +109,20 @@ func NewPluginRegistry(ictx workflow.InvocationContext, options ...RegistryOptio
 			return nil, fmt.Errorf("failed to register uv plugin: %w", err)
 		}
 	}
+	var dependencies []string
+	for _, plugin := range r.plugins {
+		dependencies = append(dependencies, plugin.GetName())
+	}
+	if err := r.register(legacy.NewPlugin(ictx), withPluginDependencies(dependencies...)); err != nil {
+		return nil, fmt.Errorf("failed to register legacy plugin: %w", err)
+	}
+
 	return r, nil
 }
 
-// Plugins returns a caller-owned slice in native, UV, legacy fallback order.
+// Plugins returns a caller-owned copy of the registered execution order.
 func (r *PluginRegistry) Plugins() []ecosystems.SCAPlugin {
-	plugins := make([]ecosystems.SCAPlugin, 0, len(r.plugins)+1)
-	for _, plugin := range r.plugins {
-		if plugin.GetName() == uv.PluginName {
-			plugins = append(plugins, plugin)
-		} else {
-			plugins = append(plugins, nativePlugin{SCAPlugin: plugin})
-		}
-	}
-	return append(plugins, legacy.NewPlugin(r.ictx))
+	return append([]ecosystems.SCAPlugin(nil), r.plugins...)
 }
 
 func (r *PluginRegistry) ResolveDepgraphs(dir string, opts *ecosystems.SCAPluginOptions) <-chan ecosystems.SCAResult {

@@ -118,7 +118,7 @@ func TestPluginRegistry_DefaultRegistryOrder(t *testing.T) {
 	r, err := NewDefaultPluginRegistry(setupMockInvocationContext(t))
 	require.NoError(t, err)
 
-	require.Len(t, r.plugins, 0)
+	require.Len(t, r.plugins, 1)
 }
 
 func TestPluginRegistry_DefaultRegistryOrder_WithFeatureFlags(t *testing.T) {
@@ -133,8 +133,8 @@ func TestPluginRegistry_DefaultRegistryOrder_WithFeatureFlags(t *testing.T) {
 	r, err := NewDefaultPluginRegistry(ictx)
 	require.NoError(t, err)
 
-	require.Len(t, r.plugins, 6)
-	expectedOrder := []string{"bazel", "bun", "pnpm", "gradle", "cargo", "dotnet"}
+	require.Len(t, r.plugins, 7)
+	expectedOrder := []string{"bazel", "bun", "pnpm", "gradle", "cargo", "dotnet", "legacycli"}
 	for i, plugin := range r.plugins {
 		assert.Equal(t, expectedOrder[i], plugin.GetName())
 	}
@@ -146,7 +146,7 @@ func TestPluginRegistry_DefaultRegistryHasNoCircularDependencies(t *testing.T) {
 	require.NoError(t, err, "NewDefaultPluginRegistry should not return error for valid dependency graph")
 	assert.NotNil(t, r)
 	assert.NotNil(t, r.plugins, "plugins should be successfully sorted without circular dependencies")
-	assert.Len(t, r.plugins, 0, "all 0 plugins should be registered")
+	assert.Len(t, r.plugins, 1, "only the legacy fallback should be registered")
 }
 
 func TestPluginRegistry_DefaultRegistryHasNoCircularDependencies_WithFeatureFlags(t *testing.T) {
@@ -163,7 +163,7 @@ func TestPluginRegistry_DefaultRegistryHasNoCircularDependencies_WithFeatureFlag
 	require.NoError(t, err, "NewDefaultPluginRegistry should not return error for valid dependency graph")
 	assert.NotNil(t, r)
 	assert.NotNil(t, r.plugins, "plugins should be successfully sorted without circular dependencies")
-	assert.Len(t, r.plugins, 6, "all 6 plugins should be registered")
+	assert.Len(t, r.plugins, 7, "six native plugins and the legacy fallback should be registered")
 }
 
 func TestPluginRegistry_CircularDependencyReturnsError(t *testing.T) {
