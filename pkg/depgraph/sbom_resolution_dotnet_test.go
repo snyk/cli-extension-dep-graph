@@ -434,13 +434,14 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 }
 
 func Test_buildPluginOptions_dotnetFlags(t *testing.T) {
-	t.Run("defaults leave every .NET option unset", func(t *testing.T) {
+	t.Run("defaults leave every .NET flag unset and keep the CLI identity", func(t *testing.T) {
 		opts, err := buildPluginOptions(configuration.New())
 		require.NoError(t, err)
 
 		assert.Empty(t, opts.Dotnet.TargetFramework, "every declared framework is reported")
 		assert.False(t, opts.Dotnet.AssetsProjectName, "the directory-derived name is kept")
 		assert.Empty(t, opts.Dotnet.PackagesFolder, "the resolver derives the location")
+		assert.True(t, opts.Dotnet.CLIProjectIdentity, "projects the CLI already monitors keep their identity")
 	})
 
 	t.Run("the .NET flags reach DotnetOptions", func(t *testing.T) {

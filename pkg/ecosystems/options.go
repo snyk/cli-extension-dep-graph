@@ -152,6 +152,14 @@ type DotnetOptions struct {
 	// packages.config names its project, and a project.json that does is
 	// already honored without a flag.
 	AssetsProjectName bool `arg:"--assets-project-name"`
+
+	// CLIProjectIdentity reports each project under the identity the legacy
+	// CLI gave it: named after the scanned directory and reported under its
+	// manifest, not the project file. A project the CLI already monitors then
+	// keeps its history. False (the default) reports the project file, named
+	// after its directory, which SCM imports depend on. Not a CLI flag: the
+	// CLI entry points set it.
+	CLIProjectIdentity bool
 }
 
 func NewPluginOptions() *SCAPluginOptions {
@@ -163,6 +171,9 @@ func NewPluginOptions() *SCAPluginOptions {
 	}
 }
 
+// NewPluginOptionsFromRawFlags builds the options for a scan the CLI runs, from
+// the flags it was invoked with. Only the CLI has raw flags, so the CLI's .NET
+// project identity is set here too.
 func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) {
 	var args struct {
 		GlobalOptions
@@ -179,6 +190,7 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 	}
 
 	args.RawFlags = rawFlags
+	args.CLIProjectIdentity = true
 
 	if args.DetectionDepthRaw != nil {
 		depth, err := ParseDetectionDepth(*args.DetectionDepthRaw)
@@ -371,5 +383,12 @@ func (o *SCAPluginOptions) WithDotnetTargetFramework(targetFramework string) *SC
 // default) names it after the directory holding the manifest.
 func (o *SCAPluginOptions) WithAssetsProjectName(assetsProjectName bool) *SCAPluginOptions {
 	o.Dotnet.AssetsProjectName = assetsProjectName
+	return o
+}
+
+// WithCLIProjectIdentity reports .NET projects under the identity the legacy CLI
+// gave them. See DotnetOptions.CLIProjectIdentity.
+func (o *SCAPluginOptions) WithCLIProjectIdentity(cliProjectIdentity bool) *SCAPluginOptions {
+	o.Dotnet.CLIProjectIdentity = cliProjectIdentity
 	return o
 }

@@ -213,7 +213,8 @@ func buildPluginOptions(config configuration.Configuration) (*ecosystems.SCAPlug
 		WithExcludePaths(parseExcludeFlag(config.GetString(workflow.FlagExcludePaths))).
 		WithFailFast(config.GetBool(workflow.FlagFailFast)).
 		WithForceSingleGraph(config.GetBool(workflow.FlagForceSingleGraph)).
-		WithAssetsProjectName(config.GetBool(workflow.FlagNugetAssetsProjectName))
+		WithAssetsProjectName(config.GetBool(workflow.FlagNugetAssetsProjectName)).
+		WithCLIProjectIdentity(true)
 
 	if targetFile := config.GetString(workflow.FlagFile); targetFile != "" {
 		opts = opts.WithTargetFile(targetFile)
