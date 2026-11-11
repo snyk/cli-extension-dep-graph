@@ -182,48 +182,15 @@ func buildPluginOptions(config configuration.Configuration) (*ecosystems.SCAPlug
 		return nil, fmt.Errorf("building plugin options: %w", err)
 	}
 
-	applyConfiguredPluginFlags(config, opts)
-
-	if config.IsSet(workflow.FlagStrictOutOfSync) {
-		strictOutOfSync := true
-		if parsed, err := strconv.ParseBool(config.GetString(workflow.FlagStrictOutOfSync)); err == nil {
-			strictOutOfSync = parsed
-		}
-		opts.WithAllowOutOfSync(!strictOutOfSync)
-	}
-	if config.IsSet(workflow.FlagExclude) {
-		opts.Global.Exclude = parseExcludeFlag(config.GetString(workflow.FlagExclude))
-	}
-	if config.IsSet(workflow.FlagExcludePaths) {
-		opts.Global.ExcludePaths = parseExcludeFlag(config.GetString(workflow.FlagExcludePaths))
-	}
-	if targetFile := config.GetString(workflow.FlagFile); targetFile != "" {
-		opts.WithTargetFile(targetFile)
-	}
-	if config.IsSet(workflow.FlagDetectionDepth) {
-		depth, err := ecosystems.ParseDetectionDepth(config.GetString(workflow.FlagDetectionDepth))
-		if err != nil {
-			return nil, fmt.Errorf("building plugin options: %w", err)
-		}
-		opts.WithDetectionDepth(depth)
-	}
-
-	// The CLI resolves --packages-folder from the working directory.
-	if config.IsSet(workflow.FlagNugetPkgsFolder) {
-		opts.Dotnet.PackagesFolder = config.GetString(workflow.FlagNugetPkgsFolder)
-	}
-	if packagesFolder := opts.Dotnet.PackagesFolder; packagesFolder != "" {
-		if abs, err := filepath.Abs(packagesFolder); err == nil {
-			packagesFolder = abs
-		}
-		opts.WithPackagesFolder(packagesFolder)
+	if err := applyConfiguredPluginFlags(config, opts); err != nil {
+		return nil, err
 	}
 
 	return opts, nil
 }
 
 // Absent config must not erase selectors parsed from the original CLI arguments.
-func applyConfiguredPluginFlags(config configuration.Configuration, opts *ecosystems.SCAPluginOptions) {
+func applyConfiguredPluginFlags(config configuration.Configuration, opts *ecosystems.SCAPluginOptions) error {
 	applyConfiguredFlags(config, config.GetBool, []configuredFlag[bool]{
 		{workflow.FlagAllProjects, &opts.Global.AllProjects},
 		{workflow.FlagUvWorkspacePackages, &opts.Global.ForceIncludeWorkspacePackages},
@@ -240,12 +207,40 @@ func applyConfiguredPluginFlags(config configuration.Configuration, opts *ecosys
 		{workflow.FlagConfigurationAttributes, &opts.Gradle.ConfigurationAttributes},
 		{workflow.FlagInitScript, &opts.Gradle.InitScript},
 		{workflow.FlagDotnetTargetFramework, &opts.Dotnet.TargetFramework},
+		{workflow.FlagNugetPkgsFolder, &opts.Dotnet.PackagesFolder},
 	})
-	if config.IsSet(workflow.FlagGradleSubProject) {
-		opts.Gradle.SubProject = config.GetString(workflow.FlagGradleSubProject)
-	} else if config.IsSet(workflow.FlagSubProject) {
-		opts.Gradle.SubProject = config.GetString(workflow.FlagSubProject)
+	applyFlag(config.IsSet, config.GetString, &opts.Gradle.SubProject, workflow.FlagGradleSubProject, workflow.FlagSubProject)
+	applyFlag(config.IsSet, func(key string) bool {
+		strict, err := strconv.ParseBool(config.GetString(key))
+		return err == nil && !strict
+	}, &opts.Global.AllowOutOfSync, workflow.FlagStrictOutOfSync)
+	applyConfiguredFlags(config, func(key string) ecosystems.CommaSeparatedString {
+		return parseExcludeFlag(config.GetString(key))
+	}, []configuredFlag[ecosystems.CommaSeparatedString]{
+		{workflow.FlagExclude, &opts.Global.Exclude},
+		{workflow.FlagExcludePaths, &opts.Global.ExcludePaths},
+	})
+	applyFlag(func(key string) bool { return config.GetString(key) != "" }, func(key string) *string {
+		value := config.GetString(key)
+		return &value
+	}, &opts.Global.TargetFile, workflow.FlagFile)
+
+	var detectionDepth string
+	if applyFlag(config.IsSet, config.GetString, &detectionDepth, workflow.FlagDetectionDepth) {
+		depth, err := ecosystems.ParseDetectionDepth(detectionDepth)
+		if err != nil {
+			return fmt.Errorf("building plugin options: %w", err)
+		}
+		opts.WithDetectionDepth(depth)
 	}
+
+	// The CLI resolves --packages-folder from the working directory.
+	if packagesFolder := opts.Dotnet.PackagesFolder; packagesFolder != "" {
+		if abs, err := filepath.Abs(packagesFolder); err == nil {
+			opts.WithPackagesFolder(abs)
+		}
+	}
+	return nil
 }
 
 type configuredFlag[T any] struct {
@@ -255,10 +250,19 @@ type configuredFlag[T any] struct {
 
 func applyConfiguredFlags[T any](config configuration.Configuration, get func(string) T, flags []configuredFlag[T]) {
 	for _, flag := range flags {
-		if config.IsSet(flag.key) {
-			*flag.target = get(flag.key)
+		applyFlag(config.IsSet, get, flag.target, flag.key)
+	}
+}
+
+// The first configured key wins, including explicit zero values.
+func applyFlag[T any](isSet func(string) bool, get func(string) T, target *T, keys ...string) bool {
+	for _, key := range keys {
+		if isSet(key) {
+			*target = get(key)
+			return true
 		}
 	}
+	return false
 }
 
 func checkFailFast(logger *zerolog.Logger, failFast, allProjects bool, results []ecosystems.SCAResult) error {
