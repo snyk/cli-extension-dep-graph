@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,6 +15,7 @@ import (
 )
 
 func TestNativePlugin_Resolution(t *testing.T) {
+	setupError := errors.New("resolver setup failed")
 	for _, tt := range []struct {
 		name         string
 		allProjects  bool
@@ -30,9 +32,9 @@ func TestNativePlugin_Resolution(t *testing.T) {
 			name: "all projects runs each native", allProjects: true,
 			firstResults: []ecosystems.SCAResult{{ProcessedFiles: []string{"Cargo.lock", "Cargo.lock"}}}, wantResults: 2, wantSecond: true,
 		},
-		{name: "all projects continues after setup error", allProjects: true, firstErr: context.DeadlineExceeded, wantResults: 2, wantSecond: true},
-		{name: "default setup error takes precedence", firstErr: context.DeadlineExceeded, wantResults: 1},
-		{name: "fail fast setup error skips later native", allProjects: true, failFast: true, firstErr: context.DeadlineExceeded, wantResults: 1},
+		{name: "all projects continues after setup error", allProjects: true, firstErr: setupError, wantResults: 2, wantSecond: true},
+		{name: "default setup error takes precedence", firstErr: setupError, wantResults: 1},
+		{name: "fail fast setup error skips later native", allProjects: true, failFast: true, firstErr: setupError, wantResults: 1},
 		{
 			name: "fail fast result error skips later native", allProjects: true, failFast: true,
 			firstResults: []ecosystems.SCAResult{{Error: context.DeadlineExceeded}}, wantResults: 1,
@@ -70,6 +72,71 @@ func TestNativePlugin_Resolution(t *testing.T) {
 			} else {
 				assert.Nil(t, second.capturedExcludePaths)
 			}
+		})
+	}
+}
+
+func TestNativePlugin_ReturnedCancellation(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		err  error
+		want error
+	}{
+		{name: "canceled", err: context.Canceled, want: context.Canceled},
+		{name: "deadline exceeded", err: context.DeadlineExceeded, want: context.DeadlineExceeded},
+		{name: "wrapped canceled", err: fmt.Errorf("resolver stopped: %w", context.Canceled), want: context.Canceled},
+		{name: "wrapped deadline exceeded", err: fmt.Errorf("resolver stopped: %w", context.DeadlineExceeded), want: context.DeadlineExceeded},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, withLaterPlugin := range []bool{false, true} {
+				t.Run(fmt.Sprintf("later plugin %t", withLaterPlugin), func(t *testing.T) {
+					first := &mockPlugin{name: "cargo", err: tt.err}
+					later := &mockPlugin{name: "uv"}
+					registry := &PluginRegistry{plugins: []ecosystems.SCAPlugin{first}}
+					if withLaterPlugin {
+						registry.plugins = append(registry.plugins, later)
+					}
+					var results []ecosystems.SCAResult
+
+					err := registry.NativePlugin().BuildDepGraphsFromDir(context.Background(), logger.Nop(), "test",
+						ecosystems.NewPluginOptions().WithAllProjects(true).WithExcludePaths([]string{"existing"}), func(result ecosystems.SCAResult) error {
+							results = append(results, result)
+							return nil
+						})
+
+					assert.ErrorIs(t, err, tt.want)
+					assert.Empty(t, results)
+					assert.Nil(t, later.capturedExcludePaths)
+				})
+			}
+		})
+	}
+}
+
+func TestNativePlugin_ReturnedErrorMetadata(t *testing.T) {
+	explicitTarget := "nested/Cargo.toml"
+	failure := errors.New("resolver setup failed")
+	for _, tt := range []struct {
+		name   string
+		target *string
+		want   string
+	}{
+		{name: "explicit target", target: &explicitTarget, want: explicitTarget},
+		{name: "plugin fallback", want: "cargo"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			registry := &PluginRegistry{plugins: []ecosystems.SCAPlugin{&mockPlugin{name: "cargo", err: failure}}}
+			opts := ecosystems.NewPluginOptions()
+			opts.Global.TargetFile = tt.target
+			var results []ecosystems.SCAResult
+
+			err := registry.NativePlugin().BuildDepGraphsFromDir(context.Background(), logger.Nop(), "test", opts,
+				func(result ecosystems.SCAResult) error { results = append(results, result); return nil })
+
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			assert.ErrorIs(t, results[0].Error, failure)
+			assert.Equal(t, &ecosystems.ResolverMetadata{PluginName: "cargo", NormalisedTargetFile: tt.want}, results[0].ResolverMetadata)
 		})
 	}
 }

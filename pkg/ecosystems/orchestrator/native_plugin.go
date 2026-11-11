@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
@@ -64,11 +65,11 @@ func (p *nativePlugin) BuildDepGraphsFromDir(
 		if callbackErr != nil {
 			return fmt.Errorf("streaming native result: %w", callbackErr)
 		}
-		if err != nil {
-			if emitErr := emit(ecosystems.SCAResult{
-				Error:            err,
-				ResolverMetadata: &ecosystems.ResolverMetadata{PluginName: plugin.GetName()},
-			}); emitErr != nil {
+		switch {
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+			return fmt.Errorf("running %s plugin: %w", plugin.GetName(), err)
+		case err != nil:
+			if emitErr := emit(ecosystems.SCAResult{Error: err}); emitErr != nil {
 				return fmt.Errorf("streaming native error: %w", emitErr)
 			}
 		}
