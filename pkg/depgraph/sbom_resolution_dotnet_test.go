@@ -40,9 +40,10 @@ func pluginNames(plugins []ecosystems.SCAPlugin) []string {
 func Test_buildSCAPlugins_dotnetResolverIsOptIn(t *testing.T) {
 	tc := setupTestContext(t, false)
 
-	plugins := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+	plugins, buildErr := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+	require.NoError(t, buildErr)
 
-	assert.Equal(t, []string{"uv", "legacycli"}, pluginNames(plugins),
+	assert.Equal(t, []string{"native", "uv", "legacycli"}, pluginNames(plugins),
 		"the .NET resolver must not run unless its feature flag is set")
 }
 
@@ -50,11 +51,12 @@ func Test_buildSCAPlugins_dotnetResolverEnabled(t *testing.T) {
 	tc := setupTestContext(t, false)
 	tc.config.Set(orchestrator.FlagDotnetResolver.Key, true)
 
-	plugins := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+	plugins, buildErr := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+	require.NoError(t, buildErr)
 
 	// legacy stays last: it is the fallback, and each plugin's processed files
 	// are excluded from the plugins that follow it.
-	require.Equal(t, []string{"uv", "dotnet", "legacycli"}, pluginNames(plugins))
+	require.Equal(t, []string{"native", "uv", "legacycli"}, pluginNames(plugins))
 }
 
 // sdkStyleProject writes a restored SDK-style project — the shape the .NET
@@ -131,7 +133,8 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 			apply(tc.config)
 		}
 
-		plugins := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+		plugins, buildErr := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+		require.NoError(t, buildErr)
 
 		workflowData, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, plugins)
 		require.NoError(t, err)
@@ -378,7 +381,8 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 		tc.config.Set(orchestrator.FlagDotnetResolver.Key, true)
 		tc.config.Set(workflow.FlagDotnetTargetFramework, "net8.0")
 
-		plugins := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+		plugins, buildErr := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+		require.NoError(t, buildErr)
 
 		// --fail-fast aborts on any error result, so this passing at all is the
 		// assertion that the filter produces none.
@@ -399,7 +403,8 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 		tc.config.Set(orchestrator.FlagDotnetResolver.Key, true)
 		tc.config.Set(workflow.FlagDotnetTargetFramework, "net9.0")
 
-		plugins := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+		plugins, buildErr := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+		require.NoError(t, buildErr)
 
 		_, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, plugins)
 		require.Error(t, err, "the user asked for a framework that exists nowhere in the scan")
