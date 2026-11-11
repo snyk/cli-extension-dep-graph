@@ -14,10 +14,6 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/scatest"
 )
 
-// scanRootName names the directory each case scans. The legacy CLI names every
-// project after it, so it is fixed rather than a random temp dir name.
-const scanRootName = "scan-root"
-
 // reportedAs is what a project is identified by: the target file it is
 // reported under and its root name. A change to either creates a new project
 // beside the one already monitored.
@@ -30,9 +26,6 @@ type reportedAs struct {
 // --dotnet-runtime-resolution modes. Its getRootName is unchanged through 4.5.8.
 // The SCM column is the identity SCM imports depend on.
 func TestPlugin_ProjectIdentity(t *testing.T) {
-	namedProjectJSON := `{"dependencies": {"Newtonsoft.Json": "8.0.3"},
-      "project": { "restore": { "projectName": "FromProjectJSON" } }}`
-
 	tests := []struct {
 		name    string
 		files   map[string]string
@@ -318,9 +311,9 @@ func TestNewProjectNaming(t *testing.T) {
 		assert.Empty(t, naming.cliRootName)
 
 		sep := string(filepath.Separator)
-		assert.Equal(t, "cart", naming.rootName(discovery.FindResult{Path: filepath.Join(sep, "cart", "obj", projectAssetsFile)}))
-		assert.Equal(t, cliLastResortRootName, naming.rootName(discovery.FindResult{Path: filepath.Join(sep, "obj", projectAssetsFile)}))
-		assert.Equal(t, cliLastResortRootName, naming.rootName(discovery.FindResult{Path: filepath.Join(sep, packagesConfigFile)}))
+		assert.Equal(t, "cart", naming.rootName(discovery.FindResult{Path: filepath.Join(sep, "cart", "obj", projectAssetsFile)}, ""))
+		assert.Equal(t, cliLastResortRootName, naming.rootName(discovery.FindResult{Path: filepath.Join(sep, "obj", projectAssetsFile)}, ""))
+		assert.Equal(t, cliLastResortRootName, naming.rootName(discovery.FindResult{Path: filepath.Join(sep, packagesConfigFile)}, ""))
 	})
 }
 
