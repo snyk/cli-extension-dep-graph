@@ -26,6 +26,7 @@ func (p nativePlugin) BuildDepGraphsFromDir(
 		if callbackErr != nil {
 			return callbackErr
 		}
+		p.withResultMetadata(&result, opts)
 		callbackErr = onGraph(result)
 		return callbackErr
 	})
@@ -38,18 +39,31 @@ func (p nativePlugin) BuildDepGraphsFromDir(
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return fmt.Errorf("running %s plugin: %w", p.GetName(), err)
 	}
-	target := p.GetName()
-	if opts != nil && opts.Global.TargetFile != nil {
-		target = *opts.Global.TargetFile
-	}
-	if emitErr := onGraph(ecosystems.SCAResult{
-		Error: err,
-		ResolverMetadata: &ecosystems.ResolverMetadata{
-			PluginName:           p.GetName(),
-			NormalisedTargetFile: target,
-		},
-	}); emitErr != nil {
+	result := ecosystems.SCAResult{Error: err}
+	p.withResultMetadata(&result, opts)
+	if emitErr := onGraph(result); emitErr != nil {
 		return fmt.Errorf("emitting %s failure: %w", p.GetName(), emitErr)
 	}
 	return nil
+}
+
+func (p nativePlugin) withResultMetadata(result *ecosystems.SCAResult, opts *ecosystems.SCAPluginOptions) {
+	var metadata ecosystems.ResolverMetadata
+	if result.ResolverMetadata != nil {
+		metadata = *result.ResolverMetadata
+	}
+	if metadata.PluginName == "" {
+		metadata.PluginName = p.GetName()
+	}
+	if metadata.NormalisedTargetFile == "" {
+		target := result.ProjectDescriptor.GetTargetFile()
+		if target == "" && opts != nil && opts.Global.TargetFile != nil {
+			target = *opts.Global.TargetFile
+		}
+		if target == "" {
+			target = p.GetName()
+		}
+		metadata.NormalisedTargetFile = target
+	}
+	result.ResolverMetadata = &metadata
 }

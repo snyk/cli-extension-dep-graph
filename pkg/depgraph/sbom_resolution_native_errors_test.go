@@ -80,3 +80,62 @@ func Test_handleSBOMResolution_nativeReturnedError(t *testing.T) {
 		})
 	}
 }
+
+func Test_handleSBOMResolution_nativeEmittedErrorWithoutMetadata(t *testing.T) {
+	cases := []struct {
+		name                  string
+		allProjects, failFast bool
+	}{
+		{name: "all projects preserves UV and legacy", allProjects: true},
+		{name: "default surfaces native error"},
+		{name: "failfast reports manifest", allProjects: true, failFast: true},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := setupTestContext(t, false)
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "build.gradle"), nil, 0o600))
+			t.Setenv("PATH", t.TempDir())
+			tc.config.Set(configuration.INPUT_DIRECTORY, dir)
+			tc.config.Set(workflow.FlagAllProjects, tt.allProjects)
+			tc.config.Set(workflow.FlagFailFast, tt.failFast)
+			tc.config.Set(workflow.FlagUseSBOMResolution, true)
+			tc.config.Set(orchestrator.FlagNewGradleResolver.Key, true)
+			if tt.allProjects && !tt.failFast {
+				tc.userInterface.EXPECT().OutputError(gomock.Any()).DoAndReturn(func(err error, _ ...ui.Opts) error {
+					assert.Contains(t, err.Error(), "build.gradle")
+					assert.Contains(t, err.Error(), "1/3 potential projects failed")
+					return nil
+				})
+			}
+			harness := NewLegacyHarness(tc)
+			harness.ReturnTargets = []string{"package.json"}
+			uv := &mockScaPlugin{name: "uv", results: []ecosystems.SCAResult{{
+				DepGraph:         createTestDepGraph(t, "uv", "python-app", "1.0.0"),
+				ResolverMetadata: &ecosystems.ResolverMetadata{PluginName: "uv", NormalisedTargetFile: "pyproject.toml"},
+			}}}
+			registry, err := orchestrator.NewDefaultPluginRegistry(tc.invocationContext)
+			require.NoError(t, err)
+
+			data, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, registry.Plugins(uv))
+
+			if !tt.allProjects || tt.failFast {
+				require.Error(t, err)
+				assert.Empty(t, data)
+				if tt.failFast {
+					require.ErrorContains(t, err, "Failed to scan build.gradle")
+					var exitErr interface{ ExitCode() int }
+					require.ErrorAs(t, err, &exitErr)
+					assert.Equal(t, 2, exitErr.ExitCode())
+				}
+				assert.False(t, harness.Called())
+				assert.Nil(t, uv.options)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, data, 2)
+			assert.Equal(t, "pyproject.toml", metaString(t, data[0], workflow.MetaKeyNormalisedTargetFile))
+			assert.Equal(t, "package.json", metaString(t, data[1], workflow.MetaKeyNormalisedTargetFile))
+		})
+	}
+}
