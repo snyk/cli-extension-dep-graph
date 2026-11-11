@@ -461,7 +461,7 @@ func collectResults(resultsChan <-chan ecosystems.SCAResult) []ecosystems.SCARes
 	return results
 }
 
-func TestPluginRegistry_Plugins(t *testing.T) {
+func TestPluginRegistry_ComposePlugins(t *testing.T) {
 	cases := []struct {
 		name       string
 		enabled    bool
@@ -489,7 +489,7 @@ func TestPluginRegistry_Plugins(t *testing.T) {
 			registry, err := NewDefaultPluginRegistry(ictx)
 			require.NoError(t, err)
 
-			plugins := registry.Plugins(tt.additional...)
+			plugins := registry.ComposePlugins(tt.additional...)
 
 			names := make([]string, len(plugins))
 			for i, plugin := range plugins {

@@ -59,7 +59,7 @@ func Test_handleSBOMResolution_nativeReturnedError(t *testing.T) {
 			registry, err := orchestrator.NewDefaultPluginRegistry(tc.invocationContext)
 			require.NoError(t, err)
 
-			data, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, registry.Plugins(uv))
+			data, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, registry.ComposePlugins(uv))
 
 			assert.Equal(t, !tt.wantError, uv.options != nil)
 			assert.Equal(t, !tt.wantError, harness.Called())
@@ -117,7 +117,7 @@ func Test_handleSBOMResolution_nativeEmittedErrorWithoutMetadata(t *testing.T) {
 			registry, err := orchestrator.NewDefaultPluginRegistry(tc.invocationContext)
 			require.NoError(t, err)
 
-			data, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, registry.Plugins(uv))
+			data, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, registry.ComposePlugins(uv))
 
 			if !tt.allProjects || tt.failFast {
 				require.Error(t, err)

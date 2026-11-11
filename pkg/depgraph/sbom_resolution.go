@@ -65,7 +65,7 @@ func buildSCAPlugins(
 	if err != nil {
 		return nil, fmt.Errorf("building scanner registry: %w", err)
 	}
-	return registry.Plugins(uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL)), nil
+	return registry.ComposePlugins(uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL)), nil
 }
 
 const errMsgNoSupportedProjects = "no supported projects detected"
