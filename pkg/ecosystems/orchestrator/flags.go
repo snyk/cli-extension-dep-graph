@@ -40,7 +40,13 @@ var FlagDotnetResolver = flag{
 	Value: "internal-dotnet-resolver",
 }
 
+var FlagUvResolver = flag{
+	Key:   "internal_snyk_cli_uv_enabled",
+	Value: "enableUvCLI",
+}
+
 var allFlags = []flag{
+	FlagUvResolver,
 	FlagUnifiedTestAPIOsCLI,
 	FlagNewGradleResolver,
 	FlagBazelResolver,

@@ -19,6 +19,7 @@ import (
 )
 
 type mockPlugin struct {
+	calls   int
 	name    string
 	results []ecosystems.SCAResult
 	err     error
@@ -45,6 +46,7 @@ func (m *mockPlugin) BuildDepGraphsFromDir(
 	opts *ecosystems.SCAPluginOptions,
 	onGraph ecosystems.OnGraphFunc,
 ) error {
+	m.calls++
 	if opts != nil {
 		m.capturedExclude = append([]string(nil), opts.Global.Exclude...)
 		m.capturedExcludePaths = append([]string(nil), opts.Global.ExcludePaths...)
@@ -459,4 +461,48 @@ func collectResults(resultsChan <-chan ecosystems.SCAResult) []ecosystems.SCARes
 		results = append(results, result)
 	}
 	return results
+}
+
+func TestPluginRegistry_Plugins(t *testing.T) {
+	cases := []struct {
+		name       string
+		enabled    bool
+		additional []ecosystems.SCAPlugin
+		want       []string
+	}{
+		{name: "legacy fallback only", want: []string{"legacycli"}},
+		{name: "injected uv before legacy", additional: []ecosystems.SCAPlugin{&mockPlugin{name: "uv"}}, want: []string{"uv", "legacycli"}},
+		{
+			name: "native callers do not enable uv", enabled: true,
+			want: []string{"bazel", "bun", "pnpm", "gradle", "cargo", "dotnet", "legacycli"},
+		},
+		{
+			name: "native scanners precede injected uv", enabled: true, additional: []ecosystems.SCAPlugin{&mockPlugin{name: "uv"}},
+			want: []string{"bazel", "bun", "pnpm", "gradle", "cargo", "dotnet", "uv", "legacycli"},
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			ictx := setupMockInvocationContextWithConfig(t, func(cfg configuration.Configuration) {
+				for _, flag := range []flag{FlagBazelResolver, FlagBunResolver, FlagPnpmResolver, FlagNewGradleResolver, FlagCargoResolver, FlagDotnetResolver} {
+					cfg.Set(flag.Key, tt.enabled)
+				}
+			})
+			var options []RegistryOption
+			if len(tt.additional) > 0 {
+				ictx.GetConfiguration().Set("use-sbom-resolution", true)
+				options = append(options, WithUVPlugin(tt.additional[0]))
+			}
+			registry, err := NewPluginRegistry(ictx, options...)
+			require.NoError(t, err)
+
+			plugins := registry.Plugins()
+
+			names := make([]string, len(plugins))
+			for i, plugin := range plugins {
+				names[i] = plugin.GetName()
+			}
+			assert.Equal(t, tt.want, names)
+		})
+	}
 }

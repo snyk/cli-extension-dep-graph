@@ -1,13 +1,15 @@
 package orchestrator
 
 import (
-	"context"
+	"errors"
 	"fmt"
 
-	"github.com/rs/zerolog"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	"github.com/snyk/go-application-framework/pkg/workflow"
 
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/remoteconv"
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/snykclient"
+	internalworkflow "github.com/snyk/cli-extension-dep-graph/v2/internal/workflow"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/bazel"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/dotnet/nuget"
@@ -16,6 +18,7 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/javascript/pnpm"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/legacy"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/python/uv"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/rust/cargo"
 )
 
@@ -36,7 +39,24 @@ type PluginRegistry struct {
 	plugins []ecosystems.SCAPlugin
 }
 
+type RegistryOption func(*registryOptions)
+
+type registryOptions struct{ uvPlugin ecosystems.SCAPlugin }
+
+// WithUVPlugin injects the UV implementation without changing its feature gate.
+func WithUVPlugin(plugin ecosystems.SCAPlugin) RegistryOption {
+	return func(opts *registryOptions) { opts.uvPlugin = plugin }
+}
+
 func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry, error) {
+	return NewPluginRegistry(ictx)
+}
+
+func NewPluginRegistry(ictx workflow.InvocationContext, options ...RegistryOption) (*PluginRegistry, error) {
+	var opts registryOptions
+	for _, option := range options {
+		option(&opts)
+	}
 	r := &PluginRegistry{
 		ictx:    ictx,
 		entries: make([]pluginEntry, 0),
@@ -74,49 +94,60 @@ func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry,
 		return nil, fmt.Errorf("failed to register dotnet plugin: %w", err)
 	}
 
+	if cfg.GetBool(FlagUvResolver.Key) || cfg.GetBool(internalworkflow.FlagUseSBOMResolution) {
+		uvPlugin := opts.uvPlugin
+		if uvPlugin == nil {
+			client := snykclient.NewSnykClient(ictx.GetNetworkAccess().GetHttpClient(), cfg.GetString(configuration.API_URL), cfg.GetString(configuration.ORGANIZATION))
+			converter := remoteconv.NewRemoteSBOMConverter(client, logger.NewFromZerolog(ictx.GetEnhancedLogger()))
+			uvPlugin = uv.NewPlugin(uv.NewClient(), converter, cfg.GetString("remote-repo-url"))
+		}
+		var dependencies []string
+		for _, plugin := range r.plugins {
+			dependencies = append(dependencies, plugin.GetName())
+		}
+		if err := r.register(uvPlugin, withPluginDependencies(dependencies...)); err != nil {
+			return nil, fmt.Errorf("failed to register uv plugin: %w", err)
+		}
+	}
 	return r, nil
 }
 
+// Plugins returns a caller-owned slice in native, UV, legacy fallback order.
+func (r *PluginRegistry) Plugins() []ecosystems.SCAPlugin {
+	plugins := make([]ecosystems.SCAPlugin, 0, len(r.plugins)+1)
+	for _, plugin := range r.plugins {
+		if plugin.GetName() == uv.PluginName {
+			plugins = append(plugins, plugin)
+		} else {
+			plugins = append(plugins, nativePlugin{SCAPlugin: plugin})
+		}
+	}
+	return append(plugins, legacy.NewPlugin(r.ictx))
+}
+
 func (r *PluginRegistry) ResolveDepgraphs(dir string, opts *ecosystems.SCAPluginOptions) <-chan ecosystems.SCAResult {
-	resultsChan := make(chan ecosystems.SCAResult)
-
-	// Clone opts so WithExcludePaths mutations during the loop don't reach into the
-	// caller's opts. Other Global fields are shallow-copied; only ExcludePaths is mutated
-	// here, so its backing slice is the only one we need to clone.
-	localOpts := *opts
-	localOpts.Global.ExcludePaths = append(ecosystems.CommaSeparatedString(nil), opts.Global.ExcludePaths...)
-	opts = &localOpts
-
+	results := make(chan ecosystems.SCAResult)
 	go func() {
-		defer close(resultsChan)
-
+		defer close(results)
 		ctx := r.ictx.Context()
-		enhancedLogger := r.ictx.GetEnhancedLogger()
-
-		for _, plugin := range r.plugins {
+		err := RunPlugins(ctx, r.Plugins(), logger.NewFromZerolog(r.ictx.GetEnhancedLogger()), dir, opts,
+			func(_ ecosystems.SCAPlugin, result ecosystems.SCAResult) error {
+				select {
+				case results <- result:
+					return nil
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}, nil)
+		var failFast *FailFastError
+		if err != nil && !errors.As(err, &failFast) {
 			select {
+			case results <- ecosystems.SCAResult{Error: err}:
 			case <-ctx.Done():
-				return
-			default:
 			}
-
-			files := executePluginWithResults(ctx, plugin, enhancedLogger, dir, opts, resultsChan)
-			if len(files) > 0 && !opts.Global.AllProjects {
-				return
-			}
-			opts.WithExcludePaths(files)
 		}
-
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
-		executePluginWithResults(ctx, legacy.NewPlugin(r.ictx), enhancedLogger, dir, opts, resultsChan)
 	}()
-
-	return resultsChan
+	return results
 }
 
 func (r *PluginRegistry) register(plugin ecosystems.SCAPlugin, opts ...registerOpt) error {
@@ -190,48 +221,4 @@ func (r *PluginRegistry) sortPlugins() []ecosystems.SCAPlugin {
 	}
 
 	return result
-}
-
-func executePluginWithResults(
-	ctx context.Context,
-	plugin ecosystems.SCAPlugin,
-	enhancedLogger *zerolog.Logger,
-	dir string,
-	opts *ecosystems.SCAPluginOptions,
-	resultsChan chan ecosystems.SCAResult,
-) []string {
-	enhancedLogger.Info().Msg(fmt.Sprintf("Executing %s plugin", plugin.GetName()))
-
-	// processedFiles is the deduped union across every emitted result.
-	// Plugins attach per-result file lists on SCAResult.ProcessedFiles;
-	// the orchestrator unions them here so callers see one flat list
-	// per plugin run.
-	seen := make(map[string]struct{})
-	var processedFiles []string
-
-	err := plugin.BuildDepGraphsFromDir(ctx, logger.NewFromZerolog(enhancedLogger), dir, opts, func(result ecosystems.SCAResult) error {
-		for _, p := range result.ProcessedFiles {
-			if _, ok := seen[p]; ok {
-				continue
-			}
-			seen[p] = struct{}{}
-			processedFiles = append(processedFiles, p)
-		}
-		select {
-		case resultsChan <- result:
-			return nil
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	})
-	if err != nil {
-		enhancedLogger.Warn().Err(err).Msg(fmt.Sprintf("%s plugin failed", plugin.GetName()))
-		select {
-		case resultsChan <- ecosystems.SCAResult{Error: err}:
-		case <-ctx.Done():
-		}
-		return processedFiles
-	}
-
-	return processedFiles
 }
