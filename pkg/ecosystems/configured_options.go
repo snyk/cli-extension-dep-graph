@@ -27,48 +27,29 @@ func NewPluginOptionsFromConfig(config configuration.Configuration) (*SCAPluginO
 
 // Absent config must not erase selectors parsed from the original CLI arguments.
 func applyConfiguredPluginFlags(config configuration.Configuration, opts *SCAPluginOptions) error {
-	applyConfiguredFlags(config, config.GetBool, []configuredFlag[bool]{
-		{workflow.FlagAllProjects, &opts.Global.AllProjects},
-		{workflow.FlagUvWorkspacePackages, &opts.Global.ForceIncludeWorkspacePackages},
-		{workflow.FlagDev, &opts.Global.IncludeDev},
-		{workflow.FlagFailFast, &opts.Global.FailFast},
-		{workflow.FlagForceSingleGraph, &opts.Global.ForceSingleGraph},
-		{workflow.FlagIncludeProvenance, &opts.Global.IncludeProvenance},
-		{workflow.FlagNugetAssetsProjectName, &opts.Dotnet.AssetsProjectName},
-		{workflow.FlagAllSubProjects, &opts.Gradle.AllSubProjects},
-		{workflow.FlagGradleNormalizeDeps, &opts.Gradle.NormalizeDeps},
-	})
-	applyConfiguredFlags(config, config.GetString, []configuredFlag[string]{
-		{workflow.FlagConfigurationMatching, &opts.Gradle.ConfigurationMatching},
-		{workflow.FlagConfigurationAttributes, &opts.Gradle.ConfigurationAttributes},
-		{workflow.FlagInitScript, &opts.Gradle.InitScript},
-		{workflow.FlagDotnetTargetFramework, &opts.Dotnet.TargetFramework},
-		{workflow.FlagNugetPkgsFolder, &opts.Dotnet.PackagesFolder},
-	})
-	if config.IsSet(workflow.FlagGradleSubProject) {
-		opts.Gradle.SubProject = config.GetString(workflow.FlagGradleSubProject)
-	} else if config.IsSet(workflow.FlagSubProject) {
-		opts.Gradle.SubProject = config.GetString(workflow.FlagSubProject)
-	}
-	if config.IsSet(workflow.FlagStrictOutOfSync) {
-		strict, err := strconv.ParseBool(config.GetString(workflow.FlagStrictOutOfSync))
-		opts.Global.AllowOutOfSync = err == nil && !strict
-	}
-	if config.IsSet(workflow.FlagExclude) {
-		opts.Global.Exclude = parseExcludeFlag(config.GetString(workflow.FlagExclude))
-	}
-	if config.IsSet(workflow.FlagExcludePaths) {
-		opts.Global.ExcludePaths = parseExcludeFlag(config.GetString(workflow.FlagExcludePaths))
-	}
-	if file := config.GetString(workflow.FlagFile); file != "" {
-		opts.WithTargetFile(file)
-	}
-	if config.IsSet(workflow.FlagDetectionDepth) {
-		depth, err := ParseDetectionDepth(config.GetString(workflow.FlagDetectionDepth))
-		if err != nil {
-			return err
-		}
-		opts.WithDetectionDepth(depth)
+	if err := applyConfigFlags(config,
+		boolFlag(workflow.FlagAllProjects, &opts.Global.AllProjects),
+		boolFlag(workflow.FlagUvWorkspacePackages, &opts.Global.ForceIncludeWorkspacePackages),
+		boolFlag(workflow.FlagDev, &opts.Global.IncludeDev),
+		boolFlag(workflow.FlagFailFast, &opts.Global.FailFast),
+		boolFlag(workflow.FlagForceSingleGraph, &opts.Global.ForceSingleGraph),
+		boolFlag(workflow.FlagIncludeProvenance, &opts.Global.IncludeProvenance),
+		boolFlag(workflow.FlagNugetAssetsProjectName, &opts.Dotnet.AssetsProjectName),
+		boolFlag(workflow.FlagAllSubProjects, &opts.Gradle.AllSubProjects),
+		boolFlag(workflow.FlagGradleNormalizeDeps, &opts.Gradle.NormalizeDeps),
+		stringFlag(workflow.FlagConfigurationMatching, &opts.Gradle.ConfigurationMatching),
+		stringFlag(workflow.FlagConfigurationAttributes, &opts.Gradle.ConfigurationAttributes),
+		stringFlag(workflow.FlagInitScript, &opts.Gradle.InitScript),
+		stringFlag(workflow.FlagDotnetTargetFramework, &opts.Dotnet.TargetFramework),
+		stringFlag(workflow.FlagNugetPkgsFolder, &opts.Dotnet.PackagesFolder),
+		stringFlag(workflow.FlagGradleSubProject, &opts.Gradle.SubProject, workflow.FlagSubProject),
+		parsedStringFlag(workflow.FlagStrictOutOfSync, &opts.Global.AllowOutOfSync, parseAllowOutOfSync),
+		parsedStringFlag(workflow.FlagExclude, &opts.Global.Exclude, parseConfiguredExcludes),
+		parsedStringFlag(workflow.FlagExcludePaths, &opts.Global.ExcludePaths, parseConfiguredExcludes),
+		nonEmptyStringFlag(workflow.FlagFile, &opts.Global.TargetFile),
+		parsedStringFlag(workflow.FlagDetectionDepth, &opts.Global.DetectionDepth, ParseDetectionDepth),
+	); err != nil {
+		return err
 	}
 
 	// The CLI resolves --packages-folder from the working directory.
@@ -80,17 +61,13 @@ func applyConfiguredPluginFlags(config configuration.Configuration, opts *SCAPlu
 	return nil
 }
 
-type configuredFlag[T any] struct {
-	key    string
-	target *T
+func parseAllowOutOfSync(raw string) (bool, error) {
+	strict, err := strconv.ParseBool(raw)
+	return err == nil && !strict, nil
 }
 
-func applyConfiguredFlags[T any](config configuration.Configuration, get func(string) T, flags []configuredFlag[T]) {
-	for _, flag := range flags {
-		if config.IsSet(flag.key) {
-			*flag.target = get(flag.key)
-		}
-	}
+func parseConfiguredExcludes(raw string) (CommaSeparatedString, error) {
+	return CommaSeparatedString(parseExcludeFlag(raw)), nil
 }
 
 // parseExcludeFlag parses a comma-separated exclude flag value into a slice of strings.
