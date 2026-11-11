@@ -248,8 +248,13 @@ func newProjectNaming(dir string, options *ecosystems.SCAPluginOptions) projectN
 	return naming
 }
 
-// rootName names a project whose manifest records no name of its own.
-func (n projectNaming) rootName(file discovery.FindResult) string {
+// rootName names a project. A name the manifest recorded wins over any derived
+// from the scan.
+func (n projectNaming) rootName(file discovery.FindResult, recorded string) string {
+	if recorded != "" {
+		return recorded
+	}
+
 	if n.cliRootName != "" {
 		return n.cliRootName
 	}
@@ -314,16 +319,17 @@ func (p Plugin) emitAssetsResults(
 		return nil
 	}
 
-	rootName := naming.rootName(file)
+	var recordedName string
 	if options.Dotnet.AssetsProjectName {
-		if named := assets.Project.Restore.ProjectName; named != "" {
-			rootName = named
-		} else {
-			// Silently keeping the derived name would look like the flag did
-			// nothing.
-			log.Debug(ctx, "The restore recorded no project name, so the .NET project keeps its directory-derived name",
-				logger.Attr(logFieldTargetFile, targetFile), logger.Attr(logFieldRootName, rootName))
-		}
+		recordedName = assets.Project.Restore.ProjectName
+	}
+
+	rootName := naming.rootName(file, recordedName)
+	if options.Dotnet.AssetsProjectName && recordedName == "" {
+		// Silently keeping the derived name would look like the flag did
+		// nothing.
+		log.Debug(ctx, "The restore recorded no project name, so the .NET project keeps its directory-derived name",
+			logger.Attr(logFieldTargetFile, targetFile), logger.Attr(logFieldRootName, rootName))
 	}
 
 	frameworks := assets.targetFrameworks()
@@ -669,10 +675,7 @@ func (p Plugin) emitFrameworkResult(
 		))
 	}
 
-	rootName := manifest.rootName
-	if rootName == "" {
-		rootName = naming.rootName(file)
-	}
+	rootName := naming.rootName(file, manifest.rootName)
 
 	projectFile := projectFileOf(file)
 	claimed := claimedFiles(projectFile, targetFile)
