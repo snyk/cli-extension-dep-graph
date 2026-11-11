@@ -22,6 +22,7 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/v2/internal/workflow"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/conversion"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/legacy"
 	ecosystemslogger "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/orchestrator"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/python/uv"
@@ -65,7 +66,7 @@ func buildSCAPlugins(
 	if err != nil {
 		return nil, fmt.Errorf("building scanner registry: %w", err)
 	}
-	return registry.ComposePlugins(uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL)), nil
+	return registry.Plugins().With(uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL)).With(legacy.NewPlugin(ctx)), nil
 }
 
 const errMsgNoSupportedProjects = "no supported projects detected"
@@ -223,10 +224,7 @@ func buildPluginOptions(config configuration.Configuration) (*ecosystems.SCAPlug
 
 // Absent config must not erase selectors parsed from the original CLI arguments.
 func applyConfiguredPluginFlags(config configuration.Configuration, opts *ecosystems.SCAPluginOptions) {
-	for _, flag := range []struct {
-		key    string
-		target *bool
-	}{
+	applyConfiguredFlags(config, config.GetBool, []configuredFlag[bool]{
 		{workflow.FlagAllProjects, &opts.Global.AllProjects},
 		{workflow.FlagUvWorkspacePackages, &opts.Global.ForceIncludeWorkspacePackages},
 		{workflow.FlagDev, &opts.Global.IncludeDev},
@@ -236,28 +234,30 @@ func applyConfiguredPluginFlags(config configuration.Configuration, opts *ecosys
 		{workflow.FlagNugetAssetsProjectName, &opts.Dotnet.AssetsProjectName},
 		{workflow.FlagAllSubProjects, &opts.Gradle.AllSubProjects},
 		{workflow.FlagGradleNormalizeDeps, &opts.Gradle.NormalizeDeps},
-	} {
-		if config.IsSet(flag.key) {
-			*flag.target = config.GetBool(flag.key)
-		}
-	}
-	for _, flag := range []struct {
-		key    string
-		target *string
-	}{
+	})
+	applyConfiguredFlags(config, config.GetString, []configuredFlag[string]{
 		{workflow.FlagConfigurationMatching, &opts.Gradle.ConfigurationMatching},
 		{workflow.FlagConfigurationAttributes, &opts.Gradle.ConfigurationAttributes},
 		{workflow.FlagInitScript, &opts.Gradle.InitScript},
 		{workflow.FlagDotnetTargetFramework, &opts.Dotnet.TargetFramework},
-	} {
-		if config.IsSet(flag.key) {
-			*flag.target = config.GetString(flag.key)
-		}
-	}
+	})
 	if config.IsSet(workflow.FlagGradleSubProject) {
 		opts.Gradle.SubProject = config.GetString(workflow.FlagGradleSubProject)
 	} else if config.IsSet(workflow.FlagSubProject) {
 		opts.Gradle.SubProject = config.GetString(workflow.FlagSubProject)
+	}
+}
+
+type configuredFlag[T any] struct {
+	key    string
+	target *T
+}
+
+func applyConfiguredFlags[T any](config configuration.Configuration, get func(string) T, flags []configuredFlag[T]) {
+	for _, flag := range flags {
+		if config.IsSet(flag.key) {
+			*flag.target = get(flag.key)
+		}
 	}
 }
 

@@ -77,16 +77,14 @@ func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry,
 	return r, nil
 }
 
-// ComposePlugins keeps optional resolvers behind every enabled native scanner and
-// ahead of the legacy fallback. Native failures are emitted as SCAResults;
-// optional resolvers retain their own error contract. The slice belongs to the caller.
-func (r *PluginRegistry) ComposePlugins(additionalPlugins ...ecosystems.SCAPlugin) []ecosystems.SCAPlugin {
-	plugins := make([]ecosystems.SCAPlugin, 0, len(r.plugins)+len(additionalPlugins)+1)
+// Plugins returns enabled native scanners with per-result failure handling.
+// The caller owns the slice and appends any optional resolvers explicitly.
+func (r *PluginRegistry) Plugins() PluginList {
+	plugins := make(PluginList, 0, len(r.plugins))
 	for _, plugin := range r.plugins {
 		plugins = append(plugins, nativePlugin{SCAPlugin: plugin})
 	}
-	plugins = append(plugins, additionalPlugins...)
-	return append(plugins, legacy.NewPlugin(r.ictx))
+	return plugins
 }
 
 func (r *PluginRegistry) ResolveDepgraphs(dir string, opts *ecosystems.SCAPluginOptions) <-chan ecosystems.SCAResult {
@@ -105,7 +103,7 @@ func (r *PluginRegistry) ResolveDepgraphs(dir string, opts *ecosystems.SCAPlugin
 		ctx := r.ictx.Context()
 		enhancedLogger := r.ictx.GetEnhancedLogger()
 
-		for _, plugin := range r.ComposePlugins() {
+		for _, plugin := range r.Plugins().With(legacy.NewPlugin(r.ictx)) {
 			select {
 			case <-ctx.Done():
 				return

@@ -64,7 +64,7 @@ func TestPluginRegistry_InjectedPluginRetainsReturnedErrors(t *testing.T) {
 	registry, err := NewDefaultPluginRegistry(ictx)
 	require.NoError(t, err)
 	pluginErr := errors.New("optional resolver setup failed")
-	plugins := registry.ComposePlugins(&mockPlugin{name: "uv", err: pluginErr})
+	plugins := registry.Plugins().With(&mockPlugin{name: "uv", err: pluginErr})
 	var results []ecosystems.SCAResult
 
 	err = plugins[0].BuildDepGraphsFromDir(context.Background(), logger.Nop(), ".", ecosystems.NewPluginOptions(), func(r ecosystems.SCAResult) error {

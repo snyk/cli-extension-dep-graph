@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/legacy"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/identity"
 )
@@ -461,7 +462,7 @@ func collectResults(resultsChan <-chan ecosystems.SCAResult) []ecosystems.SCARes
 	return results
 }
 
-func TestPluginRegistry_ComposePlugins(t *testing.T) {
+func TestPluginRegistry_ExplicitPluginOrder(t *testing.T) {
 	cases := []struct {
 		name       string
 		enabled    bool
@@ -489,7 +490,7 @@ func TestPluginRegistry_ComposePlugins(t *testing.T) {
 			registry, err := NewDefaultPluginRegistry(ictx)
 			require.NoError(t, err)
 
-			plugins := registry.ComposePlugins(tt.additional...)
+			plugins := registry.Plugins().With(tt.additional...).With(legacy.NewPlugin(ictx))
 
 			names := make([]string, len(plugins))
 			for i, plugin := range plugins {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/v2/internal/workflow"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/legacy"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/orchestrator"
 )
 
@@ -59,7 +60,7 @@ func Test_handleSBOMResolution_nativeReturnedError(t *testing.T) {
 			registry, err := orchestrator.NewDefaultPluginRegistry(tc.invocationContext)
 			require.NoError(t, err)
 
-			data, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, registry.ComposePlugins(uv))
+			data, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, registry.Plugins().With(uv).With(legacy.NewPlugin(tc.invocationContext)))
 
 			assert.Equal(t, !tt.wantError, uv.options != nil)
 			assert.Equal(t, !tt.wantError, harness.Called())
@@ -117,7 +118,7 @@ func Test_handleSBOMResolution_nativeEmittedErrorWithoutMetadata(t *testing.T) {
 			registry, err := orchestrator.NewDefaultPluginRegistry(tc.invocationContext)
 			require.NoError(t, err)
 
-			data, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, registry.ComposePlugins(uv))
+			data, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, registry.Plugins().With(uv).With(legacy.NewPlugin(tc.invocationContext)))
 
 			if !tt.allProjects || tt.failFast {
 				require.Error(t, err)
