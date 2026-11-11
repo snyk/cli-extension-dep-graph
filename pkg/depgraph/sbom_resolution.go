@@ -209,25 +209,26 @@ func applyConfiguredPluginFlags(config configuration.Configuration, opts *ecosys
 		{workflow.FlagDotnetTargetFramework, &opts.Dotnet.TargetFramework},
 		{workflow.FlagNugetPkgsFolder, &opts.Dotnet.PackagesFolder},
 	})
-	applyFlag(config.IsSet, config.GetString, &opts.Gradle.SubProject, workflow.FlagGradleSubProject, workflow.FlagSubProject)
-	applyFlag(config.IsSet, func(key string) bool {
-		strict, err := strconv.ParseBool(config.GetString(key))
-		return err == nil && !strict
-	}, &opts.Global.AllowOutOfSync, workflow.FlagStrictOutOfSync)
-	applyConfiguredFlags(config, func(key string) ecosystems.CommaSeparatedString {
-		return parseExcludeFlag(config.GetString(key))
-	}, []configuredFlag[ecosystems.CommaSeparatedString]{
-		{workflow.FlagExclude, &opts.Global.Exclude},
-		{workflow.FlagExcludePaths, &opts.Global.ExcludePaths},
-	})
-	applyFlag(func(key string) bool { return config.GetString(key) != "" }, func(key string) *string {
-		value := config.GetString(key)
-		return &value
-	}, &opts.Global.TargetFile, workflow.FlagFile)
-
-	var detectionDepth string
-	if applyFlag(config.IsSet, config.GetString, &detectionDepth, workflow.FlagDetectionDepth) {
-		depth, err := ecosystems.ParseDetectionDepth(detectionDepth)
+	if config.IsSet(workflow.FlagGradleSubProject) {
+		opts.Gradle.SubProject = config.GetString(workflow.FlagGradleSubProject)
+	} else if config.IsSet(workflow.FlagSubProject) {
+		opts.Gradle.SubProject = config.GetString(workflow.FlagSubProject)
+	}
+	if config.IsSet(workflow.FlagStrictOutOfSync) {
+		strict, err := strconv.ParseBool(config.GetString(workflow.FlagStrictOutOfSync))
+		opts.Global.AllowOutOfSync = err == nil && !strict
+	}
+	if config.IsSet(workflow.FlagExclude) {
+		opts.Global.Exclude = parseExcludeFlag(config.GetString(workflow.FlagExclude))
+	}
+	if config.IsSet(workflow.FlagExcludePaths) {
+		opts.Global.ExcludePaths = parseExcludeFlag(config.GetString(workflow.FlagExcludePaths))
+	}
+	if file := config.GetString(workflow.FlagFile); file != "" {
+		opts.WithTargetFile(file)
+	}
+	if config.IsSet(workflow.FlagDetectionDepth) {
+		depth, err := ecosystems.ParseDetectionDepth(config.GetString(workflow.FlagDetectionDepth))
 		if err != nil {
 			return fmt.Errorf("building plugin options: %w", err)
 		}
@@ -250,19 +251,10 @@ type configuredFlag[T any] struct {
 
 func applyConfiguredFlags[T any](config configuration.Configuration, get func(string) T, flags []configuredFlag[T]) {
 	for _, flag := range flags {
-		applyFlag(config.IsSet, get, flag.target, flag.key)
-	}
-}
-
-// The first configured key wins, including explicit zero values.
-func applyFlag[T any](isSet func(string) bool, get func(string) T, target *T, keys ...string) bool {
-	for _, key := range keys {
-		if isSet(key) {
-			*target = get(key)
-			return true
+		if config.IsSet(flag.key) {
+			*flag.target = get(flag.key)
 		}
 	}
-	return false
 }
 
 func checkFailFast(logger *zerolog.Logger, failFast, allProjects bool, results []ecosystems.SCAResult) error {
