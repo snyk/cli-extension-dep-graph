@@ -60,7 +60,7 @@ func Test_handleSBOMResolution_nativeFirst(t *testing.T) {
 			tc.config.Set(workflow.FlagFailFast, tt.failFast)
 			tc.config.Set(orchestrator.FlagCargoResolver.Key, tt.cargoEnabled)
 			tc.config.Set(orchestrator.FlagDotnetResolver.Key, tt.dotnetEnabled)
-			plugins, err := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+			plugins, err := buildSCAPlugins(tc.invocationContext, nil, "")
 			require.NoError(t, err)
 			uvPlugin := &mockScaPlugin{name: "uv", results: []ecosystems.SCAResult{withProcessedFiles(ecosystems.SCAResult{
 				DepGraph:         createTestDepGraph(t, "uv", "python-app", "1.0.0"),
@@ -143,7 +143,7 @@ func Test_handleSBOMResolution_nativeGradleMissingBinary(t *testing.T) {
 					return nil
 				}).Times(1)
 			}
-			plugins, err := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+			plugins, err := buildSCAPlugins(tc.invocationContext, nil, "")
 			require.NoError(t, err)
 			uvPlugin := &mockScaPlugin{name: "uv", results: []ecosystems.SCAResult{{
 				DepGraph:         createTestDepGraph(t, "uv", "python-app", "1.0.0"),

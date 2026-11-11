@@ -40,7 +40,7 @@ func pluginNames(plugins []ecosystems.SCAPlugin) []string {
 func Test_buildSCAPlugins_dotnetResolverIsOptIn(t *testing.T) {
 	tc := setupTestContext(t, false)
 
-	plugins, buildErr := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+	plugins, buildErr := buildSCAPlugins(tc.invocationContext, nil, "")
 	require.NoError(t, buildErr)
 
 	assert.Equal(t, []string{"native", "uv", "legacycli"}, pluginNames(plugins),
@@ -51,7 +51,7 @@ func Test_buildSCAPlugins_dotnetResolverEnabled(t *testing.T) {
 	tc := setupTestContext(t, false)
 	tc.config.Set(orchestrator.FlagDotnetResolver.Key, true)
 
-	plugins, buildErr := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+	plugins, buildErr := buildSCAPlugins(tc.invocationContext, nil, "")
 	require.NoError(t, buildErr)
 
 	// legacy stays last: it is the fallback, and each plugin's processed files
@@ -133,7 +133,7 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 			apply(tc.config)
 		}
 
-		plugins, buildErr := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+		plugins, buildErr := buildSCAPlugins(tc.invocationContext, nil, "")
 		require.NoError(t, buildErr)
 
 		workflowData, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, plugins)
@@ -381,7 +381,7 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 		tc.config.Set(orchestrator.FlagDotnetResolver.Key, true)
 		tc.config.Set(workflow.FlagDotnetTargetFramework, "net8.0")
 
-		plugins, buildErr := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+		plugins, buildErr := buildSCAPlugins(tc.invocationContext, nil, "")
 		require.NoError(t, buildErr)
 
 		// --fail-fast aborts on any error result, so this passing at all is the
@@ -403,7 +403,7 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 		tc.config.Set(orchestrator.FlagDotnetResolver.Key, true)
 		tc.config.Set(workflow.FlagDotnetTargetFramework, "net9.0")
 
-		plugins, buildErr := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+		plugins, buildErr := buildSCAPlugins(tc.invocationContext, nil, "")
 		require.NoError(t, buildErr)
 
 		_, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, plugins)

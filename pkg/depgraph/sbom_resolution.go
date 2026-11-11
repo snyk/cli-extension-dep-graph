@@ -47,7 +47,7 @@ func handleSBOMResolution(
 
 	converter := remoteconv.NewRemoteSBOMConverter(snykClient, ecosystemslogger.NewFromZerolog(logger))
 
-	plugins, err := buildSCAPlugins(ctx, config, converter, remoteRepoURL)
+	plugins, err := buildSCAPlugins(ctx, converter, remoteRepoURL)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,6 @@ func handleSBOMResolution(
 // Native resolvers claim their files before UV; legacy handles the remainder.
 func buildSCAPlugins(
 	ctx gafworkflow.InvocationContext,
-	_ configuration.Configuration,
 	converter *remoteconv.RemoteSBOMConverter,
 	remoteRepoURL string,
 ) ([]ecosystems.SCAPlugin, error) {
