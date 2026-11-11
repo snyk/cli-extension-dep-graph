@@ -20,9 +20,8 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/v2/internal/remoteconv"
 	"github.com/snyk/cli-extension-dep-graph/v2/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/v2/internal/workflow"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/conversion"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/dotnet/nuget"
-	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/legacy"
 	ecosystemslogger "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/orchestrator"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/python/uv"
@@ -48,47 +47,25 @@ func handleSBOMResolution(
 
 	converter := remoteconv.NewRemoteSBOMConverter(snykClient, ecosystemslogger.NewFromZerolog(logger))
 
-	return handleSBOMResolutionDI(
-		ctx,
-		config,
-		logger,
-		buildSCAPlugins(ctx, config, converter, remoteRepoURL),
-	)
+	plugins, err := buildSCAPlugins(ctx, converter, remoteRepoURL)
+	if err != nil {
+		return nil, err
+	}
+
+	return handleSBOMResolutionDI(ctx, config, logger, plugins)
 }
 
-// buildSCAPlugins assembles the plugin list for the SBOM resolution flow.
-//
-// The legacy plugin stays last: it is the fallback, and each plugin's
-// processed files are excluded from every plugin after it in the list.
+// The SBOM flow shares native scanner gates and ordering with the orchestrator.
 func buildSCAPlugins(
 	ctx gafworkflow.InvocationContext,
-	config configuration.Configuration,
-	converter *remoteconv.RemoteSBOMConverter,
+	converter conversion.SBOMConverter,
 	remoteRepoURL string,
-) []ecosystems.SCAPlugin {
-	plugins := []ecosystems.SCAPlugin{
-		uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL),
+) ([]ecosystems.SCAPlugin, error) {
+	registry, err := orchestrator.NewDefaultPluginRegistry(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("building scanner registry: %w", err)
 	}
-
-	// Opt-in per org. The .NET resolver claims every manifest it resolved in
-	// full — project.assets.json, packages.config and project.json alike — and
-	// reports those as processed, so the legacy resolver skips them.
-	//
-	// A manifest it could not resolve in full it reports nothing for, and the
-	// loop below moves on to the next plugin when one returns no results, so
-	// those still reach the legacy resolver. That covers an unreadable or
-	// malformed manifest, one whose target framework nothing names, and a
-	// packages folder holding an archive we could not open — cases where
-	// claiming a partial result would hide packages the legacy resolver finds.
-	//
-	// The exception is an explicit --file naming a path that does not exist:
-	// discovery treats that as a setup failure and the scan fails there rather
-	// than falling through, which is what the CLI does for a bad --file today.
-	if config.GetBool(orchestrator.FlagDotnetResolver.Key) {
-		plugins = append(plugins, nuget.Plugin{})
-	}
-
-	return append(plugins, legacy.NewPlugin(ctx))
+	return registry.Plugins(uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL)), nil
 }
 
 const errMsgNoSupportedProjects = "no supported projects detected"
@@ -199,49 +176,89 @@ func handleSBOMResolutionDI(
 }
 
 func buildPluginOptions(config configuration.Configuration) (*ecosystems.SCAPluginOptions, error) {
-	strictOutOfSync := true
-	if parsed, err := strconv.ParseBool(config.GetString(workflow.FlagStrictOutOfSync)); err == nil {
-		strictOutOfSync = parsed
-	}
-
-	opts := ecosystems.NewPluginOptions().
-		WithAllProjects(config.GetBool(workflow.FlagAllProjects)).
-		WithForceIncludeWorkspacePackages(config.GetBool(workflow.FlagUvWorkspacePackages)).
-		WithIncludeDev(config.GetBool(workflow.FlagDev)).
-		WithAllowOutOfSync(!strictOutOfSync).
-		WithExclude(parseExcludeFlag(config.GetString(workflow.FlagExclude))).
-		WithExcludePaths(parseExcludeFlag(config.GetString(workflow.FlagExcludePaths))).
-		WithFailFast(config.GetBool(workflow.FlagFailFast)).
-		WithForceSingleGraph(config.GetBool(workflow.FlagForceSingleGraph)).
-		WithAssetsProjectName(config.GetBool(workflow.FlagNugetAssetsProjectName))
-
-	if targetFile := config.GetString(workflow.FlagFile); targetFile != "" {
-		opts = opts.WithTargetFile(targetFile)
-	}
-
-	depth, err := ecosystems.ParseDetectionDepth(config.GetString(workflow.FlagDetectionDepth))
+	opts, err := ecosystems.NewPluginOptionsFromRawFlags(config.GetStringSlice(configuration.RAW_CMD_ARGS))
 	if err != nil {
 		return nil, fmt.Errorf("building plugin options: %w", err)
 	}
-	opts = opts.WithDetectionDepth(depth)
 
-	// The CLI documents --packages-folder as relative to the working directory,
-	// not to the scanned root, so it is resolved here rather than per project.
-	if packagesFolder := config.GetString(workflow.FlagNugetPkgsFolder); packagesFolder != "" {
+	applyConfiguredPluginFlags(config, opts)
+
+	if config.IsSet(workflow.FlagStrictOutOfSync) {
+		strictOutOfSync := true
+		if parsed, err := strconv.ParseBool(config.GetString(workflow.FlagStrictOutOfSync)); err == nil {
+			strictOutOfSync = parsed
+		}
+		opts.WithAllowOutOfSync(!strictOutOfSync)
+	}
+	if config.IsSet(workflow.FlagExclude) {
+		opts.Global.Exclude = parseExcludeFlag(config.GetString(workflow.FlagExclude))
+	}
+	if config.IsSet(workflow.FlagExcludePaths) {
+		opts.Global.ExcludePaths = parseExcludeFlag(config.GetString(workflow.FlagExcludePaths))
+	}
+	if targetFile := config.GetString(workflow.FlagFile); targetFile != "" {
+		opts.WithTargetFile(targetFile)
+	}
+	if config.IsSet(workflow.FlagDetectionDepth) {
+		depth, err := ecosystems.ParseDetectionDepth(config.GetString(workflow.FlagDetectionDepth))
+		if err != nil {
+			return nil, fmt.Errorf("building plugin options: %w", err)
+		}
+		opts.WithDetectionDepth(depth)
+	}
+
+	// The CLI resolves --packages-folder from the working directory.
+	if config.IsSet(workflow.FlagNugetPkgsFolder) {
+		opts.Dotnet.PackagesFolder = config.GetString(workflow.FlagNugetPkgsFolder)
+	}
+	if packagesFolder := opts.Dotnet.PackagesFolder; packagesFolder != "" {
 		if abs, err := filepath.Abs(packagesFolder); err == nil {
 			packagesFolder = abs
 		}
-		opts = opts.WithPackagesFolder(packagesFolder)
-	}
-
-	// A target framework moniker, not a path: unlike --packages-folder there is
-	// nothing to resolve, and the resolver compares it against the frameworks
-	// each project declares.
-	if targetFramework := config.GetString(workflow.FlagDotnetTargetFramework); targetFramework != "" {
-		opts = opts.WithDotnetTargetFramework(targetFramework)
+		opts.WithPackagesFolder(packagesFolder)
 	}
 
 	return opts, nil
+}
+
+// Absent config must not erase selectors parsed from the original CLI arguments.
+func applyConfiguredPluginFlags(config configuration.Configuration, opts *ecosystems.SCAPluginOptions) {
+	for _, flag := range []struct {
+		key    string
+		target *bool
+	}{
+		{workflow.FlagAllProjects, &opts.Global.AllProjects},
+		{workflow.FlagUvWorkspacePackages, &opts.Global.ForceIncludeWorkspacePackages},
+		{workflow.FlagDev, &opts.Global.IncludeDev},
+		{workflow.FlagFailFast, &opts.Global.FailFast},
+		{workflow.FlagForceSingleGraph, &opts.Global.ForceSingleGraph},
+		{workflow.FlagIncludeProvenance, &opts.Global.IncludeProvenance},
+		{workflow.FlagNugetAssetsProjectName, &opts.Dotnet.AssetsProjectName},
+		{workflow.FlagAllSubProjects, &opts.Gradle.AllSubProjects},
+		{workflow.FlagGradleNormalizeDeps, &opts.Gradle.NormalizeDeps},
+	} {
+		if config.IsSet(flag.key) {
+			*flag.target = config.GetBool(flag.key)
+		}
+	}
+	for _, flag := range []struct {
+		key    string
+		target *string
+	}{
+		{workflow.FlagConfigurationMatching, &opts.Gradle.ConfigurationMatching},
+		{workflow.FlagConfigurationAttributes, &opts.Gradle.ConfigurationAttributes},
+		{workflow.FlagInitScript, &opts.Gradle.InitScript},
+		{workflow.FlagDotnetTargetFramework, &opts.Dotnet.TargetFramework},
+	} {
+		if config.IsSet(flag.key) {
+			*flag.target = config.GetString(flag.key)
+		}
+	}
+	if config.IsSet(workflow.FlagGradleSubProject) {
+		opts.Gradle.SubProject = config.GetString(workflow.FlagGradleSubProject)
+	} else if config.IsSet(workflow.FlagSubProject) {
+		opts.Gradle.SubProject = config.GetString(workflow.FlagSubProject)
+	}
 }
 
 func checkFailFast(logger *zerolog.Logger, failFast, allProjects bool, results []ecosystems.SCAResult) error {

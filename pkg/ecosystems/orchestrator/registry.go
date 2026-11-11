@@ -77,6 +77,18 @@ func NewDefaultPluginRegistry(ictx workflow.InvocationContext) (*PluginRegistry,
 	return r, nil
 }
 
+// Plugins keeps optional resolvers behind every enabled native scanner and
+// ahead of the legacy fallback. Native failures are emitted as SCAResults;
+// optional resolvers retain their own error contract. The slice belongs to the caller.
+func (r *PluginRegistry) Plugins(additionalPlugins ...ecosystems.SCAPlugin) []ecosystems.SCAPlugin {
+	plugins := make([]ecosystems.SCAPlugin, 0, len(r.plugins)+len(additionalPlugins)+1)
+	for _, plugin := range r.plugins {
+		plugins = append(plugins, nativePlugin{SCAPlugin: plugin})
+	}
+	plugins = append(plugins, additionalPlugins...)
+	return append(plugins, legacy.NewPlugin(r.ictx))
+}
+
 func (r *PluginRegistry) ResolveDepgraphs(dir string, opts *ecosystems.SCAPluginOptions) <-chan ecosystems.SCAResult {
 	resultsChan := make(chan ecosystems.SCAResult)
 
@@ -93,7 +105,7 @@ func (r *PluginRegistry) ResolveDepgraphs(dir string, opts *ecosystems.SCAPlugin
 		ctx := r.ictx.Context()
 		enhancedLogger := r.ictx.GetEnhancedLogger()
 
-		for _, plugin := range r.plugins {
+		for _, plugin := range r.Plugins() {
 			select {
 			case <-ctx.Done():
 				return
@@ -106,14 +118,6 @@ func (r *PluginRegistry) ResolveDepgraphs(dir string, opts *ecosystems.SCAPlugin
 			}
 			opts.WithExcludePaths(files)
 		}
-
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
-		executePluginWithResults(ctx, legacy.NewPlugin(r.ictx), enhancedLogger, dir, opts, resultsChan)
 	}()
 
 	return resultsChan
