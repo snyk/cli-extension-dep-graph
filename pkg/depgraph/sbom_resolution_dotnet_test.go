@@ -310,7 +310,7 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 		assert.Empty(t, harness.CapturedExcludePaths(), "nothing was claimed from under it")
 	})
 
-	// The flag has to survive buildPluginOptions and reach the plugin; a unit
+	// The flag has to survive NewPluginOptionsFromConfig and reach the plugin; a unit
 	// test on the options alone would not catch it being dropped in between.
 	t.Run("flag on: --dotnet-target-framework narrows a multi-targeting project", func(t *testing.T) {
 		workflowData, _ := run(t, multiTargetProject(t), true, true, nil,
@@ -435,52 +435,6 @@ func Test_handleSBOMResolution_dotnetResolver(t *testing.T) {
 		graph, err := dg.UnmarshalJSON(payload)
 		require.NoError(t, err)
 		assert.Equal(t, "NamedByRestore", graph.GetRootPkg().Info.Name)
-	})
-}
-
-func Test_buildPluginOptions_dotnetFlags(t *testing.T) {
-	t.Run("defaults leave every .NET option unset", func(t *testing.T) {
-		opts, err := buildPluginOptions(configuration.New())
-		require.NoError(t, err)
-
-		assert.Empty(t, opts.Dotnet.TargetFramework, "every declared framework is reported")
-		assert.False(t, opts.Dotnet.AssetsProjectName, "the directory-derived name is kept")
-		assert.Empty(t, opts.Dotnet.PackagesFolder, "the resolver derives the location")
-	})
-
-	t.Run("the .NET flags reach DotnetOptions", func(t *testing.T) {
-		config := configuration.New()
-		config.Set(workflow.FlagDotnetTargetFramework, "net8.0")
-		config.Set(workflow.FlagNugetAssetsProjectName, true)
-
-		opts, err := buildPluginOptions(config)
-		require.NoError(t, err)
-
-		assert.Equal(t, "net8.0", opts.Dotnet.TargetFramework)
-		assert.True(t, opts.Dotnet.AssetsProjectName)
-	})
-
-	// A moniker is not a path, so unlike --packages-folder it must survive
-	// verbatim — the resolver compares it against what each project declares.
-	t.Run("a target framework is forwarded verbatim", func(t *testing.T) {
-		config := configuration.New()
-		config.Set(workflow.FlagDotnetTargetFramework, "net7.0-windows")
-
-		opts, err := buildPluginOptions(config)
-		require.NoError(t, err)
-		assert.Equal(t, "net7.0-windows", opts.Dotnet.TargetFramework)
-	})
-
-	t.Run("a packages folder is made absolute", func(t *testing.T) {
-		config := configuration.New()
-		config.Set(workflow.FlagNugetPkgsFolder, "packages")
-
-		abs, err := filepath.Abs("packages")
-		require.NoError(t, err)
-
-		opts, err := buildPluginOptions(config)
-		require.NoError(t, err)
-		assert.Equal(t, abs, opts.Dotnet.PackagesFolder)
 	})
 }
 

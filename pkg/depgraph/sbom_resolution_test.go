@@ -1643,57 +1643,6 @@ func Test_callback_SBOMResolution(t *testing.T) {
 	})
 }
 
-func Test_parseExcludeFlag(t *testing.T) {
-	testCases := []struct {
-		name     string
-		input    string
-		expected []string
-	}{
-		{
-			name:     "empty string returns nil",
-			input:    "",
-			expected: nil,
-		},
-		{
-			name:     "single value",
-			input:    "dir1",
-			expected: []string{"dir1"},
-		},
-		{
-			name:     "multiple values",
-			input:    "dir1,dir2,dir3",
-			expected: []string{"dir1", "dir2", "dir3"},
-		},
-		{
-			name:     "trims whitespace around values",
-			input:    "dir1, dir2 , dir3",
-			expected: []string{"dir1", "dir2", "dir3"},
-		},
-		{
-			name:     "filters empty entries",
-			input:    "dir1,,dir2,",
-			expected: []string{"dir1", "dir2"},
-		},
-		{
-			name:     "only commas returns nil",
-			input:    ",,,",
-			expected: nil,
-		},
-		{
-			name:     "whitespace only entries are filtered",
-			input:    "dir1,   ,dir2",
-			expected: []string{"dir1", "dir2"},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := parseExcludeFlag(tc.input)
-			assert.Equal(t, tc.expected, result)
-		})
-	}
-}
-
 // Test_processedFilesFlowFromPluginsToExcludeConfig locks in the end-to-end contract that
 // the legacy CLI subprocess sees the full union of paths to skip: the user's --exclude-paths
 // flag combined with every earlier plugin's ProcessedFiles. The union is built up on
@@ -2233,46 +2182,4 @@ func TestWorkflowDataFromDepGraph(t *testing.T) {
 // stringPtr returns a pointer to the given string value.
 func stringPtr(s string) *string {
 	return &s
-}
-
-func TestBuildPluginOptions_DetectionDepth(t *testing.T) {
-	tests := []struct {
-		name      string
-		flagValue string
-		wantDepth int
-		wantErr   bool
-	}{
-		{name: "parses a positive depth", flagValue: "3", wantDepth: 3},
-		{name: "unset leaves the walk unlimited", flagValue: "", wantDepth: 0},
-		{name: "trims surrounding whitespace", flagValue: " 3 ", wantDepth: 3},
-		// snyk/cli rejects each of these, so we do too.
-		{name: "rejects zero", flagValue: "0", wantErr: true},
-		{name: "rejects a negative depth", flagValue: "-2", wantErr: true},
-		{name: "rejects a non-numeric value", flagValue: "abc", wantErr: true},
-		// Deliberate divergence: snyk/cli's Number() coercion accepts this.
-		{name: "rejects a fractional depth", flagValue: "3.5", wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			config := configuration.New()
-			config.Set(workflow.FlagDetectionDepth, tt.flagValue)
-
-			opts, err := buildPluginOptions(config)
-
-			if tt.wantErr {
-				require.Error(t, err)
-				assert.Nil(t, opts)
-
-				var snykErr snyk_errors.Error
-				require.ErrorAs(t, err, &snykErr)
-				assert.Contains(t, snykErr.Detail, "Expected a positive integer")
-				assert.Contains(t, snykErr.Detail, tt.flagValue)
-				return
-			}
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantDepth, opts.Global.DetectionDepth)
-		})
-	}
 }

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -178,7 +179,7 @@ esac
 			}
 			assert.Equal(t, tt.wantTargets, targets)
 			if tt.allProjects {
-				assert.ElementsMatch(t, tt.wantExcluded, parseExcludeFlag(harness.CapturedExcludePaths()))
+				assert.ElementsMatch(t, tt.wantExcluded, strings.Split(harness.CapturedExcludePaths(), ","))
 				assert.Empty(t, harness.CapturedExclude())
 			}
 		})
