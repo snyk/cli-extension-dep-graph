@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/snyk/go-application-framework/pkg/configuration"
+	"github.com/snyk/go-application-framework/pkg/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -116,4 +117,60 @@ func fakeCargoBinary(t *testing.T, dir string, fail bool) {
 	require.NoError(t, os.WriteFile(binaryPath, []byte(script), 0o600))
 	require.NoError(t, os.Chmod(binaryPath, 0o700))
 	t.Setenv("PATH", binaryDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func Test_handleSBOMResolution_nativeGradleMissingBinary(t *testing.T) {
+	for _, tt := range []struct {
+		name                  string
+		allProjects, failFast bool
+	}{
+		{name: "all projects preserves other results", allProjects: true},
+		{name: "default returns error"},
+		{name: "fail fast returns target error", allProjects: true, failFast: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := setupTestContext(t, false)
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "build.gradle"), []byte("plugins {}\n"), 0o600))
+			t.Setenv("PATH", t.TempDir())
+			tc.config.Set(configuration.INPUT_DIRECTORY, dir)
+			tc.config.Set(workflow.FlagAllProjects, tt.allProjects)
+			tc.config.Set(workflow.FlagFailFast, tt.failFast)
+			tc.config.Set(orchestrator.FlagNewGradleResolver.Key, true)
+			if tt.allProjects && !tt.failFast {
+				tc.userInterface.EXPECT().OutputError(gomock.Any()).DoAndReturn(func(err error, _ ...ui.Opts) error {
+					assert.Contains(t, err.Error(), "build.gradle")
+					return nil
+				}).Times(1)
+			}
+			plugins, err := buildSCAPlugins(tc.invocationContext, tc.config, nil, "")
+			require.NoError(t, err)
+			uvPlugin := &mockScaPlugin{name: "uv", results: []ecosystems.SCAResult{{
+				DepGraph:         createTestDepGraph(t, "uv", "python-app", "1.0.0"),
+				ResolverMetadata: &ecosystems.ResolverMetadata{NormalisedTargetFile: "uv.lock"},
+			}}}
+			legacyPlugin := &mockScaPlugin{name: "legacycli", results: []ecosystems.SCAResult{{
+				DepGraph:         createTestDepGraph(t, "npm", "node-app", "1.0.0"),
+				ResolverMetadata: &ecosystems.ResolverMetadata{NormalisedTargetFile: "package.json"},
+			}}}
+			plugins[1], plugins[2] = uvPlugin, legacyPlugin
+
+			data, err := handleSBOMResolutionDI(tc.invocationContext, tc.config, &nopLogger, plugins)
+
+			if tt.allProjects && !tt.failFast {
+				require.NoError(t, err)
+				require.Len(t, data, 2)
+				assert.Equal(t, "uv.lock", metaString(t, data[0], workflow.MetaKeyNormalisedTargetFile))
+				assert.Equal(t, "package.json", metaString(t, data[1], workflow.MetaKeyNormalisedTargetFile))
+			} else {
+				require.Error(t, err)
+				assert.Nil(t, data)
+				assert.Nil(t, uvPlugin.options)
+				assert.Nil(t, legacyPlugin.options)
+				if tt.failFast {
+					assert.Contains(t, err.Error(), "build.gradle")
+				}
+			}
+		})
+	}
 }

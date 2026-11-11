@@ -55,6 +55,7 @@ func (p *nativePlugin) BuildDepGraphsFromDir(
 					processedFiles = append(processedFiles, file)
 				}
 			}
+			ensureNativeResultMetadata(&result, plugin.GetName(), &localOpts)
 			callbackErr = onGraph(result)
 			return callbackErr
 		}
@@ -77,4 +78,19 @@ func (p *nativePlugin) BuildDepGraphsFromDir(
 		}
 	}
 	return nil
+}
+
+// Native resolver errors can omit metadata that the SBOM flow needs to report them.
+func ensureNativeResultMetadata(result *ecosystems.SCAResult, pluginName string, opts *ecosystems.SCAPluginOptions) {
+	if result.ResolverMetadata != nil {
+		return
+	}
+	target := result.ProjectDescriptor.GetTargetFile()
+	if target == "" && opts.Global.TargetFile != nil {
+		target = *opts.Global.TargetFile
+	}
+	if target == "" {
+		target = pluginName
+	}
+	result.ResolverMetadata = &ecosystems.ResolverMetadata{PluginName: pluginName, NormalisedTargetFile: target}
 }

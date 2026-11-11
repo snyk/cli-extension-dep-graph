@@ -10,6 +10,7 @@ import (
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/identity"
 )
 
 func TestNativePlugin_Resolution(t *testing.T) {
@@ -104,4 +105,52 @@ func TestNativePlugin_CanceledContext(t *testing.T) {
 
 	assert.ErrorIs(t, err, context.Canceled)
 	assert.Nil(t, plugin.capturedExcludePaths)
+}
+
+func TestNativePlugin_MissingMetadata(t *testing.T) {
+	descriptorTarget := "nested/build.gradle"
+	explicitTarget := "settings.gradle"
+	existing := &ecosystems.ResolverMetadata{PluginName: "resolver", NormalisedTargetFile: "existing.gradle"}
+	for _, tt := range []struct {
+		name                           string
+		descriptorTarget, optionTarget *string
+		metadata                       *ecosystems.ResolverMetadata
+		want                           *ecosystems.ResolverMetadata
+	}{
+		{
+			name: "descriptor target wins", descriptorTarget: &descriptorTarget, optionTarget: &explicitTarget,
+			want: &ecosystems.ResolverMetadata{PluginName: "gradle", NormalisedTargetFile: descriptorTarget},
+		},
+		{
+			name: "explicit target fallback", optionTarget: &explicitTarget,
+			want: &ecosystems.ResolverMetadata{PluginName: "gradle", NormalisedTargetFile: explicitTarget},
+		},
+		{name: "plugin fallback", want: &ecosystems.ResolverMetadata{PluginName: "gradle", NormalisedTargetFile: "gradle"}},
+		{name: "existing metadata preserved", descriptorTarget: &descriptorTarget, metadata: existing, want: existing},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			plugin := &mockPlugin{name: "gradle", results: []ecosystems.SCAResult{{
+				ProjectDescriptor: identity.ProjectDescriptor{Identity: identity.ProjectIdentity{TargetFile: tt.descriptorTarget}},
+				ResolverMetadata:  tt.metadata, Error: context.DeadlineExceeded,
+			}}}
+			laterPlugin := &mockPlugin{name: "cargo"}
+			registry := &PluginRegistry{plugins: []ecosystems.SCAPlugin{plugin, laterPlugin}}
+			opts := ecosystems.NewPluginOptions().WithAllProjects(true).WithFailFast(true)
+			opts.Global.TargetFile = tt.optionTarget
+			var got ecosystems.SCAResult
+
+			err := registry.NativePlugin().BuildDepGraphsFromDir(context.Background(), logger.Nop(), "test", opts, func(result ecosystems.SCAResult) error {
+				got = result
+				return nil
+			})
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got.ResolverMetadata)
+			assert.ErrorIs(t, got.Error, context.DeadlineExceeded)
+			assert.Nil(t, laterPlugin.capturedExcludePaths)
+			if tt.metadata != nil {
+				assert.Same(t, tt.metadata, got.ResolverMetadata)
+			}
+		})
+	}
 }
