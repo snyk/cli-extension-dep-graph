@@ -5,7 +5,7 @@ Scoped rules for the .NET/nuget ecosystem plugin. The repo-wide rules in the roo
 ## Hard rules
 
 - **Project identity must set `Identity.TargetRuntime`** (the disambiguating field for multi-framework projects) and propagate it to workflow metadata. Construct identity through the constructor that requires the runtime so it cannot be silently dropped. See [`plugin.go`](plugin.go).
-- **There are two identity conventions, and both must stay.** The default (project file as target file, directory name) is what SCM imports depend on. `DotnetOptions.CLIProjectIdentity`, set by the CLI entry points, reproduces the legacy CLI (manifest as target file, scanned directory's name). A change to either target file or root name gives every project already monitored under that convention a duplicate. `TestPlugin_ProjectIdentity` pins both against recorded legacy output.
+- **There are two identity conventions, and both must stay.** The default (project file as target file, directory name) is what SCM imports depend on. `DotnetOptions.CLIProjectIdentity`, set by the CLI entry points, reproduces the legacy CLI (manifest as target file, scanned directory's name). A change to either target file or root name gives every project already monitored under that convention a duplicate. The legacy CLI names projects after the scan root and reports `--file` exactly as given, so neither is resolved first. `TestPlugin_ProjectIdentity` and the `TestPlugin_CLIIdentity*` tests pin both, with expectations taken from the legacy CLI's output.
 
 The repo-wide TS-plugin parity rule in the root `AGENTS.md` applies here too — the upstream reference is `snyk-nuget-plugin`.
 

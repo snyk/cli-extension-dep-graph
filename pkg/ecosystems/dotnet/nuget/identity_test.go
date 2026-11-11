@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/scatest"
 )
@@ -205,31 +206,121 @@ func TestPlugin_ProjectIdentityOfAFilterThatMatchedNothing(t *testing.T) {
 	assert.Equal(t, reportedAs{"services/cart/obj/project.assets.json", scanRootName}, identities(t, results[len(results)-1:])[0])
 }
 
+// The legacy CLI named projects after the scan root as typed, not as resolved:
+// snyk-nuget-plugin takes path.basename of the path the CLI passed it.
+func TestPlugin_CLIIdentityTakesTheScanRootAsGiven(t *testing.T) {
+	tests := []struct {
+		name    string
+		cwd     string
+		dir     string
+		options func() *ecosystems.SCAPluginOptions
+		cli     []reportedAs
+		scm     []reportedAs
+	}{
+		{
+			name:    "the current directory as .",
+			cwd:     "services/cart",
+			dir:     ".",
+			options: ecosystems.NewPluginOptions,
+			cli:     []reportedAs{{"obj/project.assets.json", "."}},
+			scm:     []reportedAs{{"Cart.csproj", "cart"}},
+		},
+		{
+			name:    "the current directory as ./",
+			cwd:     "services/cart",
+			dir:     "./",
+			options: ecosystems.NewPluginOptions,
+			cli:     []reportedAs{{"obj/project.assets.json", "."}},
+			scm:     []reportedAs{{"Cart.csproj", "cart"}},
+		},
+		{
+			name:    "the parent directory as ..",
+			cwd:     "services/cart/obj",
+			dir:     "..",
+			options: ecosystems.NewPluginOptions,
+			cli:     []reportedAs{{"obj/project.assets.json", ".."}},
+			scm:     []reportedAs{{"Cart.csproj", "cart"}},
+		},
+		{
+			name:    "a relative path",
+			dir:     "services/cart",
+			options: ecosystems.NewPluginOptions,
+			cli:     []reportedAs{{"obj/project.assets.json", "cart"}},
+			scm:     []reportedAs{{"Cart.csproj", "cart"}},
+		},
+		{
+			name:    "every project under .",
+			dir:     ".",
+			options: allProjects,
+			cli:     []reportedAs{{"services/cart/obj/project.assets.json", "."}},
+			scm:     []reportedAs{{"services/cart/Cart.csproj", "cart"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := filepath.Join(t.TempDir(), scanRootName)
+			write(t, root, "services/cart/Cart.csproj", csprojNet45)
+			write(t, root, "services/cart/obj/project.assets.json", singleTargetAssets)
+			t.Chdir(filepath.Join(root, tt.cwd))
+
+			assert.ElementsMatch(t, tt.scm, identities(t, scan(t, tt.dir, tt.options())), "SCM identity")
+			assert.ElementsMatch(t, tt.cli, identities(t, scan(t, tt.dir, tt.options().WithCLIProjectIdentity(true))), "CLI identity")
+		})
+	}
+}
+
+// The legacy CLI reported --file exactly as typed.
+func TestPlugin_CLIIdentityReportsTheTargetFileAsGiven(t *testing.T) {
+	root := filepath.Join(t.TempDir(), scanRootName)
+	write(t, root, "services/cart/Cart.csproj", csprojNet45)
+	write(t, root, "services/cart/obj/project.assets.json", singleTargetAssets)
+	write(t, root, "services/web/Web.csproj", csprojNet45)
+	write(t, root, "services/web/packages.config", packagesConfigManifest)
+	write(t, root, "services/app/App.csproj", csprojNet45)
+	write(t, root, "services/app/project.json", projectJSONManifest)
+
+	absolute := filepath.Join(root, "services/cart/obj/project.assets.json")
+
+	tests := []struct {
+		file string
+		scm  reportedAs
+	}{
+		{"./services/cart/obj/project.assets.json", reportedAs{"services/cart/Cart.csproj", "cart"}},
+		{"services//cart/obj/project.assets.json", reportedAs{"services/cart/Cart.csproj", "cart"}},
+		{absolute, reportedAs{"services/cart/Cart.csproj", "cart"}},
+		{"./services/web/packages.config", reportedAs{"services/web/Web.csproj", "web"}},
+		{"./services/app/project.json", reportedAs{"services/app/project.json", "app"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.file, func(t *testing.T) {
+			options := func() *ecosystems.SCAPluginOptions { return ecosystems.NewPluginOptions().WithTargetFile(tt.file) }
+
+			assert.Equal(t, []reportedAs{tt.scm}, identities(t, scan(t, root, options())), "SCM identity")
+			assert.Equal(t, []reportedAs{{tt.file, scanRootName}},
+				identities(t, scan(t, root, options().WithCLIProjectIdentity(true))), "CLI identity")
+		})
+	}
+}
+
 func TestNewProjectNaming(t *testing.T) {
+	cli := ecosystems.NewPluginOptions().WithCLIProjectIdentity(true)
+
 	t.Run("off by default", func(t *testing.T) {
-		naming, err := newProjectNaming(t.TempDir(), ecosystems.NewPluginOptions())
-		require.NoError(t, err)
-		assert.Equal(t, projectNaming{}, naming)
+		assert.Equal(t, projectNaming{}, newProjectNaming(t.TempDir(), ecosystems.NewPluginOptions()))
 	})
 
-	t.Run("a relative scan root is named after the directory it resolves to", func(t *testing.T) {
-		t.Chdir(t.TempDir())
-
-		naming, err := newProjectNaming(".", ecosystems.NewPluginOptions().WithCLIProjectIdentity(true))
-		require.NoError(t, err)
-
-		cwd, err := filepath.Abs(".")
-		require.NoError(t, err)
-		assert.Equal(t, filepath.Base(cwd), naming.cliRootName)
-	})
-
-	// The filesystem root has no name, so a project there is named after its own
-	// directory, as snyk-nuget-plugin's getRootName falls back to.
-	t.Run("the filesystem root gives no name", func(t *testing.T) {
-		naming, err := newProjectNaming(string(filepath.Separator), ecosystems.NewPluginOptions().WithCLIProjectIdentity(true))
-		require.NoError(t, err)
-		assert.True(t, naming.cli)
+	// snyk-nuget-plugin's getRootName falls back to the manifest's directory,
+	// stepping over obj/, and then to "root".
+	t.Run("the filesystem root", func(t *testing.T) {
+		naming := newProjectNaming(string(filepath.Separator), cli)
 		assert.Empty(t, naming.cliRootName)
+
+		sep := string(filepath.Separator)
+		assert.Equal(t, "cart", naming.rootName(discovery.FindResult{Path: filepath.Join(sep, "cart", "obj", projectAssetsFile)}))
+		assert.Equal(t, cliLastResortRootName, naming.rootName(discovery.FindResult{Path: filepath.Join(sep, "obj", projectAssetsFile)}))
+		assert.Equal(t, cliLastResortRootName, naming.rootName(discovery.FindResult{Path: filepath.Join(sep, packagesConfigFile)}))
 	})
 }
 

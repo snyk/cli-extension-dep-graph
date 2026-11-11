@@ -105,10 +105,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 	// Whitespace alone is no request at all, which active() then reports.
 	filter := &targetFrameworkFilter{requested: strings.TrimSpace(options.Dotnet.TargetFramework)}
 
-	naming, err := newProjectNaming(dir, options)
-	if err != nil {
-		return err
-	}
+	naming := newProjectNaming(dir, options)
 
 	for _, file := range files {
 		if err := p.emitResults(ctx, log, file, options, naming, filter, onGraph); err != nil {
@@ -221,30 +218,34 @@ func (p Plugin) emitResults(
 // being replaced reported, or every project it created gets a duplicate. Which
 // resolver that is depends on the caller.
 type projectNaming struct {
-	// cliRootName is set only for the CLI's identity: the name of the scanned
-	// directory, which the legacy CLI gave every project it found under it.
+	cli bool
+	// cliRootName is the name the legacy CLI gave every project it found: the
+	// scan root's base name, taken from the path as given rather than resolved,
+	// so a scan of "." is named ".". Empty for the filesystem root.
 	cliRootName string
-	cli         bool
+	// cliTargetFile is --file exactly as given, which the legacy CLI reported
+	// unnormalized.
+	cliTargetFile string
 }
 
-func newProjectNaming(dir string, options *ecosystems.SCAPluginOptions) (projectNaming, error) {
-	if !options.Dotnet.CLIProjectIdentity {
-		return projectNaming{}, nil
-	}
+// cliLastResortRootName is snyk-nuget-plugin's name for a project when neither
+// the scan root nor the manifest's directory has one.
+const cliLastResortRootName = "root"
 
-	absDir, err := filepath.Abs(dir)
-	if err != nil {
-		return projectNaming{}, fmt.Errorf("resolving absolute path for %s: %w", dir, err)
+func newProjectNaming(dir string, options *ecosystems.SCAPluginOptions) projectNaming {
+	if !options.Dotnet.CLIProjectIdentity {
+		return projectNaming{}
 	}
 
 	naming := projectNaming{cli: true}
-	// The filesystem root has no name. The legacy CLI then names the project
-	// after its own directory, as the default does.
-	if filepath.Dir(absDir) != absDir {
-		naming.cliRootName = filepath.Base(absDir)
+	if base := filepath.Base(dir); base != string(filepath.Separator) {
+		naming.cliRootName = base
+	}
+	if options.Global.TargetFile != nil {
+		naming.cliTargetFile = *options.Global.TargetFile
 	}
 
-	return naming, nil
+	return naming
 }
 
 // rootName names a project whose manifest records no name of its own.
@@ -253,18 +254,26 @@ func (n projectNaming) rootName(file discovery.FindResult) string {
 		return n.cliRootName
 	}
 
-	return rootComponentName(file)
+	name := rootComponentName(file)
+	if n.cli && name == string(filepath.Separator) {
+		return cliLastResortRootName
+	}
+
+	return name
 }
 
 // reportedFile is the target file a project is reported under. The legacy CLI
 // reported the manifest it read. The default is the project file beside it, or
 // the manifest when there is none.
 func (n projectNaming) reportedFile(manifest, projectFile string) string {
-	if n.cli || projectFile == "" {
+	switch {
+	case n.cliTargetFile != "":
+		return n.cliTargetFile
+	case n.cli || projectFile == "":
 		return manifest
+	default:
+		return projectFile
 	}
-
-	return projectFile
 }
 
 // emitAssetsResults resolves an SDK-style project and emits a result per target
@@ -728,7 +737,7 @@ func (p Plugin) emitFrameworkResult(
 // reported under the manifest.
 func frameworkIdentityFile(manifest, projectFile string, naming projectNaming) string {
 	if filepath.Base(manifest) != packagesConfigFile {
-		return manifest
+		projectFile = ""
 	}
 
 	return naming.reportedFile(manifest, projectFile)
