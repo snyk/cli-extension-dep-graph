@@ -3,25 +3,25 @@ package orchestrator
 import (
 	"context"
 	"errors"
-	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/gradle"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/identity"
 )
 
 func TestNativePlugin_Resolution(t *testing.T) {
-	setupError := errors.New("resolver setup failed")
 	for _, tt := range []struct {
 		name         string
 		allProjects  bool
 		failFast     bool
 		firstResults []ecosystems.SCAResult
-		firstErr     error
 		wantResults  int
 		wantSecond   bool
 	}{
@@ -32,16 +32,13 @@ func TestNativePlugin_Resolution(t *testing.T) {
 			name: "all projects runs each native", allProjects: true,
 			firstResults: []ecosystems.SCAResult{{ProcessedFiles: []string{"Cargo.lock", "Cargo.lock"}}}, wantResults: 2, wantSecond: true,
 		},
-		{name: "all projects continues after setup error", allProjects: true, firstErr: setupError, wantResults: 2, wantSecond: true},
-		{name: "default setup error takes precedence", firstErr: setupError, wantResults: 1},
-		{name: "fail fast setup error skips later native", allProjects: true, failFast: true, firstErr: setupError, wantResults: 1},
 		{
 			name: "fail fast result error skips later native", allProjects: true, failFast: true,
 			firstResults: []ecosystems.SCAResult{{Error: context.DeadlineExceeded}}, wantResults: 1,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			first := &mockPlugin{name: "cargo", results: tt.firstResults, err: tt.firstErr}
+			first := &mockPlugin{name: "cargo", results: tt.firstResults}
 			second := &mockPlugin{name: "dotnet", results: []ecosystems.SCAResult{{ProcessedFiles: []string{"project.assets.json"}}}}
 			registry := &PluginRegistry{plugins: []ecosystems.SCAPlugin{first, second}}
 			backing := []string{"original", "spare1", "spare2", "spare3"}
@@ -57,11 +54,6 @@ func TestNativePlugin_Resolution(t *testing.T) {
 			require.Len(t, results, tt.wantResults)
 			assert.Equal(t, []string{"original"}, []string(opts.Global.ExcludePaths))
 			assert.Equal(t, []string{"original", "spare1", "spare2", "spare3"}, backing)
-			if tt.firstErr != nil {
-				assert.ErrorIs(t, results[0].Error, tt.firstErr)
-				require.NotNil(t, results[0].ResolverMetadata)
-				assert.Equal(t, "cargo", results[0].ResolverMetadata.PluginName)
-			}
 			if tt.wantSecond {
 				assert.Equal(t, []string{"vendor"}, second.capturedExclude)
 				wantExcludes := []string{"original"}
@@ -76,69 +68,82 @@ func TestNativePlugin_Resolution(t *testing.T) {
 	}
 }
 
-func TestNativePlugin_ReturnedCancellation(t *testing.T) {
+func TestNativePlugin_ReturnedError(t *testing.T) {
+	setupErr := errors.New("resolver setup failed")
 	for _, tt := range []struct {
-		name string
-		err  error
-		want error
+		name        string
+		allProjects bool
+		failFast    bool
 	}{
-		{name: "canceled", err: context.Canceled, want: context.Canceled},
-		{name: "deadline exceeded", err: context.DeadlineExceeded, want: context.DeadlineExceeded},
-		{name: "wrapped canceled", err: fmt.Errorf("resolver stopped: %w", context.Canceled), want: context.Canceled},
-		{name: "wrapped deadline exceeded", err: fmt.Errorf("resolver stopped: %w", context.DeadlineExceeded), want: context.DeadlineExceeded},
+		{name: "default"},
+		{name: "all projects", allProjects: true},
+		{name: "all projects fail fast", allProjects: true, failFast: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			for _, withLaterPlugin := range []bool{false, true} {
-				t.Run(fmt.Sprintf("later plugin %t", withLaterPlugin), func(t *testing.T) {
-					first := &mockPlugin{name: "cargo", err: tt.err}
-					later := &mockPlugin{name: "uv"}
-					registry := &PluginRegistry{plugins: []ecosystems.SCAPlugin{first}}
-					if withLaterPlugin {
-						registry.plugins = append(registry.plugins, later)
-					}
-					var results []ecosystems.SCAResult
-
-					err := registry.NativePlugin().BuildDepGraphsFromDir(context.Background(), logger.Nop(), "test",
-						ecosystems.NewPluginOptions().WithAllProjects(true).WithExcludePaths([]string{"existing"}), func(result ecosystems.SCAResult) error {
-							results = append(results, result)
-							return nil
-						})
-
-					assert.ErrorIs(t, err, tt.want)
-					assert.Empty(t, results)
-					assert.Nil(t, later.capturedExcludePaths)
-				})
-			}
-		})
-	}
-}
-
-func TestNativePlugin_ReturnedErrorMetadata(t *testing.T) {
-	explicitTarget := "nested/Cargo.toml"
-	failure := errors.New("resolver setup failed")
-	for _, tt := range []struct {
-		name   string
-		target *string
-		want   string
-	}{
-		{name: "explicit target", target: &explicitTarget, want: explicitTarget},
-		{name: "plugin fallback", want: "cargo"},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			registry := &PluginRegistry{plugins: []ecosystems.SCAPlugin{&mockPlugin{name: "cargo", err: failure}}}
-			opts := ecosystems.NewPluginOptions()
-			opts.Global.TargetFile = tt.target
+			first := &mockPlugin{name: "cargo", err: setupErr}
+			later := &mockPlugin{name: "uv"}
+			registry := &PluginRegistry{plugins: []ecosystems.SCAPlugin{first, later}}
+			opts := ecosystems.NewPluginOptions().WithAllProjects(tt.allProjects).WithFailFast(tt.failFast)
 			var results []ecosystems.SCAResult
 
 			err := registry.NativePlugin().BuildDepGraphsFromDir(context.Background(), logger.Nop(), "test", opts,
 				func(result ecosystems.SCAResult) error { results = append(results, result); return nil })
 
-			require.NoError(t, err)
-			require.Len(t, results, 1)
-			assert.ErrorIs(t, results[0].Error, failure)
-			assert.Equal(t, &ecosystems.ResolverMetadata{PluginName: "cargo", NormalisedTargetFile: tt.want}, results[0].ResolverMetadata)
+			assert.ErrorIs(t, err, setupErr)
+			assert.ErrorContains(t, err, "running cargo plugin")
+			assert.Empty(t, results)
+			assert.Nil(t, later.capturedExcludePaths)
 		})
 	}
+}
+
+func TestNativePlugin_CancellationDuringPlugin(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		pluginErr error
+		want      error
+	}{
+		{name: "plugin returns nil", want: context.Canceled},
+		{name: "plugin returns unrelated error", pluginErr: errors.New("killed"), want: context.Canceled},
+		{name: "plugin returns canceled", pluginErr: context.Canceled, want: context.Canceled},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			first := &mockPlugin{name: "cargo", err: tt.pluginErr, onRun: cancel}
+			later := &mockPlugin{name: "uv"}
+			registry := &PluginRegistry{plugins: []ecosystems.SCAPlugin{first, later}}
+
+			err := registry.NativePlugin().BuildDepGraphsFromDir(ctx, logger.Nop(), "test",
+				ecosystems.NewPluginOptions().WithAllProjects(true), func(ecosystems.SCAResult) error { return nil })
+
+			assert.ErrorIs(t, err, tt.want)
+			assert.Nil(t, later.capturedExcludePaths)
+		})
+	}
+}
+
+func TestNativePlugin_GradleErrorClaimsManifest(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "build.gradle"), nil, 0o600))
+	t.Setenv("PATH", "")
+	legacy := &mockPlugin{name: "legacy"}
+	registry := &PluginRegistry{plugins: []ecosystems.SCAPlugin{gradle.NewGradlePlugin(), legacy}}
+	var results []ecosystems.SCAResult
+
+	// act
+	err := registry.NativePlugin().BuildDepGraphsFromDir(context.Background(), logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithAllProjects(true),
+		func(result ecosystems.SCAResult) error { results = append(results, result); return nil })
+
+	// assert
+	require.NoError(t, err)
+	require.NotEmpty(t, results)
+	require.Error(t, results[0].Error)
+	require.NotNil(t, results[0].ResolverMetadata)
+	assert.Equal(t, "gradle", results[0].ResolverMetadata.PluginName)
+	assert.Contains(t, legacy.capturedExcludePaths, "build.gradle")
 }
 
 func TestNativePlugin_CallbackError(t *testing.T) {

@@ -536,6 +536,8 @@ func gradleErrorResult(dir, buildFilePath string, err error) ecosystems.SCAResul
 				TargetFile:  &buildFile,
 			},
 		},
-		Error: err,
+		Error:            err,
+		ProcessedFiles:   []string{buildFile},
+		ResolverMetadata: &ecosystems.ResolverMetadata{PluginName: PluginName, NormalisedTargetFile: buildFile},
 	}
 }
