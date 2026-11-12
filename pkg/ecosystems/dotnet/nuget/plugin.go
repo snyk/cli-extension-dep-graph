@@ -105,8 +105,10 @@ func (p Plugin) BuildDepGraphsFromDir(
 	// Whitespace alone is no request at all, which active() then reports.
 	filter := &targetFrameworkFilter{requested: strings.TrimSpace(options.Dotnet.TargetFramework)}
 
+	naming := newProjectNaming(dir, options)
+
 	for _, file := range files {
-		if err := p.emitResults(ctx, log, file, options, filter, onGraph); err != nil {
+		if err := p.emitResults(ctx, log, file, options, naming, filter, onGraph); err != nil {
 			return err
 		}
 	}
@@ -200,14 +202,83 @@ func (p Plugin) emitResults(
 	log logger.Logger,
 	file discovery.FindResult,
 	options *ecosystems.SCAPluginOptions,
+	naming projectNaming,
 	filter *targetFrameworkFilter,
 	onGraph ecosystems.OnGraphFunc,
 ) error {
 	if filepath.Base(file.Path) == projectAssetsFile {
-		return p.emitAssetsResults(ctx, log, file, options, filter, onGraph)
+		return p.emitAssetsResults(ctx, log, file, options, naming, filter, onGraph)
 	}
 
-	return p.emitFrameworkResult(ctx, log, file, options, filter, onGraph)
+	return p.emitFrameworkResult(ctx, log, file, options, naming, filter, onGraph)
+}
+
+// projectNaming decides the root name and target file a project is reported
+// under. The two are a project's identity, so they must stay what the resolver
+// being replaced reported, or every project it created gets a duplicate. Which
+// resolver that is depends on the caller.
+type projectNaming struct {
+	cli bool
+	// cliRootName is the name the legacy CLI gave every project it found: the
+	// scan root's base name, taken from the path as given rather than resolved,
+	// so a scan of "." is named ".". Empty for the filesystem root.
+	cliRootName string
+	// cliTargetFile is --file exactly as given, which the legacy CLI reported
+	// unnormalized.
+	cliTargetFile string
+}
+
+// cliLastResortRootName is snyk-nuget-plugin's name for a project when neither
+// the scan root nor the manifest's directory has one.
+const cliLastResortRootName = "root"
+
+func newProjectNaming(dir string, options *ecosystems.SCAPluginOptions) projectNaming {
+	if !options.Dotnet.CLIProjectIdentity {
+		return projectNaming{}
+	}
+
+	naming := projectNaming{cli: true}
+	if base := filepath.Base(dir); base != string(filepath.Separator) {
+		naming.cliRootName = base
+	}
+	if options.Global.TargetFile != nil {
+		naming.cliTargetFile = *options.Global.TargetFile
+	}
+
+	return naming
+}
+
+// rootName names a project. A name the manifest recorded wins over any derived
+// from the scan.
+func (n projectNaming) rootName(file discovery.FindResult, recorded string) string {
+	if recorded != "" {
+		return recorded
+	}
+
+	if n.cliRootName != "" {
+		return n.cliRootName
+	}
+
+	name := rootComponentName(file)
+	if n.cli && name == string(filepath.Separator) {
+		return cliLastResortRootName
+	}
+
+	return name
+}
+
+// reportedFile is the target file a project is reported under. The legacy CLI
+// reported the manifest it read. The default is the project file beside it, or
+// the manifest when there is none.
+func (n projectNaming) reportedFile(manifest, projectFile string) string {
+	switch {
+	case n.cliTargetFile != "":
+		return n.cliTargetFile
+	case n.cli || projectFile == "":
+		return manifest
+	default:
+		return projectFile
+	}
 }
 
 // emitAssetsResults resolves an SDK-style project and emits a result per target
@@ -225,6 +296,7 @@ func (p Plugin) emitAssetsResults(
 	log logger.Logger,
 	file discovery.FindResult,
 	options *ecosystems.SCAPluginOptions,
+	naming projectNaming,
 	filter *targetFrameworkFilter,
 	onGraph ecosystems.OnGraphFunc,
 ) error {
@@ -232,13 +304,11 @@ func (p Plugin) emitAssetsResults(
 
 	// The assets file is what the dependencies are read from, and what messages
 	// about them name, but it is restore output under obj/ rather than the
-	// project itself. Identity names the project file instead, which is what the
-	// legacy resolver reports an SDK-style project under — so a result and the
-	// one it replaces name the same project.
+	// project itself. By default an SDK-style project is reported under its
+	// project file; the legacy CLI reported it under the assets file. See
+	// projectNaming.
 	projectFile := projectFileOf(file)
-	if projectFile == "" {
-		projectFile = targetFile
-	}
+	reported := naming.reportedFile(targetFile, projectFile)
 	claimed := claimedFiles(projectFile, targetFile)
 
 	assets, err := readProjectAssets(file.Path, targetFile)
@@ -249,22 +319,23 @@ func (p Plugin) emitAssetsResults(
 		return nil
 	}
 
-	rootName := rootComponentName(file)
+	var recordedName string
 	if options.Dotnet.AssetsProjectName {
-		if named := assets.Project.Restore.ProjectName; named != "" {
-			rootName = named
-		} else {
-			// Silently keeping the derived name would look like the flag did
-			// nothing.
-			log.Debug(ctx, "The restore recorded no project name, so the .NET project keeps its directory-derived name",
-				logger.Attr(logFieldTargetFile, targetFile), logger.Attr(logFieldRootName, rootName))
-		}
+		recordedName = assets.Project.Restore.ProjectName
+	}
+
+	rootName := naming.rootName(file, recordedName)
+	if options.Dotnet.AssetsProjectName && recordedName == "" {
+		// Silently keeping the derived name would look like the flag did
+		// nothing.
+		log.Debug(ctx, "The restore recorded no project name, so the .NET project keeps its directory-derived name",
+			logger.Attr(logFieldTargetFile, targetFile), logger.Attr(logFieldRootName, rootName))
 	}
 
 	frameworks := assets.targetFrameworks()
 
 	if filter.active() {
-		project := scannedProject{targetFile: projectFile, claimed: claimed, rootName: rootName}
+		project := scannedProject{targetFile: reported, claimed: claimed, rootName: rootName}
 
 		selected, ok := filter.keep(project, frameworks)
 		if !ok {
@@ -293,7 +364,7 @@ func (p Plugin) emitAssetsResults(
 				fmt.Sprintf("No resolved packages for target framework %s in %s.", framework, targetFile),
 			)
 
-			if err := onGraph(p.errResult(projectFile, claimed, rootName, framework, err)); err != nil {
+			if err := onGraph(p.errResult(reported, claimed, rootName, framework, err)); err != nil {
 				return err
 			}
 
@@ -308,14 +379,14 @@ func (p Plugin) emitAssetsResults(
 
 		graph, buildErr := buildDepGraph(ctx, assets, rootName, targetsKey)
 		if buildErr != nil {
-			if err := onGraph(p.errResult(projectFile, claimed, rootName, framework, buildErr)); err != nil {
+			if err := onGraph(p.errResult(reported, claimed, rootName, framework, buildErr)); err != nil {
 				return err
 			}
 
 			continue
 		}
 
-		result := p.newResult(projectFile, claimed, rootName, framework)
+		result := p.newResult(reported, claimed, rootName, framework)
 		result.DepGraph = graph
 
 		if err := onGraph(result); err != nil {
@@ -577,6 +648,7 @@ func (p Plugin) emitFrameworkResult(
 	log logger.Logger,
 	file discovery.FindResult,
 	options *ecosystems.SCAPluginOptions,
+	naming projectNaming,
 	filter *targetFrameworkFilter,
 	onGraph ecosystems.OnGraphFunc,
 ) error {
@@ -603,14 +675,11 @@ func (p Plugin) emitFrameworkResult(
 		))
 	}
 
-	rootName := manifest.rootName
-	if rootName == "" {
-		rootName = rootComponentName(file)
-	}
+	rootName := naming.rootName(file, manifest.rootName)
 
 	projectFile := projectFileOf(file)
 	claimed := claimedFiles(projectFile, targetFile)
-	identityFile := frameworkIdentityFile(targetFile, projectFile)
+	identityFile := frameworkIdentityFile(targetFile, projectFile, naming)
 
 	// These manifests resolve one dependency set rather than one per framework,
 	// but they still have exactly one — detectTargetFramework just named it —
@@ -665,15 +734,16 @@ func (p Plugin) emitFrameworkResult(
 }
 
 // frameworkIdentityFile is the target file a packages.config or project.json
-// project is reported under. The legacy resolver reports a packages.config
-// under the project file beside it, and under the manifest only when there is
-// none. It always reports a project.json under the manifest.
-func frameworkIdentityFile(manifest, projectFile string) string {
-	if projectFile != "" && filepath.Base(manifest) == packagesConfigFile {
-		return projectFile
+// project is reported under. By default a packages.config is reported under
+// the project file beside it, and under the manifest only when there is none;
+// the legacy CLI always reported the manifest. A project.json is always
+// reported under the manifest.
+func frameworkIdentityFile(manifest, projectFile string, naming projectNaming) string {
+	if filepath.Base(manifest) != packagesConfigFile {
+		projectFile = ""
 	}
 
-	return manifest
+	return naming.reportedFile(manifest, projectFile)
 }
 
 // readFrameworkManifest reads whichever of the two older manifests this is.

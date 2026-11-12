@@ -256,6 +256,7 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 
 			assert.NoError(t, err)
 			tt.expected.Global.RawFlags = tt.rawFlags
+			tt.expected.Dotnet.CLIProjectIdentity = true
 			assert.Equal(t, tt.expected, got)
 		})
 	}
@@ -499,4 +500,15 @@ func TestWithAssetsProjectName(t *testing.T) {
 	assert.False(t, opts.Dotnet.AssetsProjectName)
 	assert.True(t, opts.WithAssetsProjectName(true).Dotnet.AssetsProjectName)
 	assert.False(t, opts.WithAssetsProjectName(false).Dotnet.AssetsProjectName)
+}
+
+func TestCLIProjectIdentity(t *testing.T) {
+	assert.False(t, NewPluginOptions().Dotnet.CLIProjectIdentity,
+		"SCM imports build their options this way and keep the SCM identity")
+
+	opts, err := NewPluginOptionsFromRawFlags([]string{})
+	assert.NoError(t, err)
+	assert.True(t, opts.Dotnet.CLIProjectIdentity, "only the CLI has raw flags")
+
+	assert.True(t, NewPluginOptions().WithCLIProjectIdentity(true).Dotnet.CLIProjectIdentity)
 }
