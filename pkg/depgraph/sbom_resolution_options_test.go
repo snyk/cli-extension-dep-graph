@@ -94,12 +94,12 @@ func Test_buildPluginOptions_configuredScope(t *testing.T) {
 		{name: "raw workspace selector does not activate UV selection", raw: []string{"--workspace-package=api"}},
 		{name: "unrelated raw options preserve defaults", raw: []string{
 			"--all-projects", "--internal-uv-workspace-packages", "--dev", "--strict-out-of-sync=false",
-			"--exclude=raw", "--exclude-paths=raw", "--fail-fast", "--force-single-graph", "--target-file=raw",
+			"--exclude=raw", "--exclude-paths=raw", "--fail-fast", "--force-single-graph", "--file=raw",
 			"--project-name=raw", "--no-build-isolation", "--assets-project-name", "--packages-folder=raw", "--dotnet-target-framework=raw",
 		}},
 		{name: "disabled native malformed values ignored", disabledNative: true, raw: []string{"--bazel-max-targets=invalid", "--configuration-matching"}},
 		{
-			name: "config wins over unrelated malformed raw flags", raw: []string{"--detection-depth=invalid", "--target-file=raw", "--exclude=raw"},
+			name: "config wins over unrelated malformed raw flags", raw: []string{"--detection-depth=invalid", "--file=raw", "--exclude=raw"},
 			config: map[string]any{
 				workflow.FlagAllProjects: true, workflow.FlagUvWorkspacePackages: true, workflow.FlagDev: true,
 				workflow.FlagStrictOutOfSync: "false", workflow.FlagExclude: " one, , two ", workflow.FlagExcludePaths: " path, , other ",
