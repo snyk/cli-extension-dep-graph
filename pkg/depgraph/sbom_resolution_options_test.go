@@ -129,7 +129,9 @@ func Test_buildPluginOptions_configuredScope(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, opts.Global)
 			assert.Equal(t, ecosystems.PythonOptions{}, opts.Python)
-			assert.Equal(t, tt.wantDotnet, opts.Dotnet)
+			wantDotnet := tt.wantDotnet
+			wantDotnet.CLIProjectIdentity = true
+			assert.Equal(t, wantDotnet, opts.Dotnet)
 		})
 	}
 }
