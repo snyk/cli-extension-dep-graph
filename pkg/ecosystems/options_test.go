@@ -20,7 +20,7 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 		{
 			name: "all fields set",
 			rawFlags: []string{
-				"--target-file", targetFile,
+				"--file", targetFile,
 				"--all-projects",
 				"--dev",
 				"--exclude", "foo",
@@ -95,7 +95,7 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 		{
 			name: "only target file",
 			rawFlags: []string{
-				"--target-file", targetFile,
+				"--file", targetFile,
 			},
 			expected: &SCAPluginOptions{
 				Global: GlobalOptions{
@@ -416,7 +416,7 @@ func TestNewPluginOptionsFromRawFlags_SubProjectAlias(t *testing.T) {
 func TestNewPluginOptionsFromRawFlags_UnknownFlags(t *testing.T) {
 	rawFlags := []string{
 		"--unknown-flag", "value",
-		"--target-file", "package.json",
+		"--file", "package.json",
 		"--dev",
 		"--another-unknown",
 	}
@@ -511,4 +511,17 @@ func TestCLIProjectIdentity(t *testing.T) {
 	assert.True(t, opts.Dotnet.CLIProjectIdentity, "only the CLI has raw flags")
 
 	assert.True(t, NewPluginOptions().WithCLIProjectIdentity(true).Dotnet.CLIProjectIdentity)
+}
+
+func TestNewPluginOptionsFromRawFlags_TargetFile(t *testing.T) {
+	for _, rawFlags := range [][]string{
+		{"test", "--file=obj/project.assets.json"},
+		{"monitor", "--file", "obj/project.assets.json"},
+	} {
+		opts, err := NewPluginOptionsFromRawFlags(rawFlags)
+
+		require.NoError(t, err)
+		require.NotNil(t, opts.Global.TargetFile, rawFlags)
+		assert.Equal(t, "obj/project.assets.json", *opts.Global.TargetFile, rawFlags)
+	}
 }
