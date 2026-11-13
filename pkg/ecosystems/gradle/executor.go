@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/snyk/go-application-framework/pkg/local_workflows/env_utils"
 )
 
 const (
@@ -45,6 +47,11 @@ func runInitScript(ctx context.Context, projectDir, gradleBinary, initScriptPath
 
 	cmd := exec.CommandContext(ctx, gradleBinary, args...)
 	cmd.Dir = projectDir
+	env, err := env_utils.SanitizeEnv(os.Environ(), cmd.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare gradle in %s: %w", projectDir, err)
+	}
+	cmd.Env = env
 
 	// Use streaming for stdout to handle potentially large output
 	stdout, err := cmd.StdoutPipe()

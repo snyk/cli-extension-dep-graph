@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
 
+	"github.com/snyk/go-application-framework/pkg/local_workflows/env_utils"
 	"golang.org/x/mod/semver"
 )
 
@@ -49,13 +51,19 @@ func (e *pnpmCmdExecutor) Run(ctx context.Context, dir string) (io.ReadCloser, e
 		return nil, errPnpmNotFound //nolint:wrapcheck // sentinel, intentionally unwrapped
 	}
 
+	//nolint:govet // Reassigning to err is fine
 	if err := checkPnpmVersion(ctx, resolved); err != nil {
 		return nil, err
 	}
 
 	cmd := exec.CommandContext(ctx, resolved, "-r", "list", "--lockfile-only", "--json", "--depth", "Infinity")
 	cmd.Dir = dir
-	cmd.Env = append(cmd.Environ(), "NO_COLOR=1")
+	env, err := env_utils.SanitizeEnv(os.Environ(), cmd.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("prepare pnpm list command: %w", err)
+	}
+	cmd.Env = env
+	cmd.Env = append(cmd.Env, "NO_COLOR=1")
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -81,7 +89,13 @@ func (e *pnpmCmdExecutor) Run(ctx context.Context, dir string) (io.ReadCloser, e
 }
 
 func checkPnpmVersion(ctx context.Context, binary string) error {
-	out, err := exec.CommandContext(ctx, binary, "--version").Output()
+	cmd := exec.CommandContext(ctx, binary, "--version")
+	env, err := env_utils.SanitizeEnv(os.Environ(), cmd.Dir)
+	if err != nil {
+		return fmt.Errorf("prepare pnpm --version: %w", err)
+	}
+	cmd.Env = env
+	out, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("failed to get pnpm version: %w", err)
 	}
