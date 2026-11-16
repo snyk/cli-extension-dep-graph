@@ -444,3 +444,36 @@ func TestBuildDepGraph_SDKInjectedPackageSurvivesAsTransitive(t *testing.T) {
 	assert.Equal(t, []string{"Declared@1.0.0"}, depsOf(t, graph, graph.Graph.RootNodeID))
 	assert.Equal(t, []string{"Microsoft.NET.ILLink.Tasks@8.0.16"}, depsOf(t, graph, "Declared@1.0.0"))
 }
+
+// When a parent node is reached through multiple paths with different visited
+// contexts, it must not get both a full edge and a pruned edge to the same child.
+// This reproduces OSF-618: a parent depending on both X and X:pruned.
+func TestBuildDepGraph_ParentReachedTwiceDoesNotCreateTwinEdges(t *testing.T) {
+	graph := build(t, `{
+      "targets": {
+        "net8.0": {
+          "Left/1.0.0": { "type": "package", "dependencies": { "Parent": "1.0.0" } },
+          "Right/1.0.0": { "type": "package", "dependencies": { "Shared": "1.0.0", "Parent": "1.0.0" } },
+          "Parent/1.0.0": { "type": "package", "dependencies": { "Shared": "1.0.0" } },
+          "Shared/1.0.0": { "type": "package" }
+        }
+      },
+      "projectFileDependencyGroups": { "net8.0": [ "Left >= 1.0.0", "Right >= 1.0.0" ] },
+      "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
+    }`)
+
+	// Parent is reached through two paths:
+	// Path 1: Root -> Left -> Parent (Shared not in visited) -> adds Parent -> Shared
+	// Path 2: Root -> Right -> Shared, Parent (Shared in visited) -> would add Parent -> Shared:pruned
+	//
+	// Expected: Parent has exactly one edge to Shared, not both Shared and Shared:pruned
+
+	parentDeps := depsOf(t, graph, "Parent@1.0.0")
+	assert.Equal(t, []string{"Shared@1.0.0"}, parentDeps, "Parent must have exactly one edge to Shared")
+
+	// Verify no pruned stub of Shared exists as a child of Parent
+	for _, dep := range parentDeps {
+		assert.NotContains(t, dep, prunedNodeSuffix,
+			"Parent must not have a pruned edge when it already has the real edge")
+	}
+}

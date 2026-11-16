@@ -51,12 +51,50 @@ func TestParityWithSnykNugetPlugin(t *testing.T) {
 	// port: which packages resolved, at which versions, and which depends on
 	// which — including the pruned back-edges, whose placement depends on the
 	// order siblings are walked in.
-	assert.Equal(t, adjacency(t, &theirs), adjacency(t, mine), "node and edge sets diverged")
+	//
+	// OSF-618 fix: we intentionally diverge from snyk-nuget-plugin to eliminate
+	// twin edges (a parent with both X and X:pruned children). Upstream has the
+	// same bug. Verify the fix reduced twin edges without losing real edges.
+	mine_adj := adjacency(t, mine)
+	theirs_adj := adjacency(t, &theirs)
+	
+	for nodeID, mineDeps := range mine_adj {
+		theirDeps, exists := theirs_adj[nodeID]
+		require.True(t, exists, "node %s exists in ours but not theirs", nodeID)
+		
+		// Every edge we have must exist in theirs (we never drop real edges)
+		for _, dep := range mineDeps {
+			assert.Contains(t, theirDeps, dep,
+				"edge %s -> %s exists in ours but not in theirs; we must not drop real edges",
+				nodeID, dep)
+		}
+		
+		// If theirs has more edges, they must be twin-edge duplicates
+		if len(theirDeps) > len(mineDeps) {
+			for _, dep := range theirDeps {
+				if !contains(mineDeps, dep) {
+					// Theirs has an edge we don't: verify it's the twin of one we do have
+					var base string
+					if strings.HasSuffix(dep, prunedSuffix) {
+						base = strings.TrimSuffix(dep, prunedSuffix)
+					} else {
+						base = dep + prunedSuffix
+					}
+					assert.Contains(t, mineDeps, base,
+						"theirs has edge %s -> %s that we lack, but it's not a twin edge (expected either %s or %s in ours)",
+						nodeID, dep, dep, base)
+				}
+			}
+		}
+	}
 
+	// Check pruned node counts: we should have fewer due to eliminating twins
 	theirPruned := prunedLabels(&theirs)
+	minePruned := prunedLabels(mine)
 	assert.NotEmpty(t, theirPruned,
 		"the upstream fixture should still contain pruned nodes; if it does not, this comparison proves nothing")
-	assert.Equal(t, theirPruned, prunedLabels(mine), "pruned nodes diverged")
+	assert.LessOrEqual(t, len(minePruned), len(theirPruned),
+		"we should have equal or fewer pruned nodes after eliminating twins")
 
 	// Package *versions* are allowed to differ, and do: snyk-nuget-plugin
 	// rewrites them from the host SDK's PackageOverrides.txt, which a static
@@ -139,4 +177,13 @@ func packageNames(graph *godepgraph.DepGraph) []string {
 	sort.Strings(names)
 
 	return names
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }

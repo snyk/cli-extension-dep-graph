@@ -39,8 +39,9 @@ func buildDepGraph(ctx context.Context, assets *projectAssets, rootName, targets
 	}
 
 	g := &graphBuilder{
-		edgeSet:  newEdgeSet(builder),
-		resolved: resolvePackages(&target),
+		edgeSet:   newEdgeSet(builder),
+		resolved:  resolvePackages(&target),
+		processed: make(map[string]struct{}),
 	}
 
 	direct := assets.directDependencies(targetsKey)
@@ -109,6 +110,11 @@ func (e *edgeSet) connect(parentNodeID, childNodeID string) error {
 type graphBuilder struct {
 	*edgeSet
 	resolved map[string]resolvedPackage
+	// processed tracks nodes whose children have been fully added, so a node
+	// reached through multiple paths only processes its children once. Without
+	// this a parent gets both a full edge and a pruned edge to the same child
+	// when the parent is reached with different visited contexts (OSF-618).
+	processed map[string]struct{}
 }
 
 // addChildren connects each named dependency to parentNodeID and recurses,
@@ -130,6 +136,13 @@ func (g *graphBuilder) addChildren(
 	// the work would diverge from upstream.
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("resolving dependencies: %w", err)
+	}
+
+	// A parent reached through multiple paths must not re-add its children with
+	// a different visited context, otherwise it gets both a full edge and a
+	// pruned edge to the same child (OSF-618).
+	if _, done := g.processed[parentNodeID]; done {
+		return nil
 	}
 
 	local := make(map[string]struct{}, len(visited)+len(childNames))
@@ -178,6 +191,8 @@ func (g *graphBuilder) addChildren(
 			return err
 		}
 	}
+
+	g.processed[parentNodeID] = struct{}{}
 
 	return nil
 }
