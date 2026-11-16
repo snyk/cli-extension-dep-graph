@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
@@ -198,6 +199,22 @@ func (e *pipError) Unwrap() error {
 	return e.err
 }
 
+var pipUnsatisfiedPinRe = regexp.MustCompile(`Could not find a version that satisfies the requirement\s+[^\s=]+==([^\s;,)]+)`)
+
+const pipIgnoredVersionsPrefix = "Ignored the following versions that require a different python version"
+
+// pinnedVersionRequiresDifferentPython reports whether pip could not install an exact
+// "name==version" pin because that very version declares a Requires-Python the current
+// interpreter does not satisfy.
+func pinnedVersionRequiresDifferentPython(stderr string) bool {
+	m := pipUnsatisfiedPinRe.FindStringSubmatch(stderr)
+	if m == nil || !strings.Contains(stderr, pipIgnoredVersionsPrefix) {
+		return false
+	}
+	ignored := regexp.MustCompile(`(^|[\s;:])` + regexp.QuoteMeta(m[1]) + `\s+Requires-Python`)
+	return ignored.MatchString(stderr)
+}
+
 // classifyPipError analyzes pip error output and returns appropriate error catalog error.
 //
 //nolint:gocyclo // Error classification requires checking multiple patterns sequentially
@@ -234,12 +251,12 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 		)
 	}
 
-	// Check for Python version mismatch. This must come before the package-not-found
-	// check: when a pinned version needs a newer interpreter, pip prints both the
-	// "Requires-Python" line and "No matching distribution", and the interpreter
-	// mismatch is the actionable root cause.
-	if strings.Contains(stderr, "requires Python") ||
-		strings.Contains(stderr, "Requires-Python") {
+	// When a pinned version cannot be installed because it needs a newer interpreter, pip
+	// prints both an "Ignored ... Requires-Python" line that names that exact version and
+	// "No matching distribution". The interpreter mismatch is the actionable cause, so it
+	// must win over package-not-found. A bare "Requires-Python" is not enough: pip also
+	// prints that line for unrelated packages, even when the requested one does not exist.
+	if pinnedVersionRequiresDifferentPython(stderr) {
 		return ecosystems.NewPipUnsupportedPythonVersionError(
 			fmt.Sprintf("Python version mismatch: %s", stderr),
 			snyk_errors.WithCause(errors.New(stderr)),
@@ -252,6 +269,15 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 		strings.Contains(stderr, "Could not find a version that satisfies") {
 		return ecosystems.NewPythonPackageNotFoundError(
 			fmt.Sprintf("Package not found: %s", stderr),
+			snyk_errors.WithCause(errors.New(stderr)),
+		)
+	}
+
+	// Check for Python version mismatch
+	if strings.Contains(stderr, "requires Python") ||
+		strings.Contains(stderr, "Requires-Python") {
+		return ecosystems.NewPipUnsupportedPythonVersionError(
+			fmt.Sprintf("Python version mismatch: %s", stderr),
 			snyk_errors.WithCause(errors.New(stderr)),
 		)
 	}
