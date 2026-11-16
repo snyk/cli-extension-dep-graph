@@ -234,21 +234,24 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 		)
 	}
 
+	// Check for Python version mismatch. This must come before the package-not-found
+	// check: when a pinned version needs a newer interpreter, pip prints both the
+	// "Requires-Python" line and "No matching distribution", and the interpreter
+	// mismatch is the actionable root cause.
+	if strings.Contains(stderr, "requires Python") ||
+		strings.Contains(stderr, "Requires-Python") {
+		return ecosystems.NewPipUnsupportedPythonVersionError(
+			fmt.Sprintf("Python version mismatch: %s", stderr),
+			snyk_errors.WithCause(errors.New(stderr)),
+		)
+	}
+
 	// Check for package not found errors
 	if strings.Contains(stderr, "Could not find a version") ||
 		strings.Contains(stderr, "No matching distribution") ||
 		strings.Contains(stderr, "Could not find a version that satisfies") {
 		return ecosystems.NewPythonPackageNotFoundError(
 			fmt.Sprintf("Package not found: %s", stderr),
-			snyk_errors.WithCause(errors.New(stderr)),
-		)
-	}
-
-	// Check for Python version mismatch
-	if strings.Contains(stderr, "requires Python") ||
-		strings.Contains(stderr, "Requires-Python") {
-		return ecosystems.NewPipUnsupportedPythonVersionError(
-			fmt.Sprintf("Python version mismatch: %s", stderr),
 			snyk_errors.WithCause(errors.New(stderr)),
 		)
 	}

@@ -112,6 +112,16 @@ func TestClassifyPipError(t *testing.T) {
 			},
 			wantErrCode: "SNYK-OS-PYTHON-0006",
 		},
+		"requires_python_takes_precedence_over_no_matching_distribution": {
+			err: &pipError{
+				err: fmt.Errorf("exit status 1"),
+				stderr: "ERROR: Ignored the following versions that require a different python version: " +
+					"2.9.0 Requires-Python >=3.11\n" +
+					"ERROR: Could not find a version that satisfies the requirement dnspython==2.9.0 (from versions: 1.16.0, 2.8.0)\n" +
+					"ERROR: No matching distribution found for dnspython==2.9.0",
+			},
+			wantErrCode: "SNYK-OS-PYTHON-0006",
+		},
 		"conflicting_requirements": {
 			err: &pipError{
 				err:    fmt.Errorf("exit status 1"),
