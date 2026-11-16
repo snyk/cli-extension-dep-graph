@@ -12,6 +12,7 @@ import (
 
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockExecutor is a test implementation of CommandExecutor.
@@ -200,4 +201,79 @@ func TestClassifyPipError(t *testing.T) {
 			}
 		})
 	}
+}
+
+const pinnedNeedsNewerPythonStderr = "ERROR: Ignored the following versions that require a different python version: " +
+	"2.9.0 Requires-Python >=3.11\n" +
+	"ERROR: Could not find a version that satisfies the requirement dnspython==2.9.0 (from versions: 1.16.0, 2.8.0)\n" +
+	"ERROR: No matching distribution found for dnspython==2.9.0"
+
+func TestClassifyPipError_UnsupportedPythonVersionNamesInterpreter(t *testing.T) {
+	err := classifyPipError(context.Background(), nil, &pipError{
+		err:           fmt.Errorf("exit status 1"),
+		stderr:        pinnedNeedsNewerPythonStderr,
+		pythonVersion: "3.9.18",
+	})
+
+	var catalogErr snyk_errors.Error
+	require.True(t, errors.As(err, &catalogErr))
+	assert.Equal(t, "SNYK-OS-PYTHON-0006", catalogErr.ErrorCode)
+	assert.Contains(t, catalogErr.Detail, "dnspython 2.9.0 requires Python >=3.11, but this scan used Python 3.9.18.")
+	// The extension serves both the CLI and SCM scans, so both remedies must be given.
+	assert.Contains(t, catalogErr.Detail, "Snyk CLI: put a compatible interpreter first on your PATH")
+	assert.Contains(t, catalogErr.Detail, "SCM integration: set the Python version in your project's .snyk file")
+	assert.Contains(t, catalogErr.Detail, pinnedNeedsNewerPythonStderr)
+}
+
+func TestClassifyPipError_UnsupportedPythonVersionWithoutKnownInterpreter(t *testing.T) {
+	err := classifyPipError(context.Background(), nil, &pipError{
+		err:    fmt.Errorf("exit status 1"),
+		stderr: pinnedNeedsNewerPythonStderr,
+	})
+
+	var catalogErr snyk_errors.Error
+	require.True(t, errors.As(err, &catalogErr))
+	assert.Equal(t, "SNYK-OS-PYTHON-0006", catalogErr.ErrorCode)
+	assert.Contains(t, catalogErr.Detail, "dnspython 2.9.0 requires Python >=3.11, which is different from the Python used for this scan.")
+	assert.NotContains(t, catalogErr.Detail, "Python  ")
+	assert.Contains(t, catalogErr.Detail, "SCM integration:")
+}
+
+func TestClassifyPipError_UnsupportedPythonVersionGenericRequiresPython(t *testing.T) {
+	// A bare Requires-Python line with no matching pin still reaches the generic branch.
+	err := classifyPipError(context.Background(), nil, &pipError{
+		err:           fmt.Errorf("exit status 1"),
+		stderr:        "ERROR: Package 'foo' requires a different Python: 3.9.18 not in '>=3.11'\nRequires-Python >=3.11",
+		pythonVersion: "3.9.18",
+	})
+
+	var catalogErr snyk_errors.Error
+	require.True(t, errors.As(err, &catalogErr))
+	assert.Equal(t, "SNYK-OS-PYTHON-0006", catalogErr.ErrorCode)
+	assert.Contains(t, catalogErr.Detail, "needs a different Python version than the one used for this scan (Python 3.9.18).")
+	assert.Contains(t, catalogErr.Detail, "Snyk CLI:")
+	assert.Contains(t, catalogErr.Detail, "SCM integration:")
+}
+
+func TestRunPipInstall_AttachesPythonVersionToPipError(t *testing.T) {
+	orig := detectPythonVersion
+	detectPythonVersion = func() (string, error) { return "3.9.18", nil }
+	t.Cleanup(func() { detectPythonVersion = orig })
+
+	executor := &MockExecutor{Err: &pipError{err: fmt.Errorf("exit status 1"), stderr: pinnedNeedsNewerPythonStderr}}
+	_, err := GetInstallReportWithExecutor(context.Background(), nil, "requirements.txt", false, executor)
+
+	var catalogErr snyk_errors.Error
+	require.True(t, errors.As(err, &catalogErr))
+	assert.Contains(t, catalogErr.Detail, "Python 3.9.18")
+}
+
+func TestRunPipInstall_DoesNotDetectPythonForOtherErrors(t *testing.T) {
+	orig := detectPythonVersion
+	detectPythonVersion = func() (string, error) { t.Fatal("should not be called"); return "", nil }
+	t.Cleanup(func() { detectPythonVersion = orig })
+
+	executor := &MockExecutor{Err: &pipError{err: fmt.Errorf("exit status 1"), stderr: "ERROR: No matching distribution found for nope==1"}}
+	_, err := GetInstallReportWithExecutor(context.Background(), nil, "requirements.txt", false, executor)
+	require.Error(t, err)
 }
