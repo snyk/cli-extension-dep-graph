@@ -215,6 +215,25 @@ func pinnedVersionRequiresDifferentPython(stderr string) bool {
 	return ignored.MatchString(stderr)
 }
 
+// pipIndexAuthHint is appended to the package-not-found message when pip's output shows it
+// could not authenticate to, or establish TLS with, a package index. It is deliberately
+// generic so it holds for both local runs (the user's own pip config) and isolated builds
+// using integration registry credentials.
+const pipIndexAuthHint = "pip could not authenticate to a package index: check the index URL and credentials " +
+	"(pip.conf, PIP_INDEX_URL, netrc or your integration's registry credentials)."
+
+// pipIndexAuthRe matches pip's own phrasing for authentication and TLS failures against an
+// index. It intentionally does not match a bare "401"/"403", which also appear in version
+// numbers, ports and URLs.
+var pipIndexAuthRe = regexp.MustCompile(
+	`\b40[13] (Client )?Error\b|` + // "401 Error, Credentials not correct", "403 Client Error: Forbidden"
+		`Client Error: 40[13]\b|` +
+		`HTTP error 40[13]\b|` +
+		`Credentials not correct|` +
+		`Unauthorized for url|` +
+		`SSLError|` +
+		`CERTIFICATE_VERIFY_FAILED`)
+
 // classifyPipError analyzes pip error output and returns appropriate error catalog error.
 //
 //nolint:gocyclo // Error classification requires checking multiple patterns sequentially
@@ -267,8 +286,13 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 	if strings.Contains(stderr, "Could not find a version") ||
 		strings.Contains(stderr, "No matching distribution") ||
 		strings.Contains(stderr, "Could not find a version that satisfies") {
+		msg := fmt.Sprintf("Package not found: %s", stderr)
+		if pipIndexAuthRe.MatchString(stderr) {
+			// pip reports index auth/TLS failures as "No matching distribution", so say so.
+			msg = fmt.Sprintf("Package not found: %s\n%s", stderr, pipIndexAuthHint)
+		}
 		return ecosystems.NewPythonPackageNotFoundError(
-			fmt.Sprintf("Package not found: %s", stderr),
+			msg,
 			snyk_errors.WithCause(errors.New(stderr)),
 		)
 	}

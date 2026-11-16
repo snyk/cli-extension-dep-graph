@@ -62,6 +62,7 @@ func TestClassifyPipError(t *testing.T) {
 		err            error
 		wantErrCode    string
 		wantContextErr error
+		wantAuthHint   bool
 	}{
 		"syntax_error_invalid_requirement": {
 			err: &pipError{
@@ -132,6 +133,74 @@ func TestClassifyPipError(t *testing.T) {
 			},
 			wantErrCode: "SNYK-OS-PYTHON-0004",
 		},
+		"index_auth_warning_then_no_matching_distribution": {
+			err: &pipError{
+				err: fmt.Errorf("exit status 1"),
+				stderr: "WARNING: 401 Error, Credentials not correct for https://pypi.example.com/simple/internal-lib/\n" +
+					"ERROR: Could not find a version that satisfies the requirement internal-lib==1.2.3 (from versions: none)\n" +
+					"ERROR: No matching distribution found for internal-lib==1.2.3",
+			},
+			wantErrCode:  "SNYK-OS-PYTHON-0004",
+			wantAuthHint: true,
+		},
+		"index_403_client_error": {
+			err: &pipError{
+				err: fmt.Errorf("exit status 1"),
+				stderr: "WARNING: Skipping page https://pypi.example.com/simple/internal-lib/ because the GET request got Content-Type: text/html\n" +
+					"Could not fetch URL https://pypi.example.com/simple/internal-lib/: 403 Client Error: Forbidden for url: https://pypi.example.com/simple/internal-lib/ - skipping\n" +
+					"ERROR: No matching distribution found for internal-lib",
+			},
+			wantErrCode:  "SNYK-OS-PYTHON-0004",
+			wantAuthHint: true,
+		},
+		"index_http_error_401": {
+			err: &pipError{
+				err: fmt.Errorf("exit status 1"),
+				stderr: "ERROR: HTTP error 401 while getting https://pypi.example.com/packages/internal-lib-1.2.3.tar.gz\n" +
+					"ERROR: Could not install requirement internal-lib==1.2.3\n" +
+					"ERROR: No matching distribution found for internal-lib==1.2.3",
+			},
+			wantErrCode:  "SNYK-OS-PYTHON-0004",
+			wantAuthHint: true,
+		},
+		"index_client_error_401_unauthorized": {
+			err: &pipError{
+				err: fmt.Errorf("exit status 1"),
+				stderr: "Could not fetch URL https://pypi.example.com/simple/x/: 401 Client Error: Unauthorized for url: https://pypi.example.com/simple/x/\n" +
+					"ERROR: No matching distribution found for x",
+			},
+			wantErrCode:  "SNYK-OS-PYTHON-0004",
+			wantAuthHint: true,
+		},
+		"index_ssl_error": {
+			err: &pipError{
+				err: fmt.Errorf("exit status 1"),
+				stderr: "WARNING: Retrying (Retry(total=0)) after connection broken by 'SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed'))': /simple/x/\n" +
+					"ERROR: Could not find a version that satisfies the requirement x (from versions: none)\n" +
+					"ERROR: No matching distribution found for x",
+			},
+			wantErrCode:  "SNYK-OS-PYTHON-0004",
+			wantAuthHint: true,
+		},
+		"version_and_url_numbers_do_not_trigger_auth_hint": {
+			err: &pipError{
+				err: fmt.Errorf("exit status 1"),
+				stderr: "ERROR: Could not find a version that satisfies the requirement foo==4.0.1 (from versions: 1.0, 4.03)\n" +
+					"ERROR: No matching distribution found for foo==4.0.1\n" +
+					"Looking in indexes: https://pypi.org/simple, https://host:4013/simple",
+			},
+			wantErrCode: "SNYK-OS-PYTHON-0004",
+		},
+		"requires_python_still_wins_over_auth_hint": {
+			err: &pipError{
+				err: fmt.Errorf("exit status 1"),
+				stderr: "WARNING: 401 Error, Credentials not correct for https://other.example.com/simple/dnspython/\n" +
+					"ERROR: Ignored the following versions that require a different python version: 2.9.0 Requires-Python >=3.11\n" +
+					"ERROR: Could not find a version that satisfies the requirement dnspython==2.9.0 (from versions: 2.8.0)\n" +
+					"ERROR: No matching distribution found for dnspython==2.9.0",
+			},
+			wantErrCode: "SNYK-OS-PYTHON-0006",
+		},
 		"conflicting_requirements": {
 			err: &pipError{
 				err:    fmt.Errorf("exit status 1"),
@@ -194,6 +263,11 @@ func TestClassifyPipError(t *testing.T) {
 				var catalogErr snyk_errors.Error
 				assert.True(t, errors.As(err, &catalogErr), "should be catalog error")
 				assert.Equal(t, tt.wantErrCode, catalogErr.ErrorCode)
+				if tt.wantAuthHint {
+					assert.Contains(t, catalogErr.Detail, pipIndexAuthHint)
+				} else {
+					assert.NotContains(t, catalogErr.Detail, pipIndexAuthHint)
+				}
 			} else {
 				// Should be a generic error
 				assert.Contains(t, err.Error(), "pip install failed")
