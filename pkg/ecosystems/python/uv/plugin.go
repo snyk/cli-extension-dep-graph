@@ -39,6 +39,18 @@ func (p Plugin) GetName() string {
 	return PluginName
 }
 
+// DetectionGlobs implements ecosystems.SCAPlugin.
+func (p Plugin) DetectionGlobs() []string {
+	return []string{LockFileName}
+}
+
+// InputGlobs implements ecosystems.SCAPlugin. A locked export reads the lockfile
+// and the pyproject.toml of the project and of each workspace member. uv.toml
+// holds project settings.
+func (p Plugin) InputGlobs() []string {
+	return []string{LockFileName, PyprojectTomlFileName, "uv.toml"}
+}
+
 func (p Plugin) BuildDepGraphsFromDir(
 	ctx context.Context,
 	log logger.Logger,
@@ -69,7 +81,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 		lockFileDir := filepath.Dir(lockFilePath)
 		log.Info(ctx, "Building dependency graph", logger.Attr("lockFile", lockFilePath)) //nolint:goconst // logger key, not worth a constant
 
-		sbom, err := p.client.ExportSBOM(lockFileDir, options)
+		sbom, err := p.client.ExportSBOM(filepath.Dir(file.Path), options)
 		if err != nil {
 			log.Error(ctx, "Failed to build dependency graph", logger.Attr("lockFile", lockFilePath), logger.Err(err))
 			wrappedErr := fmt.Errorf("failed to build dependency graph for %s: %w", lockFilePath, err)
@@ -343,6 +355,7 @@ func (p Plugin) discoverLockFiles(
 		findOpts = []discovery.FindOption{
 			discovery.WithInclude(LockFileName),
 			discovery.WithCommonExcludes(),
+			discovery.WithMaxDepth(options.Global.DetectionDepth),
 		}
 		if len(options.Global.Exclude) > 0 {
 			findOpts = append(findOpts, discovery.WithExcludes(options.Global.Exclude...))

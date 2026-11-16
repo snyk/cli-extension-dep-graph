@@ -69,11 +69,38 @@ const (
 	prunedLabelValue = "true"
 )
 
+// projectFileExtensions are the extensions that name a .NET project, and the set
+// the legacy resolver treats as one. Matched case-sensitively against this
+// lowercase set, as it is: an App.CSPROJ is a file it never reports, so claiming
+// one would exclude nothing.
+//
+// Wider than csprojExt, which stays .csproj-only because it feeds target-framework
+// detection, where the narrower match is snyk-nuget-plugin's behavior.
+var projectFileExtensions = []string{csprojExt, ".fsproj", ".vbproj"}
+
 // targetFileNames lists every file name discovery matches.
 var targetFileNames = []string{
 	projectAssetsFile,
 	packagesConfigFile,
 	projectJSONFile,
+}
+
+// inputFileGlobs lists the files a restore reads: everything that defines or
+// configures the projects of a repository, in any .NET language, and none of its
+// source code. That is the project files of every language and type, solutions,
+// the MSBuild files they import, NuGet and SDK configuration, lock files, and
+// packages a feed committed to the repository holds. Paket files are for projects
+// that use Paket instead of NuGet. NuGet reads its configuration by exact name on Linux, so config files
+// are listed in both spellings.
+var inputFileGlobs = []string{
+	"*.*proj", "*.projitems", "*.vcxitems",
+	"*.sln", "*.slnx", "*.slnf",
+	"*.props", "*.targets", "*.rsp", "*.msbuild", "*.tasks",
+	"*.ruleset", "*.globalconfig",
+	"*.config", "*.Config",
+	"*.json",
+	"*.nuspec", "*.nupkg",
+	"paket.dependencies", "paket.lock", "paket.references",
 }
 
 // rootTargetFilePrecedence orders the manifests a single-project scan chooses

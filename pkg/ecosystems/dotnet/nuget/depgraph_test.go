@@ -414,3 +414,33 @@ func TestBuildDepGraph_RepeatedDirectDependency(t *testing.T) {
 		"no second edge, and no pruned leaf")
 	assert.Len(t, graph.Graph.Nodes, 2)
 }
+
+// `autoReferenced` marks the project's reference, so a package the SDK injected
+// stays in the graph when a declared dependency also depends on it — there it is
+// a real dependency of something the developer chose.
+func TestBuildDepGraph_SDKInjectedPackageSurvivesAsTransitive(t *testing.T) {
+	graph := build(t, `{
+      "targets": {
+        "net8.0": {
+          "Declared/1.0.0": {
+            "type": "package",
+            "dependencies": { "Microsoft.NET.ILLink.Tasks": "8.0.16" }
+          },
+          "Microsoft.NET.ILLink.Tasks/8.0.16": {
+            "type": "package",
+            "build": { "build/Microsoft.NET.ILLink.Tasks.props": {} }
+          }
+        }
+      },
+      "projectFileDependencyGroups": {
+        "net8.0": [ "Declared >= 1.0.0", "Microsoft.NET.ILLink.Tasks >= 8.0.16" ]
+      },
+      "project": { "version": "1.0.0", "frameworks": { "net8.0": { "dependencies": {
+        "Declared": { "version": "[1.0.0, )" },
+        "Microsoft.NET.ILLink.Tasks": { "suppressParent": "All", "version": "[8.0.16, )", "autoReferenced": true }
+      } } } }
+    }`)
+
+	assert.Equal(t, []string{"Declared@1.0.0"}, depsOf(t, graph, graph.Graph.RootNodeID))
+	assert.Equal(t, []string{"Microsoft.NET.ILLink.Tasks@8.0.16"}, depsOf(t, graph, "Declared@1.0.0"))
+}

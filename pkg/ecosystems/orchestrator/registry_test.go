@@ -22,6 +22,7 @@ type mockPlugin struct {
 	name    string
 	results []ecosystems.SCAResult
 	err     error
+	onRun   func()
 
 	// capturedExclude / capturedExcludePaths snapshot opts.Global.{Exclude,ExcludePaths}
 	// at the moment BuildDepGraphsFromDir is called, so tests can assert on what each
@@ -35,6 +36,9 @@ func (m *mockPlugin) GetName() string {
 	return m.name
 }
 
+func (m *mockPlugin) DetectionGlobs() []string { return nil }
+func (m *mockPlugin) InputGlobs() []string     { return nil }
+
 func (m *mockPlugin) BuildDepGraphsFromDir(
 	_ context.Context,
 	_ logger.Logger,
@@ -45,6 +49,9 @@ func (m *mockPlugin) BuildDepGraphsFromDir(
 	if opts != nil {
 		m.capturedExclude = append([]string(nil), opts.Global.Exclude...)
 		m.capturedExcludePaths = append([]string(nil), opts.Global.ExcludePaths...)
+	}
+	if m.onRun != nil {
+		m.onRun()
 	}
 	for _, r := range m.results {
 		if err := onGraph(r); err != nil {

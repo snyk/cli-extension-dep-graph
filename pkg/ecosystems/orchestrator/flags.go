@@ -7,7 +7,7 @@ type flag struct {
 
 var FlagUnifiedTestAPIOsCLI = flag{
 	Key:   "internal_snyk_cli_use_unified_test_api_for_os_cli_test",
-	Value: "unified-test-api-os-cli",
+	Value: "unified-test-api-os-cli-v2",
 }
 
 var FlagNewGradleResolver = flag{

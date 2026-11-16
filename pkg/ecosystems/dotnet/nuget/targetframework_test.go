@@ -153,6 +153,56 @@ func TestCsprojTargetFramework(t *testing.T) {
 	}
 }
 
+// MSBuild folds case on element names, so a property group is read the same
+// however it is spelled.
+func TestCsprojTargetFramework_ElementNamesIgnoreCase(t *testing.T) {
+	tests := map[string]string{
+		"lowercase":  `<Project><propertygroup><targetframework>net45</targetframework></propertygroup></Project>`,
+		"uppercase":  `<Project><PROPERTYGROUP><TARGETFRAMEWORK>net45</TARGETFRAMEWORK></PROPERTYGROUP></Project>`,
+		"mixed case": `<project><PropertyGroup><TargetFrameWork>net45</TargetFrameWork></PropertyGroup></project>`,
+	}
+
+	for name, content := range tests {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "App.csproj"), []byte(content), 0o600))
+
+			framework, ok, err := csprojTargetFramework(dir)
+			require.NoError(t, err)
+			require.True(t, ok)
+			assert.Equal(t, "net45", framework.original)
+		})
+	}
+}
+
+func TestCsprojTargetFramework_OtherSourcesIgnoreCase(t *testing.T) {
+	tests := map[string]struct {
+		content string
+		want    string
+	}{
+		"TargetFrameworks": {
+			content: `<Project><PropertyGroup><targetframeworks>net45;net46</targetframeworks></PropertyGroup></Project>`,
+			want:    "net45",
+		},
+		"TargetFrameworkVersion": {
+			content: `<Project><PropertyGroup><targetframeworkversion>v4.5</targetframeworkversion></PropertyGroup></Project>`,
+			want:    "v4.5",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "App.csproj"), []byte(test.content), 0o600))
+
+			framework, ok, err := csprojTargetFramework(dir)
+			require.NoError(t, err)
+			require.True(t, ok)
+			assert.Equal(t, test.want, framework.original)
+		})
+	}
+}
+
 func TestCsprojTargetFramework_UTF16(t *testing.T) {
 	dir := t.TempDir()
 	csproj := `<?xml version="1.0" encoding="utf-16"?>

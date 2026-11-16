@@ -120,3 +120,23 @@ func makePackageDirs(t *testing.T, folder string, names ...string) {
 		require.NoError(t, os.MkdirAll(filepath.Join(folder, name), 0o750))
 	}
 }
+
+func TestInstalledPackages_FolderCasingReplacesManifestCasing(t *testing.T) {
+	for name, version := range map[string]string{"same version": "1.9.0", "different version": "1.10.2"} {
+		t.Run(name, func(t *testing.T) {
+			folder := t.TempDir()
+			makePackageDirs(t, folder, "jQuery."+version)
+
+			installed := installedPackages(context.Background(), logger.Nop(),
+				[]declaredPackage{{"jquery", "1.9.0"}}, folder)
+
+			assert.Equal(t, []declaredPackage{{"jQuery", version}}, installed.packages,
+				"the folder's casing wins and the manifest's entry is not kept alongside it")
+			assert.Len(t, installed.index, 1, "the manifest's stale key is dropped")
+
+			pkg, ok := installed.get("jquery")
+			require.True(t, ok)
+			assert.Equal(t, declaredPackage{"jQuery", version}, pkg)
+		})
+	}
+}

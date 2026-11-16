@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
@@ -19,6 +20,9 @@ const (
 	defaultMaxTargets = 1000
 )
 
+// workspaceMarkers are the files at a Bazel workspace root.
+var workspaceMarkers = []string{"MODULE.bazel", "REPO.bazel", "WORKSPACE", "WORKSPACE.bazel"}
+
 type Plugin struct{}
 
 // Ensures this Plugin satisfies the SCAPlugin interface.
@@ -26,6 +30,19 @@ var _ ecosystems.SCAPlugin = new(Plugin)
 
 func (p Plugin) GetName() string {
 	return pluginName
+}
+
+// DetectionGlobs implements ecosystems.SCAPlugin. The resolver still needs its
+// options set before it runs.
+func (p Plugin) DetectionGlobs() []string {
+	return slices.Clone(workspaceMarkers)
+}
+
+// InputGlobs implements ecosystems.SCAPlugin. A query follows load statements
+// into .bzl and BUILD files across the repository, so the files it needs cannot be
+// listed.
+func (p Plugin) InputGlobs() []string {
+	return []string{ecosystems.AllFilesGlob}
 }
 
 func (p Plugin) BuildDepGraphsFromDir(

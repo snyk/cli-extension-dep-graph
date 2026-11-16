@@ -13,7 +13,9 @@ import (
 const (
 	packageJSONFile = "package.json"
 	bunLockFile     = "bun.lock"
-	defaultVersion  = "0.0.0"
+	// bunBinaryLockFile is not read, but still marks a bun project.
+	bunBinaryLockFile = "bun.lockb"
+	defaultVersion    = "0.0.0"
 )
 
 // packageJSON represents the fields we need from a package.json file.

@@ -21,7 +21,7 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/v2/internal/snykclient"
 	"github.com/snyk/cli-extension-dep-graph/v2/internal/workflow"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/dotnet/nuget"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/argparser"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/legacy"
 	ecosystemslogger "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/orchestrator"
@@ -48,47 +48,28 @@ func handleSBOMResolution(
 
 	converter := remoteconv.NewRemoteSBOMConverter(snykClient, ecosystemslogger.NewFromZerolog(logger))
 
-	return handleSBOMResolutionDI(
-		ctx,
-		config,
-		logger,
-		buildSCAPlugins(ctx, config, converter, remoteRepoURL),
-	)
+	plugins, err := buildSCAPlugins(ctx, converter, remoteRepoURL)
+	if err != nil {
+		return nil, err
+	}
+	return handleSBOMResolutionDI(ctx, config, logger, plugins)
 }
 
-// buildSCAPlugins assembles the plugin list for the SBOM resolution flow.
-//
-// The legacy plugin stays last: it is the fallback, and each plugin's
-// processed files are excluded from every plugin after it in the list.
+// Native resolvers claim their files before UV; legacy handles the remainder.
 func buildSCAPlugins(
 	ctx gafworkflow.InvocationContext,
-	config configuration.Configuration,
 	converter *remoteconv.RemoteSBOMConverter,
 	remoteRepoURL string,
-) []ecosystems.SCAPlugin {
-	plugins := []ecosystems.SCAPlugin{
+) ([]ecosystems.SCAPlugin, error) {
+	registry, err := orchestrator.NewDefaultPluginRegistry(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("building native plugins: %w", err)
+	}
+	return []ecosystems.SCAPlugin{
+		registry.NativePlugin(),
 		uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL),
-	}
-
-	// Opt-in per org. The .NET resolver claims every manifest it resolved in
-	// full — project.assets.json, packages.config and project.json alike — and
-	// reports those as processed, so the legacy resolver skips them.
-	//
-	// A manifest it could not resolve in full it reports nothing for, and the
-	// loop below moves on to the next plugin when one returns no results, so
-	// those still reach the legacy resolver. That covers an unreadable or
-	// malformed manifest, one whose target framework nothing names, and a
-	// packages folder holding an archive we could not open — cases where
-	// claiming a partial result would hide packages the legacy resolver finds.
-	//
-	// The exception is an explicit --file naming a path that does not exist:
-	// discovery treats that as a setup failure and the scan fails there rather
-	// than falling through, which is what the CLI does for a bad --file today.
-	if config.GetBool(orchestrator.FlagDotnetResolver.Key) {
-		plugins = append(plugins, nuget.Plugin{})
-	}
-
-	return append(plugins, legacy.NewPlugin(ctx))
+		legacy.NewPlugin(ctx),
+	}, nil
 }
 
 const errMsgNoSupportedProjects = "no supported projects detected"
@@ -114,7 +95,10 @@ func handleSBOMResolutionDI(
 	failFast := config.GetBool(workflow.FlagFailFast)
 	forceIncludeWorkspacePackages := config.GetBool(workflow.FlagUvWorkspacePackages)
 	targetFile := config.GetString(workflow.FlagFile)
-	pluginOptions := buildPluginOptions(config)
+	pluginOptions, err := buildPluginOptions(config)
+	if err != nil {
+		return nil, err
+	}
 
 	pluginLogger := ecosystemslogger.NewFromZerolog(logger)
 	workflowData := []gafworkflow.Data{}
@@ -195,7 +179,7 @@ func handleSBOMResolutionDI(
 	return workflowData, nil
 }
 
-func buildPluginOptions(config configuration.Configuration) *ecosystems.SCAPluginOptions {
+func buildPluginOptions(config configuration.Configuration) (*ecosystems.SCAPluginOptions, error) {
 	strictOutOfSync := true
 	if parsed, err := strconv.ParseBool(config.GetString(workflow.FlagStrictOutOfSync)); err == nil {
 		strictOutOfSync = parsed
@@ -209,11 +193,19 @@ func buildPluginOptions(config configuration.Configuration) *ecosystems.SCAPlugi
 		WithExclude(parseExcludeFlag(config.GetString(workflow.FlagExclude))).
 		WithExcludePaths(parseExcludeFlag(config.GetString(workflow.FlagExcludePaths))).
 		WithFailFast(config.GetBool(workflow.FlagFailFast)).
-		WithForceSingleGraph(config.GetBool(workflow.FlagForceSingleGraph))
+		WithForceSingleGraph(config.GetBool(workflow.FlagForceSingleGraph)).
+		WithAssetsProjectName(config.GetBool(workflow.FlagNugetAssetsProjectName)).
+		WithCLIProjectIdentity(true)
 
 	if targetFile := config.GetString(workflow.FlagFile); targetFile != "" {
 		opts = opts.WithTargetFile(targetFile)
 	}
+
+	depth, err := ecosystems.ParseDetectionDepth(config.GetString(workflow.FlagDetectionDepth))
+	if err != nil {
+		return nil, fmt.Errorf("building plugin options: %w", err)
+	}
+	opts = opts.WithDetectionDepth(depth)
 
 	// The CLI documents --packages-folder as relative to the working directory,
 	// not to the scanned root, so it is resolved here rather than per project.
@@ -224,7 +216,60 @@ func buildPluginOptions(config configuration.Configuration) *ecosystems.SCAPlugi
 		opts = opts.WithPackagesFolder(packagesFolder)
 	}
 
-	return opts
+	// A target framework moniker, not a path: unlike --packages-folder there is
+	// nothing to resolve, and the resolver compares it against the frameworks
+	// each project declares.
+	if targetFramework := config.GetString(workflow.FlagDotnetTargetFramework); targetFramework != "" {
+		opts = opts.WithDotnetTargetFramework(targetFramework)
+	}
+
+	raw := config.GetStringSlice(configuration.RAW_CMD_ARGS)
+	if config.GetBool(orchestrator.FlagNewGradleResolver.Key) {
+		var args struct {
+			ecosystems.GradleOptions
+			IncludeProvenance bool `arg:"--include-provenance"`
+		}
+		if err := argparser.Parse(raw, &args); err != nil {
+			return nil, fmt.Errorf("building Gradle plugin options: %w", err)
+		}
+		opts.Gradle = args.GradleOptions
+		opts.Global.IncludeProvenance = args.IncludeProvenance
+		applyConfiguredFlags(config, config.GetBool, []configuredFlag[bool]{
+			{workflow.FlagIncludeProvenance, &opts.Global.IncludeProvenance},
+			{workflow.FlagAllSubProjects, &opts.Gradle.AllSubProjects},
+			{workflow.FlagGradleNormalizeDeps, &opts.Gradle.NormalizeDeps},
+		})
+		applyConfiguredFlags(config, config.GetString, []configuredFlag[string]{
+			{workflow.FlagConfigurationMatching, &opts.Gradle.ConfigurationMatching},
+			{workflow.FlagConfigurationAttributes, &opts.Gradle.ConfigurationAttributes},
+			{workflow.FlagInitScript, &opts.Gradle.InitScript},
+		})
+		if config.IsSet(workflow.FlagGradleSubProject) {
+			opts.Gradle.SubProject = config.GetString(workflow.FlagGradleSubProject)
+		} else if config.IsSet(workflow.FlagSubProject) {
+			opts.Gradle.SubProject = config.GetString(workflow.FlagSubProject)
+		}
+	}
+	if config.GetBool(orchestrator.FlagBazelResolver.Key) {
+		if err := argparser.Parse(raw, &opts.Bazel); err != nil {
+			return nil, fmt.Errorf("building Bazel plugin options: %w", err)
+		}
+	}
+
+	return opts, nil
+}
+
+type configuredFlag[T any] struct {
+	key    string
+	target *T
+}
+
+func applyConfiguredFlags[T any](config configuration.Configuration, get func(string) T, flags []configuredFlag[T]) {
+	for _, flag := range flags {
+		if config.IsSet(flag.key) {
+			*flag.target = get(flag.key)
+		}
+	}
 }
 
 func checkFailFast(logger *zerolog.Logger, failFast, allProjects bool, results []ecosystems.SCAResult) error {
@@ -381,6 +426,13 @@ func processResultsIndividually(logger *zerolog.Logger, results []ecosystems.SCA
 				return nil, problemResults, result.Error
 			}
 
+			continue
+		}
+
+		// A result with neither a graph nor an error claims its files and
+		// reports nothing — a project the plugin recognized and left out of
+		// scope. Marshaling it would emit a `null` dep graph.
+		if result.DepGraph == nil {
 			continue
 		}
 

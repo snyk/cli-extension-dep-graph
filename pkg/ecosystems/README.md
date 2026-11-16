@@ -311,6 +311,19 @@ To add support for a new ecosystem:
        // 3. Build depgraph.DepGraph using the builder
        // 4. Return PluginResult with results and processed files
    }
+
+   // DetectionGlobs returns base-name globs for the files whose presence means this
+   // plugin should run, so a caller holding only a file listing can choose it.
+   func (p *Plugin) DetectionGlobs() []string {
+       return []string{"tool.lock"}
+   }
+
+   // InputGlobs returns base-name globs for every file the plugin may read, a
+   // superset of DetectionGlobs. A plugin that cannot name its files returns
+   // ecosystems.AllFilesGlob.
+   func (p *Plugin) InputGlobs() []string {
+       return []string{"tool.lock", "tool.toml"}
+   }
    ```
 
 3. **Add ecosystem-specific options** (if needed):

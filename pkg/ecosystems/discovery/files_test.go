@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
@@ -312,5 +313,123 @@ func TestFindFiles_EdgeCases(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, results, 1)
 		assert.True(t, filepath.IsAbs(results[0].Path), "path should be absolute")
+	})
+}
+
+func relPaths(t *testing.T, results []FindResult) []string {
+	t.Helper()
+	paths := make([]string, 0, len(results))
+	for _, r := range results {
+		paths = append(paths, filepath.ToSlash(r.RelPath))
+	}
+	sort.Strings(paths)
+	return paths
+}
+
+func TestFindFiles_MaxDepth(t *testing.T) {
+	tmpDir := t.TempDir()
+	setupFiles(t, tmpDir, map[string]string{
+		"manifest.txt":       "test",
+		"a/manifest.txt":     "test",
+		"a/b/manifest.txt":   "test",
+		"a/b/c/manifest.txt": "test",
+	})
+
+	all := []string{"a/b/c/manifest.txt", "a/b/manifest.txt", "a/manifest.txt", "manifest.txt"}
+
+	tests := []struct {
+		name     string
+		maxDepth int
+		want     []string
+	}{
+		{"depth 1 finds only files in the root", 1, []string{"manifest.txt"}},
+		{"depth 2 also finds one directory down", 2, []string{"a/manifest.txt", "manifest.txt"}},
+		{"depth 3 also finds two directories down", 3, []string{"a/b/manifest.txt", "a/manifest.txt", "manifest.txt"}},
+		{"depth deeper than the tree finds everything", 10, all},
+		// snyk/cli rejects --detection-depth<=0 before resolution runs, so a
+		// non-positive value is treated as unset rather than as "root only".
+		{"depth 0 means unlimited", 0, all},
+		{"negative depth means unlimited", -1, all},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results, err := FindFiles(context.Background(), logger.Nop(), tmpDir,
+				WithInclude("manifest.txt"),
+				WithMaxDepth(tt.maxDepth))
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, relPaths(t, results))
+		})
+	}
+
+	t.Run("no depth option means unlimited", func(t *testing.T) {
+		results, err := FindFiles(context.Background(), logger.Nop(), tmpDir,
+			WithInclude("manifest.txt"))
+		require.NoError(t, err)
+		assert.Equal(t, all, relPaths(t, results))
+	})
+
+	t.Run("depth does not restrict an explicit target file", func(t *testing.T) {
+		results, err := FindFiles(context.Background(), logger.Nop(), tmpDir,
+			WithTargetFile("a/b/c/manifest.txt"),
+			WithMaxDepth(1))
+		require.NoError(t, err)
+		assert.Equal(t, []string{"a/b/c/manifest.txt"}, relPaths(t, results))
+	})
+}
+
+func TestFindFiles_MaxDepthWithExcludes(t *testing.T) {
+	tmpDir := t.TempDir()
+	setupFiles(t, tmpDir, map[string]string{
+		"manifest.txt":                "test",
+		"a/manifest.txt":              "test",
+		"a/b/manifest.txt":            "test",
+		"node_modules/manifest.txt":   "test",
+		"a/node_modules/manifest.txt": "test",
+		"skipme/manifest.txt":         "test",
+		"a/skipme/manifest.txt":       "test",
+	})
+
+	t.Run("composes with WithCommonExcludes", func(t *testing.T) {
+		results, err := FindFiles(context.Background(), logger.Nop(), tmpDir,
+			WithInclude("manifest.txt"),
+			WithCommonExcludes(),
+			WithMaxDepth(3))
+		require.NoError(t, err)
+		assert.Equal(t, []string{
+			"a/b/manifest.txt",
+			"a/manifest.txt",
+			"a/skipme/manifest.txt",
+			"manifest.txt",
+			"skipme/manifest.txt",
+		}, relPaths(t, results))
+	})
+
+	t.Run("common excludes still apply when depth would allow them", func(t *testing.T) {
+		results, err := FindFiles(context.Background(), logger.Nop(), tmpDir,
+			WithInclude("manifest.txt"),
+			WithCommonExcludes(),
+			WithMaxDepth(2))
+		require.NoError(t, err)
+		assert.Equal(t, []string{"a/manifest.txt", "manifest.txt", "skipme/manifest.txt"}, relPaths(t, results))
+	})
+
+	t.Run("depth prunes deeper than the exclude patterns reach", func(t *testing.T) {
+		results, err := FindFiles(context.Background(), logger.Nop(), tmpDir,
+			WithInclude("manifest.txt"),
+			WithExcludes("node_modules", "skipme"),
+			WithMaxDepth(2))
+		require.NoError(t, err)
+		assert.Equal(t, []string{"a/manifest.txt", "manifest.txt"}, relPaths(t, results))
+	})
+
+	t.Run("excludes narrow results within the depth limit", func(t *testing.T) {
+		results, err := FindFiles(context.Background(), logger.Nop(), tmpDir,
+			WithInclude("manifest.txt"),
+			WithCommonExcludes(),
+			WithExclude("skipme"),
+			WithMaxDepth(3))
+		require.NoError(t, err)
+		assert.Equal(t, []string{"a/b/manifest.txt", "a/manifest.txt", "manifest.txt"}, relPaths(t, results))
 	})
 }

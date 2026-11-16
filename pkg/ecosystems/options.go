@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	clierrors "github.com/snyk/error-catalog-golang-public/cli"
+
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/argparser"
 )
 
@@ -20,7 +22,7 @@ type SCAPluginOptions struct {
 
 // GlobalOptions contains options that apply globally across all SCA plugins.
 type GlobalOptions struct {
-	TargetFile                    *string              `arg:"--target-file"`
+	TargetFile                    *string              `arg:"--file"`
 	AllProjects                   bool                 `arg:"--all-projects"`
 	IncludeDev                    bool                 `arg:"--dev,-d"`
 	Exclude                       CommaSeparatedString `arg:"--exclude"`
@@ -32,7 +34,12 @@ type GlobalOptions struct {
 	ProjectName                   *string              `arg:"--project-name"`
 	IncludeProvenance             bool                 `arg:"--include-provenance"`
 	WorkspacePackage              *string              `arg:"--workspace-package"`
-	RawFlags                      []string
+	// DetectionDepth caps how deep --all-projects discovery walks, counted in
+	// path segments below the scanned root. 0 means unlimited. Parsed by
+	// ParseDetectionDepth rather than by the argparser so that both entry
+	// points share one validation rule.
+	DetectionDepth int
+	RawFlags       []string
 }
 
 // CommaSeparatedString is a custom type that parses comma-separated values.
@@ -42,6 +49,31 @@ type CommaSeparatedString []string
 func (c *CommaSeparatedString) UnmarshalText(text []byte) error {
 	*c = strings.Split(string(text), ",")
 	return nil
+}
+
+// ParseDetectionDepth parses --detection-depth. Empty means absent, which
+// leaves discovery unlimited — snyk/cli skips a falsy value and passes
+// levelsDeep: undefined, so its own depth check never trips.
+//
+// Non-positive and non-numeric values are rejected, as snyk/cli rejects them.
+// So are fractional ones, which is a deliberate divergence: Number() lets
+// --detection-depth=3.5 past its validation and caps the walk at 3, but its
+// own error message promises "a positive integer", so we surface it rather
+// than silently flooring.
+func ParseDetectionDepth(raw string) (int, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return 0, nil
+	}
+
+	depth, err := strconv.Atoi(trimmed)
+	if err != nil || depth <= 0 {
+		return 0, clierrors.NewInvalidFlagOptionError(
+			fmt.Sprintf("Unsupported value for --detection-depth flag: %q. Expected a positive integer.", raw),
+		)
+	}
+
+	return depth, nil
 }
 
 // PythonOptions contains Python-specific options for dependency graph generation.
@@ -94,6 +126,40 @@ type DotnetOptions struct {
 	// `nuget restore` populates for packages.config and project.json projects.
 	// Empty means the location is derived from the manifest's own path.
 	PackagesFolder string `arg:"--packages-folder"`
+
+	// TargetFramework narrows the scan to the one target framework named here,
+	// for a solution whose owner only cares about one of the several its
+	// projects target. An SDK-style project reports just that framework out of
+	// the several project.assets.json declares; a packages.config or
+	// project.json project, which resolves one dependency set against a single
+	// framework, is either kept or left out whole.
+	//
+	// It only ever selects among the frameworks a project declares, and never
+	// stands in for one it does not: resolving a framework against another's
+	// packages is what projectAssets.matchTargetsKey exists to prevent.
+	//
+	// Surrounding whitespace is ignored, so a moniker read from a CI variable
+	// still matches. Empty — or whitespace alone — means every framework each
+	// project declares is reported, which is what the CLI documents as the
+	// default.
+	TargetFramework string `arg:"--dotnet-target-framework"`
+
+	// AssetsProjectName names an SDK-style project after the project name its
+	// restore recorded, rather than after the directory holding the manifest -
+	// which for a project.assets.json under obj/ is all the resolver otherwise
+	// has to go on. False (the default) keeps the derived name, as does a
+	// restore that recorded no name. project.assets.json only: nothing in a
+	// packages.config names its project, and a project.json that does is
+	// already honored without a flag.
+	AssetsProjectName bool `arg:"--assets-project-name"`
+
+	// CLIProjectIdentity reports each project under the identity the legacy
+	// CLI gave it: named after the scanned directory and reported under its
+	// manifest, not the project file. A project the CLI already monitors then
+	// keeps its history. False (the default) reports the project file, named
+	// after its directory, which SCM imports depend on. Not a CLI flag: the
+	// CLI entry points set it.
+	CLIProjectIdentity bool
 }
 
 func NewPluginOptions() *SCAPluginOptions {
@@ -105,6 +171,9 @@ func NewPluginOptions() *SCAPluginOptions {
 	}
 }
 
+// NewPluginOptionsFromRawFlags builds the options for a scan the CLI runs, from
+// the flags it was invoked with. Only the CLI has raw flags, so the CLI's .NET
+// project identity is set here too.
 func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) {
 	var args struct {
 		GlobalOptions
@@ -112,7 +181,8 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 		GradleOptions
 		BazelOptions
 		DotnetOptions
-		StrictOutOfSync *string `arg:"--strict-out-of-sync"`
+		StrictOutOfSync   *string `arg:"--strict-out-of-sync"`
+		DetectionDepthRaw *string `arg:"--detection-depth"`
 	}
 
 	if err := argparser.Parse(rawFlags, &args); err != nil {
@@ -120,6 +190,15 @@ func NewPluginOptionsFromRawFlags(rawFlags []string) (*SCAPluginOptions, error) 
 	}
 
 	args.RawFlags = rawFlags
+	args.CLIProjectIdentity = true
+
+	if args.DetectionDepthRaw != nil {
+		depth, err := ParseDetectionDepth(*args.DetectionDepthRaw)
+		if err != nil {
+			return nil, err
+		}
+		args.DetectionDepth = depth
+	}
 
 	if args.StrictOutOfSync != nil {
 		if parsed, err := strconv.ParseBool(*args.StrictOutOfSync); err == nil {
@@ -193,6 +272,14 @@ func (o *SCAPluginOptions) WithForceIncludeWorkspacePackages(forceIncludeWorkspa
 
 func (o *SCAPluginOptions) WithProjectName(projectName string) *SCAPluginOptions {
 	o.Global.ProjectName = &projectName
+	return o
+}
+
+// WithDetectionDepth caps how deep --all-projects discovery walks, mirroring
+// the CLI's --detection-depth. See discovery.WithMaxDepth for the semantics;
+// values <= 0 leave the walk unlimited.
+func (o *SCAPluginOptions) WithDetectionDepth(depth int) *SCAPluginOptions {
+	o.Global.DetectionDepth = depth
 	return o
 }
 
@@ -280,5 +367,28 @@ func (o *SCAPluginOptions) WithBazelPlatforms(platforms string) *SCAPluginOption
 // resolver to derive the location from each manifest's own path.
 func (o *SCAPluginOptions) WithPackagesFolder(packagesFolder string) *SCAPluginOptions {
 	o.Dotnet.PackagesFolder = packagesFolder
+	return o
+}
+
+// WithDotnetTargetFramework narrows the .NET resolver to one target framework,
+// mirroring the CLI's --dotnet-target-framework. Empty (the default) reports
+// every framework an SDK-style project declares.
+func (o *SCAPluginOptions) WithDotnetTargetFramework(targetFramework string) *SCAPluginOptions {
+	o.Dotnet.TargetFramework = targetFramework
+	return o
+}
+
+// WithAssetsProjectName reports an SDK-style project under the name recorded in
+// its project.assets.json, mirroring the CLI's --assets-project-name. False (the
+// default) names it after the directory holding the manifest.
+func (o *SCAPluginOptions) WithAssetsProjectName(assetsProjectName bool) *SCAPluginOptions {
+	o.Dotnet.AssetsProjectName = assetsProjectName
+	return o
+}
+
+// WithCLIProjectIdentity reports .NET projects under the identity the legacy CLI
+// gave them. See DotnetOptions.CLIProjectIdentity.
+func (o *SCAPluginOptions) WithCLIProjectIdentity(cliProjectIdentity bool) *SCAPluginOptions {
+	o.Dotnet.CLIProjectIdentity = cliProjectIdentity
 	return o
 }

@@ -32,6 +32,17 @@ func (p Plugin) GetName() string {
 	return PluginName
 }
 
+// DetectionGlobs implements ecosystems.SCAPlugin.
+func (p Plugin) DetectionGlobs() []string {
+	return []string{bunLockFile, bunBinaryLockFile}
+}
+
+// InputGlobs implements ecosystems.SCAPlugin. The package.json files are those of
+// the workspace packages the text lockfile describes.
+func (p Plugin) InputGlobs() []string {
+	return []string{bunLockFile, bunBinaryLockFile, packageJSONFile}
+}
+
 // BuildDepGraphsFromDir discovers bun.lock files under dir and produces dep
 // graphs for each one. Workspace projects yield one SCAResult per workspace
 // package plus one for the root; non-workspace projects yield a single result.
@@ -218,6 +229,7 @@ func (p Plugin) discoverLockFiles(
 		findOpts := []discovery.FindOption{
 			discovery.WithInclude(bunLockFile),
 			discovery.WithCommonExcludes(),
+			discovery.WithMaxDepth(options.Global.DetectionDepth),
 		}
 
 		if len(options.Global.Exclude) > 0 {

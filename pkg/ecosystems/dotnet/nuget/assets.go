@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"slices"
 	"strings"
 
 	snykecosystems "github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
@@ -31,10 +32,45 @@ type projectAssets struct {
 
 	Project assetsProject
 
+	// Logs holds the diagnostics the restore raised for this project, which is
+	// where the reason a target framework came out short is recorded. NuGet
+	// writes them here so an incremental restore can replay them, as far back as
+	// SDK 1.1.14 — the oldest that still publishes an image to test against.
+	//
+	// A file without them is still read: a restore that recorded no reason
+	// leaves the graph to speak for itself, as it did before this was decoded.
+	Logs []assetsLog
+
 	// projectPresent records whether the `project` field existed at all, so a
 	// missing one is reported differently from one that is merely empty.
 	projectPresent bool
 }
+
+// assetsLog is one diagnostic the restore raised.
+type assetsLog struct {
+	Code    string `json:"code"`
+	Level   string `json:"level"`
+	Message string `json:"message"`
+	// LibraryID is the package the diagnostic is about, absent when it is about
+	// the project as a whole.
+	LibraryID string `json:"libraryId"`
+	// TargetGraphs are the `targets` keys the diagnostic applies to, absent when
+	// it applies to every one of them. A multi-targeting project can fail on one
+	// framework and resolve on another.
+	TargetGraphs []string `json:"targetGraphs"`
+}
+
+// failedRestore reports whether the diagnostic is one that failed the restore.
+func (l *assetsLog) failedRestore() bool { return l.Level == assetsLogLevelError }
+
+// appliesTo reports whether the diagnostic covers targetsKey.
+func (l *assetsLog) appliesTo(targetsKey string) bool {
+	return len(l.TargetGraphs) == 0 || slices.Contains(l.TargetGraphs, targetsKey)
+}
+
+// assetsLogLevelError is the level NuGet gives a diagnostic that failed the
+// restore. Warnings share the array.
+const assetsLogLevelError = "Error"
 
 // assetsTargetEntry is one resolved package within a target framework.
 //
@@ -44,14 +80,41 @@ type projectAssets struct {
 // a `type: "project"` entry becomes an ordinary node.
 type assetsTargetEntry struct {
 	Dependencies orderedMap[string] `json:"dependencies"`
+
+	// Build, Compile and Runtime are decoded for presence alone — which kinds
+	// of asset the package contributes, never what they are. See buildOnly.
+	Build   json.RawMessage `json:"build"`
+	Compile json.RawMessage `json:"compile"`
+	Runtime json.RawMessage `json:"runtime"`
 }
 
-// project.restore is absent until --assets-project-name is honored (CMPA-718).
-// Upstream reads restore.projectName there; decoding it before the flag exists
-// would only suggest it is already supported.
+// buildOnly reports whether the package contributes MSBuild logic and nothing
+// the project compiles against or runs.
+//
+// A section counts as present even when its only entry is NuGet's `_._` empty
+// placeholder. NETStandard.Library resolves exactly that way — compile and
+// runtime hold `lib/netstandard1.0/_._` and nothing else — and it is a package
+// to report, so reading the placeholder as "no assets" would drop it.
+func (e *assetsTargetEntry) buildOnly() bool {
+	return len(e.Build) > 0 && len(e.Compile) == 0 && len(e.Runtime) == 0
+}
+
+// assetsProject is the `project` section: what the project declares about
+// itself, as distinct from what the restore resolved for it.
+//
+// restore.projectPath is read upstream only to locate a .csproj for the dotnet
+// CLI, which this resolver never runs, so it is omitted for the same reason
+// `libraries` and `packageFolders` are.
 type assetsProject struct {
 	Version    string                             `json:"version"`
+	Restore    assetsProjectRestore               `json:"restore"`
 	Frameworks orderedMap[assetsProjectFramework] `json:"frameworks"`
+}
+
+// assetsProjectRestore is the restore metadata NuGet records for the project.
+// Only the project name is read, and only --assets-project-name reports it.
+type assetsProjectRestore struct {
+	ProjectName string `json:"projectName"`
 }
 
 type assetsProjectFramework struct {
@@ -59,6 +122,18 @@ type assetsProjectFramework struct {
 	// where the framework key itself is a longer one ("net7.0-windows7.0"). It
 	// is not always present.
 	TargetAlias string `json:"targetAlias"`
+
+	// Dependencies is the project's own reference list, and the only place the
+	// file records who wrote a reference. Keyed by declared name, which NuGet
+	// treats case-insensitively.
+	Dependencies map[string]assetsProjectDependency `json:"dependencies"`
+}
+
+// assetsProjectDependency is one of the project's references. Only the flag
+// marking a reference the SDK added is read: the version range beside it is a
+// minimum constraint, and the resolved version comes from `targets`.
+type assetsProjectDependency struct {
+	AutoReferenced bool `json:"autoReferenced"`
 }
 
 // UnmarshalJSON decodes the assets file, recording whether `project` was present
@@ -69,6 +144,7 @@ func (a *projectAssets) UnmarshalJSON(data []byte) error {
 		Targets                     orderedMap[orderedMap[assetsTargetEntry]] `json:"targets"`
 		ProjectFileDependencyGroups map[string][]string                       `json:"projectFileDependencyGroups"`
 		Project                     json.RawMessage                           `json:"project"`
+		Logs                        []assetsLog                               `json:"logs"`
 	}
 
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -77,6 +153,7 @@ func (a *projectAssets) UnmarshalJSON(data []byte) error {
 
 	a.Targets = raw.Targets
 	a.ProjectFileDependencyGroups = raw.ProjectFileDependencyGroups
+	a.Logs = raw.Logs
 	a.projectPresent = len(raw.Project) > 0 && string(raw.Project) != "null"
 
 	if a.projectPresent {
@@ -330,9 +407,33 @@ func anyPrefixMatch(key string, names []string) bool {
 	return false
 }
 
+// selectTargetFramework picks the project's framework the user asked for,
+// reporting false when the project declares none like it.
+//
+// Compared case-insensitively, because a moniker is user input here rather than
+// a filesystem name - a --dotnet-target-framework=NET8.0 names the same
+// framework as the net8.0 the project declared. The declared spelling is what
+// comes back: the target runtime is part of a project's identity, so it stays a
+// property of the project and not of the command line.
+//
+// Exact, never a prefix: matchTargetsKey reconciles a moniker with a `targets`
+// key because both come from the manifest, whereas accepting "net8" for
+// "net8.0" here would silently swallow a typo and report a graph under it.
+func selectTargetFramework(frameworks []string, requested string) (string, bool) {
+	for _, framework := range frameworks {
+		if strings.EqualFold(framework, requested) {
+			return framework, true
+		}
+	}
+
+	return "", false
+}
+
 // directDependencies extracts the direct dependency names for a framework from
-// projectFileDependencyGroups. Entries look like "Newtonsoft.Json >= 13.0.3";
-// the constraint is ignored, since the resolved version comes from `targets`.
+// projectFileDependencyGroups, less the build tooling the SDK injected (see
+// sdkInjected).
+// Entries look like "Newtonsoft.Json >= 13.0.3"; the constraint is ignored,
+// since the resolved version comes from `targets`.
 //
 // Upstream indexes this map unguarded and throws when the key is missing, taking
 // down the scan. Degrade instead: use the sole group where there is one, and
@@ -348,6 +449,7 @@ func (a *projectAssets) directDependencies(targetsKey string) []string {
 
 	names := make([]string, 0, len(entries))
 	seen := make(map[string]struct{}, len(entries))
+	injected := a.sdkInjected(targetsKey)
 
 	for _, entry := range entries {
 		fields := strings.Fields(entry)
@@ -362,11 +464,98 @@ func (a *projectAssets) directDependencies(targetsKey string) []string {
 			continue
 		}
 
+		if _, sdkAdded := injected[strings.ToLower(name)]; sdkAdded {
+			continue
+		}
+
 		seen[name] = struct{}{}
 		names = append(names, name)
 	}
 
 	return names
+}
+
+// sdkInjected returns the lowercased names of the build tooling the SDK added
+// to the framework reported under targetsKey. Two things have to hold: NuGet
+// flagged the reference `autoReferenced`, and the package it resolved to is
+// nothing but MSBuild logic.
+//
+// The pair the SDK injects for PublishAot and PublishTrimmed —
+// Microsoft.DotNet.ILCompiler and Microsoft.NET.ILLink.Tasks — takes its
+// version from whichever SDK ran the restore, so reporting them as the
+// project's own dependencies moves the graph when the restoring SDK changes and
+// the project did not. Neither resolves to anything the application compiles
+// against or ships.
+//
+// The flag alone is too broad: NETStandard.Library and
+// Microsoft.NETFramework.ReferenceAssemblies carry it too, and both stay in the
+// graph. Their versions are fixed by the target framework rather than by the
+// SDK, and the first of them does deliver assemblies.
+//
+// snyk-nuget-plugin reports every one of these, so this is a divergence from
+// it, and a deliberate one rather than a port defect.
+func (a *projectAssets) sdkInjected(targetsKey string) map[string]struct{} {
+	autoReferenced := a.autoReferencedNames(targetsKey)
+	if len(autoReferenced) == 0 {
+		return nil
+	}
+
+	// A reference the restore did not resolve has no package to judge, so it is
+	// reported rather than dropped.
+	target, ok := a.Targets.Get(targetsKey)
+	if !ok {
+		return nil
+	}
+
+	injected := make(map[string]struct{}, len(autoReferenced))
+
+	for _, key := range target.Keys() {
+		name, _, found := strings.Cut(key, "/")
+		if !found {
+			continue
+		}
+
+		lowered := strings.ToLower(name)
+		if _, added := autoReferenced[lowered]; !added {
+			continue
+		}
+
+		if entry, _ := target.Get(key); entry.buildOnly() {
+			injected[lowered] = struct{}{}
+		}
+	}
+
+	return injected
+}
+
+// autoReferencedNames returns the lowercased names of the references NuGet
+// recorded as the SDK's rather than the developer's, for the framework reported
+// under targetsKey.
+//
+// project.frameworks is keyed by the moniker the project declared, which is not
+// the `targets` key before net5.0, so each framework is mapped forwards to find
+// the one describing targetsKey. The first match wins, which only matters for a
+// project whose frameworks all resolve to a single `targets` key — there they
+// already share a package set.
+func (a *projectAssets) autoReferencedNames(targetsKey string) map[string]struct{} {
+	for _, key := range a.Project.Frameworks.Keys() {
+		if a.matchTargetsKey(key) != targetsKey {
+			continue
+		}
+
+		framework, _ := a.Project.Frameworks.Get(key)
+		names := make(map[string]struct{}, len(framework.Dependencies))
+
+		for name, dependency := range framework.Dependencies {
+			if dependency.AutoReferenced {
+				names[strings.ToLower(name)] = struct{}{}
+			}
+		}
+
+		return names
+	}
+
+	return nil
 }
 
 // soleDependencyGroup returns the only dependency group, when there is exactly

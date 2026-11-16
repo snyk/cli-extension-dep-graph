@@ -1,10 +1,11 @@
 package pnpm
 
 const (
-	packageJSONFile = "package.json"
-	pnpmLockFile    = "pnpm-lock.yaml"
-	rushJSONFile    = "rush.json"
-	defaultVersion  = "0.0.0"
+	packageJSONFile   = "package.json"
+	pnpmLockFile      = "pnpm-lock.yaml"
+	pnpmWorkspaceFile = "pnpm-workspace.yaml"
+	rushJSONFile      = "rush.json"
+	defaultVersion    = "0.0.0"
 )
 
 // listProject is one importer entry from `pnpm list --json` (an array, one

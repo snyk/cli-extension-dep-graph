@@ -109,7 +109,15 @@ func Parse(rawFlags []string, dest interface{}) error { //nolint:gocyclo // Comp
 
 		switch info.fieldType.Kind() {
 		case reflect.Bool:
-			field.SetBool(true)
+			value := true
+			if hasEqualsSyntax {
+				b, err := strconv.ParseBool(flagValue)
+				if err != nil {
+					return fmt.Errorf("invalid boolean value %q for %s", flagValue, flag)
+				}
+				value = b
+			}
+			field.SetBool(value)
 
 		case reflect.String:
 			var value string

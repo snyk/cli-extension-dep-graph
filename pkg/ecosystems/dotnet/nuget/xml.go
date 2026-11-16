@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -30,17 +31,61 @@ var (
 // The charset reader accepts every label rather than checking it against the
 // bytes, which matches upstream: a file whose declaration disagrees with its
 // contents is read as whatever its BOM says, or as UTF-8.
+//
+// Element and attribute names are matched without regard to case: MSBuild and
+// the .NET tooling around it treat them that way, and a lowercase `<version>`
+// that restores fine must not drop a package here. Struct tags for anything
+// decoded through this function therefore have to be written in lowercase.
 func decodeXML(data []byte, into any) error {
 	decoder := xml.NewDecoder(bytes.NewReader(toUTF8(data)))
 	decoder.CharsetReader = func(_ string, input io.Reader) (io.Reader, error) {
 		return input, nil
 	}
 
-	if err := decoder.Decode(into); err != nil {
+	if err := xml.NewTokenDecoder(lowercaseNames{decoder}).Decode(into); err != nil {
 		return fmt.Errorf("decoding XML: %w", err)
 	}
 
 	return nil
+}
+
+// lowercaseNames folds element and attribute local names to lowercase as tokens
+// are read, which is how a case-sensitive struct-tag decoder gets to match
+// case-insensitively. Namespaces and character data are left alone.
+type lowercaseNames struct {
+	decoder *xml.Decoder
+}
+
+var _ xml.TokenReader = lowercaseNames{}
+
+func (l lowercaseNames) Token() (xml.Token, error) {
+	token, err := l.decoder.Token()
+	if err != nil {
+		// io.EOF must reach the caller unwrapped for the decoder to see the
+		// end of the document.
+		return nil, err //nolint:wrapcheck // sentinel passthrough
+	}
+
+	switch t := token.(type) {
+	case xml.StartElement:
+		t.Name.Local = strings.ToLower(t.Name.Local)
+
+		attrs := make([]xml.Attr, len(t.Attr))
+		for i, attr := range t.Attr {
+			attr.Name.Local = strings.ToLower(attr.Name.Local)
+			attrs[i] = attr
+		}
+
+		t.Attr = attrs
+
+		return t, nil
+	case xml.EndElement:
+		t.Name.Local = strings.ToLower(t.Name.Local)
+
+		return t, nil
+	default:
+		return token, nil
+	}
 }
 
 // toUTF8 strips a UTF-8 BOM, or transcodes UTF-16 to UTF-8 when a UTF-16 BOM is

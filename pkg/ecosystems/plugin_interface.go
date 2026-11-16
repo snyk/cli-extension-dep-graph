@@ -19,6 +19,12 @@ type ResolverMetadata struct {
 // either a successfully-built dep-graph for one project, or an error
 // surfaced against the project's descriptor.
 //
+// A result with neither a DepGraph nor an Error claims its ProcessedFiles and
+// reports nothing: the plugin recognized the project and deliberately left it
+// out of scope, so no later plugin should answer for it either. Consumers must
+// skip such a result rather than treat it as a graph — marshaling a nil
+// DepGraph yields a `null` payload.
+//
 // ProcessedFiles lists the files this result was derived from
 // (lockfile + any manifests consulted). Per-graph attribution; if a
 // consumer wants a deduped union across all results, it computes it
@@ -34,6 +40,10 @@ type SCAResult struct {
 // OnGraphFunc is the per-graph callback BuildDepGraphsFromDir invokes
 // for each emitted SCAResult. See SCAPlugin for the contract.
 type OnGraphFunc func(SCAResult) error
+
+// AllFilesGlob matches every file. A plugin returns it from InputGlobs when it
+// needs the whole directory.
+const AllFilesGlob = "*"
 
 // SCAPlugin builds dependency graphs from a directory containing
 // project files. Results are emitted one at a time via onGraph as the
@@ -60,4 +70,13 @@ type SCAPlugin interface {
 		onGraph OnGraphFunc,
 	) error
 	GetName() string
+	// DetectionGlobs returns base-name globs for the files whose presence means this
+	// plugin should run on a directory, so a caller holding only a file listing
+	// can choose plugins. Nil means it applies whatever the directory holds.
+	DetectionGlobs() []string
+	// InputGlobs returns base-name globs for every file the plugin may read to build
+	// a dep graph, so a caller holding a file listing can fetch only those. It
+	// includes DetectionGlobs. A plugin that cannot name its files returns
+	// AllFilesGlob.
+	InputGlobs() []string
 }

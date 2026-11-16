@@ -40,6 +40,16 @@ func (p Plugin) GetName() string {
 	return PluginName
 }
 
+// DetectionGlobs implements ecosystems.SCAPlugin.
+func (p Plugin) DetectionGlobs() []string {
+	return []string{pipfileFile, pipfileLockFile}
+}
+
+// InputGlobs implements ecosystems.SCAPlugin. Both files are parsed directly.
+func (p Plugin) InputGlobs() []string {
+	return []string{pipfileFile, pipfileLockFile}
+}
+
 // BuildDepGraphsFromDir discovers and builds dependency graphs for
 // Pipenv projects. Build work runs concurrently (bounded by
 // maxConcurrentInstalls); onGraph invocations are serialized under a
@@ -138,6 +148,7 @@ func (p Plugin) discoverPipfiles(ctx context.Context, log logger.Logger, dir str
 		findOpts = []discovery.FindOption{
 			discovery.WithInclude(pipfileFile),
 			discovery.WithExcludes(excludes...),
+			discovery.WithMaxDepth(options.Global.DetectionDepth),
 		}
 	default:
 		// Default: find Pipfile at root only

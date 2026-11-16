@@ -38,7 +38,7 @@ type nuspecDependencies struct {
 // nuspecGroup is a <group>. An empty TargetFramework means the group applies to
 // every framework.
 type nuspecGroup struct {
-	TargetFramework string             `xml:"targetFramework,attr"`
+	TargetFramework string             `xml:"targetframework,attr"`
 	Dependencies    []nuspecDependency `xml:"dependency"`
 }
 

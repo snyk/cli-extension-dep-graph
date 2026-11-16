@@ -95,6 +95,34 @@ func TestParse_BooleanFlags(t *testing.T) {
 	}
 }
 
+func TestParse_BooleanFlagExplicitValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		rawFlags []string
+		want     bool
+		wantErr  bool
+	}{
+		{name: "explicit true", rawFlags: []string{"--bool-flag=true"}, want: true},
+		{name: "explicit false", rawFlags: []string{"--bool-flag=false"}, want: false},
+		{name: "invalid value", rawFlags: []string{"--bool-flag=maybe"}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := &TestOptions{}
+
+			err := Parse(tt.rawFlags, opts)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, opts.BoolFlag)
+		})
+	}
+}
+
 func TestParse_StringFlags(t *testing.T) {
 	tests := []struct {
 		name     string
