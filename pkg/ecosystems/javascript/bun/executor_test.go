@@ -1,6 +1,11 @@
 package bun
 
 import (
+	"context"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,4 +62,29 @@ func TestParseBunVersion(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestCheckBunVersionHidesSnykVariablesFromChild(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake bun binary is a POSIX shell script")
+	}
+	t.Setenv("SNYK_TOKEN", "secret")
+	dir := t.TempDir()
+	envFile := filepath.Join(dir, "child-env.txt")
+	script := filepath.Join(dir, "bun")
+	body := "#!/bin/sh\nenv > '" + envFile + "'\necho 1.2.19\n"
+	require.NoError(t, os.WriteFile(script, []byte(body), 0o755)) //nolint:gosec // the fake binary must be executable
+
+	require.NoError(t, checkBunVersion(context.Background(), script))
+
+	childEnv, err := os.ReadFile(envFile)
+	require.NoError(t, err)
+	var names []string
+	for _, line := range strings.Split(string(childEnv), "\n") {
+		if name, _, found := strings.Cut(line, "="); found {
+			names = append(names, name)
+		}
+	}
+	require.NotEmpty(t, names)
+	assert.NotContains(t, names, "SNYK_TOKEN")
 }
