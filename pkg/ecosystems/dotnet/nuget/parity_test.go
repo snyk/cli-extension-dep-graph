@@ -55,11 +55,11 @@ func TestParityWithSnykNugetPlugin(t *testing.T) {
 	// OSF-618 fix: we intentionally diverge from snyk-nuget-plugin to eliminate
 	// twin edges (a parent with both X and X:pruned children). Upstream has the
 	// same bug. Verify the fix reduced twin edges without losing real edges.
-	mine_adj := adjacency(t, mine)
-	theirs_adj := adjacency(t, &theirs)
+	mineAdj := adjacency(t, mine)
+	theirsAdj := adjacency(t, &theirs)
 
-	for nodeID, mineDeps := range mine_adj {
-		theirDeps, exists := theirs_adj[nodeID]
+	for nodeID, mineDeps := range mineAdj {
+		theirDeps, exists := theirsAdj[nodeID]
 		require.True(t, exists, "node %s exists in ours but not theirs", nodeID)
 
 		// Every edge we have must exist in theirs (we never drop real edges)
