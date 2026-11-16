@@ -22,7 +22,7 @@ type SCAPluginOptions struct {
 
 // GlobalOptions contains options that apply globally across all SCA plugins.
 type GlobalOptions struct {
-	TargetFile                    *string              `arg:"--target-file"`
+	TargetFile                    *string              `arg:"--file"`
 	AllProjects                   bool                 `arg:"--all-projects"`
 	IncludeDev                    bool                 `arg:"--dev,-d"`
 	Exclude                       CommaSeparatedString `arg:"--exclude"`
