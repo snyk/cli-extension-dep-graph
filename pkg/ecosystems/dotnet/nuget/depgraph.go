@@ -116,9 +116,9 @@ func (e *edgeSet) connect(parentNodeID, childNodeID string) error {
 type graphBuilder struct {
 	*edgeSet
 	resolved map[string]resolvedPackage
-	// hasRealEdge tracks which (parent, child) pairs have real edges, preventing pruned edges to same child
+	// hasRealEdge tracks which parent->child pairs have real edges
 	hasRealEdge map[string]map[string]bool
-	// pendingPruned holds pruned edges that haven't been added yet, in case we later need real edges instead
+	// pendingPruned holds deferred pruned edges finalized after the tree walk
 	pendingPruned []prunedEdge
 }
 
@@ -163,6 +163,8 @@ func (g *graphBuilder) addChildren(
 			continue
 		}
 
+		// Expected rather than wrong: framework references such as
+		// Microsoft.NETCore.App are declared but never resolved as packages.
 		pkg, ok := g.resolved[strings.ToLower(childName)]
 		if !ok {
 			continue
@@ -172,7 +174,7 @@ func (g *graphBuilder) addChildren(
 		childNodeID := pkgNodeID(pkg.name, pkg.version)
 
 		if _, seen := local[childNodeID]; seen {
-			// Child in visited - defer pruned edge (will be added later if no real edge emerges)
+			// Child in visited - defer pruned edge
 			if !g.hasRealEdge[parentNodeID][childNodeID] {
 				g.pendingPruned = append(g.pendingPruned, prunedEdge{
 					parent: parentNodeID,
@@ -184,15 +186,13 @@ func (g *graphBuilder) addChildren(
 			continue
 		}
 
-		// Child not in visited - add real edge if not already added
-		if g.hasRealEdge[parentNodeID][childNodeID] {
-			continue
-		}
+		// Child not in visited - add real edge
+		if !g.hasRealEdge[parentNodeID][childNodeID] {
+			g.builder.AddNode(childNodeID, info)
 
-		g.builder.AddNode(childNodeID, info)
-
-		if err := g.connect(parentNodeID, childNodeID); err != nil {
-			return err
+			if err := g.connect(parentNodeID, childNodeID); err != nil {
+				return err
+			}
 		}
 
 		g.hasRealEdge[parentNodeID][childNodeID] = true

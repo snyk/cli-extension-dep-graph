@@ -446,8 +446,7 @@ func TestBuildDepGraph_SDKInjectedPackageSurvivesAsTransitive(t *testing.T) {
 	assert.Equal(t, []string{"Microsoft.NET.ILLink.Tasks@8.0.16"}, depsOf(t, graph, "Declared@1.0.0"))
 }
 
-// When a parent node is reached through multiple paths with different visited
-// contexts, it must not get both a full edge and a pruned edge to the same child.
+// Parent reached via multiple routes must not have both real and pruned edges to same child.
 func TestBuildDepGraph_ParentReachedTwiceDoesNotCreateTwinEdges(t *testing.T) {
 	graph := build(t, `{
       "targets": {
@@ -462,11 +461,6 @@ func TestBuildDepGraph_ParentReachedTwiceDoesNotCreateTwinEdges(t *testing.T) {
       "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
     }`)
 
-	// Parent is reached through two paths:
-	// Path 1: Root -> Left -> Parent (Shared not in visited) -> adds Parent -> Shared
-	// Path 2: Root -> Right -> Shared, Parent (Shared in visited) -> defers Parent -> Shared:pruned
-	// Result: Parent has only the real edge, pruned edge was never added
-
 	parentDeps := depsOf(t, graph, "Parent@1.0.0")
 	assert.Equal(t, []string{"Shared@1.0.0"}, parentDeps, "Parent must have exactly one edge to Shared")
 
@@ -476,8 +470,7 @@ func TestBuildDepGraph_ParentReachedTwiceDoesNotCreateTwinEdges(t *testing.T) {
 	}
 }
 
-// Tests the mirrored order where the first route has child in visited, ensuring
-// the deferred pruned edge gets upgraded when a later route has child not in visited.
+// Mirrored order: first route has child in visited, later route does not.
 func TestBuildDepGraph_MirroredOrder(t *testing.T) {
 	graph := build(t, `{
       "targets": {
@@ -492,10 +485,6 @@ func TestBuildDepGraph_MirroredOrder(t *testing.T) {
       "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
     }`)
 
-	// First route (A): Root -> A -> Shared, Parent (Shared in visited) -> defers Parent -> Shared:pruned
-	// Second route (B): Root -> B -> Parent (Shared not in visited) -> adds Parent -> Shared real
-	// Result: Parent has only the real edge, deferred pruned edge not added
-
 	parentDeps := depsOf(t, graph, "Parent@1.0.0")
 	assert.Equal(t, []string{"Shared@1.0.0"}, parentDeps, "Parent must have real edge to Shared")
 
@@ -504,10 +493,41 @@ func TestBuildDepGraph_MirroredOrder(t *testing.T) {
 			"Parent must not have pruned edge when real edge was added via later route")
 	}
 
-	// Verify no orphaned Shared:pruned stub exists
 	for _, node := range graph.Graph.Nodes {
 		if node.NodeID == "Shared@1.0.0:pruned" {
 			t.Fatal("Orphaned Shared:pruned node should not exist")
+		}
+	}
+}
+
+// Grandchild upgrade: first route walks Parent->Child where Grandchild is in visited,
+// later route walks Parent->Child where Grandchild is not in visited.
+func TestBuildDepGraph_GrandchildUpgrade(t *testing.T) {
+	graph := build(t, `{
+      "targets": {
+        "net8.0": {
+          "Left/1.0.0": { "type": "package", "dependencies": { "Grandchild": "1.0.0", "Parent": "1.0.0" } },
+          "Right/1.0.0": { "type": "package", "dependencies": { "Parent": "1.0.0" } },
+          "Parent/1.0.0": { "type": "package", "dependencies": { "Child": "1.0.0" } },
+          "Child/1.0.0": { "type": "package", "dependencies": { "Grandchild": "1.0.0" } },
+          "Grandchild/1.0.0": { "type": "package" }
+        }
+      },
+      "projectFileDependencyGroups": { "net8.0": [ "Left >= 1.0.0", "Right >= 1.0.0" ] },
+      "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
+    }`)
+
+	childDeps := depsOf(t, graph, "Child@1.0.0")
+	assert.Equal(t, []string{"Grandchild@1.0.0"}, childDeps, "Child must have real edge to Grandchild")
+
+	for _, dep := range childDeps {
+		assert.NotContains(t, dep, prunedNodeSuffix,
+			"Child must not have pruned edge after later route upgraded it to real")
+	}
+
+	for _, node := range graph.Graph.Nodes {
+		if node.NodeID == "Grandchild@1.0.0:pruned" {
+			t.Fatal("Orphaned Grandchild:pruned node should not exist")
 		}
 	}
 }
@@ -552,12 +572,7 @@ func TestBuildDepGraph_DotnetExampleRepo(t *testing.T) {
 		twinCount += len(children)
 	}
 
-	t.Logf("Nodes: %d, Pruned: %d, Twin edges: %d", nodeCount, prunedCount, twinCount)
-
-	assert.Equal(t, 0, twinCount, "must have zero twin edges (parent with both X and X:pruned)")
-
-	if nodeCount != 229 || prunedCount != 34 {
-		t.Logf("Expected 229 nodes and 34 pruned, got %d nodes and %d pruned", nodeCount, prunedCount)
-		t.Logf("This may indicate the fix needs refinement or the expectation needs adjustment")
-	}
+	assert.Equal(t, 229, nodeCount, "must have 229 nodes")
+	assert.Equal(t, 34, prunedCount, "must have 34 pruned nodes")
+	assert.Equal(t, 0, twinCount, "must have zero twin edges")
 }
