@@ -57,18 +57,18 @@ func TestParityWithSnykNugetPlugin(t *testing.T) {
 	// same bug. Verify the fix reduced twin edges without losing real edges.
 	mine_adj := adjacency(t, mine)
 	theirs_adj := adjacency(t, &theirs)
-	
+
 	for nodeID, mineDeps := range mine_adj {
 		theirDeps, exists := theirs_adj[nodeID]
 		require.True(t, exists, "node %s exists in ours but not theirs", nodeID)
-		
+
 		// Every edge we have must exist in theirs (we never drop real edges)
 		for _, dep := range mineDeps {
 			assert.Contains(t, theirDeps, dep,
 				"edge %s -> %s exists in ours but not in theirs; we must not drop real edges",
 				nodeID, dep)
 		}
-		
+
 		// If theirs has more edges, they must be twin-edge duplicates
 		if len(theirDeps) > len(mineDeps) {
 			for _, dep := range theirDeps {
