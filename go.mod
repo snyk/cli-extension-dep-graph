@@ -13,7 +13,7 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/snyk/dep-graph/go v0.0.0-20260127160647-c836da762c62
 	github.com/snyk/error-catalog-golang-public v0.0.0-20261109151447-ff0c5a9c0665
-	github.com/snyk/go-application-framework v0.52.2-0.20261117121440-37fb44401f37
+	github.com/snyk/go-application-framework v0.52.2-0.20261117123731-ae956a913114
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/mod v0.41.0

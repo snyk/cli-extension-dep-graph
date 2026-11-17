@@ -27,7 +27,7 @@ func TestEnvironRemovesSnykVariablesAndKeepsOthers(t *testing.T) {
 	assert.Contains(t, env, "KEEP_ME=1")
 }
 
-func TestEnvironReturnsSubprocessFailedErrorWhenDirCannotBeResolved(t *testing.T) {
+func TestEnvironReturnsExternalProgramFailedErrorWhenDirCannotBeResolved(t *testing.T) {
 	if runtime.GOOS == "windows" || runtime.GOOS == "plan9" {
 		t.Skip("PWD is not set on windows or plan9")
 	}
