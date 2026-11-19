@@ -442,6 +442,19 @@ func TestPlugin_UnusableAssetsFileIsLeftToLegacy(t *testing.T) {
 		"no project section": `{"version":3,"targets":{"net8.0":{}}}`,
 		"no frameworks":      `{"version":3,"targets":{"net8.0":{}},"project":{"version":"1.0.0"}}`,
 		"no targets":         `{"version":3,"project":{"frameworks":{"net8.0":{}}}}`,
+		// A classic project restores every declared alias against its own
+		// framework, so the key repeats and one alias's packages are lost.
+		"fewer frameworks restored than declared": `{
+		  "version": 3,
+		  "targets": { ".NETFramework,Version=v4.0": {} },
+		  "project": {
+		    "restore": { "originalTargetFrameworks": [ "netcoreapp1.1", "netcoreapp1.2" ] },
+		    "frameworks": {
+		      "net40": { "targetAlias": "netcoreapp1.1" },
+		      "net40": { "targetAlias": "netcoreapp1.2" }
+		    }
+		  }
+		}`,
 	}
 
 	for name, content := range tests {
