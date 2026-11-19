@@ -112,9 +112,11 @@ type assetsProject struct {
 }
 
 // assetsProjectRestore is the restore metadata NuGet records for the project.
-// Only the project name is read, and only --assets-project-name reports it.
+// The project name is reported only with --assets-project-name. The declared
+// frameworks are compared with the restored ones in validate.
 type assetsProjectRestore struct {
-	ProjectName string `json:"projectName"`
+	ProjectName              string   `json:"projectName"`
+	OriginalTargetFrameworks []string `json:"originalTargetFrameworks"`
 }
 
 type assetsProjectFramework struct {
@@ -239,6 +241,17 @@ func (a *projectAssets) validate(path string) error {
 		)
 	}
 
+	// A classic (non-SDK) project cannot cross-target, so NuGet restores every
+	// declared alias against the project's own framework and writes that key
+	// once per alias. Only one entry survives decoding, so reading it would
+	// report one alias's packages under another alias's name.
+	if declared := distinctFolded(a.Project.Restore.OriginalTargetFrameworks); declared > a.Project.Frameworks.Len() {
+		return snykecosystems.NewUnparseableManifestError(
+			fmt.Sprintf("%s records %d target frameworks, but the project declares %d.",
+				path, a.Project.Frameworks.Len(), declared),
+		)
+	}
+
 	// The moniker becomes the project's target runtime, which is part of its
 	// identity, so a nameless framework is refused rather than carried.
 	for _, framework := range a.targetFrameworks() {
@@ -250,6 +263,16 @@ func (a *projectAssets) validate(path string) error {
 	}
 
 	return nil
+}
+
+// distinctFolded counts the distinct values, ignoring case, as NuGet does.
+func distinctFolded(values []string) int {
+	seen := make(map[string]struct{}, len(values))
+	for _, v := range values {
+		seen[strings.ToLower(v)] = struct{}{}
+	}
+
+	return len(seen)
 }
 
 // targetFrameworks lists the project's frameworks in document order, preferring
