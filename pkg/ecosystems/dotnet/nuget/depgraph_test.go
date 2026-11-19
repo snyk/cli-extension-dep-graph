@@ -95,7 +95,12 @@ func build(t *testing.T, content string) *godepgraph.DepGraph {
 
 	framework := assets.targetFrameworks()[0]
 
-	graph, err := buildDepGraph(t.Context(), assets, "RootProject", assets.matchTargetsKey(framework))
+	rootVersion := assets.Project.Version
+	if rootVersion == "" {
+		rootVersion = defaultVersion
+	}
+
+	graph, err := buildDepGraph(t.Context(), assets, "RootProject", rootVersion, assets.matchTargetsKey(framework))
 	require.NoError(t, err)
 
 	return graph
@@ -350,7 +355,7 @@ func TestBuildDepGraph_HonoursCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	_, err := buildDepGraph(ctx, assets, "RootProject", "net8.0")
+	_, err := buildDepGraph(ctx, assets, "RootProject", "0.0.0", "net8.0")
 	require.ErrorIs(t, err, context.Canceled)
 }
 
@@ -360,7 +365,7 @@ func TestBuildDepGraph_UnknownTargetsKey(t *testing.T) {
       "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
     }`)
 
-	_, err := buildDepGraph(t.Context(), assets, "RootProject", "net9.0")
+	_, err := buildDepGraph(t.Context(), assets, "RootProject", "0.0.0", "net9.0")
 	require.ErrorIs(t, err, errNoResolvedPackages)
 	assert.Contains(t, err.Error(), "net9.0")
 }
@@ -380,7 +385,7 @@ func TestBuildDepGraph_DeclaredDependenciesButNoPackages(t *testing.T) {
               "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
             }`)
 
-			_, err := buildDepGraph(t.Context(), assets, "RootProject", "net8.0")
+			_, err := buildDepGraph(t.Context(), assets, "RootProject", "0.0.0", "net8.0")
 			require.ErrorIs(t, err, errNoResolvedPackages)
 		})
 	}
@@ -394,7 +399,7 @@ func TestBuildDepGraph_NoDependenciesDeclaredOrResolved(t *testing.T) {
       "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
     }`)
 
-	graph, err := buildDepGraph(t.Context(), assets, "RootProject", "net8.0")
+	graph, err := buildDepGraph(t.Context(), assets, "RootProject", "0.0.0", "net8.0")
 	require.NoError(t, err)
 	assert.Len(t, graph.Pkgs, 1)
 }

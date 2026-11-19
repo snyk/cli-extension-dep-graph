@@ -95,30 +95,12 @@ func csprojTargetFramework(dir string) (targetFramework, bool, error) {
 		return targetFramework{}, false, err
 	}
 
-	data, err := os.ReadFile(path)
+	parsed, err := readProjectFile(path)
 	if err != nil {
-		return targetFramework{}, false, snykecosystems.NewUnprocessableFileError(
-			fmt.Sprintf("Could not read %s: %v.", filepath.Base(path), readFailureReason(err)),
-			snyk_errors.WithCause(err),
-		)
+		return targetFramework{}, false, err
 	}
 
-	var project struct {
-		PropertyGroups []struct {
-			TargetFrameworkVersion []string `xml:"targetframeworkversion"`
-			TargetFramework        []string `xml:"targetframework"`
-			TargetFrameworks       []string `xml:"targetframeworks"`
-		} `xml:"propertygroup"`
-	}
-
-	if err := decodeXML(data, &project); err != nil {
-		return targetFramework{}, false, snykecosystems.NewUnparseableManifestError(
-			fmt.Sprintf("Could not parse %s as XML.", filepath.Base(path)),
-			snyk_errors.WithCause(err),
-		)
-	}
-
-	for _, group := range project.PropertyGroups {
+	for _, group := range parsed.PropertyGroups {
 		// One source per property group, in upstream's precedence order. A
 		// group naming none of them contributes nothing rather than ending the
 		// search: real projects put TargetFramework in a later group than, say,
@@ -138,6 +120,74 @@ func csprojTargetFramework(dir string) (targetFramework, bool, error) {
 	}
 
 	return targetFramework{}, false, nil
+}
+
+// projectFile holds the subset of a .NET project file this resolver reads.
+type projectFile struct {
+	Sdk            string `xml:"sdk,attr"`
+	PropertyGroups []struct {
+		TargetFrameworkVersion []string `xml:"targetframeworkversion"`
+		TargetFramework        []string `xml:"targetframework"`
+		TargetFrameworks       []string `xml:"targetframeworks"`
+		PackageID              []string `xml:"packageid"` //nolint:misspell // MSBuild property name
+		AssemblyName           []string `xml:"assemblyname"`
+	} `xml:"propertygroup"`
+}
+
+// readProjectFile reads and parses a .csproj, .vbproj, or .fsproj file.
+func readProjectFile(path string) (*projectFile, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, snykecosystems.NewUnprocessableFileError(
+			fmt.Sprintf("Could not read %s: %v.", filepath.Base(path), readFailureReason(err)),
+			snyk_errors.WithCause(err),
+		)
+	}
+
+	var project projectFile
+	if err := decodeXML(data, &project); err != nil {
+		return nil, snykecosystems.NewUnparseableManifestError(
+			fmt.Sprintf("Could not parse %s as XML.", filepath.Base(path)),
+			snyk_errors.WithCause(err),
+		)
+	}
+
+	return &project, nil
+}
+
+// isSdkStyle reports whether the project file uses SDK-style format.
+func (p *projectFile) isSdkStyle() bool {
+	if p.Sdk == "" {
+		return false
+	}
+
+	sdkPrefixes := []string{
+		"Microsoft.NET.Sdk",
+		"MSBuild.Sdk.Extras",
+		"MSTest.Sdk",
+		"Uno.Sdk",
+		"Godot.NET.Sdk",
+	}
+
+	for _, prefix := range sdkPrefixes {
+		if strings.HasPrefix(p.Sdk, prefix) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// scmRootName returns the SCM root name for a classic project: PackageID, else
+// AssemblyName, else the fallback.
+func (p *projectFile) scmRootName(fallback string) string {
+	for _, group := range p.PropertyGroups {
+		if name := firstNonEmpty(group.PackageID, group.AssemblyName); name != "" {
+			return name
+		}
+	}
+
+	return fallback
 }
 
 // firstCsproj returns the first .csproj in dir by name.

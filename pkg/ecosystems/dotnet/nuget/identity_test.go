@@ -119,42 +119,42 @@ func TestPlugin_ProjectIdentity(t *testing.T) {
 			files:   map[string]string{"services/web/packages.config": packagesConfigManifest, "services/web/Web.csproj": csprojNet45},
 			options: allProjects,
 			cli:     []reportedAs{{"services/web/packages.config", scanRootName}},
-			scm:     []reportedAs{{"services/web/Web.csproj", "web"}},
+			scm:     []reportedAs{{"services/web/Web.csproj", "project"}},
 		},
 		{
 			name:    "packages.config beside a .vbproj",
 			files:   map[string]string{"services/web/packages.config": packagesConfigManifest, "services/web/Web.vbproj": ""},
 			options: allProjects,
 			cli:     []reportedAs{{"services/web/packages.config", scanRootName}},
-			scm:     []reportedAs{{"services/web/Web.vbproj", "web"}},
+			scm:     []reportedAs{{"services/web/Web.vbproj", "project"}},
 		},
 		{
 			name:    "packages.config named by --file",
 			files:   map[string]string{"services/web/packages.config": packagesConfigManifest, "services/web/Web.csproj": csprojNet45},
 			options: targetFile("services/web/packages.config"),
 			cli:     []reportedAs{{"services/web/packages.config", scanRootName}},
-			scm:     []reportedAs{{"services/web/Web.csproj", "web"}},
+			scm:     []reportedAs{{"services/web/Web.csproj", "project"}},
 		},
 		{
 			name:    "packages.config with no project file",
 			files:   map[string]string{"services/flat/packages.config": packagesConfigManifest},
 			options: allProjects,
 			cli:     []reportedAs{{"services/flat/packages.config", scanRootName}},
-			scm:     []reportedAs{{"services/flat/packages.config", "flat"}},
+			scm:     []reportedAs{{"services/flat/packages.config", "project"}},
 		},
 		{
 			name:    "project.json beside a .csproj",
 			files:   map[string]string{"services/app/project.json": projectJSONManifest, "services/app/App.csproj": csprojNet45},
 			options: allProjects,
 			cli:     []reportedAs{{"services/app/project.json", scanRootName}},
-			scm:     []reportedAs{{"services/app/project.json", "app"}},
+			scm:     []reportedAs{{"services/app/project.json", "project"}},
 		},
 		{
 			name:    "project.json that names its project",
 			files:   map[string]string{"services/app/project.json": namedProjectJSON, "services/app/App.csproj": csprojNet45},
 			options: allProjects,
 			cli:     []reportedAs{{"services/app/project.json", "FromProjectJSON"}},
-			scm:     []reportedAs{{"services/app/project.json", "FromProjectJSON"}},
+			scm:     []reportedAs{{"services/app/project.json", "project"}},
 		},
 	}
 
@@ -282,8 +282,8 @@ func TestPlugin_CLIIdentityReportsTheTargetFileAsGiven(t *testing.T) {
 		{"./services/cart/obj/project.assets.json", reportedAs{"services/cart/Cart.csproj", "cart"}},
 		{"services//cart/obj/project.assets.json", reportedAs{"services/cart/Cart.csproj", "cart"}},
 		{absolute, reportedAs{"services/cart/Cart.csproj", "cart"}},
-		{"./services/web/packages.config", reportedAs{"services/web/Web.csproj", "web"}},
-		{"./services/app/project.json", reportedAs{"services/app/project.json", "app"}},
+		{"./services/web/packages.config", reportedAs{"services/web/Web.csproj", "project"}},
+		{"./services/app/project.json", reportedAs{"services/app/project.json", "project"}},
 	}
 
 	for _, tt := range tests {
@@ -315,6 +315,84 @@ func TestNewProjectNaming(t *testing.T) {
 		assert.Equal(t, cliLastResortRootName, naming.rootName(discovery.FindResult{Path: filepath.Join(sep, "obj", projectAssetsFile)}, ""))
 		assert.Equal(t, cliLastResortRootName, naming.rootName(discovery.FindResult{Path: filepath.Join(sep, packagesConfigFile)}, ""))
 	})
+}
+
+// TestPlugin_ClassicProjectSCMNaming tests that classic (non-SDK) projects
+// resolved via project.assets.json use PackageId, AssemblyName, or "project"
+// as the root name in SCM mode, with empty version.
+func TestPlugin_ClassicProjectSCMNaming(t *testing.T) {
+	tests := []struct {
+		name            string
+		projectContent  string
+		expectedSCMName string
+		expectedCLIName string
+	}{
+		{
+			name: "classic project with PackageId",
+			projectContent: `<Project>
+				<PropertyGroup>
+					<TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+					<PackageId>MyCustomPackageId</PackageId>
+					<AssemblyName>SomeAssemblyName</AssemblyName>
+				</PropertyGroup>
+			</Project>`,
+			expectedSCMName: "MyCustomPackageId",
+			expectedCLIName: scanRootName,
+		},
+		{
+			name: "classic project with AssemblyName but no PackageId",
+			projectContent: `<Project>
+				<PropertyGroup>
+					<TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+					<AssemblyName>MyAssemblyName</AssemblyName>
+				</PropertyGroup>
+			</Project>`,
+			expectedSCMName: "MyAssemblyName",
+			expectedCLIName: scanRootName,
+		},
+		{
+			name: "classic project with neither PackageId nor AssemblyName",
+			projectContent: `<Project>
+				<PropertyGroup>
+					<TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+				</PropertyGroup>
+			</Project>`,
+			expectedSCMName: "project",
+			expectedCLIName: scanRootName,
+		},
+		{
+			name: "SDK-style project is not affected",
+			projectContent: `<Project Sdk="Microsoft.NET.Sdk">
+				<PropertyGroup>
+					<TargetFramework>net8.0</TargetFramework>
+					<PackageId>CustomId</PackageId>
+				</PropertyGroup>
+			</Project>`,
+			expectedSCMName: "classic",
+			expectedCLIName: scanRootName,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := filepath.Join(t.TempDir(), scanRootName)
+			write(t, root, "services/classic/App.csproj", tt.projectContent)
+			write(t, root, "services/classic/obj/project.assets.json", singleTargetAssets)
+
+			scm := scan(t, root, allProjects())
+			cli := scan(t, root, allProjects().WithCLIProjectIdentity(true))
+
+			require.Len(t, scm, 1)
+			require.Len(t, cli, 1)
+
+			assert.Equal(t, tt.expectedSCMName, scm[0].ProjectDescriptor.Identity.RootComponentName, "SCM name")
+			assert.Equal(t, tt.expectedCLIName, cli[0].ProjectDescriptor.Identity.RootComponentName, "CLI name")
+
+			if tt.name != "SDK-style project is not affected" {
+				assert.Equal(t, "", scm[0].DepGraph.GetRootPkg().Info.Version, "SCM version should be empty for classic projects")
+			}
+		})
+	}
 }
 
 func allProjects() *ecosystems.SCAPluginOptions {

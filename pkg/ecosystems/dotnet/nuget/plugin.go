@@ -355,6 +355,8 @@ func (p Plugin) emitAssetsResults(
 		frameworks = []string{selected}
 	}
 
+	rootName, isClassic := scmClassicRoot(file, frameworks, naming, rootName)
+
 	for _, framework := range frameworks {
 		targetsKey := assets.matchTargetsKey(framework)
 		if targetsKey == "" {
@@ -377,7 +379,14 @@ func (p Plugin) emitAssetsResults(
 			logger.Attr(logFieldTargetsKey, targetsKey),
 		)
 
-		graph, buildErr := buildDepGraph(ctx, assets, rootName, targetsKey)
+		rootVersion := assets.Project.Version
+		if isClassic {
+			rootVersion = ""
+		} else if rootVersion == "" {
+			rootVersion = defaultVersion
+		}
+
+		graph, buildErr := buildDepGraph(ctx, assets, rootName, rootVersion, targetsKey)
 		if buildErr != nil {
 			if err := onGraph(p.errResult(reported, claimed, rootName, framework, buildErr)); err != nil {
 				return err
@@ -479,6 +488,28 @@ func projectFileOf(file discovery.FindResult) string {
 	}
 
 	return filepath.Join(projectDirOf(file.RelPath), filepath.Base(projectFile))
+}
+
+// scmClassicRoot determines the root name and classic flag for a project in
+// SCM mode. Classic (non-SDK) single-target projects resolved via
+// project.assets.json use PackageId, else AssemblyName from the project file,
+// else the fallback. SDK-style projects and CLI mode keep the given name.
+func scmClassicRoot(file discovery.FindResult, frameworks []string, naming projectNaming, currentName string) (string, bool) {
+	if naming.cli || len(frameworks) != 1 {
+		return currentName, false
+	}
+
+	projFile := projectFileOf(file)
+	if projFile == "" {
+		return currentName, false
+	}
+
+	parsed, err := readProjectFile(filepath.Join(projectDirOf(file.Path), filepath.Base(projFile)))
+	if err != nil || parsed.isSdkStyle() {
+		return currentName, false
+	}
+
+	return parsed.scmRootName(scmFallbackRootName), true
 }
 
 // claimedFiles are the files a result claims so the legacy resolver does not
@@ -675,7 +706,14 @@ func (p Plugin) emitFrameworkResult(
 		))
 	}
 
-	rootName := naming.rootName(file, manifest.rootName)
+	var recordedName string
+	if !naming.cli {
+		recordedName = scmFallbackRootName
+	} else {
+		recordedName = manifest.rootName
+	}
+
+	rootName := naming.rootName(file, recordedName)
 
 	projectFile := projectFileOf(file)
 	claimed := claimedFiles(projectFile, targetFile)
@@ -718,7 +756,7 @@ func (p Plugin) emitFrameworkResult(
 	}
 
 	rootVersion := manifest.rootVersion
-	if rootVersion == "" {
+	if naming.cli && rootVersion == "" {
 		rootVersion = defaultVersion
 	}
 

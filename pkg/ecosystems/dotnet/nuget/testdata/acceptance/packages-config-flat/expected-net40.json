@@ -26,10 +26,9 @@
       }
     },
     {
-      "id": "packages-config-flat@0.0.0",
+      "id": "project@",
       "info": {
-        "name": "packages-config-flat",
-        "version": "0.0.0"
+        "name": "project"
       }
     }
   ],
@@ -53,7 +52,7 @@
       },
       {
         "nodeId": "root-node",
-        "pkgId": "packages-config-flat@0.0.0",
+        "pkgId": "project@",
         "deps": [
           {
             "nodeId": "Antlr@3.4.1.9004"

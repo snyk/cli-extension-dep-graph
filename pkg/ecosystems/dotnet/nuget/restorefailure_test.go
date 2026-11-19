@@ -31,7 +31,7 @@ func TestBuildDepGraph_PartlyResolvedFrameworkReportsTheRestoreFailure(t *testin
       ]
     }`)
 
-	_, err := buildDepGraph(t.Context(), assets, "RootProject", "net8.0")
+	_, err := buildDepGraph(t.Context(), assets, "RootProject", "0.0.0", "net8.0")
 
 	require.Error(t, err, "a graph missing a declared dependency must not pass as resolved")
 	assert.Contains(t, detailOf(t, err), "NU1101")
@@ -70,12 +70,12 @@ func TestBuildDepGraph_FailedFrameworkIsReportedEvenWhereThePackageResolved(t *t
       ]
     }`)
 
-	_, err := buildDepGraph(t.Context(), assets, "RootProject", ".NETFramework,Version=v4.7.2")
+	_, err := buildDepGraph(t.Context(), assets, "RootProject", "0.0.0", ".NETFramework,Version=v4.7.2")
 	require.Error(t, err, "the package is present but arrives with none of its dependencies")
 	assert.Contains(t, detailOf(t, err), "NU1202")
 
 	// The framework the failure does not name keeps the closure it resolved.
-	graph, err := buildDepGraph(t.Context(), assets, "RootProject", "net8.0")
+	graph, err := buildDepGraph(t.Context(), assets, "RootProject", "0.0.0", "net8.0")
 	require.NoError(t, err)
 	assert.Contains(t, pkgIDs(graph.Pkgs), "Newtonsoft.Json@13.0.3",
 		"the transitive dependency the failing framework lost")
@@ -106,11 +106,11 @@ func TestBuildDepGraph_FailureIsScopedToTheFrameworksItNames(t *testing.T) {
       ]
     }`
 
-	graph, err := buildDepGraph(t.Context(), assetsFrom(t, content), "RootProject", "net8.0")
+	graph, err := buildDepGraph(t.Context(), assetsFrom(t, content), "RootProject", "0.0.0", "net8.0")
 	require.NoError(t, err, "the framework the diagnostic does not name is unaffected")
 	assert.Contains(t, pkgIDs(graph.Pkgs), "Newtonsoft.Json@13.0.3")
 
-	_, err = buildDepGraph(t.Context(), assetsFrom(t, content), "RootProject", ".NETFramework,Version=v4.7.2")
+	_, err = buildDepGraph(t.Context(), assetsFrom(t, content), "RootProject", "0.0.0", ".NETFramework,Version=v4.7.2")
 	require.Error(t, err, "the framework it names lost a declared dependency")
 	assert.Contains(t, detailOf(t, err), "NU1202")
 }
@@ -130,7 +130,7 @@ func TestBuildDepGraph_FailureNamingNoFrameworkAppliesToAll(t *testing.T) {
       ]
     }`)
 
-	_, err := buildDepGraph(t.Context(), assets, "RootProject", "net8.0")
+	_, err := buildDepGraph(t.Context(), assets, "RootProject", "0.0.0", "net8.0")
 
 	require.Error(t, err, "a project-wide failure covers every framework")
 	assert.Contains(t, detailOf(t, err), "NU1010")
@@ -153,7 +153,7 @@ func TestBuildDepGraph_WarningsAreNotFailures(t *testing.T) {
       ]
     }`)
 
-	graph, err := buildDepGraph(t.Context(), assets, "RootProject", "net8.0")
+	graph, err := buildDepGraph(t.Context(), assets, "RootProject", "0.0.0", "net8.0")
 
 	require.NoError(t, err)
 	assert.Contains(t, pkgIDs(graph.Pkgs), "OldOnly@1.0.0")
@@ -169,7 +169,7 @@ func TestBuildDepGraph_NoLogsLeavesTheGraphToSpeakForItself(t *testing.T) {
       "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
     }`)
 
-	graph, err := buildDepGraph(t.Context(), assets, "RootProject", "net8.0")
+	graph, err := buildDepGraph(t.Context(), assets, "RootProject", "0.0.0", "net8.0")
 
 	require.NoError(t, err)
 	assert.Contains(t, pkgIDs(graph.Pkgs), "Newtonsoft.Json@13.0.3")
