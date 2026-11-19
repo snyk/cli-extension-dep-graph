@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -443,4 +444,135 @@ func TestBuildDepGraph_SDKInjectedPackageSurvivesAsTransitive(t *testing.T) {
 
 	assert.Equal(t, []string{"Declared@1.0.0"}, depsOf(t, graph, graph.Graph.RootNodeID))
 	assert.Equal(t, []string{"Microsoft.NET.ILLink.Tasks@8.0.16"}, depsOf(t, graph, "Declared@1.0.0"))
+}
+
+// Parent reached via multiple routes must not have both real and pruned edges to same child.
+func TestBuildDepGraph_ParentReachedTwiceDoesNotCreateTwinEdges(t *testing.T) {
+	graph := build(t, `{
+      "targets": {
+        "net8.0": {
+          "Left/1.0.0": { "type": "package", "dependencies": { "Parent": "1.0.0" } },
+          "Right/1.0.0": { "type": "package", "dependencies": { "Shared": "1.0.0", "Parent": "1.0.0" } },
+          "Parent/1.0.0": { "type": "package", "dependencies": { "Shared": "1.0.0" } },
+          "Shared/1.0.0": { "type": "package" }
+        }
+      },
+      "projectFileDependencyGroups": { "net8.0": [ "Left >= 1.0.0", "Right >= 1.0.0" ] },
+      "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
+    }`)
+
+	parentDeps := depsOf(t, graph, "Parent@1.0.0")
+	assert.Equal(t, []string{"Shared@1.0.0"}, parentDeps, "Parent must have exactly one edge to Shared")
+
+	for _, dep := range parentDeps {
+		assert.NotContains(t, dep, prunedNodeSuffix,
+			"Parent must not have a pruned edge when it has the real edge")
+	}
+}
+
+// Mirrored order: first route has child in visited, later route does not.
+func TestBuildDepGraph_MirroredOrder(t *testing.T) {
+	graph := build(t, `{
+      "targets": {
+        "net8.0": {
+          "A/1.0.0": { "type": "package", "dependencies": { "Shared": "1.0.0", "Parent": "1.0.0" } },
+          "B/1.0.0": { "type": "package", "dependencies": { "Parent": "1.0.0" } },
+          "Parent/1.0.0": { "type": "package", "dependencies": { "Shared": "1.0.0" } },
+          "Shared/1.0.0": { "type": "package" }
+        }
+      },
+      "projectFileDependencyGroups": { "net8.0": [ "A >= 1.0.0", "B >= 1.0.0" ] },
+      "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
+    }`)
+
+	parentDeps := depsOf(t, graph, "Parent@1.0.0")
+	assert.Equal(t, []string{"Shared@1.0.0"}, parentDeps, "Parent must have real edge to Shared")
+
+	for _, dep := range parentDeps {
+		assert.NotContains(t, dep, prunedNodeSuffix,
+			"Parent must not have pruned edge when real edge was added via later route")
+	}
+
+	for _, node := range graph.Graph.Nodes {
+		if node.NodeID == "Shared@1.0.0:pruned" {
+			t.Fatal("Orphaned Shared:pruned node should not exist")
+		}
+	}
+}
+
+// Grandchild upgrade: first route walks Parent->Child where Grandchild is in visited,
+// later route walks Parent->Child where Grandchild is not in visited.
+func TestBuildDepGraph_GrandchildUpgrade(t *testing.T) {
+	graph := build(t, `{
+      "targets": {
+        "net8.0": {
+          "Left/1.0.0": { "type": "package", "dependencies": { "Grandchild": "1.0.0", "Parent": "1.0.0" } },
+          "Right/1.0.0": { "type": "package", "dependencies": { "Parent": "1.0.0" } },
+          "Parent/1.0.0": { "type": "package", "dependencies": { "Child": "1.0.0" } },
+          "Child/1.0.0": { "type": "package", "dependencies": { "Grandchild": "1.0.0" } },
+          "Grandchild/1.0.0": { "type": "package" }
+        }
+      },
+      "projectFileDependencyGroups": { "net8.0": [ "Left >= 1.0.0", "Right >= 1.0.0" ] },
+      "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
+    }`)
+
+	childDeps := depsOf(t, graph, "Child@1.0.0")
+	assert.Equal(t, []string{"Grandchild@1.0.0"}, childDeps, "Child must have real edge to Grandchild")
+
+	for _, dep := range childDeps {
+		assert.NotContains(t, dep, prunedNodeSuffix,
+			"Child must not have pruned edge after later route upgraded it to real")
+	}
+
+	for _, node := range graph.Graph.Nodes {
+		if node.NodeID == "Grandchild@1.0.0:pruned" {
+			t.Fatal("Orphaned Grandchild:pruned node should not exist")
+		}
+	}
+}
+
+// Tests the full dotnet-example-repo assets file to verify node count and absence of twin edges.
+func TestBuildDepGraph_DotnetExampleRepo(t *testing.T) {
+	assets, err := readProjectAssets(
+		"testdata/osf-618/project.assets.json",
+		"testdata/osf-618/project.assets.json",
+	)
+	require.NoError(t, err)
+
+	frameworks := assets.targetFrameworks()
+	require.Len(t, frameworks, 1, "test expects single framework")
+
+	graph, err := buildDepGraph(t.Context(), assets, "dotnet_6", assets.matchTargetsKey(frameworks[0]))
+	require.NoError(t, err)
+
+	// Count nodes, pruned nodes, and check for twin edges
+	var prunedCount int
+	twins := make(map[string][]string) // parent -> list of children with twins
+
+	for _, node := range graph.Graph.Nodes {
+		if strings.HasSuffix(node.NodeID, prunedNodeSuffix) && node.NodeID != prunedNodeSuffix {
+			prunedCount++
+		}
+
+		// Check for twin edges (parent has both X and X:pruned)
+		depMap := make(map[string]bool)
+		for _, dep := range node.Deps {
+			baseDep := strings.TrimSuffix(dep.NodeID, prunedNodeSuffix)
+			if depMap[baseDep] {
+				twins[node.NodeID] = append(twins[node.NodeID], baseDep)
+			}
+			depMap[baseDep] = true
+		}
+	}
+
+	nodeCount := len(graph.Graph.Nodes)
+	twinCount := 0
+	for _, children := range twins {
+		twinCount += len(children)
+	}
+
+	assert.Equal(t, 229, nodeCount, "must have 229 nodes")
+	assert.Equal(t, 34, prunedCount, "must have 34 pruned nodes")
+	assert.Equal(t, 0, twinCount, "must have zero twin edges")
 }

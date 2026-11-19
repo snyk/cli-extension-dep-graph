@@ -27,21 +27,7 @@ import (
 )
 
 func TestParityWithSnykNugetPlugin(t *testing.T) {
-	dir := filepath.Join("testdata", "parity", "dotnet_6")
-
-	results, err := scatest.Run(t.Context(), nuget.Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
-	require.NoError(t, err)
-	require.Len(t, results, 1, "the project targets one framework")
-	require.NoError(t, results[0].Error)
-
-	mine := results[0].DepGraph
-	require.NotNil(t, mine)
-
-	raw, err := os.ReadFile(filepath.Join(dir, "snyk-nuget-plugin.json"))
-	require.NoError(t, err)
-
-	var theirs godepgraph.DepGraph
-	require.NoError(t, json.Unmarshal(raw, &theirs))
+	mine, theirs := loadParityGraphs(t)
 
 	assert.Equal(t, theirs.SchemaVersion, mine.SchemaVersion)
 	assert.Equal(t, theirs.PkgManager, mine.PkgManager)
@@ -50,10 +36,12 @@ func TestParityWithSnykNugetPlugin(t *testing.T) {
 	// Node identities and edges must match exactly. This is the substance of the
 	// port: which packages resolved, at which versions, and which depends on
 	// which — including the pruned back-edges, whose placement depends on the
-	// order siblings are walked in.
-	assert.Equal(t, adjacency(t, &theirs), adjacency(t, mine), "node and edge sets diverged")
+	// order siblings are walked in. Upstream is compared with twin edges collapsed.
+	theirsNormalized := withoutTwinEdges(adjacency(t, theirs))
 
-	theirPruned := prunedLabels(&theirs)
+	assert.Equal(t, theirsNormalized, adjacency(t, mine), "node and edge sets diverged")
+
+	theirPruned := restrictToKeys(prunedLabels(theirs), theirsNormalized)
 	assert.NotEmpty(t, theirPruned,
 		"the upstream fixture should still contain pruned nodes; if it does not, this comparison proves nothing")
 	assert.Equal(t, theirPruned, prunedLabels(mine), "pruned nodes diverged")
@@ -61,7 +49,7 @@ func TestParityWithSnykNugetPlugin(t *testing.T) {
 	// Package *versions* are allowed to differ, and do: snyk-nuget-plugin
 	// rewrites them from the host SDK's PackageOverrides.txt, which a static
 	// resolver cannot read. The set of package names must still be identical.
-	assert.Equal(t, packageNames(&theirs), packageNames(mine), "package sets diverged")
+	assert.Equal(t, packageNames(theirs), packageNames(mine), "package sets diverged")
 
 	overridden := 0
 	for _, node := range theirs.Graph.Nodes {
@@ -79,6 +67,43 @@ func TestParityWithSnykNugetPlugin(t *testing.T) {
 		assert.Contains(t, []string{node.PkgID, node.PkgID + prunedSuffix}, node.NodeID,
 			"this resolver reports resolved versions, so a node's ID always names its own package")
 	}
+}
+
+// TestDivergesFromSnykNugetPlugin_TwinEdges verifies we do not emit twin edges
+// (parent with both X and X:pruned) while snyk-nuget-plugin does. If the upstream
+// fixture is regenerated without twins, this test fails and withoutTwinEdges can be removed.
+func TestDivergesFromSnykNugetPlugin_TwinEdges(t *testing.T) {
+	mine, theirs := loadParityGraphs(t)
+
+	theirTwins := countTwinEdges(adjacency(t, theirs))
+	mineTwins := countTwinEdges(adjacency(t, mine))
+
+	assert.Equal(t, 52, theirTwins, "upstream fixture must have 52 twin edges")
+	assert.Equal(t, 0, mineTwins, "this resolver must have 0 twin edges")
+}
+
+// loadParityGraphs returns this resolver's graph and snyk-nuget-plugin's graph
+// for the dotnet_6 fixture.
+func loadParityGraphs(t *testing.T) (mine, theirs *godepgraph.DepGraph) {
+	t.Helper()
+
+	dir := filepath.Join("testdata", "parity", "dotnet_6")
+
+	results, err := scatest.Run(t.Context(), nuget.Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+	require.Len(t, results, 1, "the project targets one framework")
+	require.NoError(t, results[0].Error)
+
+	mine = results[0].DepGraph
+	require.NotNil(t, mine)
+
+	raw, err := os.ReadFile(filepath.Join(dir, "snyk-nuget-plugin.json"))
+	require.NoError(t, err)
+
+	theirs = new(godepgraph.DepGraph)
+	require.NoError(t, json.Unmarshal(raw, theirs))
+
+	return mine, theirs
 }
 
 const prunedSuffix = ":pruned"
@@ -102,6 +127,70 @@ func adjacency(t *testing.T, graph *godepgraph.DepGraph) map[string][]string {
 		out[node.NodeID] = deps
 	}
 
+	return out
+}
+
+// withoutTwinEdges collapses twin edges: when a parent has both X and X:pruned,
+// keeps X and drops X:pruned. Unreferenced pruned nodes are removed.
+func withoutTwinEdges(adj map[string][]string) map[string][]string {
+	normalized := make(map[string][]string, len(adj))
+	referenced := make(map[string]bool)
+
+	for parent, deps := range adj {
+		hasReal := make(map[string]bool)
+		for _, dep := range deps {
+			if !strings.HasSuffix(dep, prunedSuffix) {
+				hasReal[dep] = true
+			}
+		}
+
+		filtered := make([]string, 0, len(deps))
+		for _, dep := range deps {
+			if strings.HasSuffix(dep, prunedSuffix) {
+				base := strings.TrimSuffix(dep, prunedSuffix)
+				if hasReal[base] {
+					continue
+				}
+			}
+			filtered = append(filtered, dep)
+			referenced[dep] = true
+		}
+
+		normalized[parent] = filtered
+	}
+
+	for nodeID := range adj {
+		if strings.HasSuffix(nodeID, prunedSuffix) && !referenced[nodeID] {
+			delete(normalized, nodeID)
+		}
+	}
+
+	return normalized
+}
+
+// countTwinEdges counts how many children the normalization removes.
+func countTwinEdges(adj map[string][]string) int {
+	original := 0
+	for _, deps := range adj {
+		original += len(deps)
+	}
+
+	normalized := 0
+	for _, deps := range withoutTwinEdges(adj) {
+		normalized += len(deps)
+	}
+
+	return original - normalized
+}
+
+// restrictToKeys filters a map to keys present in the adjacency map.
+func restrictToKeys(labels map[string]map[string]string, adj map[string][]string) map[string]map[string]string {
+	out := make(map[string]map[string]string, len(labels))
+	for nodeID, nodeLabels := range labels {
+		if _, exists := adj[nodeID]; exists {
+			out[nodeID] = nodeLabels
+		}
+	}
 	return out
 }
 

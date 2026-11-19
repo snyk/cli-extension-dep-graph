@@ -39,8 +39,10 @@ func buildDepGraph(ctx context.Context, assets *projectAssets, rootName, targets
 	}
 
 	g := &graphBuilder{
-		edgeSet:  newEdgeSet(builder),
-		resolved: resolvePackages(&target),
+		edgeSet:       newEdgeSet(builder),
+		resolved:      resolvePackages(&target),
+		hasRealEdge:   make(map[string]map[string]bool),
+		pendingPruned: nil,
 	}
 
 	direct := assets.directDependencies(targetsKey)
@@ -60,6 +62,11 @@ func buildDepGraph(ctx context.Context, assets *projectAssets, rootName, targets
 	}
 
 	if err := g.addChildren(ctx, builder.GetRootNode().NodeID, direct, nil); err != nil {
+		return nil, err
+	}
+
+	// Add deferred pruned edges that weren't superseded by real edges
+	if err := g.finalizePrunedEdges(); err != nil {
 		return nil, err
 	}
 
@@ -109,6 +116,16 @@ func (e *edgeSet) connect(parentNodeID, childNodeID string) error {
 type graphBuilder struct {
 	*edgeSet
 	resolved map[string]resolvedPackage
+	// hasRealEdge tracks which parent->child pairs have real edges
+	hasRealEdge map[string]map[string]bool
+	// pendingPruned holds deferred pruned edges finalized after the tree walk
+	pendingPruned []prunedEdge
+}
+
+type prunedEdge struct {
+	parent string
+	child  string
+	info   *godepgraph.PkgInfo
 }
 
 // addChildren connects each named dependency to parentNodeID and recurses,
@@ -132,6 +149,10 @@ func (g *graphBuilder) addChildren(
 		return fmt.Errorf("resolving dependencies: %w", err)
 	}
 
+	if g.hasRealEdge[parentNodeID] == nil {
+		g.hasRealEdge[parentNodeID] = make(map[string]bool)
+	}
+
 	local := make(map[string]struct{}, len(visited)+len(childNames))
 	for id := range visited {
 		local[id] = struct{}{}
@@ -153,29 +174,52 @@ func (g *graphBuilder) addChildren(
 		childNodeID := pkgNodeID(pkg.name, pkg.version)
 
 		if _, seen := local[childNodeID]; seen {
-			prunedNodeID := childNodeID + prunedNodeSuffix
-
-			g.builder.AddNode(prunedNodeID, info, godepgraph.WithNodeInfo(&godepgraph.NodeInfo{
-				Labels: map[string]string{prunedLabelKey: prunedLabelValue},
-			}))
-
-			if err := g.connect(parentNodeID, prunedNodeID); err != nil {
-				return err
+			// Child in visited - defer pruned edge
+			if !g.hasRealEdge[parentNodeID][childNodeID] {
+				g.pendingPruned = append(g.pendingPruned, prunedEdge{
+					parent: parentNodeID,
+					child:  childNodeID,
+					info:   info,
+				})
 			}
 
 			continue
 		}
 
-		g.builder.AddNode(childNodeID, info)
+		// Child not in visited - add real edge
+		if !g.hasRealEdge[parentNodeID][childNodeID] {
+			g.builder.AddNode(childNodeID, info)
 
-		if err := g.connect(parentNodeID, childNodeID); err != nil {
-			return err
+			if err := g.connect(parentNodeID, childNodeID); err != nil {
+				return err
+			}
 		}
 
+		g.hasRealEdge[parentNodeID][childNodeID] = true
 		local[childNodeID] = struct{}{}
 
 		if err := g.addChildren(ctx, childNodeID, pkg.deps.Keys(), local); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+// finalizePrunedEdges adds pending pruned edges that don't have corresponding real edges.
+func (g *graphBuilder) finalizePrunedEdges() error {
+	for _, pending := range g.pendingPruned {
+		// Only add pruned edge if no real edge exists
+		if !g.hasRealEdge[pending.parent][pending.child] {
+			prunedNodeID := pending.child + prunedNodeSuffix
+
+			g.builder.AddNode(prunedNodeID, pending.info, godepgraph.WithNodeInfo(&godepgraph.NodeInfo{
+				Labels: map[string]string{prunedLabelKey: prunedLabelValue},
+			}))
+
+			if err := g.connect(pending.parent, prunedNodeID); err != nil {
+				return err
+			}
 		}
 	}
 
