@@ -12,6 +12,10 @@ const (
 	packagesConfigFile = "packages.config"
 	projectJSONFile    = "project.json"
 
+	// scmFallbackRootName is the root name for packages.config, project.json,
+	// and classic projects with no PackageId or AssemblyName in SCM mode.
+	scmFallbackRootName = "project"
+
 	// objDir is where `dotnet restore` writes project.assets.json. A target file
 	// inside it describes the project one directory up.
 	objDir = "obj"

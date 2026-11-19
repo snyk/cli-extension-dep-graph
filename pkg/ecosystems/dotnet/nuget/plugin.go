@@ -334,16 +334,6 @@ func (p Plugin) emitAssetsResults(
 
 	frameworks := assets.targetFrameworks()
 
-	isClassic := false
-	if !naming.cli && len(frameworks) == 1 {
-		if projFile := projectFileOf(file); projFile != "" {
-			if parsed, err := readProjectFile(filepath.Join(projectDirOf(file.Path), filepath.Base(projFile))); err == nil && !parsed.isSdkStyle() {
-				rootName = parsed.scmRootName("project")
-				isClassic = true
-			}
-		}
-	}
-
 	if filter.active() {
 		project := scannedProject{targetFile: reported, claimed: claimed, rootName: rootName}
 
@@ -364,6 +354,8 @@ func (p Plugin) emitAssetsResults(
 
 		frameworks = []string{selected}
 	}
+
+	rootName, isClassic := scmClassicRoot(file, frameworks, naming, rootName)
 
 	for _, framework := range frameworks {
 		targetsKey := assets.matchTargetsKey(framework)
@@ -496,6 +488,28 @@ func projectFileOf(file discovery.FindResult) string {
 	}
 
 	return filepath.Join(projectDirOf(file.RelPath), filepath.Base(projectFile))
+}
+
+// scmClassicRoot determines the root name and classic flag for a project in
+// SCM mode. Classic (non-SDK) single-target projects resolved via
+// project.assets.json use PackageId, else AssemblyName from the project file,
+// else the fallback. SDK-style projects and CLI mode keep the given name.
+func scmClassicRoot(file discovery.FindResult, frameworks []string, naming projectNaming, currentName string) (string, bool) {
+	if naming.cli || len(frameworks) != 1 {
+		return currentName, false
+	}
+
+	projFile := projectFileOf(file)
+	if projFile == "" {
+		return currentName, false
+	}
+
+	parsed, err := readProjectFile(filepath.Join(projectDirOf(file.Path), filepath.Base(projFile)))
+	if err != nil || parsed.isSdkStyle() {
+		return currentName, false
+	}
+
+	return parsed.scmRootName(scmFallbackRootName), true
 }
 
 // claimedFiles are the files a result claims so the legacy resolver does not
@@ -694,7 +708,7 @@ func (p Plugin) emitFrameworkResult(
 
 	var recordedName string
 	if !naming.cli {
-		recordedName = "project"
+		recordedName = scmFallbackRootName
 	} else {
 		recordedName = manifest.rootName
 	}

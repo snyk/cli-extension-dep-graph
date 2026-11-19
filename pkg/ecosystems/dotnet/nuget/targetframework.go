@@ -129,7 +129,7 @@ type projectFile struct {
 		TargetFrameworkVersion []string `xml:"targetframeworkversion"`
 		TargetFramework        []string `xml:"targetframework"`
 		TargetFrameworks       []string `xml:"targetframeworks"`
-		PackageId              []string `xml:"packageid"`
+		PackageID              []string `xml:"packageid"` //nolint:misspell // MSBuild property name
 		AssemblyName           []string `xml:"assemblyname"`
 	} `xml:"propertygroup"`
 }
@@ -178,11 +178,11 @@ func (p *projectFile) isSdkStyle() bool {
 	return false
 }
 
-// scmRootName returns the SCM root name for a classic project: PackageId, else
+// scmRootName returns the SCM root name for a classic project: PackageID, else
 // AssemblyName, else the fallback.
 func (p *projectFile) scmRootName(fallback string) string {
 	for _, group := range p.PropertyGroups {
-		if name := firstNonEmpty(group.PackageId, group.AssemblyName); name != "" {
+		if name := firstNonEmpty(group.PackageID, group.AssemblyName); name != "" {
 			return name
 		}
 	}
