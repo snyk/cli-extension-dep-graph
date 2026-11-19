@@ -33,6 +33,10 @@ func TestParityWithSnykNugetPlugin(t *testing.T) {
 	assert.Equal(t, theirs.PkgManager, mine.PkgManager)
 	assert.Equal(t, theirs.Graph.RootNodeID, mine.Graph.RootNodeID)
 
+	// Node identities and edges must match exactly. This is the substance of the
+	// port: which packages resolved, at which versions, and which depends on
+	// which — including the pruned back-edges, whose placement depends on the
+	// order siblings are walked in. Upstream is compared with twin edges collapsed.
 	theirsNormalized := withoutTwinEdges(adjacency(t, theirs))
 
 	assert.Equal(t, theirsNormalized, adjacency(t, mine), "node and edge sets diverged")
@@ -42,6 +46,9 @@ func TestParityWithSnykNugetPlugin(t *testing.T) {
 		"the upstream fixture should still contain pruned nodes; if it does not, this comparison proves nothing")
 	assert.Equal(t, theirPruned, prunedLabels(mine), "pruned nodes diverged")
 
+	// Package *versions* are allowed to differ, and do: snyk-nuget-plugin
+	// rewrites them from the host SDK's PackageOverrides.txt, which a static
+	// resolver cannot read. The set of package names must still be identical.
 	assert.Equal(t, packageNames(theirs), packageNames(mine), "package sets diverged")
 
 	overridden := 0
@@ -63,7 +70,8 @@ func TestParityWithSnykNugetPlugin(t *testing.T) {
 }
 
 // TestDivergesFromSnykNugetPlugin_TwinEdges verifies we do not emit twin edges
-// (parent with both X and X:pruned) while snyk-nuget-plugin does.
+// (parent with both X and X:pruned) while snyk-nuget-plugin does. If the upstream
+// fixture is regenerated without twins, this test fails and withoutTwinEdges can be removed.
 func TestDivergesFromSnykNugetPlugin_TwinEdges(t *testing.T) {
 	mine, theirs := loadParityGraphs(t)
 
