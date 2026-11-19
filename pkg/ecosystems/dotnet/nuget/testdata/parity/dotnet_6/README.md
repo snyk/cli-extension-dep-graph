@@ -18,15 +18,11 @@ The project is worth pinning because it is large enough to exercise the parts of
 small fixture cannot: 105 nodes, 68 packages, 37 pruned back-edges, and `targets` sections for both
 `net6.0` and `net6.0/linux-x64`.
 
-The one difference the test allows for is package **versions**, and it is a limitation rather than a
-choice. `snyk-nuget-plugin` rewrites 97 of them from `PackageOverrides.txt`, which it reads out of
-the host SDK at
-`$(dirname sdkPath)/packs/Microsoft.NETCore.App.Ref/$(runtimeVersion)/data/PackageOverrides.txt`
-after shelling out to `dotnet --info` and `dotnet --list-runtimes` — so `System.Runtime@4.3.0` is
-reported as `System.Runtime@6.0.0`. That file is not in the repository being scanned and its
-contents depend on which SDK happens to be installed, so there is no way to reproduce it without
-invoking `dotnet`. Closing this gap means putting `dotnet` back in scope, which is the question
-CMPA-714 exists to answer.
+Two permitted differences:
+
+Package **versions** differ because `snyk-nuget-plugin` rewrites 97 of them from `PackageOverrides.txt`, which it reads from the host SDK at `$(dirname sdkPath)/packs/Microsoft.NETCore.App.Ref/$(runtimeVersion)/data/PackageOverrides.txt` after shelling out to `dotnet --info` and `dotnet --list-runtimes` — so `System.Runtime@4.3.0` is reported as `System.Runtime@6.0.0`. That file is not in the repository being scanned and its contents depend on which SDK happens to be installed, so there is no way to reproduce it without invoking `dotnet`. Closing this gap means putting `dotnet` back in scope, which is the question CMPA-714 exists to answer.
+
+**Twin edges**: this resolver does not emit twin edges (a parent with both X and X:pruned as dependencies). The upstream fixture has 52 twin edges; the test normalizes it by collapsing each twin to its real edge before comparing adjacency and pruned labels.
 
 Node identities keep the resolved version in both implementations, which is why the node and edge
 sets match exactly and only the package versions differ.
