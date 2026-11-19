@@ -9,6 +9,8 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/childenv"
 )
 
 // TODO: support custom bazel command? like bazelisk or custom path to bazel binary.
@@ -56,6 +58,11 @@ func bazelCquery(ctx context.Context, dir, query, platform string) (*queryResult
 
 	cmd := exec.CommandContext(ctx, bazelCommand, args...)
 	cmd.Dir = dir
+	env, err := childenv.Environ(cmd.Dir)
+	if err != nil {
+		return nil, wrapBazelErr(args, err, "")
+	}
+	cmd.Env = env
 	out, err := cmd.Output()
 	if err != nil {
 		var exitErr *exec.ExitError
@@ -86,6 +93,11 @@ func bazelStreamedQuery(ctx context.Context, dir, query string) ([]*bazelTarget,
 	args := []string{"query", query, "--output=streamed_jsonproto"}
 	cmd := exec.CommandContext(ctx, bazelCommand, args...)
 	cmd.Dir = dir
+	env, err := childenv.Environ(cmd.Dir)
+	if err != nil {
+		return nil, wrapBazelErr(args, err, "")
+	}
+	cmd.Env = env
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

@@ -14,6 +14,7 @@ import (
 	snyk_ecosystems "github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/childenv"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
@@ -260,6 +261,11 @@ func GetPythonVersion() (string, error) {
 // execPythonVersion executes python --version and parses the output.
 func execPythonVersion(pythonCmd string) (string, error) {
 	cmd := exec.Command(pythonCmd, "--version") //nolint:noctx // No context available in this function
+	env, err := childenv.Environ(cmd.Dir)
+	if err != nil {
+		return "", fmt.Errorf("prepare %s --version: %w", pythonCmd, err)
+	}
+	cmd.Env = env
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to execute %s --version: %w", pythonCmd, err)

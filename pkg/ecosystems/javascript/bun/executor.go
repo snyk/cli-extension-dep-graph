@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"golang.org/x/mod/semver"
+
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/childenv"
 )
 
 // errBunNotFound is returned when the bun binary is not in PATH.
@@ -50,13 +52,19 @@ func (e *bunCmdExecutor) Run(ctx context.Context, dir string) (io.ReadCloser, er
 		return nil, errBunNotFound //nolint:wrapcheck // sentinel error, intentionally returned unwrapped
 	}
 
+	//nolint:govet // Reassigning to err is fine
 	if err := checkBunVersion(ctx, resolved); err != nil {
 		return nil, err
 	}
 
 	cmd := exec.CommandContext(ctx, resolved, "--no-env-file", "why", "*", "--top")
 	cmd.Dir = dir
-	cmd.Env = append(cmd.Environ(), "NO_COLOR=1")
+	env, err := childenv.Environ(cmd.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("prepare bun why command: %w", err)
+	}
+	cmd.Env = env
+	cmd.Env = append(cmd.Env, "NO_COLOR=1")
 
 	var stderr bytes.Buffer
 
@@ -85,7 +93,13 @@ func (e *bunCmdExecutor) Run(ctx context.Context, dir string) (io.ReadCloser, er
 }
 
 func checkBunVersion(ctx context.Context, binary string) error {
-	out, err := exec.CommandContext(ctx, binary, "--version").Output()
+	cmd := exec.CommandContext(ctx, binary, "--version")
+	env, err := childenv.Environ(cmd.Dir)
+	if err != nil {
+		return fmt.Errorf("prepare bun --version: %w", err)
+	}
+	cmd.Env = env
+	out, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("failed to get bun version: %w", err)
 	}
