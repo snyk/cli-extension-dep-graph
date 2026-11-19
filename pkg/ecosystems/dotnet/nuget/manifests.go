@@ -279,11 +279,15 @@ func versionOf(value any) string {
 	return unknownVersion
 }
 
+// projectJSONRootKey is the project.json key that holds the project name and
+// version.
+const projectJSONRootKey = "project"
+
 // projectJSONRoot reads the project name and version a project.json may carry.
 // snyk-nuget-plugin looks for them under `project`, the shape project.assets.json
 // uses; real project.json files almost never have it.
 func projectJSONRoot(doc *orderedMap[json.RawMessage]) (name, version string) {
-	raw, ok := doc.Get("project")
+	raw, ok := doc.Get(projectJSONRootKey)
 	if !ok {
 		return "", ""
 	}
