@@ -101,6 +101,10 @@ func csprojTargetFramework(dir string) (targetFramework, bool, error) {
 	}
 
 	for _, group := range parsed.PropertyGroups {
+		// One source per property group, in upstream's precedence order. A
+		// group naming none of them contributes nothing rather than ending the
+		// search: real projects put TargetFramework in a later group than, say,
+		// AssemblyName.
 		source := firstNonEmpty(group.TargetFrameworkVersion, group.TargetFramework, group.TargetFrameworks)
 
 		for _, moniker := range strings.Split(source, ";") {

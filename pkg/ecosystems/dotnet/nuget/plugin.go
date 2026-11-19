@@ -219,7 +219,6 @@ func (p Plugin) emitResults(
 // resolver that is depends on the caller.
 type projectNaming struct {
 	cli bool
-	scm bool
 	// cliRootName is the name the legacy CLI gave every project it found: the
 	// scan root's base name, taken from the path as given rather than resolved,
 	// so a scan of "." is named ".". Empty for the filesystem root.
@@ -234,18 +233,16 @@ type projectNaming struct {
 const cliLastResortRootName = "root"
 
 func newProjectNaming(dir string, options *ecosystems.SCAPluginOptions) projectNaming {
-	naming := projectNaming{
-		cli: options.Dotnet.CLIProjectIdentity,
-		scm: options.Global.AllProjects,
+	if !options.Dotnet.CLIProjectIdentity {
+		return projectNaming{}
 	}
 
-	if naming.cli {
-		if base := filepath.Base(dir); base != string(filepath.Separator) {
-			naming.cliRootName = base
-		}
-		if options.Global.TargetFile != nil {
-			naming.cliTargetFile = *options.Global.TargetFile
-		}
+	naming := projectNaming{cli: true}
+	if base := filepath.Base(dir); base != string(filepath.Separator) {
+		naming.cliRootName = base
+	}
+	if options.Global.TargetFile != nil {
+		naming.cliTargetFile = *options.Global.TargetFile
 	}
 
 	return naming
@@ -329,22 +326,21 @@ func (p Plugin) emitAssetsResults(
 
 	rootName := naming.rootName(file, recordedName)
 	if options.Dotnet.AssetsProjectName && recordedName == "" {
+		// Silently keeping the derived name would look like the flag did
+		// nothing.
 		log.Debug(ctx, "The restore recorded no project name, so the .NET project keeps its directory-derived name",
 			logger.Attr(logFieldTargetFile, targetFile), logger.Attr(logFieldRootName, rootName))
 	}
 
 	frameworks := assets.targetFrameworks()
 
-	isClassic := len(frameworks) == 1 && naming.scm && !naming.cli && recordedName == ""
-	if isClassic {
-		if projFile, found, err := firstProjectFile(projectDirOf(file.Path)); err == nil && found {
-			if parsed, err := readProjectFile(projFile); err == nil && !parsed.isSdkStyle() {
+	isClassic := false
+	if !naming.cli && len(frameworks) == 1 {
+		if projFile := projectFileOf(file); projFile != "" {
+			if parsed, err := readProjectFile(filepath.Join(projectDirOf(file.Path), filepath.Base(projFile))); err == nil && !parsed.isSdkStyle() {
 				rootName = parsed.scmRootName("project")
-			} else {
-				isClassic = false
+				isClassic = true
 			}
-		} else {
-			isClassic = false
 		}
 	}
 
@@ -353,6 +349,11 @@ func (p Plugin) emitAssetsResults(
 
 		selected, ok := filter.keep(project, frameworks)
 		if !ok {
+			// Out of scope rather than broken, so nothing is reported for it —
+			// a project that targets something else is not a failure. The file
+			// is still claimed, so the legacy resolver cannot answer with a
+			// framework this scan excluded, and the exclude set stays the same
+			// whether or not the flag was passed.
 			log.Debug(ctx, "Leaving out a .NET project that does not declare the requested target framework",
 				logger.Attr(logFieldTargetFile, targetFile),
 				logger.Attr(logFieldTargetFramework, filter.requested),
@@ -367,6 +368,8 @@ func (p Plugin) emitAssetsResults(
 	for _, framework := range frameworks {
 		targetsKey := assets.matchTargetsKey(framework)
 		if targetsKey == "" {
+			// Guessing a sibling's packages would report the wrong dependencies
+			// under this framework's name.
 			err := snykecosystems.NewUnsupportedTargetFrameworkError(
 				fmt.Sprintf("No resolved packages for target framework %s in %s.", framework, targetFile),
 			)
@@ -690,7 +693,7 @@ func (p Plugin) emitFrameworkResult(
 	}
 
 	var recordedName string
-	if naming.scm && !naming.cli {
+	if !naming.cli {
 		recordedName = "project"
 	} else {
 		recordedName = manifest.rootName
@@ -739,10 +742,8 @@ func (p Plugin) emitFrameworkResult(
 	}
 
 	rootVersion := manifest.rootVersion
-	if !naming.scm || naming.cli {
-		if rootVersion == "" {
-			rootVersion = defaultVersion
-		}
+	if naming.cli && rootVersion == "" {
+		rootVersion = defaultVersion
 	}
 
 	graph, err := buildFrameworkDepGraph(ctx, rootName, rootVersion, installed, children)

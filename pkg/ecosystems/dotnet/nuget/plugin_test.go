@@ -171,7 +171,7 @@ func TestPlugin_PackagesConfigResolves(t *testing.T) {
 	require.NoError(t, result.Error)
 	require.NotNil(t, result.DepGraph)
 	assert.Equal(t, packagesConfigFile, result.ProjectDescriptor.GetTargetFile())
-	assert.Equal(t, filepath.Base(dir), result.ProjectDescriptor.Identity.RootComponentName)
+	assert.Equal(t, "project", result.ProjectDescriptor.Identity.RootComponentName)
 	assert.Equal(t, pkgManager, result.ProjectDescriptor.Identity.ProjectType)
 	assert.Equal(t, []string{"net45"}, runtimes(t, results))
 
@@ -1272,9 +1272,9 @@ func TestPlugin_AssetsProjectNameFallsBackWhenTheRestoreNamedNothing(t *testing.
 }
 
 func TestPlugin_AssetsProjectNameDoesNotChangeAProjectJSONName(t *testing.T) {
-	// In SCM mode, project.json is named "project" regardless of its recorded
-	// name (matching legacy SCM import behavior). In CLI mode, the recorded name
-	// is used.
+	// project.json's own name override ports project-json-parser.ts, which is
+	// flag-free upstream. In CLI mode the recorded name is used; in SCM mode
+	// it is ignored per legacy SCM import behavior.
 	const named = `{"dependencies": {"Newtonsoft.Json": "8.0.3"},
       "project": { "restore": { "projectName": "FromProjectJSON" } }}`
 
@@ -1283,18 +1283,20 @@ func TestPlugin_AssetsProjectNameDoesNotChangeAProjectJSONName(t *testing.T) {
 		write(t, dir, projectJSONFile, named)
 		write(t, dir, "app.csproj", csprojNet45)
 
+		// project.json is reachable only through --all-projects or --file: the
+		// CLI lists it in AUTO_DETECTABLE_FILES but not DETECTABLE_FILES.
 		scm, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
 			ecosystems.NewPluginOptions().WithAllProjects(true).WithAssetsProjectName(assetsProjectName))
 		require.NoError(t, err)
 		require.Len(t, scm, 1)
 		assert.Equal(t, "project", scm[0].ProjectDescriptor.Identity.RootComponentName,
-			"SCM mode: --assets-project-name=%t must not change project.json name", assetsProjectName)
+			"SCM mode: --assets-project-name=%t must not change a project.json name", assetsProjectName)
 
 		cli, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
 			ecosystems.NewPluginOptions().WithAllProjects(true).WithAssetsProjectName(assetsProjectName).WithCLIProjectIdentity(true))
 		require.NoError(t, err)
 		require.Len(t, cli, 1)
 		assert.Equal(t, "FromProjectJSON", cli[0].ProjectDescriptor.Identity.RootComponentName,
-			"CLI mode: --assets-project-name=%t must not change project.json name", assetsProjectName)
+			"CLI mode: --assets-project-name=%t must not change a project.json name", assetsProjectName)
 	}
 }
