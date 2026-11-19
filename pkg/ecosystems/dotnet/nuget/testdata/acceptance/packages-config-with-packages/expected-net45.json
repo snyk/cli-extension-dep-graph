@@ -26,10 +26,9 @@
       }
     },
     {
-      "id": "packages-config-with-packages@0.0.0",
+      "id": "project@",
       "info": {
-        "name": "packages-config-with-packages",
-        "version": "0.0.0"
+        "name": "project"
       }
     }
   ],
@@ -57,7 +56,7 @@
       },
       {
         "nodeId": "root-node",
-        "pkgId": "packages-config-with-packages@0.0.0",
+        "pkgId": "project@",
         "deps": [
           {
             "nodeId": "Swagger.Net@0.5.5"

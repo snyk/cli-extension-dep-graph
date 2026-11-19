@@ -219,6 +219,7 @@ func (p Plugin) emitResults(
 // resolver that is depends on the caller.
 type projectNaming struct {
 	cli bool
+	scm bool
 	// cliRootName is the name the legacy CLI gave every project it found: the
 	// scan root's base name, taken from the path as given rather than resolved,
 	// so a scan of "." is named ".". Empty for the filesystem root.
@@ -233,16 +234,18 @@ type projectNaming struct {
 const cliLastResortRootName = "root"
 
 func newProjectNaming(dir string, options *ecosystems.SCAPluginOptions) projectNaming {
-	if !options.Dotnet.CLIProjectIdentity {
-		return projectNaming{}
+	naming := projectNaming{
+		cli: options.Dotnet.CLIProjectIdentity,
+		scm: options.Global.AllProjects,
 	}
 
-	naming := projectNaming{cli: true}
-	if base := filepath.Base(dir); base != string(filepath.Separator) {
-		naming.cliRootName = base
-	}
-	if options.Global.TargetFile != nil {
-		naming.cliTargetFile = *options.Global.TargetFile
+	if naming.cli {
+		if base := filepath.Base(dir); base != string(filepath.Separator) {
+			naming.cliRootName = base
+		}
+		if options.Global.TargetFile != nil {
+			naming.cliTargetFile = *options.Global.TargetFile
+		}
 	}
 
 	return naming
@@ -326,24 +329,30 @@ func (p Plugin) emitAssetsResults(
 
 	rootName := naming.rootName(file, recordedName)
 	if options.Dotnet.AssetsProjectName && recordedName == "" {
-		// Silently keeping the derived name would look like the flag did
-		// nothing.
 		log.Debug(ctx, "The restore recorded no project name, so the .NET project keeps its directory-derived name",
 			logger.Attr(logFieldTargetFile, targetFile), logger.Attr(logFieldRootName, rootName))
 	}
 
 	frameworks := assets.targetFrameworks()
 
+	isClassic := len(frameworks) == 1 && naming.scm && !naming.cli && recordedName == ""
+	if isClassic {
+		if projFile, found, err := firstProjectFile(projectDirOf(file.Path)); err == nil && found {
+			if parsed, err := readProjectFile(projFile); err == nil && !parsed.isSdkStyle() {
+				rootName = parsed.scmRootName("project")
+			} else {
+				isClassic = false
+			}
+		} else {
+			isClassic = false
+		}
+	}
+
 	if filter.active() {
 		project := scannedProject{targetFile: reported, claimed: claimed, rootName: rootName}
 
 		selected, ok := filter.keep(project, frameworks)
 		if !ok {
-			// Out of scope rather than broken, so nothing is reported for it —
-			// a project that targets something else is not a failure. The file
-			// is still claimed, so the legacy resolver cannot answer with a
-			// framework this scan excluded, and the exclude set stays the same
-			// whether or not the flag was passed.
 			log.Debug(ctx, "Leaving out a .NET project that does not declare the requested target framework",
 				logger.Attr(logFieldTargetFile, targetFile),
 				logger.Attr(logFieldTargetFramework, filter.requested),
@@ -358,8 +367,6 @@ func (p Plugin) emitAssetsResults(
 	for _, framework := range frameworks {
 		targetsKey := assets.matchTargetsKey(framework)
 		if targetsKey == "" {
-			// Guessing a sibling's packages would report the wrong dependencies
-			// under this framework's name.
 			err := snykecosystems.NewUnsupportedTargetFrameworkError(
 				fmt.Sprintf("No resolved packages for target framework %s in %s.", framework, targetFile),
 			)
@@ -377,7 +384,14 @@ func (p Plugin) emitAssetsResults(
 			logger.Attr(logFieldTargetsKey, targetsKey),
 		)
 
-		graph, buildErr := buildDepGraph(ctx, assets, rootName, targetsKey)
+		rootVersion := assets.Project.Version
+		if isClassic {
+			rootVersion = ""
+		} else if rootVersion == "" {
+			rootVersion = defaultVersion
+		}
+
+		graph, buildErr := buildDepGraph(ctx, assets, rootName, rootVersion, targetsKey)
 		if buildErr != nil {
 			if err := onGraph(p.errResult(reported, claimed, rootName, framework, buildErr)); err != nil {
 				return err
@@ -675,7 +689,14 @@ func (p Plugin) emitFrameworkResult(
 		))
 	}
 
-	rootName := naming.rootName(file, manifest.rootName)
+	var recordedName string
+	if naming.scm && !naming.cli {
+		recordedName = "project"
+	} else {
+		recordedName = manifest.rootName
+	}
+
+	rootName := naming.rootName(file, recordedName)
 
 	projectFile := projectFileOf(file)
 	claimed := claimedFiles(projectFile, targetFile)
@@ -718,8 +739,10 @@ func (p Plugin) emitFrameworkResult(
 	}
 
 	rootVersion := manifest.rootVersion
-	if rootVersion == "" {
-		rootVersion = defaultVersion
+	if !naming.scm || naming.cli {
+		if rootVersion == "" {
+			rootVersion = defaultVersion
+		}
 	}
 
 	graph, err := buildFrameworkDepGraph(ctx, rootName, rootVersion, installed, children)
