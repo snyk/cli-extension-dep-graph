@@ -320,14 +320,12 @@ func (p Plugin) emitAssetsResults(
 	}
 
 	var recordedName string
-	if options.Dotnet.AssetsProjectName {
+	if options.Dotnet.AssetsProjectName || !naming.cli {
 		recordedName = assets.Project.Restore.ProjectName
 	}
 
 	rootName := naming.rootName(file, recordedName)
 	if options.Dotnet.AssetsProjectName && recordedName == "" {
-		// Silently keeping the derived name would look like the flag did
-		// nothing.
 		log.Debug(ctx, "The restore recorded no project name, so the .NET project keeps its directory-derived name",
 			logger.Attr(logFieldTargetFile, targetFile), logger.Attr(logFieldRootName, rootName))
 	}

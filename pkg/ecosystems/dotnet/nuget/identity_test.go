@@ -112,7 +112,7 @@ func TestPlugin_ProjectIdentity(t *testing.T) {
 			files:   map[string]string{"services/orphan/obj/project.assets.json": singleTargetAssets},
 			options: allProjects,
 			cli:     []reportedAs{{"services/orphan/obj/project.assets.json", scanRootName}},
-			scm:     []reportedAs{{"services/orphan/obj/project.assets.json", "orphan"}},
+			scm:     []reportedAs{{"services/orphan/obj/project.assets.json", "FromAssetsFile"}},
 		},
 		{
 			name:    "packages.config beside a .csproj",
@@ -216,7 +216,7 @@ func TestPlugin_CLIIdentityTakesTheScanRootAsGiven(t *testing.T) {
 			dir:     ".",
 			options: ecosystems.NewPluginOptions,
 			cli:     []reportedAs{{"obj/project.assets.json", "."}},
-			scm:     []reportedAs{{"Cart.csproj", "cart"}},
+			scm:     []reportedAs{{"Cart.csproj", "FromAssetsFile"}},
 		},
 		{
 			name:    "the current directory as ./",
@@ -224,7 +224,7 @@ func TestPlugin_CLIIdentityTakesTheScanRootAsGiven(t *testing.T) {
 			dir:     "./",
 			options: ecosystems.NewPluginOptions,
 			cli:     []reportedAs{{"obj/project.assets.json", "."}},
-			scm:     []reportedAs{{"Cart.csproj", "cart"}},
+			scm:     []reportedAs{{"Cart.csproj", "FromAssetsFile"}},
 		},
 		{
 			name:    "the parent directory as ..",
@@ -232,21 +232,21 @@ func TestPlugin_CLIIdentityTakesTheScanRootAsGiven(t *testing.T) {
 			dir:     "..",
 			options: ecosystems.NewPluginOptions,
 			cli:     []reportedAs{{"obj/project.assets.json", ".."}},
-			scm:     []reportedAs{{"Cart.csproj", "cart"}},
+			scm:     []reportedAs{{"Cart.csproj", "FromAssetsFile"}},
 		},
 		{
 			name:    "a relative path",
 			dir:     "services/cart",
 			options: ecosystems.NewPluginOptions,
 			cli:     []reportedAs{{"obj/project.assets.json", "cart"}},
-			scm:     []reportedAs{{"Cart.csproj", "cart"}},
+			scm:     []reportedAs{{"Cart.csproj", "FromAssetsFile"}},
 		},
 		{
 			name:    "every project under .",
 			dir:     ".",
 			options: allProjects,
 			cli:     []reportedAs{{"services/cart/obj/project.assets.json", "."}},
-			scm:     []reportedAs{{"services/cart/Cart.csproj", "cart"}},
+			scm:     []reportedAs{{"services/cart/Cart.csproj", "FromAssetsFile"}},
 		},
 	}
 
@@ -279,9 +279,9 @@ func TestPlugin_CLIIdentityReportsTheTargetFileAsGiven(t *testing.T) {
 		file string
 		scm  reportedAs
 	}{
-		{"./services/cart/obj/project.assets.json", reportedAs{"services/cart/Cart.csproj", "cart"}},
-		{"services//cart/obj/project.assets.json", reportedAs{"services/cart/Cart.csproj", "cart"}},
-		{absolute, reportedAs{"services/cart/Cart.csproj", "cart"}},
+		{"./services/cart/obj/project.assets.json", reportedAs{"services/cart/Cart.csproj", "FromAssetsFile"}},
+		{"services//cart/obj/project.assets.json", reportedAs{"services/cart/Cart.csproj", "FromAssetsFile"}},
+		{absolute, reportedAs{"services/cart/Cart.csproj", "FromAssetsFile"}},
 		{"./services/web/packages.config", reportedAs{"services/web/Web.csproj", "web"}},
 		{"./services/app/project.json", reportedAs{"services/app/project.json", "app"}},
 	}

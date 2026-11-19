@@ -123,7 +123,7 @@ func TestPlugin_RootDirOnly(t *testing.T) {
 	require.NoError(t, result.Error)
 	require.NotNil(t, result.DepGraph)
 	assert.Equal(t, projectAssetsFile, result.ProjectDescriptor.GetTargetFile())
-	assert.Equal(t, filepath.Base(dir), result.ProjectDescriptor.Identity.RootComponentName)
+	assert.Equal(t, "FromAssetsFile", result.ProjectDescriptor.Identity.RootComponentName)
 	assert.Equal(t, pkgManager, result.ProjectDescriptor.Identity.ProjectType)
 
 	// The target framework comes from the assets file rather than a placeholder.
@@ -144,7 +144,7 @@ func TestPlugin_RootDirOnly_FindsProjectAssetsInObj(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, filepath.Join(objDir, projectAssetsFile), results[0].ProjectDescriptor.GetTargetFile())
-	assert.Equal(t, filepath.Base(dir), results[0].ProjectDescriptor.Identity.RootComponentName)
+	assert.Equal(t, "FromAssetsFile", results[0].ProjectDescriptor.Identity.RootComponentName)
 }
 
 // Project files are not discoverable target files: snyk-nuget-plugin reads them
@@ -339,7 +339,7 @@ func TestPlugin_DepGraphShape(t *testing.T) {
 	graph := results[0].DepGraph
 	require.NotNil(t, graph)
 	assert.Equal(t, pkgManager, graph.PkgManager.Name)
-	assert.Equal(t, filepath.Base(dir), graph.GetRootPkg().Info.Name)
+	assert.Equal(t, "FromAssetsFile", graph.GetRootPkg().Info.Name)
 	assert.Equal(t, "1.2.3", graph.GetRootPkg().Info.Version, "the root version comes from project.version")
 
 	assert.ElementsMatch(t,
@@ -524,7 +524,7 @@ func TestPlugin_UnusableAssetsFileClaimsNothing(t *testing.T) {
 	// The healthy project resolves and is claimed; the broken one is absent
 	// entirely, so nothing downstream is told to skip it.
 	require.Len(t, results, 1)
-	assert.Equal(t, "Healthy", results[0].ProjectDescriptor.Identity.RootComponentName)
+	assert.Equal(t, "FromAssetsFile", results[0].ProjectDescriptor.Identity.RootComponentName)
 	assert.Equal(t, []string{filepath.Join("Healthy", objDir, projectAssetsFile)}, results[0].ProcessedFiles)
 }
 
@@ -702,7 +702,7 @@ func TestPlugin_TargetFile(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, target, results[0].ProjectDescriptor.GetTargetFile())
-	assert.Equal(t, "b", results[0].ProjectDescriptor.Identity.RootComponentName)
+	assert.Equal(t, "FromAssetsFile", results[0].ProjectDescriptor.Identity.RootComponentName)
 }
 
 // A --file pointing straight at restore output must keep working: that is how
@@ -717,8 +717,8 @@ func TestPlugin_TargetFile_ProjectAssetsInObj(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, target, results[0].ProjectDescriptor.GetTargetFile())
-	assert.Equal(t, "App", results[0].ProjectDescriptor.Identity.RootComponentName,
-		"obj/ is a build artifact directory, so the project is named one level up")
+	assert.Equal(t, "FromAssetsFile", results[0].ProjectDescriptor.Identity.RootComponentName,
+		"the restore recorded name is used")
 }
 
 // An assets file directly in the scanned root has no relative directory to be
@@ -731,7 +731,7 @@ func TestPlugin_TargetFile_InScannedRoot(t *testing.T) {
 	results, err := scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir, opts)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
-	assert.Equal(t, filepath.Base(dir), results[0].ProjectDescriptor.Identity.RootComponentName)
+	assert.Equal(t, "FromAssetsFile", results[0].ProjectDescriptor.Identity.RootComponentName)
 }
 
 func TestPlugin_TargetFile_UnsupportedIsSkipped(t *testing.T) {
@@ -816,7 +816,7 @@ func TestPlugin_RootDirOnly_RelativeDirYieldsRealName(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 
-	assert.Equal(t, filepath.Base(dir), results[0].ProjectDescriptor.Identity.RootComponentName)
+	assert.Equal(t, "FromAssetsFile", results[0].ProjectDescriptor.Identity.RootComponentName)
 	assert.Equal(t, projectAssetsFile, results[0].ProjectDescriptor.GetTargetFile())
 }
 
@@ -1242,8 +1242,15 @@ func TestPlugin_AssetsProjectNameUsesTheRestoreName(t *testing.T) {
 		ecosystems.NewPluginOptions())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
+	assert.Equal(t, "FromAssetsFile", results[0].ProjectDescriptor.Identity.RootComponentName,
+		"SCM mode uses the recorded name by default")
+
+	results, err = scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithCLIProjectIdentity(true))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
 	assert.Equal(t, filepath.Base(dir), results[0].ProjectDescriptor.Identity.RootComponentName,
-		"the derived name is kept while the flag is off, even though the restore recorded one")
+		"CLI mode keeps the directory name")
 
 	results, err = scatest.Run(context.Background(), Plugin{}, logger.Nop(), dir,
 		ecosystems.NewPluginOptions().WithAssetsProjectName(true))

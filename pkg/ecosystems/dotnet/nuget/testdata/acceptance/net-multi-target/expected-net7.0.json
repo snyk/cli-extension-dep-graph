@@ -5,17 +5,17 @@
   },
   "pkgs": [
     {
+      "id": "MultiTarget@2.1.0",
+      "info": {
+        "name": "MultiTarget",
+        "version": "2.1.0"
+      }
+    },
+    {
       "id": "Newtonsoft.Json@13.0.3",
       "info": {
         "name": "Newtonsoft.Json",
         "version": "13.0.3"
-      }
-    },
-    {
-      "id": "net-multi-target@2.1.0",
-      "info": {
-        "name": "net-multi-target",
-        "version": "2.1.0"
       }
     }
   ],
@@ -29,7 +29,7 @@
       },
       {
         "nodeId": "root-node",
-        "pkgId": "net-multi-target@2.1.0",
+        "pkgId": "MultiTarget@2.1.0",
         "deps": [
           {
             "nodeId": "Newtonsoft.Json@13.0.3"
