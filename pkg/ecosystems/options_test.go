@@ -525,3 +525,18 @@ func TestNewPluginOptionsFromRawFlags_TargetFile(t *testing.T) {
 		assert.Equal(t, "obj/project.assets.json", *opts.Global.TargetFile, rawFlags)
 	}
 }
+
+func TestNewPluginOptionsFromRawFlags_IncludeComponentMetadata(t *testing.T) {
+	got, err := NewPluginOptionsFromRawFlags([]string{"--include-component-metadata"})
+	assert.NoError(t, err)
+	assert.True(t, got.Global.IncludeComponentMetadata)
+
+	got, err = NewPluginOptionsFromRawFlags([]string{})
+	assert.NoError(t, err)
+	assert.False(t, got.Global.IncludeComponentMetadata)
+}
+
+func TestWithIncludeComponentMetadata(t *testing.T) {
+	assert.True(t, NewPluginOptions().WithIncludeComponentMetadata(true).Global.IncludeComponentMetadata)
+	assert.False(t, NewPluginOptions().WithIncludeComponentMetadata(false).Global.IncludeComponentMetadata)
+}

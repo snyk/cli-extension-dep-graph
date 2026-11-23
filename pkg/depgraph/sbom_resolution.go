@@ -195,6 +195,7 @@ func buildPluginOptions(config configuration.Configuration) (*ecosystems.SCAPlug
 		WithFailFast(config.GetBool(workflow.FlagFailFast)).
 		WithForceSingleGraph(config.GetBool(workflow.FlagForceSingleGraph)).
 		WithAssetsProjectName(config.GetBool(workflow.FlagNugetAssetsProjectName)).
+		WithIncludeComponentMetadata(config.GetBool(workflow.FlagIncludeComponentMetadata)).
 		WithCLIProjectIdentity(true)
 
 	if targetFile := config.GetString(workflow.FlagFile); targetFile != "" {

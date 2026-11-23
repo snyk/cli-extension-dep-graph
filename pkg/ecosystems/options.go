@@ -33,7 +33,11 @@ type GlobalOptions struct {
 	ForceIncludeWorkspacePackages bool                 `arg:"--internal-uv-workspace-packages"`
 	ProjectName                   *string              `arg:"--project-name"`
 	IncludeProvenance             bool                 `arg:"--include-provenance"`
-	WorkspacePackage              *string              `arg:"--workspace-package"`
+	// IncludeComponentMetadata asks plugins to label nodes with the artifact
+	// hashes and distribution URL the package manager already recorded; see
+	// the componentmetadata package for the label contract.
+	IncludeComponentMetadata bool    `arg:"--include-component-metadata"`
+	WorkspacePackage         *string `arg:"--workspace-package"`
 	// DetectionDepth caps how deep --all-projects discovery walks, counted in
 	// path segments below the scanned root. 0 means unlimited. Parsed by
 	// ParseDetectionDepth rather than by the argparser so that both entry
@@ -325,6 +329,11 @@ func (o *SCAPluginOptions) WithGradleNormalizeDeps(normalizeDeps bool) *SCAPlugi
 
 func (o *SCAPluginOptions) WithIncludeProvenance(includeProvenance bool) *SCAPluginOptions {
 	o.Global.IncludeProvenance = includeProvenance
+	return o
+}
+
+func (o *SCAPluginOptions) WithIncludeComponentMetadata(include bool) *SCAPluginOptions {
+	o.Global.IncludeComponentMetadata = include
 	return o
 }
 
