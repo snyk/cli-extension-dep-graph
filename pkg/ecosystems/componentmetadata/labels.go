@@ -15,6 +15,8 @@ import (
 	"encoding/hex"
 	"net/url"
 	"strings"
+
+	"github.com/snyk/dep-graph/go/pkg/depgraph"
 )
 
 const (
@@ -125,4 +127,26 @@ func SanitizeURL(rawURL string) (string, bool) {
 	u.Fragment = ""
 	u.RawFragment = ""
 	return u.String(), true
+}
+
+// ApplyTo merges the labels into a dep-graph node, keeping any label the node
+// already has: a producer's own labels (pruned, scope) describe the node and
+// must not be overwritten by metadata about its artifact. NodeInfo is created
+// only when there is something to add, so a node without metadata serializes
+// exactly as before.
+func (l Labels) ApplyTo(node *depgraph.Node) {
+	if len(l) == 0 {
+		return
+	}
+	if node.Info == nil {
+		node.Info = &depgraph.NodeInfo{}
+	}
+	if node.Info.Labels == nil {
+		node.Info.Labels = make(map[string]string, len(l))
+	}
+	for k, v := range l {
+		if _, exists := node.Info.Labels[k]; !exists {
+			node.Info.Labels[k] = v
+		}
+	}
 }
