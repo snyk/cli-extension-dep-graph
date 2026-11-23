@@ -112,12 +112,21 @@ func (l Labels) AddDistributionURL(rawURL string) bool {
 // false for anything other than an absolute http or https URL, which rules out
 // path, file and VCS sources.
 //
+// A URL with an "auth" path segment is rejected outright: MyGet's
+// pre-authenticated feeds (/F/<feed>/auth/<key>/) carry the API key there, and
+// a missing URL costs far less than a key in a shared SBOM. Other tokens
+// embedded in a path cannot be recognized and are kept, as in the TypeScript
+// producers.
+//
 // Surrounding whitespace is trimmed and the host lowercased, as the WHATWG URL
 // parser does in the TypeScript producers (snyk-poetry-lockfile-parser), so a
 // package gets the same label whichever resolver produced it.
 func SanitizeURL(rawURL string) (string, bool) {
 	u, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return "", false
+	}
+	if hasAuthSegment(u.Path) {
 		return "", false
 	}
 	u.Host = strings.ToLower(u.Host)
@@ -127,6 +136,15 @@ func SanitizeURL(rawURL string) (string, bool) {
 	u.Fragment = ""
 	u.RawFragment = ""
 	return u.String(), true
+}
+
+func hasAuthSegment(path string) bool {
+	for _, segment := range strings.Split(path, "/") {
+		if strings.EqualFold(segment, "auth") {
+			return true
+		}
+	}
+	return false
 }
 
 // ApplyTo merges the labels into a dep-graph node, keeping any label the node

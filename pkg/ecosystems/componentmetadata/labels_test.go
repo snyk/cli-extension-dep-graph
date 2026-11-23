@@ -120,6 +120,10 @@ func TestSanitizeURL(t *testing.T) {
 		{"strips percent-encoded credentials", "https://us%40er:pa%3Ass@h/x", "https://h/x", true},
 		{"keeps an IPv6 host", "https://[::1]:8443/x", "https://[::1]:8443/x", true},
 		{"rejects an opaque URL", "https:host/x", "", false},
+		// MyGet's pre-authenticated feeds carry the API key in the path.
+		{"rejects a pre-authenticated feed path", "https://www.myget.org/F/feed/auth/1111-2222/api/v3/index.json", "", false},
+		{"rejects an auth segment in any case", "https://h/F/feed/AUTH/key/index.json", "", false},
+		{"keeps a path that only mentions auth", "https://h/oauth/authors/index.json", "https://h/oauth/authors/index.json", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
