@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/componentmetadata"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/identity"
@@ -155,10 +156,26 @@ func (p Plugin) buildResults(
 		allMemberIDs[m.Name+"@"+m.Version] = struct{}{}
 	}
 
+	// Cargo.lock is read only after the first successful cargo tree: with
+	// AllowOutOfSync cargo rewrites the lock as it resolves, and cargo tree is
+	// what validates it (cargo metadata --no-deps never reads it), so the
+	// file read then is the one the graph came from and cargo has accepted.
+	var (
+		labels       map[string]componentmetadata.Labels
+		labelsLoaded bool
+	)
+	labelsFor := func() map[string]componentmetadata.Labels {
+		if !labelsLoaded {
+			labelsLoaded = true
+			labels = p.componentLabels(ctx, log, lockFileRelPath, lockFileAbsDir, options)
+		}
+		return labels
+	}
+
 	var results []ecosystems.SCAResult
 
 	for _, member := range members {
-		memberResult := p.buildMemberResult(ctx, log, lockFileRelPath, lockFileAbsDir, lockFileDir, member, allMemberIDs, exec, options)
+		memberResult := p.buildMemberResult(ctx, log, lockFileRelPath, lockFileAbsDir, lockFileDir, member, allMemberIDs, labelsFor, exec, options)
 		results = append(results, memberResult)
 	}
 
@@ -201,6 +218,7 @@ func (p Plugin) buildMemberResult(
 	lockFileRelPath, lockFileAbsDir, lockFileDir string,
 	member workspaceMember,
 	allMemberIDs map[string]struct{},
+	labelsFor func() map[string]componentmetadata.Labels,
 	exec cargoRunner,
 	options *ecosystems.SCAPluginOptions,
 ) ecosystems.SCAResult {
@@ -257,7 +275,7 @@ func (p Plugin) buildMemberResult(
 		}
 	}
 
-	dg, err := buildDepGraph(out, otherMembers)
+	dg, err := buildDepGraph(out, otherMembers, labelsFor())
 	if err != nil {
 		return memberErrResult(fmt.Errorf("building dep graph for member %s: %w", member.Name, err))
 	}
@@ -277,6 +295,34 @@ func (p Plugin) buildMemberResult(
 			NormalisedTargetFile: tf,
 		},
 	}
+}
+
+// componentLabels reads Cargo.lock for --include-component-metadata. Without
+// the flag it returns nil before touching the file.
+//
+// An unreadable, oversized or malformed lockfile yields no labels rather than
+// an error result: the labels are optional enrichment of a graph cargo tree
+// has already resolved, so failing the scan would cost the user their
+// dependencies for want of a checksum.
+func (p Plugin) componentLabels(
+	ctx context.Context,
+	log logger.Logger,
+	lockFileRelPath, lockFileAbsDir string,
+	options *ecosystems.SCAPluginOptions,
+) map[string]componentmetadata.Labels {
+	if !options.Global.IncludeComponentMetadata {
+		return nil
+	}
+
+	pkgs, err := readLockFile(filepath.Join(lockFileAbsDir, cargoLockFile))
+	if err != nil {
+		log.Info(ctx, fmt.Sprintf("Cannot use %s for component metadata; no component hashes emitted", lockFileRelPath),
+			logger.Attr(logFieldLockFile, lockFileRelPath),
+			logger.Err(err),
+		)
+		return nil
+	}
+	return buildComponentLabels(pkgs, newRegistryConfigs(cargoHomeDir()))
 }
 
 // wrapRunError converts errors from the cargo runner into user-facing messages.

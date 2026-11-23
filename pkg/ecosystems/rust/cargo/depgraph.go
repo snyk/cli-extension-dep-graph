@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	godepgraph "github.com/snyk/dep-graph/go/pkg/depgraph"
+
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/componentmetadata"
 )
 
 // buildDepGraph produces a Snyk dep graph rooted at out.RootID by walking
@@ -13,7 +15,14 @@ import (
 // stopAt is used for workspace member graphs to avoid duplicating the subtree
 // of one member inside the graph of another. Pass an empty/nil map for the
 // single-crate case.
-func buildDepGraph(out *treeOutput, stopAt map[string]struct{}) (*godepgraph.DepGraph, error) {
+//
+// labels, keyed by node ID, are attached to matching nodes; nil when
+// component metadata was not requested.
+func buildDepGraph(
+	out *treeOutput,
+	stopAt map[string]struct{},
+	labels map[string]componentmetadata.Labels,
+) (*godepgraph.DepGraph, error) {
 	rootName, rootVersion := splitPkgID(out.RootID)
 
 	builder, err := godepgraph.NewBuilder(
@@ -28,7 +37,7 @@ func buildDepGraph(out *treeOutput, stopAt map[string]struct{}) (*godepgraph.Dep
 	visited := make(map[string]bool)
 
 	for childID := range out.Graph[out.RootID] {
-		if err := addNode(builder, rootNodeID, childID, out.Graph, stopAt, visited); err != nil {
+		if err := addNode(builder, rootNodeID, childID, out.Graph, stopAt, labels, visited); err != nil {
 			return nil, err
 		}
 	}
@@ -47,17 +56,19 @@ func addNode(
 	parentID, id string,
 	forward forwardGraph,
 	stopAt map[string]struct{},
+	labels map[string]componentmetadata.Labels,
 	visited map[string]bool,
 ) error {
 	if !visited[id] {
 		visited[id] = true
 
 		name, version := splitPkgID(id)
-		builder.AddNode(id, &godepgraph.PkgInfo{Name: name, Version: version})
+		node := builder.AddNode(id, &godepgraph.PkgInfo{Name: name, Version: version})
+		labels[id].ApplyTo(node)
 
 		if _, stop := stopAt[id]; !stop {
 			for childID := range forward[id] {
-				if err := addNode(builder, id, childID, forward, stopAt, visited); err != nil {
+				if err := addNode(builder, id, childID, forward, stopAt, labels, visited); err != nil {
 					return err
 				}
 			}

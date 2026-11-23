@@ -34,6 +34,9 @@ type fakeExecutor struct {
 	treeByPkg        map[string]string
 	treeErrByPkg     map[string]error
 	capturedTreeOpts []cargoTreeOpts
+	// beforeTree runs as cargo tree would start, e.g. to rewrite Cargo.lock
+	// the way cargo does when it re-resolves an out-of-sync lockfile.
+	beforeTree func()
 }
 
 func (f *fakeExecutor) RunMetadata(_ context.Context, _ string) (io.ReadCloser, error) {
@@ -45,6 +48,9 @@ func (f *fakeExecutor) RunMetadata(_ context.Context, _ string) (io.ReadCloser, 
 
 func (f *fakeExecutor) RunTree(_ context.Context, _ string, opts cargoTreeOpts) (io.ReadCloser, error) {
 	f.capturedTreeOpts = append(f.capturedTreeOpts, opts)
+	if f.beforeTree != nil {
+		f.beforeTree()
+	}
 
 	if err, ok := f.treeErrByPkg[opts.Pkg]; ok {
 		return nil, err

@@ -27,7 +27,8 @@ import (
 //	"3foo v1.0.0 (*)"                      → 3, "foo",          "1.0.0",   " (*)"
 //
 // Trailing annotations are captured but not yet consumed — git/path source
-// disambiguation in node IDs is deferred (see types.go). The cycle marker (*)
+// disambiguation in node IDs is deferred (see types.go). A source-aware
+// Cargo.lock join for component metadata should land with that node-ID change. The cycle marker (*)
 // is harmless: cargo only emits children of a (*) node above it in the output,
 // so the parser's depth stack naturally treats it as a leaf.
 var treeLineRe = regexp.MustCompile(`^(\d+)(\S+)\sv(\S+)(.*)$`)

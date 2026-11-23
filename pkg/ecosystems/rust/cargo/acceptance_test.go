@@ -224,3 +224,30 @@ func normalizedJSON(dg *depgraph.DepGraph) string {
 
 	return string(data)
 }
+
+// TestAcceptance_ComponentMetadata runs real cargo on the simple fixture with
+// --include-component-metadata and checks the registry crate is labeled
+// with its Cargo.lock checksum and crates.io download URL.
+func TestAcceptance_ComponentMetadata(t *testing.T) {
+	requireCargo(t)
+
+	dir := filepath.Join("testdata", "acceptance", "simple")
+	opts := ecosystems.NewPluginOptions().WithIncludeComponentMetadata(true)
+	results, err := scatest.Run(t.Context(), cargo.Plugin{}, logger.Nop(), dir, opts)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.NoError(t, results[0].Error)
+
+	labels := map[string]map[string]string{}
+	for _, n := range results[0].DepGraph.Graph.Nodes {
+		if n.Info != nil {
+			labels[n.NodeID] = n.Info.Labels
+		}
+	}
+	assert.Equal(t, map[string]map[string]string{
+		"lazy_static@1.5.0": {
+			"hash:sha-256":     "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe",
+			"distribution:url": "https://static.crates.io/crates/lazy_static/1.5.0/download",
+		},
+	}, labels)
+}
