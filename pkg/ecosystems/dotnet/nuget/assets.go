@@ -15,8 +15,7 @@ import (
 
 // projectAssets is the subset of project.assets.json this resolver reads,
 // mirroring snyk-nuget-plugin's v3 parser
-// (lib/nuget-parser/parsers/dotnet-core-v3-parser.ts). `libraries` and
-// `packageFolders` are declared upstream but never read, so they are omitted.
+// (lib/nuget-parser/parsers/dotnet-core-v3-parser.ts).
 type projectAssets struct {
 	// Targets maps a target framework moniker to its resolved package set, keyed
 	// by "<name>/<version>": the authoritative source of versions and edges.
@@ -40,6 +39,17 @@ type projectAssets struct {
 	// A file without them is still read: a restore that recorded no reason
 	// leaves the graph to speak for itself, as it did before this was decoded.
 	Logs []assetsLog
+
+	// PackageFolders lists the global packages folder and any fallback folders
+	// the restore read from, in the order NuGet searches them. Only read for
+	// --include-component-metadata, to find each package's .nupkg.
+	PackageFolders orderedMap[json.RawMessage]
+
+	// Libraries is read only for --include-component-metadata, for each
+	// entry's type: a project reference has no .nupkg to describe. Its sha512
+	// is deliberately not read: it is the package's content hash, not the
+	// .nupkg's, and the two differ for a signed package.
+	Libraries map[string]assetsLibrary
 
 	// projectPresent records whether the `project` field existed at all, so a
 	// missing one is reported differently from one that is merely empty.
@@ -72,6 +82,12 @@ func (l *assetsLog) appliesTo(targetsKey string) bool {
 // restore. Warnings share the array.
 const assetsLogLevelError = "Error"
 
+// assetsLibrary is one `libraries` entry: "package" for a restored package,
+// "project" for a project reference.
+type assetsLibrary struct {
+	Type string `json:"type"`
+}
+
 // assetsTargetEntry is one resolved package within a target framework.
 //
 // Dependencies holds minimum constraints, not resolved versions (see
@@ -103,8 +119,7 @@ func (e *assetsTargetEntry) buildOnly() bool {
 // itself, as distinct from what the restore resolved for it.
 //
 // restore.projectPath is read upstream only to locate a .csproj for the dotnet
-// CLI, which this resolver never runs, so it is omitted for the same reason
-// `libraries` and `packageFolders` are.
+// CLI, which this resolver never runs, so it is omitted.
 type assetsProject struct {
 	Version    string                             `json:"version"`
 	Restore    assetsProjectRestore               `json:"restore"`
@@ -147,6 +162,8 @@ func (a *projectAssets) UnmarshalJSON(data []byte) error {
 		ProjectFileDependencyGroups map[string][]string                       `json:"projectFileDependencyGroups"`
 		Project                     json.RawMessage                           `json:"project"`
 		Logs                        []assetsLog                               `json:"logs"`
+		PackageFolders              orderedMap[json.RawMessage]               `json:"packageFolders"`
+		Libraries                   map[string]assetsLibrary                  `json:"libraries"`
 	}
 
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -156,6 +173,8 @@ func (a *projectAssets) UnmarshalJSON(data []byte) error {
 	a.Targets = raw.Targets
 	a.ProjectFileDependencyGroups = raw.ProjectFileDependencyGroups
 	a.Logs = raw.Logs
+	a.PackageFolders = raw.PackageFolders
+	a.Libraries = raw.Libraries
 	a.projectPresent = len(raw.Project) > 0 && string(raw.Project) != "null"
 
 	if a.projectPresent {
