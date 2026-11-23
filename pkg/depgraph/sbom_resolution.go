@@ -68,8 +68,22 @@ func buildSCAPlugins(
 	return []ecosystems.SCAPlugin{
 		registry.NativePlugin(),
 		uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL),
-		legacy.NewPlugin(ctx),
+		newLegacyPlugin(ctx),
 	}, nil
+}
+
+// newLegacyPlugin builds the legacy fallback. A caller that sets
+// ConfigKeyKeepCallerGraphMode (cli-extension-sbom, for `snyk sbom`) gets its
+// own graph flags passed through, and so the same graphs as on the standard
+// depgraph path. Other callers keep the forced effective graph with errors:
+// `snyk test` from cli-extension-os-flows also enters SBOM resolution, for uv
+// repos, and relies on the per-project error lines that mode prints.
+func newLegacyPlugin(ctx gafworkflow.InvocationContext) *legacy.Resolver {
+	mode := legacy.GraphModeEffectiveWithErrors
+	if ctx.GetConfiguration().GetBool(workflow.ConfigKeyKeepCallerGraphMode) {
+		mode = legacy.GraphModeCaller
+	}
+	return legacy.NewPlugin(ctx, legacy.WithGraphMode(mode))
 }
 
 const errMsgNoSupportedProjects = "no supported projects detected"

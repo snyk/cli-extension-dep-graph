@@ -22,12 +22,45 @@ import (
 
 const PluginName = "legacycli"
 
+// GraphMode selects which dep-graph output the plugin asks the legacy CLI for.
+type GraphMode int
+
+const (
+	// GraphModeEffectiveWithErrors is the default. It overrides the caller's
+	// effective-graph flags and asks for --print-effective-graph-with-errors, or for
+	// --print-graph when the caller set print-output-jsonl-with-errors. `snyk test`
+	// relies on it for the pruned graph plus per-project error lines. It is
+	// transitional: once `snyk test` prunes centrally for every resolver (SCAS-1061),
+	// callers can pass their own graph mode.
+	GraphModeEffectiveWithErrors GraphMode = iota
+	// GraphModeCaller leaves the caller's graph flags alone, so the legacy CLI receives
+	// the argument the standard depgraph path (legacycli.HandleLegacyResolution) would
+	// choose. `snyk sbom` needs it: it documents the raw graph and asks for the pruned
+	// one only with -p, so forcing the effective graph changes its output.
+	GraphModeCaller
+)
+
 type Resolver struct {
-	ictx gafworkflow.InvocationContext
+	ictx      gafworkflow.InvocationContext
+	graphMode GraphMode
 }
 
-func NewPlugin(ictx gafworkflow.InvocationContext) *Resolver {
-	return &Resolver{ictx: ictx}
+// Option configures a Resolver.
+type Option func(*Resolver)
+
+// WithGraphMode sets the graph the plugin asks the legacy CLI for.
+func WithGraphMode(mode GraphMode) Option {
+	return func(r *Resolver) {
+		r.graphMode = mode
+	}
+}
+
+func NewPlugin(ictx gafworkflow.InvocationContext, opts ...Option) *Resolver {
+	r := &Resolver{ictx: ictx}
+	for _, opt := range opts {
+		opt(r)
+	}
+	return r
 }
 
 func (l *Resolver) GetName() string {
@@ -64,7 +97,7 @@ func (l *Resolver) BuildDepGraphsFromDir(
 		return fmt.Errorf("cannot resolve dependencies without options")
 	}
 
-	legacyConfig := buildLegacyConfig(l.ictx.GetConfiguration(), opts)
+	legacyConfig := buildLegacyConfig(l.ictx.GetConfiguration(), opts, l.graphMode)
 
 	depGraphs, err := legacycli.InvokeLegacy(l.ictx, legacyConfig, l.ictx.GetEnhancedLogger())
 	if err != nil {
@@ -95,15 +128,19 @@ func (l *Resolver) BuildDepGraphsFromDir(
 // reported as processed. When non-empty, we write it onto the cloned config's FlagExcludePaths, overriding
 // whatever was already there: in every production path the user's `--exclude-paths` is also on opts, so the
 // live config's value is a subset of opts and the override is lossless.
-func buildLegacyConfig(src configuration.Configuration, opts *ecosystems.SCAPluginOptions) configuration.Configuration {
+//
+// In GraphModeCaller the graph flags are left as the caller set them.
+func buildLegacyConfig(src configuration.Configuration, opts *ecosystems.SCAPluginOptions, mode GraphMode) configuration.Configuration {
 	cfg := src.Clone()
 
-	cfg.Unset(workflow.FlagPrintEffectiveGraph)
+	if mode == GraphModeEffectiveWithErrors {
+		cfg.Unset(workflow.FlagPrintEffectiveGraph)
 
-	if cfg.GetBool(workflow.FlagPrintOutputJsonlWithErrors) {
-		cfg.Set(workflow.FlagPrintEffectiveGraphWithErrors, false)
-	} else {
-		cfg.Set(workflow.FlagPrintEffectiveGraphWithErrors, true)
+		if cfg.GetBool(workflow.FlagPrintOutputJsonlWithErrors) {
+			cfg.Set(workflow.FlagPrintEffectiveGraphWithErrors, false)
+		} else {
+			cfg.Set(workflow.FlagPrintEffectiveGraphWithErrors, true)
+		}
 	}
 
 	if len(opts.Global.ExcludePaths) > 0 {
