@@ -53,6 +53,10 @@ func normalize(report *Report) *Report {
 		// Clear RequiresDist - it varies by environment but we still capture it
 		// We validate that we GET the data, just not the exact content
 		normalized.Install[i].Metadata.RequiresDist = nil
+		// DownloadInfo names the file pip picks for this platform and the
+		// latest matching release, so it varies too; labels built from it are
+		// covered by component_metadata_test.go.
+		normalized.Install[i].DownloadInfo = nil
 	}
 
 	// Sort by package name for consistent comparison

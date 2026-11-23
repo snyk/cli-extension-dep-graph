@@ -62,6 +62,15 @@ func (p Plugin) BuildDepGraphsFromDir(
 		log = logger.Nop()
 	}
 
+	// With component metadata requested this plugin runs ahead of the legacy
+	// plugin, so under --file it claims only a Pipfile: legacy owns
+	// requirements.txt and setup.py. Without the flag, --file is used as given.
+	if tf := options.Global.TargetFile; tf != nil && options.Global.IncludeComponentMetadata &&
+		filepath.Base(*tf) != pipfileFile {
+		log.Info(ctx, "Skipping pipenv plugin", logger.Attr("targetFile", *tf), logger.Attr("reason", "not a 'Pipfile'"))
+		return nil
+	}
+
 	// Discover Pipfile files
 	files, err := p.discoverPipfiles(ctx, log, dir, options)
 	if err != nil {
@@ -73,11 +82,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 		return nil
 	}
 
-	// Get Python runtime version
-	pythonVersion, err := pip.GetPythonVersion()
-	if err != nil {
-		return fmt.Errorf("failed to detect Python version: %w", err)
-	}
+	pythonCommand := pip.ResolvePythonCommand(options.Python.Command, dir)
 
 	var emitMu sync.Mutex
 
@@ -87,8 +92,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 	for _, file := range files {
 		g.Go(func() error {
 			projectName := pip.GetProjectName(file.RelPath, dir, options.Global.ProjectName)
-			result, err := p.buildDepGraphFromPipfile(ctx, log, file, pythonVersion, options.Python.NoBuildIsolation,
-				options.Global.IncludeDev, projectName)
+			result, err := p.buildDepGraphFromPipfile(ctx, log, file, pip.WorkingDir(dir, file, options), pythonCommand, options, projectName)
 			if err != nil {
 				attrs := []logger.Field{
 					logger.Attr(logFieldFile, file.RelPath),
@@ -140,7 +144,8 @@ func (p Plugin) discoverPipfiles(ctx context.Context, log logger.Logger, dir str
 		}
 	case options.Global.AllProjects:
 		// Find all Pipfile files recursively
-		defaultExcludes := []string{".*", "__pycache__", "*.egg-info", "dist", "build", "venv"}
+		// ".*" also covers .git and .build, which snyk-python-plugin skips.
+		defaultExcludes := []string{".*", "__pycache__", "*.egg-info", "dist", "build", "venv", "node_modules"}
 		excludes := make([]string, 0, len(defaultExcludes)+len(options.Global.Exclude)+len(options.Global.ExcludePaths))
 		excludes = append(excludes, defaultExcludes...)
 		excludes = append(excludes, options.Global.Exclude...)
@@ -169,11 +174,18 @@ func (p Plugin) buildDepGraphFromPipfile(
 	ctx context.Context,
 	log logger.Logger,
 	file discovery.FindResult,
-	pythonVersion string,
-	noBuildIsolation bool,
-	includeDevDeps bool,
+	workDir, pythonCommand string,
+	options *ecosystems.SCAPluginOptions,
 	projectName string,
 ) (ecosystems.SCAResult, error) {
+	// Same working directory rule as the pip plugin. Pipfile paths are
+	// relative to the Pipfile, whatever the working directory.
+	pipfileDir := filepath.Dir(file.Path)
+	pythonVersion, err := pip.GetPythonVersionForCommand(pythonCommand, workDir)
+	if err != nil {
+		return ecosystems.SCAResult{}, fmt.Errorf("failed to detect Python version: %w", err)
+	}
+
 	log.Debug(ctx, "Building dependency graph from Pipfile",
 		logger.Attr(logFieldFile, file.RelPath),
 		logger.Attr("python_version", pythonVersion),
@@ -186,7 +198,6 @@ func (p Plugin) buildDepGraphFromPipfile(
 	}
 
 	// Check for Pipfile.lock in the same directory
-	pipfileDir := filepath.Dir(file.Path)
 	lockfilePath := filepath.Join(pipfileDir, pipfileLockFile)
 
 	var lockfile *PipfileLock
@@ -206,13 +217,15 @@ func (p Plugin) buildDepGraphFromPipfile(
 	}
 
 	// Get pip install report with packages and constraints passed directly
-	report, err := p.getInstallReport(ctx, log, pipfile, lockfile, noBuildIsolation, includeDevDeps)
+	report, err := p.getInstallReport(ctx, log, pipfile, lockfile, pythonCommand, pipfileDir, workDir, options)
 	if err != nil {
 		return ecosystems.SCAResult{}, fmt.Errorf("failed to get pip install report: %w", err)
 	}
 
 	// Convert report to dependency graph
-	depGraph, err := report.ToDependencyGraph(ctx, log, projectName)
+	// Labels come from the pip report, which names the file pip picked.
+	// Pipfile.lock's hashes name no file, so they are not used.
+	depGraph, err := report.ToDependencyGraph(ctx, log, projectName, pip.GraphOptions(options)...)
 	if err != nil {
 		return ecosystems.SCAResult{}, fmt.Errorf("failed to convert pip report to dependency graph: %w", err)
 	}
@@ -253,11 +266,23 @@ func (p Plugin) getInstallReport(
 	log logger.Logger,
 	pipfile *Pipfile,
 	lockfile *PipfileLock,
-	noBuildIsolation bool,
-	includeDevDeps bool,
+	pythonCommand, pipfileDir, workDir string,
+	options *ecosystems.SCAPluginOptions,
 ) (*pip.Report, error) {
+	includeDevDeps := options.Global.IncludeDev
 	// Get package names without version specifiers
+	// Without the flag, keep the by-name resolution of path and file
+	// entries unchanged: isolated builds copy only the Pipfile and its lock,
+	// so those paths do not exist there. Fixing it is tracked separately.
 	packages := pipfile.ToPackageNames(includeDevDeps)
+	if options.Global.IncludeComponentMetadata {
+		var dropped []string
+		packages, dropped = pipfile.ToRequirements(includeDevDeps, pipfileDir)
+		for _, name := range dropped {
+			log.Info(ctx, "Leaving out a Pipfile entry whose local path is not a Python project",
+				logger.Attr("package", name), logger.Attr("reason", "path or file missing"))
+		}
+	}
 	if len(packages) == 0 {
 		// Return empty report for empty Pipfile (creates depgraph with just root node)
 		return &pip.Report{}, nil
@@ -267,7 +292,8 @@ func (p Plugin) getInstallReport(
 	constraints := lockfile.ToConstraints(includeDevDeps)
 
 	// Get pip install report passing packages and constraints directly
-	report, err := pip.GetInstallReportFromPackages(ctx, log, packages, constraints, noBuildIsolation)
+	report, err := pip.GetInstallReportFromPackagesWithCommand(ctx, log, packages, constraints,
+		options.Python.NoBuildIsolation, pythonCommand, &pip.DefaultExecutor{Dir: workDir})
 	if err != nil {
 		return nil, fmt.Errorf("pip install report failed: %w", err)
 	}

@@ -83,6 +83,10 @@ func ParseDetectionDepth(raw string) (int, error) {
 // PythonOptions contains Python-specific options for dependency graph generation.
 type PythonOptions struct {
 	NoBuildIsolation bool `arg:"--no-build-isolation"`
+	// Command is the Python interpreter --command names. When set, pip runs as
+	// `<Command> -m pip` so it resolves against that interpreter, as
+	// snyk-python-plugin does; otherwise bare pip from PATH runs.
+	Command string `arg:"--command"`
 }
 
 // GradleOptions contains Gradle-specific options for dependency graph generation.
@@ -231,6 +235,11 @@ func (o *SCAPluginOptions) WithAllProjects(allProjects bool) *SCAPluginOptions {
 
 func (o *SCAPluginOptions) WithNoBuildIsolation(noBuildIsolation bool) *SCAPluginOptions {
 	o.Python.NoBuildIsolation = noBuildIsolation
+	return o
+}
+
+func (o *SCAPluginOptions) WithPythonCommand(command string) *SCAPluginOptions {
+	o.Python.Command = command
 	return o
 }
 

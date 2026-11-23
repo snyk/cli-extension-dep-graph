@@ -6,6 +6,7 @@ package pipenv
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -309,3 +310,61 @@ func TestPipfile_ToPackageNames(t *testing.T) {
 		})
 	}
 }
+
+// ToRequirements is ToPackageNames for the dry run: path and file entries
+// become PEP 508 direct references, so pip builds them from disk (or the
+// given URL) instead of resolving their name from an index.
+func TestPipfile_ToRequirements(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("expected file URLs are written for POSIX paths")
+	}
+	dir := t.TempDir()
+	for _, d := range []string{"utils", "abs", "extra", "dev", "a;b c+&%@"} {
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, d), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, d, "pyproject.toml"), nil, 0o600))
+	}
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "wheels"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "wheels", "w-1.0-py3-none-any.whl"), nil, 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "notaproject"), 0o755))
+	pipfile := &Pipfile{
+		Packages: map[string]interface{}{
+			"requests": "==2.31.0",
+			"odd":      map[string]interface{}{"path": "a;b c+&%@"},
+			"missing":  map[string]interface{}{"path": "./gone"},
+			"gonefile": map[string]interface{}{"file": "./gone.whl"},
+			"bare":     map[string]interface{}{"path": "notaproject"},
+			"utils":    map[string]interface{}{"path": "./utils", "editable": true},
+			"absolute": map[string]interface{}{"path": filepath.Join(dir, "abs")},
+			"wheel":    map[string]interface{}{"file": "wheels/w-1.0-py3-none-any.whl"},
+			"remote":   map[string]interface{}{"file": "https://files.example/remote-1.0.tar.gz"},
+			"extra":    map[string]interface{}{"path": "extra", "extras": []interface{}{"cli"}},
+			"flask":    map[string]interface{}{"version": ">=2", "extras": []interface{}{"async"}},
+			"elsewhere": map[string]interface{}{
+				"path": "./elsewhere", "markers": "sys_platform == 'no-such-platform' and sys_platform != '" + getCurrentPlatform() + "'",
+			},
+		},
+		DevPkgs: map[string]interface{}{"devlocal": map[string]interface{}{"path": "dev"}},
+	}
+
+	got, dropped := pipfile.ToRequirements(false, dir)
+	assert.ElementsMatch(t, []string{"missing", "gonefile", "bare"}, dropped,
+		"a path with no project and a file that does not exist are left out")
+	assert.ElementsMatch(t, []string{
+		// Characters PEP 508 or URL parsing would misread are percent-encoded:
+		// ";" would start a marker, " " end the URL.
+		"odd @ " + wantFileURL(dir) + "/a%3Bb%20c%2B%26%25%40",
+		"requests",
+		"utils @ " + wantFileURL(filepath.Join(dir, "utils")),
+		"absolute @ " + wantFileURL(filepath.Join(dir, "abs")),
+		"wheel @ " + wantFileURL(filepath.Join(dir, "wheels", "w-1.0-py3-none-any.whl")),
+		"remote @ https://files.example/remote-1.0.tar.gz",
+		"extra[cli] @ " + wantFileURL(filepath.Join(dir, "extra")),
+		"flask[async]",
+	}, got)
+
+	withDev, _ := pipfile.ToRequirements(true, dir)
+	assert.Contains(t, withDev, "devlocal @ "+wantFileURL(filepath.Join(dir, "dev")))
+}
+
+// wantFileURL is the RFC 8089 form pip accepts in a direct reference.
+func wantFileURL(path string) string { return "file://" + path }

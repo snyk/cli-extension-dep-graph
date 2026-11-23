@@ -532,3 +532,27 @@ func TestWithIncludeComponentMetadata(t *testing.T) {
 	assert.True(t, NewPluginOptions().WithIncludeComponentMetadata(true).Global.IncludeComponentMetadata)
 	assert.False(t, NewPluginOptions().WithIncludeComponentMetadata(false).Global.IncludeComponentMetadata)
 }
+
+// --command takes its value the way every other string option does: from
+// --command=<v>, or from the next argument even when that looks like a flag,
+// exactly as --file does.
+func TestNewPluginOptionsFromRawFlags_PythonCommand(t *testing.T) {
+	opts, err := NewPluginOptionsFromRawFlags([]string{"--command=python3.11", "--dev"})
+	require.NoError(t, err)
+	assert.Equal(t, "python3.11", opts.Python.Command)
+	assert.True(t, opts.Global.IncludeDev)
+
+	opts, err = NewPluginOptionsFromRawFlags([]string{"--command", "python3.11"})
+	require.NoError(t, err)
+	assert.Equal(t, "python3.11", opts.Python.Command)
+
+	cmdOpts, err := NewPluginOptionsFromRawFlags([]string{"--command", "--dev"})
+	require.NoError(t, err)
+	fileOpts, err := NewPluginOptionsFromRawFlags([]string{"--file", "--dev"})
+	require.NoError(t, err)
+	assert.Equal(t, *fileOpts.Global.TargetFile, cmdOpts.Python.Command)
+	assert.Equal(t, fileOpts.Global.IncludeDev, cmdOpts.Global.IncludeDev)
+
+	_, err = NewPluginOptionsFromRawFlags([]string{"--command"})
+	require.Error(t, err, "a trailing --command with no value is an error, as for --file")
+}

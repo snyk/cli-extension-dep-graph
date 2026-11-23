@@ -33,6 +33,8 @@ func normalizePackageName(name string) string {
 type packageLookup struct {
 	nameToIndex map[string]int
 	install     []InstallItem
+	// labelComponents adds component-metadata labels to each node.
+	labelComponents bool
 }
 
 // findPackage returns the install item for a normalized package name, or nil if not found.
@@ -51,7 +53,9 @@ func getNodeID(item *InstallItem) string {
 // ToDependencyGraph converts a pip install Report into a DepGraph using the dep-graph builder.
 // The root node represents the project and points to all direct dependencies.
 // The projectName parameter sets the root package name (defaults to "root" if empty).
-func (r *Report) ToDependencyGraph(ctx context.Context, log logger.Logger, projectName string) (*depgraph.DepGraph, error) {
+func (r *Report) ToDependencyGraph(
+	ctx context.Context, log logger.Logger, projectName string, opts ...GraphOption,
+) (*depgraph.DepGraph, error) {
 	if r == nil {
 		return nil, fmt.Errorf("report cannot be nil")
 	}
@@ -73,10 +77,16 @@ func (r *Report) ToDependencyGraph(ctx context.Context, log logger.Logger, proje
 		return nil, fmt.Errorf("failed to create depgraph builder: %w", err)
 	}
 
+	var o graphOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+
 	// Build lightweight package lookup using only indices (no data duplication)
 	lookup := &packageLookup{
-		nameToIndex: make(map[string]int, numPackages),
-		install:     r.Install,
+		nameToIndex:     make(map[string]int, numPackages),
+		install:         r.Install,
+		labelComponents: o.componentMetadata,
 	}
 	for i := range r.Install {
 		item := &r.Install[i]
@@ -152,6 +162,8 @@ func dfsVisitDirect(
 			normalizedName := depItem.Metadata.GetNormalizePackageName()
 			version := depItem.Metadata.GetNormalizeVersion()
 
+			// The stub carries only its pruned label: sbom-export folds it into
+			// the full node, which holds the component metadata.
 			builder.AddNode(prunedNodeID, &depgraph.PkgInfo{
 				Name:    normalizedName,
 				Version: version,
@@ -169,10 +181,13 @@ func dfsVisitDirect(
 		normalizedName := depItem.Metadata.GetNormalizePackageName()
 		version := depItem.Metadata.GetNormalizeVersion()
 
-		builder.AddNode(childID, &depgraph.PkgInfo{
+		node := builder.AddNode(childID, &depgraph.PkgInfo{
 			Name:    normalizedName,
 			Version: version,
 		})
+		if lookup.labelComponents {
+			depItem.componentLabels().ApplyTo(node)
+		}
 
 		if err := builder.ConnectNodes(parentID, childID); err != nil {
 			return fmt.Errorf("failed to connect dependency %s -> %s: %w", parentID, childID, err)
