@@ -76,9 +76,11 @@ const assetsLogLevelError = "Error"
 //
 // Dependencies holds minimum constraints, not resolved versions (see
 // resolvePackages), and its order decides sibling walk order, which decides
-// which edges get pruned. `type` is absent because upstream never inspects it:
-// a `type: "project"` entry becomes an ordinary node.
+// which edges get pruned.
 type assetsTargetEntry struct {
+	// Type is "package" for a NuGet package and "project" for a local
+	// ProjectReference.
+	Type         string             `json:"type"`
 	Dependencies orderedMap[string] `json:"dependencies"`
 
 	// Build, Compile and Runtime are decoded for presence alone — which kinds
@@ -87,6 +89,16 @@ type assetsTargetEntry struct {
 	Compile json.RawMessage `json:"compile"`
 	Runtime json.RawMessage `json:"runtime"`
 }
+
+// isProject reports whether the entry is a local ProjectReference rather than a
+// package. A project has no identity in a registry, so it is never a graph node;
+// see graphBuilder.expandProjects.
+func (e *assetsTargetEntry) isProject() bool {
+	return strings.EqualFold(e.Type, assetsEntryTypeProject)
+}
+
+// assetsEntryTypeProject is the `type` NuGet writes for a ProjectReference.
+const assetsEntryTypeProject = "project"
 
 // buildOnly reports whether the package contributes MSBuild logic and nothing
 // the project compiles against or runs.
@@ -601,6 +613,9 @@ type resolvedPackage struct {
 	name    string
 	version string
 	deps    orderedMap[string]
+	// project marks a local ProjectReference, which the graph walks through
+	// without emitting.
+	project bool
 }
 
 // resolvePackages indexes a target framework's packages by lowercased name.
@@ -634,6 +649,7 @@ func resolvePackages(target *orderedMap[assetsTargetEntry]) map[string]resolvedP
 			name:    name,
 			version: version,
 			deps:    entry.Dependencies,
+			project: entry.isProject(),
 		}
 	}
 

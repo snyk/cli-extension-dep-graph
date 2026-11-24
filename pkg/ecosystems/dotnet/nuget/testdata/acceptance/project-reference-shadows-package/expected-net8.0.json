@@ -1,0 +1,149 @@
+{
+  "schemaVersion": "1.3.0",
+  "pkgManager": {
+    "name": "nuget"
+  },
+  "pkgs": [
+    {
+      "id": "Microsoft.NETCore.Platforms@2.0.0",
+      "info": {
+        "name": "Microsoft.NETCore.Platforms",
+        "version": "2.0.0"
+      }
+    },
+    {
+      "id": "System.Configuration.ConfigurationManager@4.5.0",
+      "info": {
+        "name": "System.Configuration.ConfigurationManager",
+        "version": "4.5.0"
+      }
+    },
+    {
+      "id": "System.Security.AccessControl@4.5.0",
+      "info": {
+        "name": "System.Security.AccessControl",
+        "version": "4.5.0"
+      }
+    },
+    {
+      "id": "System.Security.Cryptography.ProtectedData@4.5.0",
+      "info": {
+        "name": "System.Security.Cryptography.ProtectedData",
+        "version": "4.5.0"
+      }
+    },
+    {
+      "id": "System.Security.Permissions@4.5.0",
+      "info": {
+        "name": "System.Security.Permissions",
+        "version": "4.5.0"
+      }
+    },
+    {
+      "id": "System.Security.Principal.Windows@4.5.0",
+      "info": {
+        "name": "System.Security.Principal.Windows",
+        "version": "4.5.0"
+      }
+    },
+    {
+      "id": "log4net@2.0.17",
+      "info": {
+        "name": "log4net",
+        "version": "2.0.17"
+      }
+    },
+    {
+      "id": "project-reference-shadows-package@1.0.0",
+      "info": {
+        "name": "project-reference-shadows-package",
+        "version": "1.0.0"
+      }
+    }
+  ],
+  "graph": {
+    "rootNodeId": "root-node",
+    "nodes": [
+      {
+        "nodeId": "Microsoft.NETCore.Platforms@2.0.0",
+        "pkgId": "Microsoft.NETCore.Platforms@2.0.0",
+        "deps": []
+      },
+      {
+        "nodeId": "Microsoft.NETCore.Platforms@2.0.0:pruned",
+        "pkgId": "Microsoft.NETCore.Platforms@2.0.0",
+        "info": {
+          "labels": {
+            "pruned": "true"
+          }
+        },
+        "deps": []
+      },
+      {
+        "nodeId": "System.Configuration.ConfigurationManager@4.5.0",
+        "pkgId": "System.Configuration.ConfigurationManager@4.5.0",
+        "deps": [
+          {
+            "nodeId": "System.Security.Cryptography.ProtectedData@4.5.0"
+          },
+          {
+            "nodeId": "System.Security.Permissions@4.5.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "System.Security.AccessControl@4.5.0",
+        "pkgId": "System.Security.AccessControl@4.5.0",
+        "deps": [
+          {
+            "nodeId": "Microsoft.NETCore.Platforms@2.0.0"
+          },
+          {
+            "nodeId": "System.Security.Principal.Windows@4.5.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "System.Security.Cryptography.ProtectedData@4.5.0",
+        "pkgId": "System.Security.Cryptography.ProtectedData@4.5.0",
+        "deps": []
+      },
+      {
+        "nodeId": "System.Security.Permissions@4.5.0",
+        "pkgId": "System.Security.Permissions@4.5.0",
+        "deps": [
+          {
+            "nodeId": "System.Security.AccessControl@4.5.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "System.Security.Principal.Windows@4.5.0",
+        "pkgId": "System.Security.Principal.Windows@4.5.0",
+        "deps": [
+          {
+            "nodeId": "Microsoft.NETCore.Platforms@2.0.0:pruned"
+          }
+        ]
+      },
+      {
+        "nodeId": "log4net@2.0.17",
+        "pkgId": "log4net@2.0.17",
+        "deps": [
+          {
+            "nodeId": "System.Configuration.ConfigurationManager@4.5.0"
+          }
+        ]
+      },
+      {
+        "nodeId": "root-node",
+        "pkgId": "project-reference-shadows-package@1.0.0",
+        "deps": [
+          {
+            "nodeId": "log4net@2.0.17"
+          }
+        ]
+      }
+    ]
+  }
+}

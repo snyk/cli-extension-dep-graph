@@ -137,7 +137,7 @@ func (g *graphBuilder) addChildren(
 		local[id] = struct{}{}
 	}
 
-	for _, childName := range childNames {
+	for _, childName := range g.expandProjects(childNames) {
 		if isFilteredPackage(childName) {
 			continue
 		}
@@ -180,6 +180,67 @@ func (g *graphBuilder) addChildren(
 	}
 
 	return nil
+}
+
+// expandProjects replaces each local ProjectReference among names with the
+// names it depends on, in the project's position, so they attach to the
+// project's parent.
+//
+// A project is not a package, but the registry cannot tell: a node named after
+// it is matched to any registry package with that name and version, which
+// reports that package's license and vulnerabilities against code the user
+// wrote. Its dependencies are real, so they are kept.
+//
+// A name already placed by an earlier expansion is not placed again, and a
+// declared name that an expansion placed earlier is skipped. Otherwise the
+// second route would be read as a repeat and become a pruned leaf next to the
+// real node. Names the caller listed twice are left as they are.
+func (g *graphBuilder) expandProjects(names []string) []string {
+	expanded := make([]string, 0, len(names))
+	fromProject := make(map[string]struct{})
+	placed := make(map[string]struct{}, len(names))
+	visited := make(map[string]struct{})
+
+	var expand func(names []string, nested bool)
+
+	expand = func(names []string, nested bool) {
+		for _, name := range names {
+			key := strings.ToLower(name)
+			pkg, resolved := g.resolved[key]
+
+			if resolved && pkg.project {
+				// A project reached twice adds nothing the first visit did not,
+				// and this also ends a cycle in a file NuGet would have rejected.
+				if _, done := visited[key]; done {
+					continue
+				}
+
+				visited[key] = struct{}{}
+
+				expand(pkg.deps.Keys(), true)
+
+				continue
+			}
+
+			if nested {
+				if _, seen := placed[key]; seen {
+					continue
+				}
+
+				fromProject[key] = struct{}{}
+			} else if _, seen := fromProject[key]; seen {
+				continue
+			}
+
+			placed[key] = struct{}{}
+
+			expanded = append(expanded, name)
+		}
+	}
+
+	expand(names, false)
+
+	return expanded
 }
 
 // pkgNodeID is the graph identity of a package, matching the dep-graph

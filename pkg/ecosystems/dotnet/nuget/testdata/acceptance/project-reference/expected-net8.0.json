@@ -12,13 +12,6 @@
       }
     },
     {
-      "id": "Referenced@1.0.0",
-      "info": {
-        "name": "Referenced",
-        "version": "1.0.0"
-      }
-    },
-    {
       "id": "project-reference@1.0.0",
       "info": {
         "name": "project-reference",
@@ -35,23 +28,11 @@
         "deps": []
       },
       {
-        "nodeId": "Referenced@1.0.0",
-        "pkgId": "Referenced@1.0.0",
-        "deps": [
-          {
-            "nodeId": "Newtonsoft.Json@13.0.3"
-          }
-        ]
-      },
-      {
         "nodeId": "root-node",
         "pkgId": "project-reference@1.0.0",
         "deps": [
           {
             "nodeId": "Newtonsoft.Json@13.0.3"
-          },
-          {
-            "nodeId": "Referenced@1.0.0"
           }
         ]
       }
