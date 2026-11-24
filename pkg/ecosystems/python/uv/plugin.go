@@ -100,6 +100,8 @@ func (p Plugin) BuildDepGraphsFromDir(
 				ResolverMetadata: &scaecosystems.ResolverMetadata{
 					PluginName:           PluginName,
 					NormalisedTargetFile: lockFilePath,
+					// A failed export, often an old uv, is where the version matters most.
+					VersionBuildInfo: maps.Clone(scan.versionBuildInfo),
 				},
 				Error: wrappedErr,
 			}); emitErr != nil {

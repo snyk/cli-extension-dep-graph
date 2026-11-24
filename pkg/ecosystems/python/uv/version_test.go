@@ -135,3 +135,17 @@ func TestUVClient_Version_MissingBinary(t *testing.T) {
 
 	require.Error(t, err)
 }
+
+// A failed export still reports the uv version, which is the diagnostic for
+// scans that fail on an old uv.
+func TestPlugin_ExportFailureCarriesUvVersion(t *testing.T) {
+	tmpDir := createFiles(t, "uv.lock", "pyproject.toml")
+	client := &MockClient{UvVersion: "0.9.29", ReturnErr: errors.New("export failed")}
+
+	results, err := scatest.Run(t.Context(), NewPlugin(client, mockConverter(), ""), testLogger, tmpDir, ecosystems.NewPluginOptions())
+
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Error(t, results[0].Error)
+	assert.Equal(t, map[string]string{metadata.UvVersion: "0.9.29"}, results[0].ResolverMetadata.VersionBuildInfo)
+}
