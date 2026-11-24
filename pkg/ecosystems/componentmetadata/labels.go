@@ -112,8 +112,8 @@ func (l Labels) AddDistributionURL(rawURL string) bool {
 // false for anything other than an absolute http or https URL, which rules out
 // path, file and VCS sources.
 //
-// A URL with an "auth" path segment is rejected outright: MyGet's
-// pre-authenticated feeds (/F/<feed>/auth/<key>/) carry the API key there, and
+// A MyGet pre-authenticated feed URL (/F/<feed>/auth/<key>/) is rejected
+// outright: the API key is in the path, and
 // a missing URL costs far less than a key in a shared SBOM. Other tokens
 // embedded in a path cannot be recognized and are kept, as in the TypeScript
 // producers.
@@ -138,9 +138,14 @@ func SanitizeURL(rawURL string) (string, bool) {
 	return u.String(), true
 }
 
+// hasAuthSegment reports MyGet's pre-authenticated feed shape,
+// /F/<feed>/auth/<key>/..., where the segment after "auth" is the API key.
+// It matches only that shape: a package, crate or feed can itself be called
+// "auth", and its URL must keep working.
 func hasAuthSegment(path string) bool {
-	for _, segment := range strings.Split(path, "/") {
-		if strings.EqualFold(segment, "auth") {
+	segments := strings.Split(path, "/")
+	for i := 2; i+1 < len(segments); i++ {
+		if strings.EqualFold(segments[i], "auth") && strings.EqualFold(segments[i-2], "F") && segments[i+1] != "" {
 			return true
 		}
 	}

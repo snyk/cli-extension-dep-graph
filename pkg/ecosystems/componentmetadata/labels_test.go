@@ -124,6 +124,14 @@ func TestSanitizeURL(t *testing.T) {
 		{"rejects a pre-authenticated feed path", "https://www.myget.org/F/feed/auth/1111-2222/api/v3/index.json", "", false},
 		{"rejects an auth segment in any case", "https://h/F/feed/AUTH/key/index.json", "", false},
 		{"keeps a path that only mentions auth", "https://h/oauth/authors/index.json", "https://h/oauth/authors/index.json", true},
+		// A package can be called auth; only MyGet's /F/<feed>/auth/<key>/ shape carries a key.
+		{
+			"keeps a nuget.org package named auth",
+			"https://api.nuget.org/v3-flatcontainer/auth/1.0.0/auth.1.0.0.nupkg",
+			"https://api.nuget.org/v3-flatcontainer/auth/1.0.0/auth.1.0.0.nupkg", true,
+		},
+		{"keeps a crate named auth", "https://static.crates.io/crates/auth/0.1.0/download", "https://static.crates.io/crates/auth/0.1.0/download", true},
+		{"keeps a feed named auth", "https://h/F/auth/api/v3/index.json", "https://h/F/auth/api/v3/index.json", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
