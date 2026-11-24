@@ -368,3 +368,12 @@ func TestPipfile_ToRequirements(t *testing.T) {
 
 // wantFileURL is the RFC 8089 form pip accepts in a direct reference.
 func wantFileURL(path string) string { return "file://" + path }
+
+// Without the component-metadata flag, a file entry resolves by name with its
+// extras, exactly as before the flag existed.
+func TestPipfile_ToPackageNames_FileEntryKeepsExtras(t *testing.T) {
+	p := &Pipfile{Packages: map[string]interface{}{
+		"pkg": map[string]interface{}{"file": "https://files.example/pkg-1.0.tar.gz", "extras": []interface{}{"cli"}},
+	}}
+	assert.Equal(t, []string{"pkg[cli]"}, p.ToPackageNames(false))
+}

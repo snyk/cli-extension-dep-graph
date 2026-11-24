@@ -155,9 +155,6 @@ func extractComplexPackageName(name string, spec map[string]interface{}) string 
 	if _, ok := spec["url"].(string); ok {
 		return name
 	}
-	if _, ok := spec["file"].(string); ok {
-		return name
-	}
 
 	return withExtras(name, spec)
 }
