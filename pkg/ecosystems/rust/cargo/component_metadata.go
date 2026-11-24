@@ -199,7 +199,7 @@ func (r *registryConfigs) lookup(indexURL string) (string, bool) {
 	}
 	dirName := regexp.MustCompile(`^` + regexp.QuoteMeta(host) + `-[0-9a-f]{16}$`)
 
-	indexDir := filepath.Join(r.cargoHome, "registry", registryIndexDir)
+	indexDir := filepath.Join(r.cargoHome, registryIndexPath)
 	entries, err := os.ReadDir(indexDir)
 	if err != nil {
 		return "", false
@@ -238,8 +238,8 @@ func readRegistryDL(path string) (string, bool) {
 const (
 	// cargoHomeEnv overrides cargo's home directory, as cargo itself reads it.
 	cargoHomeEnv = "CARGO_HOME"
-	// registryIndexDir is where cargo caches registry indexes under its home.
-	registryIndexDir = "index"
+	// registryIndexPath is where cargo caches registry indexes under its home.
+	registryIndexPath = "registry/index"
 )
 
 // cargoHomeDir follows cargo's default: $CARGO_HOME, else ~/.cargo.
