@@ -173,3 +173,34 @@ func TestPlugin_ErrorResultsCarryUvVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestPlugin_ObservesUvVersionOncePerScan(t *testing.T) {
+	tmpDir := createFiles(t, "a/uv.lock", "a/pyproject.toml", "b/uv.lock", "b/pyproject.toml")
+	var observed []string
+	plugin := NewPlugin(&MockClient{UvVersion: "0.12.5"}, mockConverter(), "",
+		WithVersionObserver(func(v string) { observed = append(observed, v) }))
+
+	results, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, ecosystems.NewPluginOptions().WithAllProjects(true))
+
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	assert.Equal(t, []string{"0.12.5"}, observed, "two lockfiles, one scan, one observation")
+}
+
+func TestPlugin_DoesNotObserveAnUnknownUvVersion(t *testing.T) {
+	for name, client := range map[string]*MockClient{
+		"version error": {VersionErr: errors.New("boom")},
+		"empty version": {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			tmpDir := createFiles(t, "uv.lock", "pyproject.toml")
+			observed := false
+			plugin := NewPlugin(client, mockConverter(), "", WithVersionObserver(func(string) { observed = true }))
+
+			_, err := scatest.Run(t.Context(), plugin, testLogger, tmpDir, ecosystems.NewPluginOptions())
+
+			require.NoError(t, err)
+			assert.False(t, observed)
+		})
+	}
+}

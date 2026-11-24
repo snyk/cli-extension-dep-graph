@@ -16,6 +16,7 @@ import (
 	"github.com/rs/zerolog"
 	dg "github.com/snyk/dep-graph/go/pkg/depgraph"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
+	"github.com/snyk/go-application-framework/pkg/analytics"
 	"github.com/snyk/go-application-framework/pkg/configuration"
 	gafmocks "github.com/snyk/go-application-framework/pkg/mocks"
 	"github.com/snyk/go-application-framework/pkg/networking"
@@ -2275,4 +2276,32 @@ func TestBuildPluginOptions_DetectionDepth(t *testing.T) {
 			assert.Equal(t, tt.wantDepth, opts.Global.DetectionDepth)
 		})
 	}
+}
+
+// recordingAnalytics records extension values; the embedded interface is nil,
+// so any other call panics and shows up as a test failure.
+type recordingAnalytics struct {
+	analytics.Analytics
+	calls []string
+}
+
+func (r *recordingAnalytics) AddExtensionStringValue(key, value string) {
+	r.calls = append(r.calls, key+"="+value)
+}
+
+func Test_reportUvVersion_addsTheVersionToCLIAnalyticsOnce(t *testing.T) {
+	tc := setupTestContext(t, false)
+	recorder := &recordingAnalytics{}
+	tc.invocationContext.EXPECT().GetAnalytics().Return(recorder).Times(1)
+
+	reportUvVersion(tc.invocationContext)("0.12.22")
+
+	assert.Equal(t, []string{"uvVersion=0.12.22"}, recorder.calls)
+}
+
+func Test_reportUvVersion_toleratesNilAnalytics(t *testing.T) {
+	tc := setupTestContext(t, false)
+	tc.invocationContext.EXPECT().GetAnalytics().Return(nil).Times(1)
+
+	assert.NotPanics(t, func() { reportUvVersion(tc.invocationContext)("0.12.22") })
 }
