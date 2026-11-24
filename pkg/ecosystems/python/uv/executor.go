@@ -15,9 +15,14 @@ import (
 
 var minVersion = Version{0, 9, 29}
 
+var versionPattern = regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
+
 // cmdExecutor interface for executing commands mockable.
 type cmdExecutor interface {
 	Execute(binary, dir string, args ...string) ([]byte, error)
+	// VersionOutput runs `binary --version` alone, without the version check
+	// Execute makes first, so reading the version starts the binary once.
+	VersionOutput(binary string) ([]byte, error)
 }
 
 // uvCmdExecutor is the cmdExecutor implementation for the uv command, handling its execution and output capture.
@@ -55,6 +60,18 @@ func (e *uvCmdExecutor) Execute(binary, dir string, args ...string) ([]byte, err
 	return stdout.Bytes(), nil
 }
 
+func (e *uvCmdExecutor) VersionOutput(binary string) ([]byte, error) {
+	resolvedBinary, err := exec.LookPath(binary)
+	if err != nil {
+		return nil, fmt.Errorf("%s binary not found in PATH: %w", binary, err)
+	}
+	output, err := exec.Command(resolvedBinary, "--version").Output() //nolint:noctx // No context available in this function
+	if err != nil {
+		return output, fmt.Errorf("running %s --version: %w", binary, err)
+	}
+	return output, nil
+}
+
 func checkVersion(binary string) error {
 	cmd := exec.Command(binary, "--version") //nolint:noctx // No context available in this function
 	output, err := cmd.Output()
@@ -68,8 +85,7 @@ func checkVersion(binary string) error {
 }
 
 func parseAndValidateVersion(binary, versionOutput string) error {
-	versionRe := regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
-	matches := versionRe.FindStringSubmatch(versionOutput)
+	matches := versionPattern.FindStringSubmatch(versionOutput)
 	// First element in matches is the full match, remainder are capture groups
 	if len(matches) < 4 {
 		return clierrors.NewGeneralSCAFailureError(

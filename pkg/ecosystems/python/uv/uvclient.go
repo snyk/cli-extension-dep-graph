@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	clierrors "github.com/snyk/error-catalog-golang-public/cli"
@@ -23,6 +24,8 @@ const (
 
 type Client interface {
 	ExportSBOM(inputDir string, opts *scaecosystems.SCAPluginOptions) (Sbom, error)
+	// Version reports the uv binary's version, such as "0.12.5".
+	Version() (string, error)
 }
 
 type client struct {
@@ -206,4 +209,25 @@ func isOutOfSyncLockfileError(err error) bool {
 func isOutOfSyncLockfileMessage(errMsg string) bool {
 	errMsg = strings.ToLower(errMsg)
 	return strings.Contains(errMsg, "lockfile") && strings.Contains(errMsg, "needs to be updated")
+}
+
+// uvVersionLine matches uv's own `uv X.Y.Z` line, on any line of the output,
+// so that a version in a shim's warning line (`mise WARN 2026.1.3 ...`) is
+// never taken for uv's. A prerelease such as 0.12.5-alpha.1 reads as its base
+// version, 0.12.5.
+var uvVersionLine = regexp.MustCompile(`(?m)^uv (\d+\.\d+\.\d+)`)
+
+// Version reports the uv binary's version, such as "0.12.5". Resolver
+// metadata carries it, so that support for old uv versions can be dropped on
+// evidence of who still runs them.
+func (c client) Version() (string, error) {
+	output, err := c.executor.VersionOutput(c.uvBinary)
+	if err != nil {
+		return "", fmt.Errorf("reading the uv version: %w", err)
+	}
+	matches := uvVersionLine.FindStringSubmatch(string(output))
+	if matches == nil {
+		return "", fmt.Errorf("unable to parse uv version from output: %q", strings.TrimSpace(string(output)))
+	}
+	return matches[1], nil
 }

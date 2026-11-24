@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 
@@ -16,6 +17,7 @@ import (
 	scaecosystems "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/discovery"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
+	resolvermeta "github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/metadata"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/identity"
 )
 
@@ -76,6 +78,8 @@ func (p Plugin) BuildDepGraphsFromDir(
 		return nil
 	}
 
+	scan := p.newScan(ctx, log)
+
 	for _, file := range files {
 		lockFilePath := file.RelPath // e.g., "uv.lock" or "project1/uv.lock"
 		lockFileDir := filepath.Dir(lockFilePath)
@@ -103,7 +107,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 			}
 			continue
 		}
-		emitted, err := p.buildResults(ctx, sbom, lockFilePath, lockFileDir, options, log, onGraph)
+		emitted, err := p.buildResults(ctx, sbom, lockFilePath, lockFileDir, scan, options, log, onGraph)
 		if err != nil {
 			return err
 		}
@@ -125,6 +129,7 @@ func (p Plugin) buildResults(
 	sbom Sbom,
 	lockFilePath string,
 	lockFileDir string,
+	scan scanState,
 	options *scaecosystems.SCAPluginOptions,
 	log logger.Logger,
 	onGraph scaecosystems.OnGraphFunc,
@@ -176,7 +181,7 @@ func (p Plugin) buildResults(
 	emitted := 0
 	for _, depGraph := range depGraphs {
 		workspacePackage := findWorkspacePackage(depGraph, workspacePackages)
-		result := buildSCAResult(depGraph, lockFileDir, workspacePackage)
+		result := buildSCAResult(depGraph, lockFileDir, workspacePackage, scan.versionBuildInfo)
 		if emitErr := onGraph(result); emitErr != nil {
 			return emitted, emitErr
 		}
@@ -188,7 +193,12 @@ func (p Plugin) buildResults(
 
 // buildSCAResult constructs the SCAResult for a single dep-graph, deriving the
 // manifest path and processed files from the (optional) workspace package.
-func buildSCAResult(depGraph *depgraph.DepGraph, lockFileDir string, workspacePackage *WorkspacePackage) scaecosystems.SCAResult {
+func buildSCAResult(
+	depGraph *depgraph.DepGraph,
+	lockFileDir string,
+	workspacePackage *WorkspacePackage,
+	versionBuildInfo map[string]string,
+) scaecosystems.SCAResult {
 	var manifestFile string
 	switch {
 	case workspacePackage != nil:
@@ -225,10 +235,33 @@ func buildSCAResult(depGraph *depgraph.DepGraph, lockFileDir string, workspacePa
 		ResolverMetadata: &scaecosystems.ResolverMetadata{
 			PluginName:           PluginName,
 			NormalisedTargetFile: manifestFile,
-			VersionBuildInfo:     map[string]string{},
+			// A copy per result, so that no consumer can change another's.
+			VersionBuildInfo: maps.Clone(versionBuildInfo),
 		},
 		ProcessedFiles: processedFiles,
 	}
+}
+
+// scanState holds what is read once per scan and shared by every lockfile in
+// it.
+type scanState struct {
+	versionBuildInfo map[string]string
+}
+
+// newScan asks the client for the uv version once per scan. A version that
+// cannot be read is logged and left out: it is diagnostic data and must not
+// fail a scan that would otherwise succeed.
+func (p Plugin) newScan(ctx context.Context, log logger.Logger) scanState {
+	scan := scanState{versionBuildInfo: map[string]string{}}
+	version, err := p.client.Version()
+	if err != nil {
+		log.Debug(ctx, "Could not read the uv version for resolver metadata", logger.Err(err))
+		return scan
+	}
+	if version != "" {
+		scan.versionBuildInfo[resolvermeta.UvVersion] = version
+	}
+	return scan
 }
 
 // sbomMetadata is the minimal metadata needed to construct an empty dep-graph

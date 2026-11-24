@@ -8,6 +8,17 @@ type MockClient struct {
 	CalledDirs []string
 	ReturnErr  error
 	ErrorDirs  map[string]error
+
+	// UvVersion and VersionErr are what Version returns; an empty UvVersion
+	// with no error reads as an unknown version.
+	UvVersion    string
+	VersionErr   error
+	VersionCalls int
+}
+
+func (m *MockClient) Version() (string, error) {
+	m.VersionCalls++
+	return m.UvVersion, m.VersionErr
 }
 
 func (m *MockClient) ExportSBOM(inputDir string, _ *ecosystems.SCAPluginOptions) (Sbom, error) {
