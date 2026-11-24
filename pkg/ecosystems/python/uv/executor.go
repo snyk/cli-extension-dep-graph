@@ -11,6 +11,8 @@ import (
 	clierrors "github.com/snyk/error-catalog-golang-public/cli"
 	snykerrors "github.com/snyk/error-catalog-golang-public/snyk"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
+
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/childenv"
 )
 
 var minVersion = Version{0, 9, 29}
@@ -40,6 +42,11 @@ func (e *uvCmdExecutor) Execute(binary, dir string, args ...string) ([]byte, err
 
 	cmd := exec.Command(resolvedBinary, args...) //nolint:noctx // No context available in this function
 	cmd.Dir = dir
+	env, err := childenv.Environ(cmd.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("prepare uv command: %w", err)
+	}
+	cmd.Env = env
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -57,6 +64,11 @@ func (e *uvCmdExecutor) Execute(binary, dir string, args ...string) ([]byte, err
 
 func checkVersion(binary string) error {
 	cmd := exec.Command(binary, "--version") //nolint:noctx // No context available in this function
+	env, err := childenv.Environ(cmd.Dir)
+	if err != nil {
+		return fmt.Errorf("prepare %s version check: %w", binary, err)
+	}
+	cmd.Env = env
 	output, err := cmd.Output()
 	if err != nil {
 		return clierrors.NewGeneralSCAFailureError(

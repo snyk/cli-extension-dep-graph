@@ -14,6 +14,7 @@ import (
 	"github.com/snyk/error-catalog-golang-public/snyk"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/childenv"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 )
 
@@ -164,6 +165,11 @@ type DefaultExecutor struct{}
 // Execute runs a command with optional stdin input and returns its stdout output.
 func (e *DefaultExecutor) Execute(ctx context.Context, stdin, name string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+	env, err := childenv.Environ(cmd.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("prepare %s command: %w", name, err)
+	}
+	cmd.Env = env
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
