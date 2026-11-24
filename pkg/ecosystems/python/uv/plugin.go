@@ -78,12 +78,12 @@ func (p Plugin) BuildDepGraphsFromDir(
 		return nil
 	}
 
-	scan := p.newScan(ctx, log)
+	scan := p.newScan(ctx, log, options)
 
 	for _, file := range files {
 		lockFilePath := file.RelPath // e.g., "uv.lock" or "project1/uv.lock"
 		lockFileDir := filepath.Dir(lockFilePath)
-		log.Info(ctx, "Building dependency graph", logger.Attr("lockFile", lockFilePath)) //nolint:goconst // logger key, not worth a constant
+		log.Info(ctx, "Building dependency graph", logger.Attr("lockFile", lockFilePath))
 
 		sbom, err := p.client.ExportSBOM(filepath.Dir(file.Path), options)
 		if err != nil {
@@ -178,6 +178,10 @@ func (p Plugin) buildResults(
 		}
 	}
 
+	if scan.componentMetadata {
+		labelComponents(ctx, log, sbom, depGraphs, lockFilePath)
+	}
+
 	emitted := 0
 	for _, depGraph := range depGraphs {
 		workspacePackage := findWorkspacePackage(depGraph, workspacePackages)
@@ -246,20 +250,34 @@ func buildSCAResult(
 // it.
 type scanState struct {
 	versionBuildInfo map[string]string
+	// componentMetadata is set when packages are to be labeled with their
+	// artifact's hashes and URL.
+	componentMetadata bool
 }
 
 // newScan asks the client for the uv version once per scan. A version that
 // cannot be read is logged and left out: it is diagnostic data and must not
 // fail a scan that would otherwise succeed.
-func (p Plugin) newScan(ctx context.Context, log logger.Logger) scanState {
+func (p Plugin) newScan(ctx context.Context, log logger.Logger, options *scaecosystems.SCAPluginOptions) scanState {
 	scan := scanState{versionBuildInfo: map[string]string{}}
 	version, err := p.client.Version()
 	if err != nil {
 		log.Debug(ctx, "Could not read the uv version for resolver metadata", logger.Err(err))
-		return scan
-	}
-	if version != "" {
+		version = ""
+	} else if version != "" {
 		scan.versionBuildInfo[resolvermeta.UvVersion] = version
+	}
+
+	if options.Global.IncludeComponentMetadata {
+		scan.componentMetadata = supportsComponentMetadata(version)
+		switch {
+		case scan.componentMetadata:
+		case version == "":
+			log.Info(ctx, "Could not read the uv version; no component hashes emitted")
+		default:
+			log.Info(ctx, "Leaving uv packages without component metadata: uv exports artifact hashes from "+
+				formatVersion(minComponentMetadataVersion), logger.Attr("uvVersion", version))
+		}
 	}
 	return scan
 }

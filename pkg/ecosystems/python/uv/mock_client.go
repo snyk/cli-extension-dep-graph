@@ -8,6 +8,8 @@ type MockClient struct {
 	CalledDirs []string
 	ReturnErr  error
 	ErrorDirs  map[string]error
+	// SBOM, when set, is what ExportSBOM returns in place of the built-in one.
+	SBOM Sbom
 
 	// UvVersion and VersionErr are what Version returns; an empty UvVersion
 	// with no error reads as an unknown version.
@@ -32,6 +34,9 @@ func (m *MockClient) ExportSBOM(inputDir string, _ *ecosystems.SCAPluginOptions)
 
 	if m.ReturnErr != nil {
 		return nil, m.ReturnErr
+	}
+	if m.SBOM != nil {
+		return m.SBOM, nil
 	}
 
 	sbom := `{
