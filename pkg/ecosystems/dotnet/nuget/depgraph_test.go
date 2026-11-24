@@ -3,6 +3,8 @@ package nuget
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"sort"
 	"testing"
 
@@ -311,9 +313,11 @@ func TestBuildDepGraph_CycleYieldsPrunedLeaf(t *testing.T) {
 	assert.ElementsMatch(t, []string{"RootProject@1.0.0", "Top@1.0.0", "Loop@1.0.0"}, pkgIDs(graph.Pkgs))
 }
 
-// A ProjectReference appears in `targets` as type "project". Upstream never
-// inspects the type, so it becomes an ordinary node named after the project.
-func TestBuildDepGraph_ProjectReferenceIsAnOrdinaryNode(t *testing.T) {
+// A ProjectReference appears in `targets` as type "project". It is a local
+// project, not a package, so it gets no node: a node named after it would be
+// matched to whichever registry package shares the name. Its dependencies move
+// up to the project's parent.
+func TestBuildDepGraph_ProjectReferenceIsNotANode(t *testing.T) {
 	graph := build(t, `{
       "targets": {
         "net8.0": {
@@ -328,8 +332,114 @@ func TestBuildDepGraph_ProjectReferenceIsAnOrdinaryNode(t *testing.T) {
       "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
     }`)
 
-	assert.Equal(t, []string{"Referenced@1.0.0"}, depsOf(t, graph, graph.Graph.RootNodeID))
-	assert.Equal(t, []string{"Newtonsoft.Json@13.0.3"}, depsOf(t, graph, "Referenced@1.0.0"))
+	assert.Equal(t, []string{"Newtonsoft.Json@13.0.3"}, depsOf(t, graph, graph.Graph.RootNodeID))
+	assert.ElementsMatch(t, []string{"RootProject@1.0.0", "Newtonsoft.Json@13.0.3"}, pkgIDs(graph.Pkgs))
+}
+
+// The shape a real restore writes: a consumer that references a local project
+// named like a registry package, and that project depends on log4net. The
+// fixture is the targets section of `dotnet restore` output (SDK 8.0.428).
+func TestBuildDepGraph_LocalProjectNamedLikeAPackageIsAbsent(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("testdata", "acceptance", "project-reference-shadows-package", "obj", "project.assets.json"))
+	require.NoError(t, err)
+
+	assets := assetsFrom(t, string(raw))
+	graph, err := buildDepGraph(t.Context(), assets, "Consumer", assets.matchTargetsKey("net8.0"))
+	require.NoError(t, err)
+
+	assert.NotContains(t, pkgIDs(graph.Pkgs), "Communicator@1.0.0")
+
+	for _, node := range graph.Graph.Nodes {
+		assert.NotContains(t, node.NodeID, "Communicator")
+	}
+
+	assert.Equal(t, []string{"log4net@2.0.17"}, depsOf(t, graph, graph.Graph.RootNodeID))
+	assert.Contains(t, depsOf(t, graph, "log4net@2.0.17"), "System.Configuration.ConfigurationManager@4.5.0")
+}
+
+// A project reached through another project is dropped too, and what it brings
+// ends up on the nearest package or root above the chain.
+func TestBuildDepGraph_NestedProjectReferencesAreFlattened(t *testing.T) {
+	graph := build(t, `{
+      "targets": {
+        "net8.0": {
+          "Outer/1.0.0": { "type": "project", "dependencies": { "Inner": "1.0.0", "Serilog": "3.1.1" } },
+          "Inner/1.0.0": { "type": "project", "dependencies": { "log4net": "2.0.17" } },
+          "log4net/2.0.17": { "type": "package", "dependencies": { "Leaf": "1.0.0" } },
+          "Leaf/1.0.0": { "type": "package" },
+          "Serilog/3.1.1": { "type": "package" }
+        }
+      },
+      "projectFileDependencyGroups": { "net8.0": [ "Outer >= 1.0.0" ] },
+      "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
+    }`)
+
+	assert.Equal(t, []string{"Serilog@3.1.1", "log4net@2.0.17"}, depsOf(t, graph, graph.Graph.RootNodeID))
+	assert.Equal(t, []string{"Leaf@1.0.0"}, depsOf(t, graph, "log4net@2.0.17"))
+	assert.ElementsMatch(t,
+		[]string{"RootProject@1.0.0", "Serilog@3.1.1", "log4net@2.0.17", "Leaf@1.0.0"}, pkgIDs(graph.Pkgs))
+}
+
+// A package that the root and a referenced project both depend on is one node
+// with one edge from the root. Moving the project's dependencies up must not
+// read the second route as a repeat and prune it.
+func TestBuildDepGraph_ProjectReferenceSharingADirectDependency(t *testing.T) {
+	for name, direct := range map[string]string{
+		"direct dependency first": `"log4net >= 2.0.17", "Referenced >= 1.0.0"`,
+		"project first":           `"Referenced >= 1.0.0", "log4net >= 2.0.17"`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			graph := build(t, `{
+      "targets": {
+        "net8.0": {
+          "Referenced/1.0.0": { "type": "project", "dependencies": { "log4net": "2.0.17" } },
+          "log4net/2.0.17": { "type": "package" }
+        }
+      },
+      "projectFileDependencyGroups": { "net8.0": [ `+direct+` ] },
+      "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
+    }`)
+
+			assert.Equal(t, []string{"log4net@2.0.17"}, depsOf(t, graph, graph.Graph.RootNodeID))
+			assert.ElementsMatch(t, []string{"RootProject@1.0.0", "log4net@2.0.17"}, pkgIDs(graph.Pkgs))
+		})
+	}
+}
+
+// NuGet rejects a circular ProjectReference at restore, so the file should not
+// exist; a hand-edited one must still finish.
+func TestBuildDepGraph_CircularProjectReferencesTerminate(t *testing.T) {
+	graph := build(t, `{
+      "targets": {
+        "net8.0": {
+          "A/1.0.0": { "type": "project", "dependencies": { "B": "1.0.0", "log4net": "2.0.17" } },
+          "B/1.0.0": { "type": "project", "dependencies": { "A": "1.0.0" } },
+          "log4net/2.0.17": { "type": "package" }
+        }
+      },
+      "projectFileDependencyGroups": { "net8.0": [ "A >= 1.0.0" ] },
+      "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
+    }`)
+
+	assert.Equal(t, []string{"log4net@2.0.17"}, depsOf(t, graph, graph.Graph.RootNodeID))
+	assert.ElementsMatch(t, []string{"RootProject@1.0.0", "log4net@2.0.17"}, pkgIDs(graph.Pkgs))
+}
+
+// A package entry whose `type` is absent or unrecognized stays a package: only
+// the value NuGet writes for a local project removes a node.
+func TestBuildDepGraph_OnlyProjectTypeEntriesAreDropped(t *testing.T) {
+	graph := build(t, `{
+      "targets": {
+        "net8.0": {
+          "NoType/1.0.0": {},
+          "Other/1.0.0": { "type": "unknown" }
+        }
+      },
+      "projectFileDependencyGroups": { "net8.0": [ "NoType >= 1.0.0", "Other >= 1.0.0" ] },
+      "project": { "version": "1.0.0", "frameworks": { "net8.0": {} } }
+    }`)
+
+	assert.Equal(t, []string{"NoType@1.0.0", "Other@1.0.0"}, depsOf(t, graph, graph.Graph.RootNodeID))
 }
 
 // A shared subtree is re-walked once per path that reaches it, matching
