@@ -159,6 +159,7 @@ func (p Plugin) buildResults(
 			ResolverMetadata: &scaecosystems.ResolverMetadata{
 				PluginName:           PluginName,
 				NormalisedTargetFile: lockFilePath,
+				VersionBuildInfo:     maps.Clone(scan.versionBuildInfo),
 			},
 			Error: noRootErr,
 		})
@@ -176,7 +177,7 @@ func (p Plugin) buildResults(
 		depGraphs = filterDepGraphsByName(depGraphs, workspaceMember)
 		if len(depGraphs) == 0 {
 			log.Info(ctx, "Workspace package not found", logger.Attr("workspacePackage", workspaceMember), logger.Attr("lockFile", lockFilePath))
-			return 1, onGraph(workspacePackageNotFoundResult(workspaceMember, lockFilePath))
+			return 1, onGraph(workspacePackageNotFoundResult(workspaceMember, lockFilePath, scan.versionBuildInfo))
 		}
 	}
 
@@ -365,7 +366,7 @@ func filterDepGraphsByName(depGraphs []*depgraph.DepGraph, name string) []*depgr
 
 // workspacePackageNotFoundResult builds a single errored result for a requested
 // workspace member that is not present in the exported workspace.
-func workspacePackageNotFoundResult(pkg, lockFilePath string) scaecosystems.SCAResult {
+func workspacePackageNotFoundResult(pkg, lockFilePath string, versionBuildInfo map[string]string) scaecosystems.SCAResult {
 	return scaecosystems.SCAResult{
 		ProjectDescriptor: identity.ProjectDescriptor{
 			Identity: identity.ProjectIdentity{
@@ -376,6 +377,7 @@ func workspacePackageNotFoundResult(pkg, lockFilePath string) scaecosystems.SCAR
 		ResolverMetadata: &scaecosystems.ResolverMetadata{
 			PluginName:           PluginName,
 			NormalisedTargetFile: lockFilePath,
+			VersionBuildInfo:     maps.Clone(versionBuildInfo),
 		},
 		Error: clierrors.NewGeneralSCAFailureError(fmt.Sprintf("Workspace package '%s' not found.", pkg)),
 	}

@@ -149,3 +149,27 @@ func TestPlugin_ExportFailureCarriesUvVersion(t *testing.T) {
 	require.Error(t, results[0].Error)
 	assert.Equal(t, map[string]string{metadata.UvVersion: "0.9.29"}, results[0].ResolverMetadata.VersionBuildInfo)
 }
+
+// Every error result of a scan carries the uv version, not only successes.
+func TestPlugin_ErrorResultsCarryUvVersion(t *testing.T) {
+	tests := map[string]struct {
+		sbom    []byte
+		options *ecosystems.SCAPluginOptions
+	}{
+		"workspace with no root project": {virtualWorkspaceSBOMJSON, ecosystems.NewPluginOptions()},
+		"workspace package not found":    {workspaceSBOMJSON, ecosystems.NewPluginOptions().WithWorkspacePackage("no-such-member")},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			tmpDir := createFiles(t, "uv.lock", "pyproject.toml")
+			client := &MockClient{UvVersion: "0.12.5", SBOM: Sbom(tt.sbom)}
+
+			results, err := scatest.Run(t.Context(), NewPlugin(client, mockConverter(createTestDepGraph("member", "1.0.0")), ""), testLogger, tmpDir, tt.options)
+
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			require.Error(t, results[0].Error)
+			assert.Equal(t, map[string]string{metadata.UvVersion: "0.12.5"}, results[0].ResolverMetadata.VersionBuildInfo)
+		})
+	}
+}
