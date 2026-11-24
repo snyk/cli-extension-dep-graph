@@ -234,12 +234,19 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 		)
 	}
 
-	// Check for package not found errors
+	// Check for package not found errors. Pip often prints this after a private-index
+	// 401/403/TLS failure, so when those signals are present keep SNYK-OS-PYTHON-0004
+	// but hint that authentication was the likely cause. Auth detection only runs on this
+	// branch, so a Requires-Python classification that wins earlier keeps precedence.
 	if strings.Contains(stderr, "Could not find a version") ||
 		strings.Contains(stderr, "No matching distribution") ||
 		strings.Contains(stderr, "Could not find a version that satisfies") {
+		msg := fmt.Sprintf("Package not found: %s", stderr)
+		if looksLikePrivateIndexAuthFailure(stderr) {
+			msg = msg + "\n" + privateIndexAuthHint
+		}
 		return ecosystems.NewPythonPackageNotFoundError(
-			fmt.Sprintf("Package not found: %s", stderr),
+			msg,
 			snyk_errors.WithCause(errors.New(stderr)),
 		)
 	}
@@ -281,6 +288,45 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 		fmt.Sprintf("Pip install failed: %s", stderr),
 		snyk_errors.WithCause(errors.New(stderr)),
 	)
+}
+
+// privateIndexAuthHint is appended to SNYK-OS-PYTHON-0004 when pip's package-not-found
+// output also shows that a private index rejected credentials or failed TLS verification.
+// There is no Python-specific private-index catalog error; Go/npm/NuGet credential codes
+// would mislead, so the code stays 0004 with this hint.
+const privateIndexAuthHint = "pip could not authenticate to a package index: " +
+	"check the index URL and credentials (pip.conf, PIP_INDEX_URL, netrc or your integration's registry credentials)."
+
+// looksLikePrivateIndexAuthFailure reports whether pip stderr shows an index authentication
+// or TLS failure. Patterns require pip's own phrasing (for example "401 Error"), not a bare
+// "401"/"403", which appear in version numbers, ports and URLs.
+func looksLikePrivateIndexAuthFailure(stderr string) bool {
+	if strings.Contains(stderr, "401 Error") ||
+		strings.Contains(stderr, "403 Client Error") ||
+		strings.Contains(stderr, "Credentials not correct") ||
+		strings.Contains(stderr, "Unauthorized for url") ||
+		strings.Contains(stderr, "SSLError") ||
+		strings.Contains(stderr, "CERTIFICATE_VERIFY_FAILED") {
+		return true
+	}
+	return containsStatusPhrase(stderr, "Client Error: 40") ||
+		containsStatusPhrase(stderr, "HTTP error 40")
+}
+
+// containsStatusPhrase reports whether stderr contains prefix immediately followed by a digit
+// (for example prefix "Client Error: 40" matches "Client Error: 401").
+func containsStatusPhrase(stderr, prefix string) bool {
+	for {
+		i := strings.Index(stderr, prefix)
+		if i < 0 {
+			return false
+		}
+		rest := stderr[i+len(prefix):]
+		if rest != "" && rest[0] >= '0' && rest[0] <= '9' {
+			return true
+		}
+		stderr = stderr[i+1:]
+	}
 }
 
 // extractFailedPackageName attempts to extract the package name from pip error output.
