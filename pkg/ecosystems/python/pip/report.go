@@ -234,6 +234,17 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 		)
 	}
 
+	// Prefer Python version mismatch over package-not-found when pip ignored the
+	// exact requested pin for Requires-Python. pip emits both messages for that
+	// case; matching on bare "Requires-Python" is too broad (older Pythons print
+	// Ignored…Requires-Python for unrelated packages even when the pin is missing).
+	if pinnedRequirementIgnoredForPythonVersion(stderr) {
+		return ecosystems.NewPipUnsupportedPythonVersionError(
+			fmt.Sprintf("Python version mismatch: %s", stderr),
+			snyk_errors.WithCause(errors.New(stderr)),
+		)
+	}
+
 	// Check for package not found errors
 	if strings.Contains(stderr, "Could not find a version") ||
 		strings.Contains(stderr, "No matching distribution") ||
@@ -281,6 +292,37 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 		fmt.Sprintf("Pip install failed: %s", stderr),
 		snyk_errors.WithCause(errors.New(stderr)),
 	)
+}
+
+// pinnedRequirementIgnoredForPythonVersion reports whether pip's stderr shows that
+// the exact pin from "Could not find a version that satisfies the requirement name==X"
+// was listed among versions ignored for a different Python version. Matching only the
+// pin's version (as "X Requires-Python") keeps unrelated Ignored…Requires-Python noise
+// from flipping a true package-not-found into a version-mismatch error.
+func pinnedRequirementIgnoredForPythonVersion(stderr string) bool {
+	const findPrefix = "Could not find a version that satisfies the requirement "
+	idx := strings.Index(stderr, findPrefix)
+	if idx == -1 {
+		return false
+	}
+	rest := stderr[idx+len(findPrefix):]
+	end := strings.IndexAny(rest, " \n\r\t")
+	req := rest
+	if end != -1 {
+		req = rest[:end]
+	}
+	eq := strings.LastIndex(req, "==")
+	if eq == -1 || eq+2 >= len(req) {
+		return false
+	}
+	version := req[eq+2:]
+
+	const ignoredMarker = "Ignored the following versions that require a different python version"
+	if !strings.Contains(stderr, ignoredMarker) {
+		return false
+	}
+	// pip lists ignored candidates as "VERSION Requires-Python …" (no package name).
+	return strings.Contains(stderr, version+" Requires-Python")
 }
 
 // extractFailedPackageName attempts to extract the package name from pip error output.

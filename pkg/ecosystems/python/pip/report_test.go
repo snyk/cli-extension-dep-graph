@@ -98,6 +98,33 @@ func TestClassifyPipError(t *testing.T) {
 			},
 			wantErrCode: "SNYK-OS-PYTHON-0004",
 		},
+		// Pinned version ignored for Requires-Python: pip also prints
+		// "No matching distribution" / "Could not find a version", which must
+		// not hide the Python version mismatch (SNYK-OS-PYTHON-0006).
+		"pinned_version_requires_newer_python": {
+			err: &pipError{
+				err: fmt.Errorf("exit status 1"),
+				stderr: "ERROR: Ignored the following versions that require a different python version: " +
+					"2.9.0 Requires-Python >=3.11; 2.9.1 Requires-Python >=3.11; 2.9.2 Requires-Python >=3.11\n" +
+					"ERROR: Could not find a version that satisfies the requirement dnspython==2.9.0 " +
+					"(from versions: 1.15.0, 2.0.0, 2.7.0, 2.8.0)\n" +
+					"ERROR: No matching distribution found for dnspython==2.9.0",
+			},
+			wantErrCode: "SNYK-OS-PYTHON-0006",
+		},
+		// On older Pythons pip may print Ignored…Requires-Python for unrelated
+		// packages even when the requested pin simply does not exist — still 0004.
+		"ignored_requires_python_for_unrelated_package": {
+			err: &pipError{
+				err: fmt.Errorf("exit status 1"),
+				stderr: "ERROR: Ignored the following versions that require a different python version: " +
+					"2.9.0 Requires-Python >=3.11; 2.9.1 Requires-Python >=3.11\n" +
+					"ERROR: Could not find a version that satisfies the requirement nonexistent-package==1.0.0 " +
+					"(from versions: none)\n" +
+					"ERROR: No matching distribution found for nonexistent-package==1.0.0",
+			},
+			wantErrCode: "SNYK-OS-PYTHON-0004",
+		},
 		"python_version_mismatch": {
 			err: &pipError{
 				err:    fmt.Errorf("exit status 1"),
