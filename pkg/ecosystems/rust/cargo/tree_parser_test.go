@@ -69,6 +69,39 @@ func TestParseTree(t *testing.T) {
 			},
 		},
 		{
+			name: "children keep emission order and repeats are collapsed",
+			input: `0my-app v0.1.0
+1zeta v1.0.0
+1alpha v1.0.0
+1zeta v1.0.0
+`,
+			wantRoot: "my-app@0.1.0",
+			wantEdges: map[string][]string{
+				"my-app@0.1.0": {"zeta@1.0.0", "alpha@1.0.0"},
+				"zeta@1.0.0":   {},
+				"alpha@1.0.0":  {},
+			},
+		},
+		{
+			name: "same crate under two parents (--no-dedupe) keeps one child list",
+			input: `0my-app v0.1.0
+1a v1.0.0
+2shared v1.0.0
+3leaf v1.0.0
+1b v1.0.0
+2shared v1.0.0
+3leaf v1.0.0
+`,
+			wantRoot: "my-app@0.1.0",
+			wantEdges: map[string][]string{
+				"my-app@0.1.0": {"a@1.0.0", "b@1.0.0"},
+				"a@1.0.0":      {"shared@1.0.0"},
+				"b@1.0.0":      {"shared@1.0.0"},
+				"shared@1.0.0": {"leaf@1.0.0"},
+				"leaf@1.0.0":   {},
+			},
+		},
+		{
 			name: "cycle marker (*) is treated as a leaf",
 			input: `0my-app v0.1.0
 1foo v1.0.0
@@ -150,12 +183,7 @@ func TestParseTree(t *testing.T) {
 				children, ok := out.Graph[parent]
 				require.True(t, ok, "expected node %q in graph", parent)
 
-				gotChildren := make([]string, 0, len(children))
-				for c := range children {
-					gotChildren = append(gotChildren, c)
-				}
-
-				assert.ElementsMatch(t, wantChildren, gotChildren, "children of %s", parent)
+				assert.Equal(t, wantChildren, children, "children of %s", parent)
 			}
 		})
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"slices"
 	"strconv"
 
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
@@ -76,7 +77,7 @@ func parseTree(ctx context.Context, log logger.Logger, r io.Reader) (*treeOutput
 		id := m[2] + "@" + m[3]
 
 		if _, exists := out.Graph[id]; !exists {
-			out.Graph[id] = make(map[string]struct{})
+			out.Graph[id] = []string{}
 		}
 
 		// Pop frames at or beyond current depth — they are no longer ancestors.
@@ -95,7 +96,9 @@ func parseTree(ctx context.Context, log logger.Logger, r io.Reader) (*treeOutput
 			}
 		case len(stack) > 0:
 			parent := stack[len(stack)-1].id
-			out.Graph[parent][id] = struct{}{}
+			if !slices.Contains(out.Graph[parent], id) {
+				out.Graph[parent] = append(out.Graph[parent], id)
+			}
 		default:
 			// Non-zero depth with no parent in scope: malformed output. Surface
 			// rather than silently dropping the edge.

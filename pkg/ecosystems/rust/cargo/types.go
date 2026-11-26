@@ -2,13 +2,12 @@ package cargo
 
 import "strings"
 
-// forwardGraph maps each full package ID ("name@version") to the set of package
-// IDs it directly depends on, as produced by `cargo tree --no-dedupe`.
+// forwardGraph maps each full package ID ("name@version") to the package IDs it
+// directly depends on, as produced by `cargo tree --no-dedupe`.
 //
-// Because cargo tree prints in parent-to-child order, we store forward edges
-// directly rather than inverting from a reverse adjacency (bun's why-output
-// shape).
-type forwardGraph map[string]map[string]struct{}
+// Children keep cargo tree's emission order (deduplicated) so the built graph
+// is deterministic; a map here would randomize node and edge order.
+type forwardGraph map[string][]string
 
 // treeOutput is the parsed result of one `cargo tree` invocation.
 type treeOutput struct {
