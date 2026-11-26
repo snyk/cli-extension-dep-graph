@@ -36,6 +36,8 @@ import (
 
 var updateGolden = flag.Bool("update", false, "overwrite expected.json golden files with current plugin output")
 
+const acceptanceRuns = 3
+
 type acceptanceFixture struct {
 	name string
 	dir  string
@@ -64,34 +66,40 @@ func TestAcceptance(t *testing.T) {
 		t.Skip("no acceptance fixtures yet — see testdata/acceptance/README.md for fixture-generation steps")
 	}
 
-	plugin := cargo.Plugin{}
-
 	for _, fx := range fixtures {
 		t.Run(fx.name, func(t *testing.T) {
-			results, err := scatest.Run(t.Context(), plugin, logger.Nop(), fx.dir, &ecosystems.SCAPluginOptions{})
-			require.NoError(t, err)
-			require.NotEmpty(t, results, "plugin returned no results for fixture %s", fx.name)
-
-			for _, r := range results {
-				require.NoError(t, r.Error, "fixture %s produced error result: %v", fx.name, r.Error)
-			}
-
-			// Match each result to its golden file by the root package name.
-			// Single-crate fixtures use expected.json; workspace fixtures use
-			// expected-<rootPkgName>.json so the matching is deterministic.
-			byRoot := make(map[string]*depgraph.DepGraph, len(results))
-			for _, r := range results {
-				byRoot[r.DepGraph.GetRootPkg().Info.Name] = r.DepGraph
-			}
-
 			if *updateGolden {
-				updateGoldenFiles(t, fx.dir, byRoot)
+				updateGoldenFiles(t, fx.dir, runFixture(t, fx))
 				return
 			}
 
-			compareAgainstGolden(t, fx.dir, byRoot)
+			// Goldens pin the exact output order, so repeated runs also catch nondeterminism.
+			for range acceptanceRuns {
+				compareAgainstGolden(t, fx.dir, runFixture(t, fx))
+			}
 		})
 	}
+}
+
+// runFixture runs the plugin on fx and returns its dep graphs keyed by root
+// package name, which is how goldens are matched: single-crate fixtures use
+// expected.json, workspace fixtures expected-<rootPkgName>.json.
+func runFixture(t *testing.T, fx acceptanceFixture) map[string]*depgraph.DepGraph {
+	t.Helper()
+
+	results, err := scatest.Run(t.Context(), cargo.Plugin{}, logger.Nop(), fx.dir, &ecosystems.SCAPluginOptions{})
+	require.NoError(t, err)
+	require.NotEmpty(t, results, "plugin returned no results for fixture %s", fx.name)
+
+	byRoot := make(map[string]*depgraph.DepGraph, len(results))
+
+	for _, r := range results {
+		require.NoError(t, r.Error, "fixture %s produced error result: %v", fx.name, r.Error)
+
+		byRoot[r.DepGraph.GetRootPkg().Info.Name] = r.DepGraph
+	}
+
+	return byRoot
 }
 
 // discoverFixtures finds all fixture directories under base that have both a
@@ -166,17 +174,7 @@ func updateGoldenFiles(t *testing.T, dir string, byRoot map[string]*depgraph.Dep
 	for rootName, dg := range byRoot {
 		path := goldenFilenameForRoot(dir, rootName, len(byRoot))
 
-		// Sort before serializing so committed goldens are stable across
-		// regenerations. cargo tree's sibling-emit order isn't fully
-		// deterministic (depends on internal hashmap iteration), and Go's
-		// map iteration is randomized on top — without sorting, every
-		// `go test -update` would produce noisy reorder-only diffs.
-		sortDepGraph(dg)
-
-		data, err := json.MarshalIndent(dg, "", "  ")
-		require.NoError(t, err, "marshaling dep graph for %s", rootName)
-
-		require.NoError(t, os.WriteFile(path, append(data, '\n'), 0o600), "writing %s", path)
+		require.NoError(t, os.WriteFile(path, marshalGolden(t, dg), 0o600), "writing %s", path)
 		t.Logf("updated %s", path)
 	}
 }
@@ -187,40 +185,18 @@ func compareAgainstGolden(t *testing.T, dir string, byRoot map[string]*depgraph.
 	for rootName, dg := range byRoot {
 		path := goldenFilenameForRoot(dir, rootName, len(byRoot))
 
-		raw, err := os.ReadFile(path)
+		want, err := os.ReadFile(path)
 		require.NoError(t, err, "reading %s — run with -update to regenerate", path)
 
-		expected, err := depgraph.UnmarshalJSON(raw)
-		require.NoError(t, err, "parsing %s", path)
-
-		assert.Equal(t, normalizedJSON(expected), normalizedJSON(dg), "mismatch in %s", path)
+		assert.Equal(t, string(want), string(marshalGolden(t, dg)), "mismatch in %s", path)
 	}
 }
 
-// sortDepGraph mutates dg in place to put all arrays into a deterministic
-// order: Pkgs by ID, Graph.Nodes by NodeID, each node's Deps by NodeID. Used
-// by both the comparison path (normalizedJSON) and the write path
-// (updateGoldenFiles) so the same ordering is enforced everywhere.
-func sortDepGraph(dg *depgraph.DepGraph) {
-	sort.Slice(dg.Pkgs, func(i, j int) bool { return dg.Pkgs[i].ID < dg.Pkgs[j].ID })
-	sort.Slice(dg.Graph.Nodes, func(i, j int) bool { return dg.Graph.Nodes[i].NodeID < dg.Graph.Nodes[j].NodeID })
-
-	for i := range dg.Graph.Nodes {
-		sort.Slice(dg.Graph.Nodes[i].Deps, func(a, b int) bool {
-			return dg.Graph.Nodes[i].Deps[a].NodeID < dg.Graph.Nodes[i].Deps[b].NodeID
-		})
-	}
-}
-
-// normalizedJSON marshals a dep graph to JSON with all arrays sorted so
-// comparisons are order-independent. Same pattern as bun's acceptance suite.
-func normalizedJSON(dg *depgraph.DepGraph) string {
-	sortDepGraph(dg)
+func marshalGolden(t *testing.T, dg *depgraph.DepGraph) []byte {
+	t.Helper()
 
 	data, err := json.MarshalIndent(dg, "", "  ")
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
-	return string(data)
+	return append(data, '\n')
 }

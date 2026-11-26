@@ -7,7 +7,8 @@ import (
 )
 
 // buildDepGraph produces a Snyk dep graph rooted at out.RootID by walking
-// out.Graph in DFS order. Nodes in stopAt are added as leaves: their incoming
+// out.Graph in DFS order, visiting children in cargo tree's emission order so
+// output is deterministic. Nodes in stopAt are added as leaves: their incoming
 // edge is connected, but the recursion does not descend into their subtree.
 //
 // stopAt is used for workspace member graphs to avoid duplicating the subtree
@@ -27,7 +28,7 @@ func buildDepGraph(out *treeOutput, stopAt map[string]struct{}) (*godepgraph.Dep
 	rootNodeID := builder.GetRootNode().NodeID
 	visited := make(map[string]bool)
 
-	for childID := range out.Graph[out.RootID] {
+	for _, childID := range out.Graph[out.RootID] {
 		if err := addNode(builder, rootNodeID, childID, out.Graph, stopAt, visited); err != nil {
 			return nil, err
 		}
@@ -56,7 +57,7 @@ func addNode(
 		builder.AddNode(id, &godepgraph.PkgInfo{Name: name, Version: version})
 
 		if _, stop := stopAt[id]; !stop {
-			for childID := range forward[id] {
+			for _, childID := range forward[id] {
 				if err := addNode(builder, id, childID, forward, stopAt, visited); err != nil {
 					return err
 				}
