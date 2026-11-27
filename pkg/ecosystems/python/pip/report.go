@@ -82,22 +82,6 @@ func GetInstallReport(ctx context.Context, log logger.Logger, requirementsFile s
 	return GetInstallReportWithExecutor(ctx, log, requirementsFile, noBuildIsolation, &DefaultExecutor{})
 }
 
-// GetInstallReportWithCommand is GetInstallReportWithExecutor run as
-// `<pythonCommand> -m pip`, or bare pip when pythonCommand is empty.
-func GetInstallReportWithCommand(
-	ctx context.Context,
-	log logger.Logger,
-	requirementsFile string,
-	noBuildIsolation bool,
-	pythonCommand string,
-	executor CommandExecutor,
-) (*Report, error) {
-	if requirementsFile == "" {
-		return nil, fmt.Errorf("requirements file path cannot be empty")
-	}
-	return runPipInstall(ctx, log, []string{"-r", requirementsFile}, nil, noBuildIsolation, pythonCommand, executor)
-}
-
 // GetInstallReportWithExecutor is a testable version that accepts a CommandExecutor.
 func GetInstallReportWithExecutor(
 	ctx context.Context,
@@ -106,7 +90,10 @@ func GetInstallReportWithExecutor(
 	noBuildIsolation bool,
 	executor CommandExecutor,
 ) (*Report, error) {
-	return GetInstallReportWithCommand(ctx, log, requirementsFile, noBuildIsolation, "", executor)
+	if requirementsFile == "" {
+		return nil, fmt.Errorf("requirements file path cannot be empty")
+	}
+	return runPipInstall(ctx, log, []string{"-r", requirementsFile}, nil, noBuildIsolation, executor)
 }
 
 // GetInstallReportFromPackages runs pip install with --dry-run and --report flags,
@@ -124,24 +111,10 @@ func GetInstallReportFromPackagesWithExecutor(
 	noBuildIsolation bool,
 	executor CommandExecutor,
 ) (*Report, error) {
-	return GetInstallReportFromPackagesWithCommand(ctx, log, packages, constraints, noBuildIsolation, "", executor)
-}
-
-// GetInstallReportFromPackagesWithCommand is
-// GetInstallReportFromPackagesWithExecutor run as `<pythonCommand> -m pip`,
-// or bare pip when pythonCommand is empty.
-func GetInstallReportFromPackagesWithCommand(
-	ctx context.Context,
-	log logger.Logger,
-	packages, constraints []string,
-	noBuildIsolation bool,
-	pythonCommand string,
-	executor CommandExecutor,
-) (*Report, error) {
 	if len(packages) == 0 {
 		return nil, fmt.Errorf("packages list cannot be empty")
 	}
-	return runPipInstall(ctx, log, packages, constraints, noBuildIsolation, pythonCommand, executor)
+	return runPipInstall(ctx, log, packages, constraints, noBuildIsolation, executor)
 }
 
 // runPipInstall executes pip install --dry-run and returns the parsed report.
@@ -157,7 +130,6 @@ func runPipInstall(
 	log logger.Logger,
 	packageArgs, constraints []string,
 	noBuildIsolation bool,
-	pythonCommand string,
 	executor CommandExecutor,
 ) (*Report, error) {
 	args := []string{
@@ -186,13 +158,7 @@ func runPipInstall(
 		args = append(args, "--index-url", indexURL)
 	}
 
-	name := "pip"
-	if pythonCommand != "" {
-		name = pythonCommand
-		args = append([]string{"-m", "pip"}, args...)
-	}
-
-	output, err := executor.Execute(ctx, stdinData, name, args...)
+	output, err := executor.Execute(ctx, stdinData, "pip", args...)
 	if err != nil {
 		return nil, classifyPipError(ctx, log, err)
 	}

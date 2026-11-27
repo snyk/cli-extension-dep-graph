@@ -33,8 +33,10 @@ func normalizePackageName(name string) string {
 type packageLookup struct {
 	nameToIndex map[string]int
 	install     []InstallItem
-	// labelComponents adds component-metadata labels to each node.
+	// labelComponents adds component-metadata labels to each node, except
+	// those named in unlabelled.
 	labelComponents bool
+	unlabelled      map[string]bool
 }
 
 // findPackage returns the install item for a normalized package name, or nil if not found.
@@ -87,6 +89,7 @@ func (r *Report) ToDependencyGraph(
 		nameToIndex:     make(map[string]int, numPackages),
 		install:         r.Install,
 		labelComponents: o.componentMetadata,
+		unlabelled:      o.unlabelled,
 	}
 	for i := range r.Install {
 		item := &r.Install[i]
@@ -185,7 +188,7 @@ func dfsVisitDirect(
 			Name:    normalizedName,
 			Version: version,
 		})
-		if lookup.labelComponents {
+		if lookup.labelComponents && !lookup.unlabelled[normalizedName] {
 			depItem.componentLabels().ApplyTo(node)
 		}
 

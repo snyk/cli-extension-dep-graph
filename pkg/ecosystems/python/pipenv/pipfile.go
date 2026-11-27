@@ -212,6 +212,36 @@ func (p *Pipfile) ToRequirements(includeDevDeps bool, pipfileDir string) (reqs, 
 	return reqs, dropped
 }
 
+// vcsKeys are the Pipfile keys naming a version-control source.
+var vcsKeys = []string{"git", "hg", "svn", "bzr"}
+
+// VCSEntries returns the names of entries with a version-control source.
+// pip resolves them by name from the index here, so the archive it reports
+// is not the one the Pipfile names, and its hash would be wrong.
+func (p *Pipfile) VCSEntries(includeDevDeps bool) []string {
+	var names []string
+	add := func(pkgs map[string]interface{}) {
+		for name, spec := range pkgs {
+			m, ok := spec.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			for _, k := range vcsKeys {
+				if _, ok := m[k]; ok {
+					names = append(names, name)
+					break
+				}
+			}
+		}
+	}
+	add(p.Packages)
+	if includeDevDeps {
+		add(p.DevPkgs)
+	}
+	sort.Strings(names)
+	return names
+}
+
 // directReference returns the URL a path or file entry points at and, for a
 // local one, its absolute path. A file entry may already be a URL.
 func directReference(spec map[string]interface{}, pipfileDir string) (ref, local string, ok bool) {

@@ -11,7 +11,6 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/snyk/error-catalog-golang-public/cli"
 	snyk_ecosystems "github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 
@@ -63,10 +62,10 @@ func (p Plugin) BuildDepGraphsFromDir(
 		log = logger.Nop()
 	}
 
-	// With component metadata requested this plugin runs ahead of the legacy
-	// plugin, so under --file it claims only requirements.txt: legacy owns
-	// Pipfile, setup.py and non-standard requirements names (those need
-	// --package-manager=pip there). Without the flag, --file is used as given.
+	// With component metadata requested, --file claims only requirements.txt:
+	// the legacy plugin owns Pipfile, setup.py and non-standard requirements
+	// names (those need --package-manager=pip there). Without the flag,
+	// --file is used as given, as before.
 	if tf := options.Global.TargetFile; tf != nil && options.Global.IncludeComponentMetadata &&
 		filepath.Base(*tf) != requirementsFile {
 		log.Info(ctx, "Skipping pip plugin", logger.Attr("targetFile", *tf), logger.Attr("reason", "not a 'requirements.txt' file"))
@@ -84,7 +83,13 @@ func (p Plugin) BuildDepGraphsFromDir(
 		return nil
 	}
 
-	pythonCommand := ResolvePythonCommand(options.Python.Command, dir)
+	// Get Python runtime version. With component metadata requested it is
+	// probed in the scan root, where pip runs; otherwise in the process's
+	// working directory, as before.
+	pythonVersion, err := GetPythonVersionIn(WorkingDir(dir, discovery.FindResult{RelPath: requirementsFile}, options))
+	if err != nil {
+		return fmt.Errorf("failed to detect Python version: %w", err)
+	}
 
 	// emitMu serializes onGraph calls; the first non-nil onGraph error
 	// is captured and surfaced to errgroup to cancel sibling builds.
@@ -96,7 +101,7 @@ func (p Plugin) BuildDepGraphsFromDir(
 	for _, file := range files {
 		g.Go(func() error {
 			projectName := GetProjectName(file.RelPath, dir, options.Global.ProjectName)
-			result, err := p.buildDepGraphFromFile(ctx, log, file, WorkingDir(dir, file, options), pythonCommand, options, projectName)
+			result, err := p.buildDepGraphFromFile(ctx, log, file, WorkingDir(dir, file, options), pythonVersion, options, projectName)
 			if err != nil {
 				attrs := []logger.Field{
 					logger.Attr(logFieldFile, file.RelPath),
@@ -114,7 +119,6 @@ func (p Plugin) BuildDepGraphsFromDir(
 					ProjectDescriptor: identity.ProjectDescriptor{
 						Identity: identity.ProjectIdentity{
 							ProjectType: "pip",
-							TargetFile:  &file.RelPath,
 						},
 					},
 					Error: err,
@@ -149,8 +153,7 @@ func (p Plugin) discoverRequirementsFiles(
 	case options.Global.AllProjects:
 		// Find all requirements.txt files recursively
 		// Exclude common directories to avoid scanning unnecessary paths
-		// ".*" also covers .git and .build, which snyk-python-plugin skips.
-		defaultExcludes := []string{".*", "__pycache__", "*.egg-info", "dist", "build", "venv", "node_modules"}
+		defaultExcludes := []string{".*", "__pycache__", "*.egg-info", "dist", "build", "venv"}
 		excludes := make([]string, 0, len(defaultExcludes)+len(options.Global.Exclude)+len(options.Global.ExcludePaths))
 		excludes = append(excludes, defaultExcludes...)
 		excludes = append(excludes, options.Global.Exclude...)
@@ -201,22 +204,17 @@ func (p Plugin) buildDepGraphFromFile(
 	ctx context.Context,
 	log logger.Logger,
 	file discovery.FindResult,
-	workDir, pythonCommand string,
+	workDir, pythonVersion string,
 	options *ecosystems.SCAPluginOptions,
 	projectName string,
 ) (ecosystems.SCAResult, error) {
-	pythonVersion, err := GetPythonVersionForCommand(pythonCommand, workDir)
-	if err != nil {
-		return ecosystems.SCAResult{}, fmt.Errorf("failed to detect Python version: %w", err)
-	}
-
 	log.Debug(ctx, "Building dependency graph",
 		logger.Attr(logFieldFile, file.RelPath),
 		logger.Attr("python_version", pythonVersion),
 		logger.Attr("project_name", projectName))
 
 	// Get pip install report (dry-run, no actual installation)
-	report, err := GetInstallReportWithCommand(ctx, log, file.Path, options.Python.NoBuildIsolation, pythonCommand,
+	report, err := GetInstallReportWithExecutor(ctx, log, file.Path, options.Python.NoBuildIsolation,
 		&DefaultExecutor{Dir: workDir})
 	if err != nil {
 		return ecosystems.SCAResult{}, fmt.Errorf("failed to get pip install report for %s: %w", file.RelPath, err)
@@ -241,7 +239,6 @@ func (p Plugin) buildDepGraphFromFile(
 		ProjectDescriptor: identity.ProjectDescriptor{
 			Identity: identity.ProjectIdentity{
 				ProjectType:       "pip",
-				TargetFile:        &file.RelPath,
 				RootComponentName: rootName,
 			},
 		},
@@ -264,16 +261,20 @@ func GraphOptions(options *ecosystems.SCAPluginOptions) []GraphOption {
 	return nil
 }
 
-// WorkingDir is where the version probe and pip run for a manifest. pip
-// resolves bare and -e paths in a requirements file (`-e .`, `./pkg`)
-// against its working directory, while -r and -c are relative to the file,
-// and pyenv picks the interpreter from it.
+// WorkingDir is where pip runs for a manifest; empty means the process's
+// working directory, which is what it is without component metadata, as
+// before. pip resolves bare and -e paths in a requirements file (`-e .`,
+// `./pkg`) against its working directory, while -r and -c are relative to
+// the file, so with the flag a wrong directory means a wrong hash.
 //
-// Under --file, or for a manifest at the root, that is the scan root, as
-// when the CLI runs from it: `--file=deploy/requirements.txt` containing
-// `-e .` names the root project. A sub-manifest found by --all-projects
-// resolves from its own directory, as it would when run there.
+// With the flag, under --file or for a manifest at the root, that is the
+// scan root, as when the CLI runs from it: `--file=deploy/requirements.txt`
+// containing `-e .` names the root project. A sub-manifest found by
+// --all-projects resolves from its own directory, as it would when run there.
 func WorkingDir(root string, file discovery.FindResult, options *ecosystems.SCAPluginOptions) string {
+	if !options.Global.IncludeComponentMetadata {
+		return ""
+	}
 	if options.Global.TargetFile == nil && filepath.Dir(file.RelPath) != "." {
 		return filepath.Dir(file.Path)
 	}
@@ -283,42 +284,14 @@ func WorkingDir(root string, file discovery.FindResult, options *ecosystems.SCAP
 	return root
 }
 
-// ResolvePythonCommand makes a relative --command path absolute against the
-// scan root, where snyk-python-plugin runs it. Without this, a relative path
-// would resolve against the manifest directory the command runs in. A bare
-// name such as python3 is left for PATH lookup.
-func ResolvePythonCommand(command, root string) string {
-	if command == "" || filepath.IsAbs(command) || !strings.ContainsAny(command, `/\`) {
-		return command
-	}
-	if abs, err := filepath.Abs(filepath.Join(root, command)); err == nil {
-		return abs
-	}
-	return command
-}
-
-// GetPythonVersionForCommand detects, in dir, the version of the interpreter
-// --command names, or of python3/python from PATH when command is empty.
-func GetPythonVersionForCommand(command, dir string) (string, error) {
-	if command == "" {
-		return getPythonVersionIn(dir)
-	}
-	version, err := execPythonVersion(command, dir)
-	if err != nil {
-		return "", cli.NewInvalidFlagOptionError(
-			fmt.Sprintf("The Python interpreter %q given in --command could not be run. Check the value passed to --command.", command),
-			snyk_errors.WithCause(err),
-		)
-	}
-	return version, nil
-}
-
 // GetPythonVersion detects the installed Python version.
 func GetPythonVersion() (string, error) {
-	return getPythonVersionIn("")
+	return GetPythonVersionIn("")
 }
 
-func getPythonVersionIn(dir string) (string, error) {
+// GetPythonVersionIn is GetPythonVersion run in dir; empty means the
+// process's working directory.
+func GetPythonVersionIn(dir string) (string, error) {
 	// Try python3 first (more common on Unix systems)
 	if version, err := execPythonVersion("python3", dir); err == nil {
 		return version, nil

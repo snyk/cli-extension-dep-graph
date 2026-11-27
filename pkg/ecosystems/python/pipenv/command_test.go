@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -35,33 +34,44 @@ func pipenvProject(t *testing.T) string {
 	return dir
 }
 
-// fakePython stands in for --command: it reports a version and, for
-// `-m pip install`, prints a one-package report whose download_info names
-// the archive pip picked. It records each invocation's arguments.
-func fakePython(t *testing.T) (cmd, argsLog string) {
+// fakePython puts python3 and pip stand-ins first on PATH. Each reports a
+// version and, for `install`, prints a report whose download_info names the
+// archive pip picked for each package in pkgs. They record each invocation's
+// working directory and arguments.
+func fakePython(t *testing.T, pkgs ...string) (argsLog string) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
 		t.Skip("shell-script interpreter stand-in")
 	}
+	if len(pkgs) == 0 {
+		pkgs = []string{"alpha@1.0"}
+	}
+	items := make([]string, 0, len(pkgs))
+	for _, p := range pkgs {
+		name, version, _ := strings.Cut(p, "@")
+		items = append(items, `{"metadata":{"name":"`+name+`","version":"`+version+`"},"requested":true,`+
+			`"download_info":{"url":"https://files.example/`+name+`-`+version+`-py3-none-any.whl","archive_info":{"hashes":{"sha256":"`+sha256Hex+`"}}}}`)
+	}
+	report := `{"install":[` + strings.Join(items, ",") + `]}`
 	dir := t.TempDir()
 	argsLog = filepath.Join(dir, "args.log")
-	report := `{"install":[{"metadata":{"name":"alpha","version":"1.0"},"requested":true,` +
-		`"download_info":{"url":"https://files.example/alpha-1.0-py3-none-any.whl","archive_info":{"hashes":{"sha256":"` + sha256Hex + `"}}}}]}`
 	script := "#!/bin/sh\necho \"$PWD $@\" >> '" + argsLog + "'\n" +
 		"if [ \"$1\" = --version ]; then echo 'Python 3.12.1'; exit 0; fi\n" +
 		"cat >/dev/null\necho '" + report + "'\n"
-	cmd = filepath.Join(dir, "fakepython")
-	require.NoError(t, os.WriteFile(cmd, []byte(script), 0o600))
-	require.NoError(t, os.Chmod(cmd, 0o700))
-	return cmd, argsLog
+	for _, name := range []string{"python3", "pip"} {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(script), 0o600))
+		require.NoError(t, os.Chmod(filepath.Join(dir, name), 0o700))
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+"/bin"+string(os.PathListSeparator)+"/usr/bin")
+	return argsLog
 }
 
-func TestPlugin_PythonCommandAndComponentMetadata(t *testing.T) {
+func TestPlugin_ComponentMetadata(t *testing.T) {
 	dir := pipenvProject(t)
-	cmd, argsLog := fakePython(t)
+	argsLog := fakePython(t)
 
 	for _, include := range []bool{true, false} {
-		opts := ecosystems.NewPluginOptions().WithPythonCommand(cmd).WithIncludeComponentMetadata(include)
+		opts := ecosystems.NewPluginOptions().WithIncludeComponentMetadata(include)
 		results, err := scatest.Run(t.Context(), Plugin{}, logger.Nop(), dir, opts)
 		require.NoError(t, err)
 		require.Len(t, results, 1)
@@ -85,11 +95,11 @@ func TestPlugin_PythonCommandAndComponentMetadata(t *testing.T) {
 
 	logged, err := os.ReadFile(argsLog)
 	require.NoError(t, err)
-	assert.Contains(t, string(logged), "-m pip install --dry-run")
+	assert.Contains(t, string(logged), " install --dry-run")
 }
 
 func TestPlugin_TargetFileScoping(t *testing.T) {
-	cmd, _ := fakePython(t)
+	fakePython(t)
 	for _, tt := range []struct {
 		file  string
 		claim bool
@@ -105,7 +115,7 @@ func TestPlugin_TargetFileScoping(t *testing.T) {
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "setup.py"), []byte(""), 0o600))
 
 			// Without the flag --file is used as given, as before.
-			opts := ecosystems.NewPluginOptions().WithPythonCommand(cmd).WithTargetFile(tt.file)
+			opts := ecosystems.NewPluginOptions().WithTargetFile(tt.file)
 			results, err := scatest.Run(t.Context(), Plugin{}, logger.Nop(), dir, opts)
 			require.NoError(t, err)
 			require.Len(t, results, 1, "flag off: --file is processed whatever its name")
@@ -122,28 +132,34 @@ func TestPlugin_TargetFileScoping(t *testing.T) {
 	}
 }
 
-// The same working-directory rule as the pip plugin: the scan root under
-// --file, the Pipfile's directory for an --all-projects sub-manifest.
+// The same working-directory rule as the pip plugin. With the flag: pip runs
+// in the scan root under --file and in the Pipfile's directory for an
+// --all-projects sub-manifest, and the version probe runs in the scan root.
+// Without it both run in the process's working directory, as before.
 func TestPlugin_WorkingDirectory(t *testing.T) {
 	for _, tt := range []struct {
 		name    string
+		flag    bool
 		opts    func(*ecosystems.SCAPluginOptions) *ecosystems.SCAPluginOptions
-		wantRel string
+		wantRel string // relative to the scan root; "" means the process cwd
 	}{
-		{"--file uses the scan root", func(o *ecosystems.SCAPluginOptions) *ecosystems.SCAPluginOptions {
+		{"flag on, --file uses the scan root", true, func(o *ecosystems.SCAPluginOptions) *ecosystems.SCAPluginOptions {
 			return o.WithTargetFile("svc/Pipfile")
 		}, "."},
-		{"--all-projects sub-manifest uses its directory", func(o *ecosystems.SCAPluginOptions) *ecosystems.SCAPluginOptions {
+		{"flag on, --all-projects sub-manifest uses its directory", true, func(o *ecosystems.SCAPluginOptions) *ecosystems.SCAPluginOptions {
 			return o.WithAllProjects(true)
 		}, "svc"},
+		{"flag off, --file uses the process cwd", false, func(o *ecosystems.SCAPluginOptions) *ecosystems.SCAPluginOptions {
+			return o.WithTargetFile("svc/Pipfile")
+		}, ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
 			require.NoError(t, os.Rename(pipenvProject(t), filepath.Join(root, "svc")))
-			cmd, argsLog := fakePython(t)
+			argsLog := fakePython(t)
 
 			results, err := scatest.Run(t.Context(), Plugin{}, logger.Nop(), root,
-				tt.opts(ecosystems.NewPluginOptions().WithPythonCommand(cmd)))
+				tt.opts(ecosystems.NewPluginOptions().WithIncludeComponentMetadata(tt.flag)))
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			require.NoError(t, results[0].Error)
@@ -152,9 +168,14 @@ func TestPlugin_WorkingDirectory(t *testing.T) {
 			require.NoError(t, err)
 			calls := strings.Split(strings.TrimSpace(string(b)), "\n")
 			require.Len(t, calls, 2)
-			want := filepath.Join(root, tt.wantRel)
-			assert.Equal(t, want, strings.SplitN(calls[0], " ", 2)[0], calls[0])
-			assert.Equal(t, want, strings.SplitN(calls[1], " ", 2)[0], calls[1])
+			cwd, err := os.Getwd()
+			require.NoError(t, err)
+			wantPip, wantProbe := cwd, cwd
+			if tt.wantRel != "" {
+				wantPip, wantProbe = filepath.Join(root, tt.wantRel), root
+			}
+			assert.Equal(t, wantProbe, strings.SplitN(calls[0], " ", 2)[0], calls[0])
+			assert.Equal(t, wantPip, strings.SplitN(calls[1], " ", 2)[0], calls[1])
 		})
 	}
 }
@@ -190,9 +211,9 @@ func TestPlugin_LocalPathEntries(t *testing.T) {
 				require.NoError(t, os.MkdirAll(filepath.Join(dir, "utils"), 0o755))
 				require.NoError(t, os.WriteFile(filepath.Join(dir, "utils", "pyproject.toml"), nil, 0o600))
 			}
-			cmd, argsLog := fakePython(t)
+			argsLog := fakePython(t)
 
-			opts := ecosystems.NewPluginOptions().WithPythonCommand(cmd).WithIncludeComponentMetadata(tt.flag)
+			opts := ecosystems.NewPluginOptions().WithIncludeComponentMetadata(tt.flag)
 			results, err := scatest.Run(t.Context(), Plugin{}, logger.Nop(), dir, opts)
 			require.NoError(t, err)
 			require.Len(t, results, 1)
@@ -208,26 +229,25 @@ func TestPlugin_LocalPathEntries(t *testing.T) {
 	}
 }
 
-func TestPlugin_AllProjectsSkipsNodeModules(t *testing.T) {
+// A Pipfile VCS entry is resolved by name from the index, so the archive pip
+// reports is not the one the Pipfile names. It gets no labels; an index
+// entry beside it keeps them.
+func TestPlugin_VCSEntriesGetNoLabels(t *testing.T) {
 	dir := t.TempDir()
-	for _, f := range []string{"Pipfile", "node_modules/pkg/Pipfile", ".build/Pipfile"} {
-		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, f)), 0o755))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, f), nil, 0o600))
-	}
-	got, err := Plugin{}.discoverPipfiles(t.Context(), logger.Nop(), dir, ecosystems.NewPluginOptions().WithAllProjects(true))
-	require.NoError(t, err)
-	require.Len(t, got, 1)
-	assert.Equal(t, "Pipfile", got[0].RelPath)
-}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Pipfile"), []byte(
+		"[packages]\nsix = {git = \"https://github.com/benjaminp/six.git\", ref = \"1.16.0\"}\n"+
+			"tool = {hg = \"https://hg.example/tool\"}\nalpha = \"==1.0\"\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Pipfile.lock"), []byte(`{"_meta":{},"default":{},"develop":{}}`), 0o600))
+	fakePython(t, "six@1.17.0", "tool@2.0", "alpha@1.0")
 
-func TestPlugin_MissingInterpreterFailsTheProject(t *testing.T) {
-	dir := pipenvProject(t)
-	opts := ecosystems.NewPluginOptions().WithPythonCommand(filepath.Join(t.TempDir(), "nope"))
-	results, err := scatest.Run(t.Context(), Plugin{}, logger.Nop(), dir, opts)
+	results, err := scatest.Run(t.Context(), Plugin{}, logger.Nop(), dir,
+		ecosystems.NewPluginOptions().WithIncludeComponentMetadata(true))
 	require.NoError(t, err)
 	require.Len(t, results, 1)
-	var snykErr snyk_errors.Error
-	require.ErrorAs(t, results[0].Error, &snykErr)
-	assert.Contains(t, snykErr.Detail, "--command")
-	assert.Equal(t, []string{"Pipfile"}, results[0].ProcessedFiles)
+	require.NoError(t, results[0].Error)
+	labelled := map[string]bool{}
+	for _, n := range results[0].DepGraph.Graph.Nodes {
+		labelled[n.NodeID] = n.Info != nil && n.Info.Labels["hash:sha-256"] != ""
+	}
+	assert.Equal(t, map[string]bool{"root-node": false, "six@1.17.0": false, "tool@2.0": false, "alpha@1.0": true}, labelled)
 }

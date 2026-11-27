@@ -11,12 +11,28 @@ type GraphOption func(*graphOptions)
 
 type graphOptions struct {
 	componentMetadata bool
+	// unlabelled holds normalized names that get no component metadata.
+	unlabelled map[string]bool
 }
 
 // WithComponentMetadata labels each node with the hashes and URL of the
 // archive pip picked for it, for --include-component-metadata.
 func WithComponentMetadata() GraphOption {
 	return func(o *graphOptions) { o.componentMetadata = true }
+}
+
+// WithoutComponentMetadataFor leaves the named packages unlabelled, for
+// manifest entries whose source is not the archive pip reports, such as a
+// Pipfile VCS entry that pip resolved by name from an index.
+func WithoutComponentMetadataFor(names ...string) GraphOption {
+	return func(o *graphOptions) {
+		if o.unlabelled == nil {
+			o.unlabelled = make(map[string]bool, len(names))
+		}
+		for _, n := range names {
+			o.unlabelled[normalizePackageName(n)] = true
+		}
+	}
 }
 
 // componentLabels describes the exact file pip picked on this machine, so two
