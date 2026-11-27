@@ -12,6 +12,7 @@ import (
 
 	"github.com/snyk/error-catalog-golang-public/snyk_errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockExecutor is a test implementation of CommandExecutor.
@@ -177,6 +178,112 @@ func TestClassifyPipError(t *testing.T) {
 			} else {
 				// Should be a generic error
 				assert.Contains(t, err.Error(), "pip install failed")
+			}
+		})
+	}
+}
+
+func TestClassifyPipError_PrivateIndexAuthHint(t *testing.T) {
+	// Realistic pip stderr ends with "No matching distribution" after a private-index
+	// 401/403/TLS failure; without the hint users only see "package not found".
+	const notFoundTail = "ERROR: Could not find a version that satisfies the requirement private-pkg==1.0.0 (from versions: none)\n" +
+		"ERROR: No matching distribution found for private-pkg==1.0.0"
+
+	tests := map[string]struct {
+		stderr         string
+		wantErrCode    string
+		wantHint       bool
+		wantDetailPart string // required substring when non-empty (precedence cases)
+	}{
+		"401_error": {
+			stderr: "WARNING: 401 Error, Credentials not correct for https://pypi.example.com/simple/private-pkg/\n" +
+				notFoundTail,
+			wantErrCode: "SNYK-OS-PYTHON-0004",
+			wantHint:    true,
+		},
+		"403_client_error": {
+			stderr: "ERROR: 403 Client Error: Forbidden for url: https://pypi.example.com/simple/private-pkg/\n" +
+				notFoundTail,
+			wantErrCode: "SNYK-OS-PYTHON-0004",
+			wantHint:    true,
+		},
+		"client_error_401": {
+			stderr: "ERROR: Client Error: 401 for url: https://pypi.example.com/simple/private-pkg/\n" +
+				notFoundTail,
+			wantErrCode: "SNYK-OS-PYTHON-0004",
+			wantHint:    true,
+		},
+		"http_error_403": {
+			stderr: "ERROR: HTTP error 403 while getting https://pypi.example.com/simple/private-pkg/\n" +
+				notFoundTail,
+			wantErrCode: "SNYK-OS-PYTHON-0004",
+			wantHint:    true,
+		},
+		"credentials_not_correct": {
+			stderr: "WARNING: Credentials not correct for https://pypi.example.com/simple/private-pkg/\n" +
+				notFoundTail,
+			wantErrCode: "SNYK-OS-PYTHON-0004",
+			wantHint:    true,
+		},
+		"unauthorized_for_url": {
+			stderr: "ERROR: Unauthorized for url: https://pypi.example.com/simple/private-pkg/\n" +
+				notFoundTail,
+			wantErrCode: "SNYK-OS-PYTHON-0004",
+			wantHint:    true,
+		},
+		"ssl_error": {
+			stderr: "ERROR: SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed'))\n" +
+				notFoundTail,
+			wantErrCode: "SNYK-OS-PYTHON-0004",
+			wantHint:    true,
+		},
+		"certificate_verify_failed": {
+			stderr: "ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate\n" +
+				notFoundTail,
+			wantErrCode: "SNYK-OS-PYTHON-0004",
+			wantHint:    true,
+		},
+		// Bare "401"/"403" appear in versions, ports and URLs; must not trigger the hint.
+		"false_positive_bare_401_in_version": {
+			stderr: "ERROR: Could not find a version that satisfies the requirement foo==1.401.0 (from versions: 1.400.0, 1.401.0)\n" +
+				"ERROR: No matching distribution found for foo==1.401.0 from https://pypi.org:443/simple/foo/",
+			wantErrCode: "SNYK-OS-PYTHON-0004",
+			wantHint:    false,
+		},
+		// Requires-Python classification keeps precedence: auth wording must not turn a
+		// version-mismatch failure into package-not-found with an auth hint.
+		"requires_python_keeps_precedence": {
+			stderr: "WARNING: 401 Error, Credentials not correct for https://pypi.example.com/simple/pkg/\n" +
+				"ERROR: Package 'pkg' requires a different Python: 3.9.18 not in '>=3.11'\n" +
+				"Requires-Python >=3.11",
+			wantErrCode:    "SNYK-OS-PYTHON-0006",
+			wantHint:       false,
+			wantDetailPart: "Python version mismatch",
+		},
+		"genuine_missing_package_keeps_plain_message": {
+			stderr:      "ERROR: No matching distribution found for nonexistent-package==9.9.9",
+			wantErrCode: "SNYK-OS-PYTHON-0004",
+			wantHint:    false,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := classifyPipError(context.Background(), nil, &pipError{
+				err:    fmt.Errorf("exit status 1"),
+				stderr: tt.stderr,
+			})
+
+			var catalogErr snyk_errors.Error
+			require.True(t, errors.As(err, &catalogErr), "should be catalog error")
+			assert.Equal(t, tt.wantErrCode, catalogErr.ErrorCode)
+			if tt.wantHint {
+				assert.Contains(t, catalogErr.Detail, privateIndexAuthHint)
+			} else {
+				assert.NotContains(t, catalogErr.Detail, privateIndexAuthHint)
+			}
+			if tt.wantDetailPart != "" {
+				assert.Contains(t, catalogErr.Detail, tt.wantDetailPart)
 			}
 		})
 	}
