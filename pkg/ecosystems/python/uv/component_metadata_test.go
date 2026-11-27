@@ -145,6 +145,29 @@ func TestComponentMetadata_LabelsFromRecordedExport(t *testing.T) {
 	assert.NotContains(t, got, "extras-probe@0.1.0", "the project itself lists no distribution")
 }
 
+// TestComponentMetadata_JoinsOnRecordedConverterOutput runs the join against
+// the remote converter's real response for extras-0.12.22.json rather than a
+// hand-built graph, so a change in how the converter names packages breaks
+// this test instead of silently dropping labels.
+func TestComponentMetadata_JoinsOnRecordedConverterOutput(t *testing.T) {
+	var graphs []*depgraph.DepGraph
+	require.NoError(t, json.Unmarshal(recordedExport(t, "extras-0.12.22.converted.json"), &graphs))
+	require.Len(t, graphs, 1)
+
+	results := scanWith(t, recordedExport(t, "extras-0.12.22.json"), "0.12.22", true, graphs...)
+
+	got := labelsByNode(results)
+	for _, n := range graphs[0].Graph.Nodes {
+		if n.NodeID == graphs[0].Graph.RootNodeID {
+			assert.NotContains(t, got, n.NodeID, "the project itself lists no distribution")
+			continue
+		}
+		assert.Contains(t, got, n.NodeID, "every registry package joins to its export component")
+	}
+	assert.Equal(t, artifactLabels(idnaWheelURL, idnaWheelHash), got["idna@3.20"])
+	assert.Equal(t, artifactLabels(charsetURL, charsetHash), got["charset-normalizer@3.5.3"])
+}
+
 func TestComponentMetadata_WorkspaceSdistFallbackAndLocalSources(t *testing.T) {
 	graphs := []*depgraph.DepGraph{
 		graphOf(node{id: "member-a@0.1.0", name: "member-a", version: "0.1.0"},
