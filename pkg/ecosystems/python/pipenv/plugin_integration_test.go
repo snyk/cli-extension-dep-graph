@@ -404,3 +404,32 @@ func getPythonMajorMinorVersion() (string, error) {
 
 	return fmt.Sprintf("%d.%d", major, minor), nil
 }
+
+// Real pip must read a path holding PEP 508 and URL delimiters as one direct
+// reference: unescaped, ";" starts a marker and " " ends the URL.
+func TestPipenvPlugin_LocalPathWithDelimiters(t *testing.T) {
+	dir := t.TempDir()
+	for name, sub := range map[string]string{"semipkg": "a;b", "spacepkg": "x @y", "pluspkg": "p+q&r", "pctpkg": "pct%41"} {
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, sub, name), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, sub, name, "__init__.py"), nil, 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, sub, "setup.py"),
+			[]byte("from setuptools import setup\nsetup(name='"+name+"', version='0.1', packages=['"+name+"'])\n"), 0o600))
+	}
+	pipfile := "[packages]\nsemipkg = {path = \"./a;b\"}\nspacepkg = {path = \"./x @y\"}\n" +
+		"pluspkg = {path = \"./p+q&r\"}\npctpkg = {path = \"./pct%41\"}\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Pipfile"), []byte(pipfile), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Pipfile.lock"), []byte(`{"_meta":{},"default":{},"develop":{}}`), 0o600))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	results, err := scatest.Run(ctx, Plugin{}, logger.Nop(), dir, ecosystems.NewPluginOptions().WithIncludeComponentMetadata(true))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.NoError(t, results[0].Error)
+
+	var pkgs []string
+	for _, p := range results[0].DepGraph.Pkgs {
+		pkgs = append(pkgs, p.ID)
+	}
+	assert.Subset(t, pkgs, []string{"semipkg@0.1", "spacepkg@0.1", "pluspkg@0.1", "pctpkg@0.1"})
+}

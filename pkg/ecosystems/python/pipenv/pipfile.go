@@ -2,8 +2,11 @@ package pipenv
 
 import (
 	"fmt"
+	"net/url"
 	"os"
+	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -153,7 +156,11 @@ func extractComplexPackageName(name string, spec map[string]interface{}) string 
 		return name
 	}
 
-	// Handle extras - include them in the package name
+	return withExtras(name, spec)
+}
+
+// withExtras appends the entry's extras to its name, as `name[a,b]`.
+func withExtras(name string, spec map[string]interface{}) string {
 	if extras, ok := spec["extras"].([]interface{}); ok && len(extras) > 0 {
 		extraStrs := make([]string, len(extras))
 		for i, e := range extras {
@@ -163,4 +170,133 @@ func extractComplexPackageName(name string, spec map[string]interface{}) string 
 	}
 
 	return name
+}
+
+// ToRequirements is ToPackageNames for pip's dry run with component
+// metadata. Path and file entries become PEP 508 direct references
+// (`name @ file:///abs/dir`, or the URL a file entry gives), resolved
+// relative to pipfileDir, so pip builds them from disk rather than resolving
+// their name from an index: by name, a local `utils` resolves to an
+// unrelated index package, with its hash. This matches snyk-python-plugin,
+// which reports the locally installed project.
+//
+// An entry whose local path is not a Python project (no pyproject.toml,
+// setup.py or setup.cfg) or whose file does not exist is returned in dropped
+// instead: isolated builds copy only the Pipfile and its lock, and pip would
+// fail the whole project on it. Both lists are sorted.
+func (p *Pipfile) ToRequirements(includeDevDeps bool, pipfileDir string) (reqs, dropped []string) {
+	add := func(pkgs map[string]interface{}) {
+		for name, spec := range pkgs {
+			req := extractPackageName(name, spec)
+			if req == "" {
+				continue
+			}
+			if m, ok := spec.(map[string]interface{}); ok {
+				if ref, local, ok := directReference(m, pipfileDir); ok {
+					if local != "" && !isInstallable(local) {
+						dropped = append(dropped, name)
+						continue
+					}
+					req = withExtras(name, m) + " @ " + ref
+				}
+			}
+			reqs = append(reqs, req)
+		}
+	}
+	add(p.Packages)
+	if includeDevDeps {
+		add(p.DevPkgs)
+	}
+	sort.Strings(reqs)
+	sort.Strings(dropped)
+	return reqs, dropped
+}
+
+// vcsKeys are the Pipfile keys naming a version-control source.
+var vcsKeys = []string{"git", "hg", "svn", "bzr"}
+
+// VCSEntries returns the names of entries with a version-control source.
+// pip resolves them by name from the index here, so the archive it reports
+// is not the one the Pipfile names, and its hash would be wrong.
+func (p *Pipfile) VCSEntries(includeDevDeps bool) []string {
+	var names []string
+	add := func(pkgs map[string]interface{}) {
+		for name, spec := range pkgs {
+			m, ok := spec.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			for _, k := range vcsKeys {
+				if _, ok := m[k]; ok {
+					names = append(names, name)
+					break
+				}
+			}
+		}
+	}
+	add(p.Packages)
+	if includeDevDeps {
+		add(p.DevPkgs)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// directReference returns the URL a path or file entry points at and, for a
+// local one, its absolute path. A file entry may already be a URL.
+func directReference(spec map[string]interface{}, pipfileDir string) (ref, local string, ok bool) {
+	ref, ok = spec["path"].(string)
+	if !ok {
+		if ref, ok = spec["file"].(string); !ok {
+			return "", "", false
+		}
+		if u, err := url.Parse(ref); err == nil && len(u.Scheme) > 1 {
+			return ref, "", true
+		}
+	}
+	if !filepath.IsAbs(ref) {
+		ref = filepath.Join(pipfileDir, ref)
+	}
+	local = filepath.Clean(ref)
+	return fileURL(local), local, true
+}
+
+// fileURL percent-encodes every byte outside RFC 3986's unreserved set, "/"
+// and ":". url.URL leaves sub-delimiters such as ";" alone, which PEP 508
+// parsers read as the start of a marker, and pip decodes the escapes when it
+// turns the URL back into a path.
+func fileURL(path string) string {
+	p := filepath.ToSlash(path)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p // a Windows drive path, file:///C:/...
+	}
+	var b strings.Builder
+	b.WriteString("file://")
+	for i := 0; i < len(p); i++ {
+		c := p[i]
+		if 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9' || strings.IndexByte("-._~/:", c) >= 0 {
+			b.WriteByte(c)
+			continue
+		}
+		fmt.Fprintf(&b, "%%%02X", c)
+	}
+	return b.String()
+}
+
+// isInstallable reports whether pip could build a local path: a file, or a
+// directory holding Python project metadata.
+func isInstallable(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	if !info.IsDir() {
+		return true
+	}
+	for _, f := range []string{"pyproject.toml", "setup.py", "setup.cfg"} {
+		if _, err := os.Stat(filepath.Join(path, f)); err == nil {
+			return true
+		}
+	}
+	return false
 }

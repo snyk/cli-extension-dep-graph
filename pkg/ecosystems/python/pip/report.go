@@ -28,6 +28,25 @@ type InstallItem struct {
 	Metadata        PackageMetadata `json:"metadata"`
 	Requested       bool            `json:"requested"`        // True if explicitly requested in requirements
 	RequestedExtras []string        `json:"requested_extras"` //nolint:tagliatelle // pip's JSON output uses snake_case
+	// DownloadInfo describes the exact file pip picked for this machine. It is
+	// read only for --include-component-metadata labels.
+	DownloadInfo *DownloadInfo `json:"download_info,omitempty"` //nolint:tagliatelle // pip's JSON output uses snake_case
+}
+
+// DownloadInfo is pip's direct URL data for an install item (PEP 610). Only
+// archive installs describe a single file: VCS and directory installs carry
+// vcs_info or dir_info instead, and their URL names a repository or folder.
+type DownloadInfo struct {
+	URL         string       `json:"url"`
+	ArchiveInfo *ArchiveInfo `json:"archive_info,omitempty"` //nolint:tagliatelle // pip's JSON output uses snake_case
+}
+
+// ArchiveInfo holds the archive's digests. Hashes (algorithm to hex digest)
+// appears from pip 23.0; Hash ("<alg>=<hex>") is on every version and
+// deprecated, so it is read only when Hashes is empty.
+type ArchiveInfo struct {
+	Hash   string            `json:"hash,omitempty"`
+	Hashes map[string]string `json:"hashes,omitempty"`
 }
 
 // IsDirectDependency returns true if this package is a direct dependency.
@@ -159,11 +178,15 @@ type CommandExecutor interface {
 }
 
 // DefaultExecutor uses os/exec to run commands.
-type DefaultExecutor struct{}
+type DefaultExecutor struct {
+	// Dir is the working directory; empty means the process's.
+	Dir string
+}
 
 // Execute runs a command with optional stdin input and returns its stdout output.
 func (e *DefaultExecutor) Execute(ctx context.Context, stdin, name string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = e.Dir
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
