@@ -6,6 +6,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	godepgraph "github.com/snyk/dep-graph/go/pkg/depgraph"
+
+	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/componentmetadata"
 )
 
 func TestBuildDepGraph(t *testing.T) {
@@ -84,7 +88,7 @@ func TestBuildDepGraph(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dg, err := buildDepGraph(tt.out, nil)
+			dg, err := buildDepGraph(tt.out, nil, nil)
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.wantRoot, dg.GetRootPkg().Info.Name)
@@ -118,7 +122,7 @@ func TestBuildDepGraph_StopAtWorkspaceMembers(t *testing.T) {
 
 	stopAt := map[string]struct{}{"b@0.1.0": {}}
 
-	dg, err := buildDepGraph(out, stopAt)
+	dg, err := buildDepGraph(out, stopAt, nil)
 	require.NoError(t, err)
 
 	gotPkgs := make([]string, 0, len(dg.Pkgs))
@@ -130,4 +134,40 @@ func TestBuildDepGraph_StopAtWorkspaceMembers(t *testing.T) {
 	// tokio (b's transitive dep) MUST NOT appear in a's graph — it belongs to
 	// b's graph only.
 	assert.Equal(t, []string{"a@0.1.0", "b@0.1.0", "serde@1.0.0"}, gotPkgs)
+}
+
+func TestBuildDepGraph_AttachesComponentLabels(t *testing.T) {
+	out := &treeOutput{
+		RootID: "my-app@0.1.0",
+		Graph: forwardGraph{
+			"my-app@0.1.0":  {"serde@1.0.193": {}, "local@0.1.0": {}},
+			"serde@1.0.193": {},
+			"local@0.1.0":   {},
+		},
+	}
+	labels := map[string]componentmetadata.Labels{
+		"serde@1.0.193": {"hash:sha-256": serdeChecksum, "distribution:url": "https://static.crates.io/crates/serde/1.0.193/download"},
+		// A label for the root must not be applied: the root is the project.
+		"my-app@0.1.0": {"hash:sha-256": itoaChecksum},
+	}
+
+	dg, err := buildDepGraph(out, nil, labels)
+	require.NoError(t, err)
+
+	byID := make(map[string]*godepgraph.NodeInfo)
+	for _, n := range dg.Graph.Nodes {
+		byID[n.NodeID] = n.Info
+	}
+	require.NotNil(t, byID["serde@1.0.193"])
+	assert.Equal(t, map[string]string{
+		"hash:sha-256":     serdeChecksum,
+		"distribution:url": "https://static.crates.io/crates/serde/1.0.193/download",
+	}, byID["serde@1.0.193"].Labels)
+	assert.Nil(t, byID["local@0.1.0"], "nodes without metadata keep no info")
+	assert.Nil(t, byID["root-node"], "root node gets no labels")
+
+	// The builder must hold its own copy: mutating the input afterwards
+	// must not change the graph.
+	labels["serde@1.0.193"]["hash:sha-256"] = "changed"
+	assert.Equal(t, serdeChecksum, byID["serde@1.0.193"].Labels["hash:sha-256"])
 }
