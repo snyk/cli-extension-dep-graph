@@ -16,6 +16,11 @@ const (
 	// inside it describes the project one directory up.
 	objDir = "obj"
 
+	// slnxExtension is the XML solution format that replaces the text `.sln` from
+	// Visual Studio 17.14 / .NET 9 onwards. It is not a manifest: passed to
+	// --file, a solution selects the projects it holds.
+	slnxExtension = ".slnx"
+
 	// packagesFolderName is the directory `nuget restore` installs into. Its
 	// default location is derived from the manifest's path; --packages-folder
 	// overrides it. See resolvePackagesFolder.
