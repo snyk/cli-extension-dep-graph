@@ -220,6 +220,8 @@ type outcome struct {
 	args      []string
 	errCode   string
 	errDetail string
+	exitCode  int
+	message   string
 	failed    bool
 	graphs    []dg.DepGraph
 	locations []string
@@ -232,6 +234,12 @@ func observe(t *testing.T, cli *legacyCLIEmulator, data []gafworkflow.Data, err 
 	var snykErr snyk_errors.Error
 	if errors.As(err, &snykErr) {
 		o.errCode, o.errDetail = snykErr.ErrorCode, snykErr.Detail
+	} else if err != nil {
+		o.message = err.Error()
+	}
+	var exitCoder legacycli.ExitCoder
+	if errors.As(err, &exitCoder) {
+		o.exitCode = exitCoder.ExitCode()
 	}
 	for _, d := range data {
 		// Error-only data is the standard path's way of reporting a failed
@@ -309,7 +317,7 @@ func withInputDir(t *testing.T, flags map[string]any, extra ...map[string]any) m
 	return out
 }
 
-var keepCallerGraphMode = map[string]any{workflow.ConfigKeyKeepCallerGraphMode: true}
+var keepCallerGraphMode = map[string]any{ConfigKeyKeepCallerGraphMode: true}
 
 // dropDir removes the input directory, for readable logs.
 func dropDir(args []string) []string {
@@ -319,8 +327,10 @@ func dropDir(args []string) []string {
 // Test_legacyGraphMode_sbomMatchesStandardPath pins SCAS-1054: for a project
 // left to the legacy CLI, `snyk sbom` through SBOM resolution must invoke the
 // legacy CLI exactly as the standard depgraph path (HandleLegacyResolution,
-// what `snyk sbom` uses today) does, and so get the same graphs, errors and
-// exit codes.
+// what `snyk sbom` uses today) does, and so get the same graphs, error-catalog
+// codes and exit codes. It does not compare messages of errors outside the
+// catalog: SBOM resolution wraps those ("error building results: ..."), so
+// the text differs while the exit code is the same.
 func Test_legacyGraphMode_sbomMatchesStandardPath(t *testing.T) {
 	for _, tt := range sbomCases {
 		for _, failing := range []bool{false, true} {
@@ -339,6 +349,7 @@ func Test_legacyGraphMode_sbomMatchesStandardPath(t *testing.T) {
 				assert.Equal(t, standard.failed, sbom.failed, "same success or failure")
 				assert.Equal(t, standard.errCode, sbom.errCode)
 				assert.Equal(t, standard.errDetail, sbom.errDetail)
+				assert.Equal(t, standard.exitCode, sbom.exitCode, "same exit code")
 				assert.Equal(t, standard.locations, sbom.locations, "same projects, in the same order")
 				assert.Equal(t, standard.graphs, sbom.graphs)
 			})
@@ -377,7 +388,7 @@ func Test_legacyGraphMode_registryKeepsEffectiveGraphWithErrors(t *testing.T) {
 			workflow.FlagPrintOutputJsonlWithErrors: true,
 		}, wantArg: printGraph},
 		graphModeCase{name: "caller sets the keep-caller-graph-mode key", flags: map[string]any{
-			workflow.ConfigKeyKeepCallerGraphMode: true, workflow.FlagPrintEffectiveGraph: true,
+			ConfigKeyKeepCallerGraphMode: true, workflow.FlagPrintEffectiveGraph: true,
 		}, wantArg: printEffectiveGraphWithErrs},
 	)
 	for _, tt := range cases {
