@@ -73,8 +73,7 @@ func buildSCAPlugins(
 }
 
 // uvVersionAnalyticsKey names the CLI analytics extension carrying the uv
-// version, the evidence for when support for old uv versions can go. It is
-// the first extension analytics key this repository reports.
+// version, the evidence for when support for old uv versions can go.
 const uvVersionAnalyticsKey = "uvVersion"
 
 // reportUvVersion adds the uv version to the invocation's CLI analytics. The
