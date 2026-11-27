@@ -12,6 +12,8 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
+
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/childenv"
 )
 
 // gradleVersionLine captures the first whitespace-separated token after the
@@ -35,7 +37,13 @@ var (
 // detectGradleVersion shells out to `gradle --version` and parses the result.
 // It is exposed as a variable so tests can stub it out if needed.
 var detectGradleVersion = func() (*semver.Version, error) {
-	out, err := exec.Command("gradle", "--version").CombinedOutput()
+	cmd := exec.Command("gradle", "--version")
+	env, err := childenv.Environ(cmd.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("prepare gradle --version: %w", err)
+	}
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("gradle --version failed: %w\n%s", err, out)
 	}
@@ -49,7 +57,13 @@ var detectGradleVersion = func() (*semver.Version, error) {
 // detectJDKVersion shells out to `java -version` (which prints to stderr) and
 // parses the result into a normalised major.minor.patch.
 var detectJDKVersion = func() (*semver.Version, error) {
-	out, err := exec.Command("java", "-version").CombinedOutput()
+	cmd := exec.Command("java", "-version")
+	env, err := childenv.Environ(cmd.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("prepare java -version: %w", err)
+	}
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("java -version failed: %w\n%s", err, out)
 	}

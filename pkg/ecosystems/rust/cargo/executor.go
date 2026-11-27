@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+
+	"github.com/snyk/cli-extension-dep-graph/v2/internal/childenv"
 )
 
 // errCargoNotFound is returned when the cargo binary is not in PATH.
@@ -143,7 +145,12 @@ func (e *cargoCmdExecutor) run(
 
 	cmd := exec.CommandContext(ctx, resolved, args...)
 	cmd.Dir = dir
-	cmd.Env = append(cmd.Environ(), "NO_COLOR=1")
+	env, err := childenv.Environ(cmd.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("preparing %s: %w", subcommandLabel, err)
+	}
+	cmd.Env = env
+	cmd.Env = append(cmd.Env, "NO_COLOR=1")
 
 	var stderr bytes.Buffer
 
