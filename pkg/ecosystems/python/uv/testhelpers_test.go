@@ -19,7 +19,8 @@ func collectBuildResults(
 	log logger.Logger,
 ) ([]scaecosystems.SCAResult, error) {
 	var results []scaecosystems.SCAResult
-	_, err := plugin.buildResults(ctx, sbom, lockFilePath, lockFileDir, opts, log, func(r scaecosystems.SCAResult) error {
+	scan := scanState{versionBuildInfo: map[string]string{}}
+	_, err := plugin.buildResults(ctx, sbom, lockFilePath, lockFileDir, scan, opts, log, func(r scaecosystems.SCAResult) error {
 		results = append(results, r)
 		return nil
 	})

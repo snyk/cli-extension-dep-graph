@@ -14,6 +14,14 @@ import (
 
 type mockCmdExecutor struct {
 	executeFunc func(binary, dir string, args ...string) ([]byte, error)
+	versionFunc func(binary string) ([]byte, error)
+}
+
+func (m *mockCmdExecutor) VersionOutput(binary string) ([]byte, error) {
+	if m.versionFunc != nil {
+		return m.versionFunc(binary)
+	}
+	return []byte("uv 0.12.22\n"), nil
 }
 
 func (m *mockCmdExecutor) Execute(binary, dir string, args ...string) ([]byte, error) {

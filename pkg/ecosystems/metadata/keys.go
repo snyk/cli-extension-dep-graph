@@ -8,6 +8,7 @@ const (
 
 	// Python ecosystem.
 	PythonVersion = "pythonVersion"
+	UvVersion     = "uvVersion"
 
 	// General build info.
 	BuildTimestamp = "buildTimestamp"
