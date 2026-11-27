@@ -107,8 +107,15 @@ func (p Plugin) BuildDepGraphsFromDir(
 
 	naming := newProjectNaming(dir, options)
 
+	// Nil unless asked for, which keeps every graph exactly as it was
+	// without the flag.
+	var labeler *componentLabeler
+	if options.Global.IncludeComponentMetadata {
+		labeler = newComponentLabeler(log)
+	}
+
 	for _, file := range files {
-		if err := p.emitResults(ctx, log, file, options, naming, filter, onGraph); err != nil {
+		if err := p.emitResults(ctx, log, file, options, naming, filter, labeler, onGraph); err != nil {
 			return err
 		}
 	}
@@ -204,13 +211,14 @@ func (p Plugin) emitResults(
 	options *ecosystems.SCAPluginOptions,
 	naming projectNaming,
 	filter *targetFrameworkFilter,
+	labeler *componentLabeler,
 	onGraph ecosystems.OnGraphFunc,
 ) error {
 	if filepath.Base(file.Path) == projectAssetsFile {
-		return p.emitAssetsResults(ctx, log, file, options, naming, filter, onGraph)
+		return p.emitAssetsResults(ctx, log, file, options, naming, filter, labeler, onGraph)
 	}
 
-	return p.emitFrameworkResult(ctx, log, file, options, naming, filter, onGraph)
+	return p.emitFrameworkResult(ctx, log, file, options, naming, filter, labeler, onGraph)
 }
 
 // projectNaming decides the root name and target file a project is reported
@@ -298,6 +306,7 @@ func (p Plugin) emitAssetsResults(
 	options *ecosystems.SCAPluginOptions,
 	naming projectNaming,
 	filter *targetFrameworkFilter,
+	labeler *componentLabeler,
 	onGraph ecosystems.OnGraphFunc,
 ) error {
 	targetFile := file.RelPath
@@ -385,6 +394,8 @@ func (p Plugin) emitAssetsResults(
 
 			continue
 		}
+
+		labeler.labelAssetsGraph(ctx, graph, assets)
 
 		result := p.newResult(reported, claimed, rootName, framework)
 		result.DepGraph = graph
@@ -650,6 +661,7 @@ func (p Plugin) emitFrameworkResult(
 	options *ecosystems.SCAPluginOptions,
 	naming projectNaming,
 	filter *targetFrameworkFilter,
+	labeler *componentLabeler,
 	onGraph ecosystems.OnGraphFunc,
 ) error {
 	targetFile := file.RelPath
@@ -726,6 +738,8 @@ func (p Plugin) emitFrameworkResult(
 	if err != nil {
 		return deferToLegacy(ctx, log, targetFile, err)
 	}
+
+	labeler.labelFrameworkGraph(ctx, graph, installed, packagesFolder)
 
 	result := p.newResult(identityFile, claimed, rootName, framework.original)
 	result.DepGraph = graph
