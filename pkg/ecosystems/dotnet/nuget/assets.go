@@ -162,8 +162,8 @@ func (a *projectAssets) UnmarshalJSON(data []byte) error {
 		ProjectFileDependencyGroups map[string][]string                       `json:"projectFileDependencyGroups"`
 		Project                     json.RawMessage                           `json:"project"`
 		Logs                        []assetsLog                               `json:"logs"`
-		PackageFolders              orderedMap[json.RawMessage]               `json:"packageFolders"`
-		Libraries                   map[string]assetsLibrary                  `json:"libraries"`
+		PackageFolders              json.RawMessage                           `json:"packageFolders"`
+		Libraries                   json.RawMessage                           `json:"libraries"`
 	}
 
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -173,8 +173,15 @@ func (a *projectAssets) UnmarshalJSON(data []byte) error {
 	a.Targets = raw.Targets
 	a.ProjectFileDependencyGroups = raw.ProjectFileDependencyGroups
 	a.Logs = raw.Logs
-	a.PackageFolders = raw.PackageFolders
-	a.Libraries = raw.Libraries
+	// packageFolders and libraries feed only component metadata labels. They
+	// are decoded leniently, so a shape the graph never needed cannot fail the
+	// file: an unexpected one leaves them empty and the packages unlabeled.
+	if json.Unmarshal(raw.PackageFolders, &a.PackageFolders) != nil {
+		a.PackageFolders = orderedMap[json.RawMessage]{}
+	}
+	if json.Unmarshal(raw.Libraries, &a.Libraries) != nil {
+		a.Libraries = nil
+	}
 	a.projectPresent = len(raw.Project) > 0 && string(raw.Project) != "null"
 
 	if a.projectPresent {

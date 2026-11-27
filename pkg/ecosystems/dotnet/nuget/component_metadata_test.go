@@ -225,6 +225,35 @@ func TestComponentMetadata_FlagOffLeavesOutputUnchanged(t *testing.T) {
 	})
 }
 
+// packageFolders and libraries feed only the labels. Shapes NuGet never writes
+// but main accepted must still parse, flag off or on, and leave the graph as
+// it was; with the flag on they just leave packages unlabeled.
+func TestComponentMetadata_UnexpectedLabelFieldShapesStillParse(t *testing.T) {
+	bare, _, _ := restoredProject(t)
+	want := graphJSON(t, scanWith(t, Plugin{}, bare, ecosystems.NewPluginOptions()))
+
+	for name, edit := range map[string]func(assets map[string]any){
+		"packageFolders as an array": func(assets map[string]any) {
+			assets["packageFolders"] = []any{"/folder"}
+		},
+		"a library type that is not a string": func(assets map[string]any) {
+			object(t, assets, "libraries", "Castle.Core/4.4.1")["type"] = 1
+		},
+		"a library given as a string": func(assets map[string]any) {
+			object(t, assets, "libraries")["Castle.Core/4.4.1"] = "package"
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir, first, _ := restoredProject(t)
+			install(t, first, castleCore)
+			editAssets(t, dir, edit)
+
+			assert.Equal(t, want, graphJSON(t, scanWith(t, Plugin{}, dir, ecosystems.NewPluginOptions())))
+			assert.NotContains(t, graphJSON(t, scanWith(t, Plugin{}, dir, withMetadata())), "hash:")
+		})
+	}
+}
+
 func TestComponentMetadata_SHA512Sidecar(t *testing.T) {
 	t.Run("found in the first package folder", func(t *testing.T) {
 		dir, first, _ := restoredProject(t)
