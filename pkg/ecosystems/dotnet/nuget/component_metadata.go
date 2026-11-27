@@ -66,16 +66,22 @@ type componentLabeler struct {
 	log logger.Logger
 	// labels caches each artifact's labels, since the same package recurs
 	// across frameworks and projects and hashing a .nupkg is not free.
-	labels map[labelKey]componentmetadata.Labels
+	labels map[artifact]componentmetadata.Labels
+	// global caches PackageReference labels, keyed by package and the
+	// folders searched, since projects can list different folders.
+	global map[globalKey]componentmetadata.Labels
 }
 
-type labelKey struct {
-	artifact
-	withURL bool
+type globalKey struct {
+	id, version, folders string
 }
 
 func newComponentLabeler(log logger.Logger) *componentLabeler {
-	return &componentLabeler{log: log, labels: make(map[labelKey]componentmetadata.Labels)}
+	return &componentLabeler{
+		log:    log,
+		labels: make(map[artifact]componentmetadata.Labels),
+		global: make(map[globalKey]componentmetadata.Labels),
+	}
 }
 
 // labelAssetsGraph labels a PackageReference project's graph from the global
@@ -104,12 +110,7 @@ func (c *componentLabeler) labelAssetsGraph(ctx context.Context, graph *godepgra
 			return nil
 		}
 
-		found, ok := locateGlobalPackage(folders, name, version)
-		if !ok {
-			return nil
-		}
-
-		return c.artifactLabels(ctx, labelKey{artifact: found, withURL: true}, name, version)
+		return c.globalPackageLabels(ctx, folders, name, version)
 	})
 }
 
@@ -140,7 +141,7 @@ func (c *componentLabeler) labelFrameworkGraph(
 
 		found := artifact{dir: packageDir(packagesFolder, pkg), stem: name + "." + version}
 
-		return c.artifactLabels(ctx, labelKey{artifact: found}, name, version)
+		return c.artifactLabels(ctx, found)
 	})
 }
 
@@ -171,15 +172,23 @@ func labelNodes(graph *godepgraph.DepGraph, labelsOf func(name, version string) 
 	}
 }
 
-// locateGlobalPackage finds a package in a global packages folder layout
-// (<folder>/<id>/<version>/, lowercased). The folder holding the .nupkg.sha512
-// wins; failing that, the first holding the .nupkg, which is then hashed.
-// Everything labeled comes from that one folder, so the hash and the URL
-// describe the same file.
-func locateGlobalPackage(folders []string, name, version string) (artifact, bool) {
+// globalPackageLabels labels a package from a global packages folder layout
+// (<folder>/<id>/<version>/, lowercased), searching the folders in order. The
+// first folder with a valid .nupkg.sha512 wins; failing that, the first whose
+// .nupkg can be hashed. A folder whose sidecar is malformed does not stop the
+// search, so a valid hash in a later folder is still found. The URL comes from
+// the .nupkg.metadata in the folder the hash came from, so both describe the
+// same file; with no hash, from the first folder that holds the package at all.
+// This matches snyk-nuget-plugin's packageReferenceLabels.
+func (c *componentLabeler) globalPackageLabels(ctx context.Context, folders []string, name, version string) componentmetadata.Labels {
 	id, ver := strings.ToLower(name), strings.ToLower(version)
 	if !safePathSegments(id, ver) {
-		return artifact{}, false
+		return nil
+	}
+
+	key := globalKey{id: id, version: ver, folders: strings.Join(folders, "\x00")}
+	if cached, ok := c.global[key]; ok {
+		return cached
 	}
 
 	candidates := make([]artifact, 0, len(folders))
@@ -187,11 +196,51 @@ func locateGlobalPackage(folders []string, name, version string) (artifact, bool
 		candidates = append(candidates, artifact{dir: filepath.Join(folder, id, ver), stem: id + "." + ver})
 	}
 
-	for _, suffix := range []string{sha512SidecarExt, nupkgExt} {
-		for _, candidate := range candidates {
-			if isRegularFile(candidate.path(suffix)) {
-				return candidate, true
-			}
+	labels := componentmetadata.Labels{}
+	hashed, ok := c.firstHashed(ctx, labels, candidates)
+	if !ok {
+		hashed, ok = firstInstalled(candidates)
+	}
+
+	if ok {
+		if source, found := c.feedSource(ctx, hashed); found {
+			labels.AddDistributionURL(distributionURL(source, name, version))
+		}
+	}
+
+	if len(labels) == 0 {
+		labels = nil
+	}
+
+	c.global[key] = labels
+
+	return labels
+}
+
+// firstHashed adds the hash of the first candidate with a valid sidecar, or
+// failing that the first whose .nupkg can be hashed, and returns it.
+func (c *componentLabeler) firstHashed(ctx context.Context, labels componentmetadata.Labels, candidates []artifact) (artifact, bool) {
+	for _, candidate := range candidates {
+		if c.addSidecarHash(ctx, labels, candidate) {
+			return candidate, true
+		}
+	}
+
+	for _, candidate := range candidates {
+		if c.addNupkgHash(ctx, labels, candidate) {
+			return candidate, true
+		}
+	}
+
+	return artifact{}, false
+}
+
+// firstInstalled returns the first candidate holding a .nupkg.sha512 or
+// .nupkg. Metadata alone is not an artifact, so it is not enough.
+func firstInstalled(candidates []artifact) (artifact, bool) {
+	for _, candidate := range candidates {
+		if isRegularFile(candidate.path(sha512SidecarExt)) || isRegularFile(candidate.path(nupkgExt)) {
+			return candidate, true
 		}
 	}
 
@@ -216,23 +265,16 @@ func isRegularFile(path string) bool {
 	return err == nil && info.Mode().IsRegular()
 }
 
-// artifactLabels returns the hash and, if asked, the distribution URL for one
-// .nupkg.
-func (c *componentLabeler) artifactLabels(ctx context.Context, key labelKey, name, version string) componentmetadata.Labels {
-	if cached, ok := c.labels[key]; ok {
+// artifactLabels returns the hash of one packages folder .nupkg.
+func (c *componentLabeler) artifactLabels(ctx context.Context, a artifact) componentmetadata.Labels {
+	if cached, ok := c.labels[a]; ok {
 		return cached
 	}
 
 	labels := componentmetadata.Labels{}
-	c.addHash(ctx, labels, key.artifact)
+	c.addHash(ctx, labels, a)
 
-	if key.withURL {
-		if source, ok := c.feedSource(ctx, key.artifact); ok {
-			labels.AddDistributionURL(distributionURL(source, name, version))
-		}
-	}
-
-	c.labels[key] = labels
+	c.labels[a] = labels
 
 	return labels
 }
@@ -242,25 +284,41 @@ func (c *componentLabeler) artifactLabels(ctx context.Context, key labelKey, nam
 // is never used: it is the package's content hash, which differs from the
 // file's for a signed package.
 func (c *componentLabeler) addHash(ctx context.Context, labels componentmetadata.Labels, a artifact) {
-	if sidecar, err := readRegularFile(a.path(sha512SidecarExt), maxSidecarBytes); err == nil {
-		if labels.AddBase64Hash("sha512", string(sidecar)) {
-			return
-		}
+	if !c.addSidecarHash(ctx, labels, a) {
+		c.addNupkgHash(ctx, labels, a)
+	}
+}
 
-		c.log.Debug(ctx, "Ignoring a .nupkg.sha512 that is not a base64 SHA-512",
-			logger.Attr(logFieldFile, a.path(sha512SidecarExt)))
+// addSidecarHash adds the hash from a's .nupkg.sha512, reporting whether it
+// was a valid base64 SHA-512.
+func (c *componentLabeler) addSidecarHash(ctx context.Context, labels componentmetadata.Labels, a artifact) bool {
+	sidecar, err := readRegularFile(a.path(sha512SidecarExt), maxSidecarBytes)
+	if err != nil {
+		return false
 	}
 
+	if labels.AddBase64Hash("sha512", string(sidecar)) {
+		return true
+	}
+
+	c.log.Debug(ctx, "Ignoring a .nupkg.sha512 that is not a base64 SHA-512",
+		logger.Attr(logFieldFile, a.path(sha512SidecarExt)))
+
+	return false
+}
+
+// addNupkgHash hashes a's .nupkg, reporting whether it could.
+func (c *componentLabeler) addNupkgHash(ctx context.Context, labels componentmetadata.Labels, a artifact) bool {
 	digest, err := fileSHA512Hex(ctx, a.path(nupkgExt))
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			c.log.Debug(ctx, "Could not hash a .nupkg", logger.Attr(logFieldFile, a.path(nupkgExt)), logger.Err(err))
 		}
 
-		return
+		return false
 	}
 
-	labels.AddHash("sha512", digest)
+	return labels.AddHash("sha512", digest)
 }
 
 // feedSource reads the feed a package was restored from.

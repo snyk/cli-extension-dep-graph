@@ -272,6 +272,23 @@ func TestComponentMetadata_SHA512Sidecar(t *testing.T) {
 		assert.Equal(t, standInSHA512, labels[castleNodeID]["hash:sha-512"])
 	})
 
+	// The first folder's malformed sidecar must not hide the second folder's
+	// valid one, and the URL comes from the folder the hash came from.
+	t.Run("a malformed sidecar in the first folder does not hide a valid one in the second", func(t *testing.T) {
+		dir, first, second := restoredProject(t)
+		firstDir := install(t, first, castleCore)
+		write(t, firstDir, "castle.core.4.4.1"+sha512SidecarExt, "not base64!")
+		writeSource(t, firstDir, customFeedIndex)
+		install(t, second, castleCore)
+
+		labels := labelsByNode(scanWith(t, Plugin{}, dir, withMetadata()))
+
+		assert.Equal(t, map[string]string{
+			"hash:sha-512":     castleCoreSHA512,
+			"distribution:url": castleCoreNuGetOrgURL,
+		}, labels[castleNodeID])
+	})
+
 	t.Run("a malformed sidecar with no .nupkg gives no hash", func(t *testing.T) {
 		dir, first, _ := restoredProject(t)
 		write(t, install(t, first, castleCore), "castle.core.4.4.1"+sha512SidecarExt, "c2hvcnQ=")
@@ -461,12 +478,12 @@ func TestComponentMetadata_Deterministic(t *testing.T) {
 
 // Ids and versions come from files in the scanned repository, so one that
 // would step out of the package folder is never looked up.
-func TestLocateGlobalPackage_RejectsPathSegments(t *testing.T) {
+func TestGlobalPackageLabels_RejectsPathSegments(t *testing.T) {
 	folder := t.TempDir()
+	labeler := newComponentLabeler(logger.Nop())
 
 	for _, pkg := range [][2]string{{"..", "."}, {"a/b", "1.0.0"}, {`a\b`, "1.0.0"}, {"a", ""}} {
-		_, ok := locateGlobalPackage([]string{folder}, pkg[0], pkg[1])
-		assert.False(t, ok, "%s %s", pkg[0], pkg[1])
+		assert.Nil(t, labeler.globalPackageLabels(t.Context(), []string{folder}, pkg[0], pkg[1]), "%s %s", pkg[0], pkg[1])
 	}
 }
 
