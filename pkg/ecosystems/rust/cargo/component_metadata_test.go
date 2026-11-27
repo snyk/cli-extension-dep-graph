@@ -71,15 +71,37 @@ func TestRegistryConfigs_DL(t *testing.T) {
 		assert.Equal(t, "http://[::1]:8080/dl", dl)
 	})
 
-	// Two dirs for one host may be two registries; even identical dl values
-	// do not say which one this source is, so no URL.
-	t.Run("several dirs for the host is ambiguous", func(t *testing.T) {
+	// Upgrading cargo across rust-lang/cargo#14917 leaves two dirs for one
+	// registry. When every dir has the same dl, the URL is the same whichever
+	// one this source is.
+	t.Run("several dirs with the same dl agree", func(t *testing.T) {
 		home := t.TempDir()
 		writeRegistryConfig(t, home, "reg.example-0123456789abcdef", `{"dl":"https://dl.example"}`)
 		writeRegistryConfig(t, home, "reg.example-fedcba9876543210", `{"dl":"https://dl.example"}`)
 
+		dl, ok := newRegistryConfigs(home).dl("https://reg.example/index")
+		require.True(t, ok)
+		assert.Equal(t, "https://dl.example", dl)
+	})
+
+	t.Run("several dirs with different dl values are ambiguous", func(t *testing.T) {
+		home := t.TempDir()
+		writeRegistryConfig(t, home, "reg.example-0123456789abcdef", `{"dl":"https://a.example"}`)
+		writeRegistryConfig(t, home, "reg.example-fedcba9876543210", `{"dl":"https://b.example"}`)
+
 		_, ok := newRegistryConfigs(home).dl("https://reg.example/index")
 		assert.False(t, ok)
+	})
+
+	// Cargo keeps the host's case in the dir name: an index URL with
+	// LOCALHOST is cached under LOCALHOST-<hash>.
+	t.Run("matches the dir name case-insensitively", func(t *testing.T) {
+		home := t.TempDir()
+		writeRegistryConfig(t, home, "LOCALHOST-9d94d3d6719014a8", `{"dl":"http://localhost:18777/dl"}`)
+
+		dl, ok := newRegistryConfigs(home).dl("sparse+http://LOCALHOST:18777/")
+		require.True(t, ok)
+		assert.Equal(t, "http://localhost:18777/dl", dl)
 	})
 
 	// Cargo's git index dirs hold .git and .cache but no config.json, so a

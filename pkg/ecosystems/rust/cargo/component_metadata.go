@@ -159,8 +159,11 @@ func cratePrefix(name string) string {
 // src/cargo/sources/registry/mod.rs), with the host as the url crate prints
 // it, so IPv6 hosts keep their brackets. The hash is of cargo's internal
 // SourceId and has changed between cargo releases, so it is not recomputed.
-// Instead the host must match exactly one dir, whether or not that dir has a
-// readable config.json: two dirs may be two registries on one host, and
+// Instead every dir whose name matches the host, compared case-insensitively
+// because cargo keeps the host's original case, must have a readable
+// config.json with the same dl. Two dirs can be one registry cached by two
+// cargo releases, or two registries on one host; when their dl values agree
+// the URL is the same either way, and when they differ, or one cannot be read,
 // which one is this source cannot be told.
 type registryConfigs struct {
 	cargoHome string
@@ -197,7 +200,7 @@ func (r *registryConfigs) lookup(indexURL string) (string, bool) {
 	if strings.Contains(host, ":") {
 		host = "[" + host + "]"
 	}
-	dirName := regexp.MustCompile(`^` + regexp.QuoteMeta(host) + `-[0-9a-f]{16}$`)
+	dirName := regexp.MustCompile(`(?i)^` + regexp.QuoteMeta(host) + `-[0-9a-f]{16}$`)
 
 	indexDir := filepath.Join(r.cargoHome, registryIndexPath)
 	entries, err := os.ReadDir(indexDir)
@@ -205,20 +208,18 @@ func (r *registryConfigs) lookup(indexURL string) (string, bool) {
 		return "", false
 	}
 
-	match := ""
+	found := ""
 	for _, e := range entries {
 		if !e.IsDir() || !dirName.MatchString(e.Name()) {
 			continue
 		}
-		if match != "" {
+		dl, ok := readRegistryDL(filepath.Join(indexDir, e.Name(), "config.json"))
+		if !ok || (found != "" && dl != found) {
 			return "", false
 		}
-		match = e.Name()
+		found = dl
 	}
-	if match == "" {
-		return "", false
-	}
-	return readRegistryDL(filepath.Join(indexDir, match, "config.json"))
+	return found, found != ""
 }
 
 func readRegistryDL(path string) (string, bool) {
