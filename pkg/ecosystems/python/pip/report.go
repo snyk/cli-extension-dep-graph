@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/snyk/error-catalog-golang-public/opensource/ecosystems"
@@ -142,6 +143,7 @@ func runPipInstall(
 
 	output, err := executor.Execute(ctx, stdinData, "pip", args...)
 	if err != nil {
+		attachPythonVersion(err)
 		return nil, classifyPipError(ctx, log, err)
 	}
 
@@ -190,10 +192,32 @@ func (e *DefaultExecutor) Execute(ctx context.Context, stdin, name string, args 
 	return stdout.Bytes(), nil
 }
 
+// detectPythonVersion is a seam for tests.
+var detectPythonVersion = GetPythonVersion
+
+// attachPythonVersion records the interpreter version on a pip error. It is called only
+// when pip has failed, so successful runs pay no extra process spawn.
+func attachPythonVersion(err error) {
+	var pipErr *pipError
+	if !errors.As(err, &pipErr) || pipErr.pythonVersion != "" {
+		return
+	}
+	// Only interpreter-mismatch failures use the version, so skip the spawn otherwise.
+	if !strings.Contains(pipErr.stderr, "Requires-Python") && !strings.Contains(pipErr.stderr, "requires Python") {
+		return
+	}
+	if v, vErr := detectPythonVersion(); vErr == nil {
+		pipErr.pythonVersion = v
+	}
+}
+
 // pipError wraps an error with stderr output from pip.
 type pipError struct {
 	err    error
 	stderr string
+	// pythonVersion is the interpreter version found on PATH when the failure was
+	// reported (empty if unknown). It is only populated on the error path.
+	pythonVersion string
 }
 
 func (e *pipError) Error() string {
@@ -202,6 +226,71 @@ func (e *pipError) Error() string {
 
 func (e *pipError) Unwrap() error {
 	return e.err
+}
+
+var pipUnsatisfiedPinRe = regexp.MustCompile(`Could not find a version that satisfies the requirement\s+([^\s=]+)==([^\s;,)]+)`)
+
+const pipIgnoredVersionsPrefix = "Ignored the following versions that require a different python version"
+
+// pinnedRequirement is an exact "name==version" pin that pip could not install because
+// that very version declares a Requires-Python the current interpreter does not satisfy.
+type pinnedRequirement struct {
+	name    string
+	version string
+	// requiresPython is the declared specifier (for example ">=3.11"), empty if not found.
+	requiresPython string
+}
+
+// findPinnedVersionRequiringDifferentPython returns the pinned requirement that pip rejected
+// because of its Requires-Python, or false when stderr does not show that exact situation.
+func findPinnedVersionRequiringDifferentPython(stderr string) (pinnedRequirement, bool) {
+	m := pipUnsatisfiedPinRe.FindStringSubmatch(stderr)
+	if m == nil || !strings.Contains(stderr, pipIgnoredVersionsPrefix) {
+		return pinnedRequirement{}, false
+	}
+	ignored := regexp.MustCompile(`(^|[\s;:])` + regexp.QuoteMeta(m[2]) + `\s+Requires-Python\s*([^;\n]*)`)
+	im := ignored.FindStringSubmatch(stderr)
+	if im == nil {
+		return pinnedRequirement{}, false
+	}
+	return pinnedRequirement{name: m[1], version: m[2], requiresPython: strings.TrimSpace(im[2])}, true
+}
+
+// pinnedVersionRequiresDifferentPython reports whether pip could not install an exact
+// "name==version" pin because that very version declares a Requires-Python the current
+// interpreter does not satisfy.
+func pinnedVersionRequiresDifferentPython(stderr string) bool {
+	_, ok := findPinnedVersionRequiringDifferentPython(stderr)
+	return ok
+}
+
+// unsupportedPythonVersionError builds the catalog error for an interpreter/Requires-Python
+// mismatch. This extension is used both by the Snyk CLI (which runs whatever python and pip are
+// first on PATH) and by SCM scans (where the Python version comes from the project's .snyk
+// file or the organization settings). The extension cannot tell which one it is running in,
+// so the message explains the fix for both.
+func unsupportedPythonVersionError(pipErr *pipError) error {
+	var headline string
+	pin, hasPin := findPinnedVersionRequiringDifferentPython(pipErr.stderr)
+	switch {
+	case hasPin && pin.requiresPython != "" && pipErr.pythonVersion != "":
+		headline = fmt.Sprintf("%s %s requires Python %s, but this scan used Python %s.",
+			pin.name, pin.version, pin.requiresPython, pipErr.pythonVersion)
+	case hasPin && pin.requiresPython != "":
+		headline = fmt.Sprintf("%s %s requires Python %s, which is different from the Python used for this scan.",
+			pin.name, pin.version, pin.requiresPython)
+	case pipErr.pythonVersion != "":
+		headline = fmt.Sprintf("A dependency in your requirements needs a different Python version than the one used for this scan (Python %s).",
+			pipErr.pythonVersion)
+	default:
+		headline = "A dependency in your requirements needs a different Python version than the one used for this scan."
+	}
+	msg := fmt.Sprintf("Python version mismatch: %s\n\n%s\n"+
+		"- Snyk CLI: put a compatible interpreter first on your PATH (for example an activated virtual environment) "+
+		"and make sure pip belongs to the same interpreter.\n"+
+		"- SCM integration: set the Python version in your project's .snyk file or in your organization's Python settings.",
+		pipErr.stderr, headline)
+	return ecosystems.NewPipUnsupportedPythonVersionError(msg, snyk_errors.WithCause(errors.New(pipErr.stderr)))
 }
 
 // classifyPipError analyzes pip error output and returns appropriate error catalog error.
@@ -240,6 +329,15 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 		)
 	}
 
+	// When a pinned version cannot be installed because it needs a newer interpreter, pip
+	// prints both an "Ignored ... Requires-Python" line that names that exact version and
+	// "No matching distribution". The interpreter mismatch is the actionable cause, so it
+	// must win over package-not-found. A bare "Requires-Python" is not enough: pip also
+	// prints that line for unrelated packages, even when the requested one does not exist.
+	if pinnedVersionRequiresDifferentPython(stderr) {
+		return unsupportedPythonVersionError(pipErr)
+	}
+
 	// Check for package not found errors
 	if strings.Contains(stderr, "Could not find a version") ||
 		strings.Contains(stderr, "No matching distribution") ||
@@ -253,10 +351,7 @@ func classifyPipError(ctx context.Context, log logger.Logger, err error) error {
 	// Check for Python version mismatch
 	if strings.Contains(stderr, "requires Python") ||
 		strings.Contains(stderr, "Requires-Python") {
-		return ecosystems.NewPipUnsupportedPythonVersionError(
-			fmt.Sprintf("Python version mismatch: %s", stderr),
-			snyk_errors.WithCause(errors.New(stderr)),
-		)
+		return unsupportedPythonVersionError(pipErr)
 	}
 
 	// Check for conflicting requirements
