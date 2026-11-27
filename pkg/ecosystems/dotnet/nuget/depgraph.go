@@ -19,12 +19,7 @@ const pkgManager = "nuget"
 // overrides it reads from the host SDK's PackageOverrides.txt: that needs a .NET
 // SDK, so the versions the assets file resolved are reported instead. See
 // CMPA-714.
-func buildDepGraph(ctx context.Context, assets *projectAssets, rootName, targetsKey string) (*godepgraph.DepGraph, error) {
-	rootVersion := assets.Project.Version
-	if rootVersion == "" {
-		rootVersion = defaultVersion
-	}
-
+func buildDepGraph(ctx context.Context, assets *projectAssets, rootName, rootVersion, targetsKey string) (*godepgraph.DepGraph, error) {
 	builder, err := godepgraph.NewBuilder(
 		&godepgraph.PkgManager{Name: pkgManager},
 		&godepgraph.PkgInfo{Name: rootName, Version: rootVersion},

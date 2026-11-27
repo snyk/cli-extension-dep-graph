@@ -12,7 +12,7 @@ const packagesConfigManifest = `<?xml version="1.0" encoding="utf-8"?>
 // only resolves with a .csproj beside it.
 const projectJSONManifest = `{"dependencies": {"Newtonsoft.Json": "8.0.3", "RouteMagic": "1.3"}}`
 
-const csprojNet45 = `<Project><PropertyGroup><TargetFramework>net45</TargetFramework></PropertyGroup></Project>`
+const csprojNet45 = `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net45</TargetFramework></PropertyGroup></Project>`
 
 // singleTargetAssets is a valid net8.0 assets file with one direct dependency
 // and one transitive one. It stands in wherever a test needs a resolvable

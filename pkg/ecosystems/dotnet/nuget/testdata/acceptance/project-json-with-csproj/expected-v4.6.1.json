@@ -26,10 +26,9 @@
       }
     },
     {
-      "id": "project-json-with-csproj@0.0.0",
+      "id": "project@",
       "info": {
-        "name": "project-json-with-csproj",
-        "version": "0.0.0"
+        "name": "project"
       }
     }
   ],
@@ -53,7 +52,7 @@
       },
       {
         "nodeId": "root-node",
-        "pkgId": "project-json-with-csproj@0.0.0",
+        "pkgId": "project@",
         "deps": [
           {
             "nodeId": "Microsoft.Web.Infrastructure@1.0.0.0"
