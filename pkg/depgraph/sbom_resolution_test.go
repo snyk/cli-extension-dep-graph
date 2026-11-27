@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -28,7 +29,6 @@ import (
 	"github.com/snyk/cli-extension-dep-graph/v2/internal/mocks"
 	"github.com/snyk/cli-extension-dep-graph/v2/internal/workflow"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems"
-	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/legacy"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/logger"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/ecosystems/python/uv"
 	"github.com/snyk/cli-extension-dep-graph/v2/pkg/identity"
@@ -112,10 +112,12 @@ type LegacyHarness struct {
 
 // NewLegacyHarness wires `ctx.engine.InvokeWithConfig` to read from the harness's
 // Return* fields at invocation time and returns a harness wrapping a real legacy plugin.
-// Pass `harness.Plugin` into the scaPlugins list under test.
+// Pass `harness.Plugin` into the scaPlugins list under test. The plugin is built as
+// production builds it (newLegacyPlugin), so its graph mode follows
+// ConfigKeyKeepCallerGraphMode on ctx.config at construction time.
 func NewLegacyHarness(ctx *testContext) *LegacyHarness {
 	h := &LegacyHarness{
-		Plugin: legacy.NewPlugin(ctx.invocationContext),
+		Plugin: newLegacyPlugin(ctx.invocationContext),
 	}
 
 	ctx.engine.EXPECT().
@@ -127,7 +129,7 @@ func NewLegacyHarness(ctx *testContext) *LegacyHarness {
 				return nil, h.ReturnError
 			}
 
-			payload := h.buildPayload()
+			payload := h.buildPayload(cfg.GetStringSlice(configuration.RAW_CMD_ARGS))
 			if payload == "" {
 				return []gafworkflow.Data{}, nil
 			}
@@ -144,17 +146,24 @@ func NewLegacyHarness(ctx *testContext) *LegacyHarness {
 	return h
 }
 
-// buildPayload turns the harness's configured Return* values into a JSONL payload.
-// ReturnLines wins if both are set.
-func (h *LegacyHarness) buildPayload() string {
+// buildPayload turns the harness's configured Return* values into the payload the
+// legacy CLI would print for args: plain text for a bare --print-graph, JSONL
+// otherwise. ReturnLines wins if both are set and is always emitted verbatim.
+func (h *LegacyHarness) buildPayload(args []string) string {
 	if len(h.ReturnLines) > 0 {
 		return strings.Join(h.ReturnLines, "\n")
 	}
 	if len(h.ReturnTargets) == 0 {
 		return ""
 	}
+	plainText := slices.Contains(args, "--print-graph") && !slices.Contains(args, "--print-output-jsonl-with-errors")
 	lines := make([]string, 0, len(h.ReturnTargets))
 	for _, tf := range h.ReturnTargets {
+		if plainText {
+			lines = append(lines, fmt.Sprintf(
+				"DepGraph data:\n{\"pkgManager\":{\"name\":\"npm\"}}\nDepGraph target:\n%s\nDepGraph end\n", tf))
+			continue
+		}
 		lines = append(lines, MakeLegacyJSONLLine(tf))
 	}
 	return strings.Join(lines, "\n")

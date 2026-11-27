@@ -10,6 +10,12 @@ const (
 	flagSetName = "depgraph"
 )
 
+// ConfigKeyKeepCallerGraphMode is the internal configuration key a caller sets
+// to have SBOM resolution hand its own graph flags to the legacy CLI instead of
+// forcing the effective graph with errors. cli-extension-sbom sets it for
+// `snyk sbom`. It is a configuration key, not a CLI flag.
+const ConfigKeyKeepCallerGraphMode = workflow.ConfigKeyKeepCallerGraphMode
+
 func getFlagSet() *pflag.FlagSet {
 	flagSet := pflag.NewFlagSet(flagSetName, pflag.ExitOnError)
 

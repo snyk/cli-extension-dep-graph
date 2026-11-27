@@ -277,6 +277,88 @@ func TestPlugin_DisablesEffectiveGraphWithErrorsWhenJSONLWithErrorsRequested(t *
 	assert.True(t, (*capturedConfig).GetBool(workflow.FlagPrintOutputJsonlWithErrors))
 }
 
+// TestPlugin_GraphModeCallerKeepsCallerGraphFlags pins SCAS-1054: in
+// GraphModeCaller the plugin hands the legacy CLI the graph flags the caller set,
+// so SBOM resolution asks for the same graph as the standard depgraph path.
+func TestPlugin_GraphModeCallerKeepsCallerGraphFlags(t *testing.T) {
+	cases := map[string]struct {
+		callerFlags   map[string]any
+		wantArgument  string
+		wantEffective bool
+		wantWithErrs  bool
+		wantJSONLErrs bool
+	}{
+		"no graph flags: raw graph":                 {callerFlags: map[string]any{}, wantArgument: "--print-graph"},
+		"effective graph requested (-p)":            {callerFlags: map[string]any{workflow.FlagPrintEffectiveGraph: true}, wantArgument: "--print-effective-graph", wantEffective: true},
+		"JSONL with errors (allow-incomplete-sbom)": {callerFlags: map[string]any{workflow.FlagPrintOutputJsonlWithErrors: true}, wantArgument: "--print-graph", wantJSONLErrs: true},
+		"effective graph with errors and JSONL with errors": {
+			callerFlags:  map[string]any{workflow.FlagPrintEffectiveGraphWithErrors: true, workflow.FlagPrintOutputJsonlWithErrors: true},
+			wantArgument: "--print-effective-graph-with-errors", wantWithErrs: true, wantJSONLErrs: true,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ictx, capturedConfig := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`, tc.callerFlags)
+			plugin := legacy.NewPlugin(ictx, legacy.WithGraphMode(legacy.GraphModeCaller))
+
+			_, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
+			require.NoError(t, err)
+
+			cfg := *capturedConfig
+			assert.Equal(t, tc.wantEffective, cfg.GetBool(workflow.FlagPrintEffectiveGraph))
+			assert.Equal(t, tc.wantWithErrs, cfg.GetBool(workflow.FlagPrintEffectiveGraphWithErrors))
+			assert.Equal(t, tc.wantJSONLErrs, cfg.GetBool(workflow.FlagPrintOutputJsonlWithErrors))
+			args := cfg.GetStringSlice(configuration.RAW_CMD_ARGS)
+			require.GreaterOrEqual(t, len(args), 3)
+			assert.Equal(t, tc.wantArgument, args[2])
+		})
+	}
+}
+
+// TestPlugin_GraphModeDefaultForcesEffectiveGraphOverCallerFlags pins that the
+// default mode (the orchestrator registry, `snyk test`) still overrides the caller.
+func TestPlugin_GraphModeDefaultForcesEffectiveGraphOverCallerFlags(t *testing.T) {
+	preexisting := map[string]any{workflow.FlagPrintEffectiveGraph: true}
+	ictx, capturedConfig := setupLegacyCLI(t, `{"depGraph":{"pkgManager":{"name":"npm"}},"normalisedTargetFile":"package.json","target":{}}`, preexisting)
+	plugin := legacy.NewPlugin(ictx, legacy.WithGraphMode(legacy.GraphModeEffectiveWithErrors))
+
+	_, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
+	require.NoError(t, err)
+
+	assert.False(t, (*capturedConfig).GetBool(workflow.FlagPrintEffectiveGraph))
+	assert.True(t, (*capturedConfig).GetBool(workflow.FlagPrintEffectiveGraphWithErrors))
+}
+
+// TestPlugin_PlainTextAndJSONLGiveTheSameResult pins that the plain-text parser
+// (bare --print-graph, which GraphModeCaller now uses) yields the same graph and
+// project as the JSONL parser for the same CLI output. Both fixtures are
+// hand-written, not captured: they follow the shapes snyk/cli prints in
+// printDepGraph and printDepGraphJsonl (src/lib/snyk-test/common.ts:142-193,
+// main 67aee31b).
+func TestPlugin_PlainTextAndJSONLGiveTheSameResult(t *testing.T) {
+	graph := `{"schemaVersion":"1.3.0","pkgManager":{"name":"npm"},"pkgs":[{"id":"app@1.0.0","info":{"name":"app","version":"1.0.0"}},{"id":"lodash@4.17.21","info":{"name":"lodash","version":"4.17.21"}}],"graph":{"rootNodeId":"root-node","nodes":[{"nodeId":"root-node","pkgId":"app@1.0.0","deps":[{"nodeId":"lodash@4.17.21"}]},{"nodeId":"lodash@4.17.21","pkgId":"lodash@4.17.21","deps":[]}]}}`
+	plainBody := "DepGraph data:\n" + graph + "\nDepGraph target:\nsub/package.json\nDepGraph end\n\n"
+	jsonlBody := `{"depGraph":` + graph + `,"normalisedTargetFile":"sub/package.json","target":{}}`
+
+	run := func(body string, preexisting map[string]any) ecosystems.SCAResult {
+		ictx, _ := setupLegacyCLI(t, body, preexisting)
+		plugin := legacy.NewPlugin(ictx, legacy.WithGraphMode(legacy.GraphModeCaller))
+		results, err := scatest.Run(t.Context(), plugin, logger.Nop(), "", ecosystems.NewPluginOptions())
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		return results[0]
+	}
+	plain := run(plainBody, nil)
+	jsonl := run(jsonlBody, map[string]any{workflow.FlagPrintOutputJsonlWithErrors: true})
+
+	require.NotNil(t, plain.DepGraph)
+	assert.Equal(t, jsonl.DepGraph, plain.DepGraph)
+	assert.Equal(t, jsonl.ProjectDescriptor, plain.ProjectDescriptor)
+	assert.Equal(t, jsonl.ResolverMetadata, plain.ResolverMetadata)
+	assert.Equal(t, jsonl.ProcessedFiles, plain.ProcessedFiles)
+	assert.Equal(t, []string{"sub/package.json"}, plain.ProcessedFiles)
+}
+
 // TestPlugin_BuildLegacyConfig_WritesExcludePathsFromOpts covers the contract:
 // opts.Global.ExcludePaths is the canonical source for what the legacy CLI receives as
 // --exclude-paths. When non-empty, it overrides any pre-existing FlagExcludePaths on the

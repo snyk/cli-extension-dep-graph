@@ -41,3 +41,10 @@ const (
 	FlagUvWorkspacePackages = "internal-uv-workspace-packages"
 	FlagForceSingleGraph    = "force-single-graph"
 )
+
+// ConfigKeyKeepCallerGraphMode is an internal configuration key, not a CLI flag.
+// A caller sets it to have SBOM resolution hand its graph flags to the legacy CLI
+// unchanged (legacy.GraphModeCaller) instead of forcing the effective graph with
+// errors. cli-extension-sbom sets it so `snyk sbom` gets the same legacy graphs as
+// the standard depgraph path; `snyk test` (cli-extension-os-flows) does not.
+const ConfigKeyKeepCallerGraphMode = "internal-keep-caller-graph-mode"
