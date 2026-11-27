@@ -24,17 +24,34 @@ import (
 const PluginName = "uv"
 
 type Plugin struct {
-	client        Client
-	converter     conversion.SBOMConverter
-	remoteRepoURL string
+	client          Client
+	converter       conversion.SBOMConverter
+	remoteRepoURL   string
+	versionObserver func(version string)
 }
 
-func NewPlugin(client Client, converter conversion.SBOMConverter, remoteRepoURL string) Plugin {
-	return Plugin{
+// Option configures optional Plugin settings.
+type Option func(*Plugin)
+
+// WithVersionObserver passes the uv version to observe once per scan in which
+// it could be read, for example to report it to CLI analytics. The plugin has
+// no analytics sink of its own, so the caller that has one supplies it.
+func WithVersionObserver(observe func(version string)) Option {
+	return func(p *Plugin) {
+		p.versionObserver = observe
+	}
+}
+
+func NewPlugin(client Client, converter conversion.SBOMConverter, remoteRepoURL string, opts ...Option) Plugin {
+	p := Plugin{
 		client:        client,
 		converter:     converter,
 		remoteRepoURL: remoteRepoURL,
 	}
+	for _, opt := range opts {
+		opt(&p)
+	}
+	return p
 }
 
 func (p Plugin) GetName() string {
@@ -269,6 +286,9 @@ func (p Plugin) newScan(ctx context.Context, log logger.Logger, options *scaecos
 		version = ""
 	} else if version != "" {
 		scan.versionBuildInfo[resolvermeta.UvVersion] = version
+		if p.versionObserver != nil {
+			p.versionObserver(version)
+		}
 	}
 
 	if options.Global.IncludeComponentMetadata {

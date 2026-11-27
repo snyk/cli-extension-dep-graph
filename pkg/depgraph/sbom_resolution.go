@@ -67,9 +67,25 @@ func buildSCAPlugins(
 	}
 	return []ecosystems.SCAPlugin{
 		registry.NativePlugin(),
-		uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL),
+		uv.NewPlugin(uv.NewClient(), converter, remoteRepoURL, uv.WithVersionObserver(reportUvVersion(ctx))),
 		legacy.NewPlugin(ctx),
 	}, nil
+}
+
+// uvVersionAnalyticsKey names the CLI analytics extension carrying the uv
+// version, the evidence for when support for old uv versions can go.
+const uvVersionAnalyticsKey = "uvVersion"
+
+// reportUvVersion adds the uv version to the invocation's CLI analytics. The
+// plugin calls it once per scan, and only with a known version. It fetches the
+// analytics sink only then, so building the plugins touches no analytics, and
+// a missing sink is skipped rather than failing the scan.
+func reportUvVersion(ctx gafworkflow.InvocationContext) func(string) {
+	return func(version string) {
+		if a := ctx.GetAnalytics(); a != nil {
+			a.AddExtensionStringValue(uvVersionAnalyticsKey, version)
+		}
+	}
 }
 
 const errMsgNoSupportedProjects = "no supported projects detected"
