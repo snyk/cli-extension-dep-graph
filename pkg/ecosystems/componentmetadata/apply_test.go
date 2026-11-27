@@ -30,6 +30,12 @@ func TestLabels_ApplyTo(t *testing.T) {
 		assert.Equal(t, "original", node.Info.Labels["hash:sha-256"])
 	})
 
+	t.Run("hashes and URL from a second artifact are not mixed in", func(t *testing.T) {
+		node := &depgraph.Node{Info: &depgraph.NodeInfo{Labels: map[string]string{"hash:sha-256": "a1", "pruned": "true"}}}
+		componentmetadata.Labels{"hash:sha-512": "b2", "distribution:url": "https://h/b"}.ApplyTo(node)
+		assert.Equal(t, map[string]string{"hash:sha-256": "a1", "pruned": "true"}, node.Info.Labels)
+	})
+
 	t.Run("empty labels leave the node untouched", func(t *testing.T) {
 		node := &depgraph.Node{}
 		componentmetadata.Labels{}.ApplyTo(node)

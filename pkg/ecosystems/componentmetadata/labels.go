@@ -1,13 +1,6 @@
-// Package componentmetadata holds the dep-graph node label vocabulary that
-// sbom-export turns into CycloneDX hashes and distribution references, and
-// SPDX checksums. It describes the packages in a graph; the metadata package,
-// by contrast, holds keys describing the resolver that built it.
-//
-// Producers attach these labels to dep-graph nodes only when
-// --include-component-metadata is set. Keeping the vocabulary in one place
-// stops each Go resolver drifting from the contract sbom-export enforces:
-// sbom-export silently drops a hash whose key or digest it does not
-// recognize, so a mislabelled hash is lost rather than reported.
+// Package componentmetadata holds the dep-graph node labels that sbom-export
+// turns into SBOM hashes and distribution references. Producers add them only
+// when --include-component-metadata is set.
 package componentmetadata
 
 import (
@@ -28,9 +21,8 @@ const (
 	DistributionURLLabel = "distribution:url"
 )
 
-// hexLengths mirrors sbom-export's hashAlgorithms table
-// (internal/sbom/hashes.go): the algorithms it accepts, keyed by canonical
-// label suffix, with the hex width a valid digest must have.
+// hexLengths mirrors the hash algorithms sbom-export accepts, keyed by
+// canonical label suffix, with the hex width a valid digest must have.
 var hexLengths = map[string]int{
 	"md5":      32,
 	"sha-1":    40,
@@ -64,30 +56,43 @@ func CanonicalAlgorithm(name string) (string, bool) {
 }
 
 // Labels collects component-metadata labels for one dep-graph node. Every
-// hash in it must describe the same artifact as its distribution URL.
-// Create it with Labels{}: like any map, a nil Labels panics on the first add.
+// hash in it must describe the same artifact as its distribution URL. The zero
+// value is ready to use.
 type Labels map[string]string
+
+func (l *Labels) set(key, value string) {
+	if *l == nil {
+		*l = Labels{}
+	}
+	(*l)[key] = value
+}
 
 // AddHash adds a hex digest under its canonical key. It reports false, and
 // adds nothing, when the algorithm is unsupported or the digest is not hex of
-// the algorithm's width, the same checks sbom-export applies.
-func (l Labels) AddHash(algorithm, hexDigest string) bool {
+// the algorithm's width, the same checks sbom-export applies. Surrounding
+// whitespace is trimmed.
+func (l *Labels) AddHash(algorithm, hexDigest string) bool {
 	alg, ok := CanonicalAlgorithm(algorithm)
-	if !ok || len(hexDigest) != hexLengths[alg] {
+	digest := strings.ToLower(strings.TrimSpace(hexDigest))
+	if !ok || len(digest) != hexLengths[alg] {
 		return false
 	}
-	lower := strings.ToLower(hexDigest)
-	if _, err := hex.DecodeString(lower); err != nil {
+	if _, err := hex.DecodeString(digest); err != nil {
 		return false
 	}
-	l[HashLabelPrefix+alg] = lower
+	l.set(HashLabelPrefix+alg, digest)
 	return true
 }
 
-// AddBase64Hash adds a base64 digest, such as NuGet's .nupkg.sha512, after
-// converting it to hex, since sbom-export drops non-hex values.
-func (l Labels) AddBase64Hash(algorithm, b64Digest string) bool {
-	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(b64Digest))
+// AddBase64Hash adds a base64 digest, padded or not, such as NuGet's
+// .nupkg.sha512, after converting it to hex, since sbom-export drops non-hex
+// values.
+func (l *Labels) AddBase64Hash(algorithm, b64Digest string) bool {
+	trimmed := strings.TrimSpace(b64Digest)
+	raw, err := base64.StdEncoding.DecodeString(trimmed)
+	if err != nil {
+		raw, err = base64.RawStdEncoding.DecodeString(trimmed)
+	}
 	if err != nil {
 		return false
 	}
@@ -95,32 +100,22 @@ func (l Labels) AddBase64Hash(algorithm, b64Digest string) bool {
 }
 
 // AddDistributionURL adds a sanitized artifact URL. It reports false, and adds
-// nothing, when the URL is not an absolute http or https URL.
-func (l Labels) AddDistributionURL(rawURL string) bool {
+// nothing, when SanitizeURL rejects it.
+func (l *Labels) AddDistributionURL(rawURL string) bool {
 	clean, ok := SanitizeURL(rawURL)
 	if !ok {
 		return false
 	}
-	l[DistributionURLLabel] = clean
+	l.set(DistributionURLLabel, clean)
 	return true
 }
 
-// SanitizeURL reduces a URL to its identity before it becomes a label:
-// credentials, query string and fragment are removed, because any of them can
-// carry authentication material and none identifies the artifact. Private
-// hosts are kept; naming an internal registry is the point of the label. ok is
-// false for anything other than an absolute http or https URL, which rules out
-// path, file and VCS sources.
+// SanitizeURL strips credentials, query string and fragment from an absolute
+// http or https URL, trims it and lowercases the host. ok is false for any
+// other URL, and for a MyGet pre-authenticated feed URL (/F/<feed>/auth/<key>/).
 //
-// A MyGet pre-authenticated feed URL (/F/<feed>/auth/<key>/) is rejected
-// outright: the API key is in the path, and
-// a missing URL costs far less than a key in a shared SBOM. Other tokens
-// embedded in a path cannot be recognized and are kept, as in the TypeScript
-// producers.
-//
-// Surrounding whitespace is trimmed and the host lowercased, as the WHATWG URL
-// parser does in the TypeScript producers (snyk-poetry-lockfile-parser), so a
-// package gets the same label whichever resolver produced it.
+// It does not find other tokens embedded in a path. Each resolver remains
+// responsible for its own registries' URL shapes.
 func SanitizeURL(rawURL string) (string, bool) {
 	u, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
@@ -153,10 +148,10 @@ func hasAuthSegment(path string) bool {
 }
 
 // ApplyTo merges the labels into a dep-graph node, keeping any label the node
-// already has: a producer's own labels (pruned, scope) describe the node and
-// must not be overwritten by metadata about its artifact. NodeInfo is created
-// only when there is something to add, so a node without metadata serializes
-// exactly as before.
+// already has. Hashes and the distribution URL are applied as one group: if
+// the node already has any of them, none are added, so a node never mixes
+// metadata from two artifacts. NodeInfo is created only when there is
+// something to add.
 func (l Labels) ApplyTo(node *depgraph.Node) {
 	if len(l) == 0 {
 		return
@@ -167,9 +162,26 @@ func (l Labels) ApplyTo(node *depgraph.Node) {
 	if node.Info.Labels == nil {
 		node.Info.Labels = make(map[string]string, len(l))
 	}
+	skipArtifact := hasArtifactLabel(node.Info.Labels)
 	for k, v := range l {
+		if skipArtifact && isArtifactLabel(k) {
+			continue
+		}
 		if _, exists := node.Info.Labels[k]; !exists {
 			node.Info.Labels[k] = v
 		}
 	}
+}
+
+func isArtifactLabel(key string) bool {
+	return key == DistributionURLLabel || strings.HasPrefix(key, HashLabelPrefix)
+}
+
+func hasArtifactLabel(labels map[string]string) bool {
+	for k := range labels {
+		if isArtifactLabel(k) {
+			return true
+		}
+	}
+	return false
 }

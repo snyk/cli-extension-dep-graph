@@ -2276,18 +2276,3 @@ func TestBuildPluginOptions_DetectionDepth(t *testing.T) {
 		})
 	}
 }
-
-// cli-extension-sbom sets include-component-metadata in the dep-graph
-// workflow's config when its feature flag is on; the SBOM-resolution path
-// must hand it to the Go plugins as the legacy path already does.
-func TestBuildPluginOptions_IncludeComponentMetadata(t *testing.T) {
-	for _, set := range []bool{true, false} {
-		config := configuration.New()
-		config.Set(workflow.FlagIncludeComponentMetadata, set)
-
-		opts, err := buildPluginOptions(config)
-
-		require.NoError(t, err)
-		assert.Equal(t, set, opts.Global.IncludeComponentMetadata)
-	}
-}

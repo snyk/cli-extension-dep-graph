@@ -93,8 +93,27 @@ func TestLabels_AddBase64Hash(t *testing.T) {
 	assert.True(t, l.AddBase64Hash("sha512", b64))
 	assert.Equal(t, componentmetadata.Labels{"hash:sha-512": hex}, l)
 
-	assert.False(t, componentmetadata.Labels{}.AddBase64Hash("sha512", "not base64!"))
-	assert.False(t, componentmetadata.Labels{}.AddBase64Hash("sha256", b64), "wrong width for the algorithm")
+	unpadded := componentmetadata.Labels{}
+	assert.True(t, unpadded.AddBase64Hash("sha512", strings.TrimRight(b64, "=")))
+	assert.Equal(t, l, unpadded)
+
+	var rejected componentmetadata.Labels
+	assert.False(t, rejected.AddBase64Hash("sha512", "not base64!"))
+	assert.False(t, rejected.AddBase64Hash("sha256", b64), "wrong width for the algorithm")
+	assert.Empty(t, rejected)
+}
+
+func TestLabels_ZeroValue(t *testing.T) {
+	var l componentmetadata.Labels
+	assert.True(t, l.AddHash("sha256", strings.Repeat("a", 64)))
+	assert.True(t, l.AddDistributionURL("https://h/x"))
+	assert.Len(t, l, 2)
+}
+
+func TestLabels_AddHashTrimsWhitespace(t *testing.T) {
+	l := componentmetadata.Labels{}
+	assert.True(t, l.AddHash("sha256", strings.Repeat("a", 64)+"\n"))
+	assert.Equal(t, strings.Repeat("a", 64), l["hash:sha-256"])
 }
 
 func TestSanitizeURL(t *testing.T) {

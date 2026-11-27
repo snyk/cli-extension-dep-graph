@@ -37,6 +37,7 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 				"--init-script", "custom.gradle",
 				"--gradle-skip-wrapper",
 				"--include-provenance",
+				"--include-component-metadata",
 				"--bazel-target-query", "kind('go_binary', //...)",
 				"--bazel-max-targets", "50",
 				"--bazel-go",
@@ -55,6 +56,7 @@ func TestNewPluginOptionsFromRawFlags_AllFields(t *testing.T) {
 					ForceSingleGraph:              true,
 					ForceIncludeWorkspacePackages: true,
 					IncludeProvenance:             true,
+					IncludeComponentMetadata:      true,
 					DetectionDepth:                3,
 				},
 				Python: PythonOptions{
@@ -524,16 +526,6 @@ func TestNewPluginOptionsFromRawFlags_TargetFile(t *testing.T) {
 		require.NotNil(t, opts.Global.TargetFile, rawFlags)
 		assert.Equal(t, "obj/project.assets.json", *opts.Global.TargetFile, rawFlags)
 	}
-}
-
-func TestNewPluginOptionsFromRawFlags_IncludeComponentMetadata(t *testing.T) {
-	got, err := NewPluginOptionsFromRawFlags([]string{"--include-component-metadata"})
-	assert.NoError(t, err)
-	assert.True(t, got.Global.IncludeComponentMetadata)
-
-	got, err = NewPluginOptionsFromRawFlags([]string{})
-	assert.NoError(t, err)
-	assert.False(t, got.Global.IncludeComponentMetadata)
 }
 
 func TestWithIncludeComponentMetadata(t *testing.T) {

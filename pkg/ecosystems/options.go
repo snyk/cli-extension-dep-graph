@@ -332,8 +332,8 @@ func (o *SCAPluginOptions) WithIncludeProvenance(includeProvenance bool) *SCAPlu
 	return o
 }
 
-func (o *SCAPluginOptions) WithIncludeComponentMetadata(include bool) *SCAPluginOptions {
-	o.Global.IncludeComponentMetadata = include
+func (o *SCAPluginOptions) WithIncludeComponentMetadata(includeComponentMetadata bool) *SCAPluginOptions {
+	o.Global.IncludeComponentMetadata = includeComponentMetadata
 	return o
 }
 
